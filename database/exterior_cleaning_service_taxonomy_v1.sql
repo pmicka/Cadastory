@@ -2,6 +2,9 @@
 -- Exterior-cleaning service taxonomy + workflow model.
 -- Consolidated source-of-truth migration for the production changes deployed 2026-09-07.
 
+-- NOTE: commercial services describe what the customer buys. Cleaning workflows describe how an operator executes that service.
+-- Pressure washing and soft washing are execution workflows under Building Envelope Cleaning, not separate commercial services.
+
 -- Commercial service taxonomy -------------------------------------------------
 do $$
 declare v_parent uuid;
@@ -329,7 +332,8 @@ begin
                     r.comparator='exists' or
                     (r.comparator='equals' and ((r.value_boolean is not null and e.value_boolean is not distinct from r.value_boolean) or (r.value_numeric is not null and e.value_numeric is not null and e.value_numeric=r.value_numeric and (r.unit is null or e.unit is null or lower(e.unit)=lower(r.unit))) or (r.value_text is not null and e.value_text is not null and lower(e.value_text)=lower(r.value_text)) or (r.value_json is not null and e.value_json=r.value_json))) or
                     (r.comparator='at_least' and r.value_numeric is not null and e.value_numeric is not null and e.value_numeric>=r.value_numeric and (r.unit is null or e.unit is null or lower(e.unit)=lower(r.unit))) or
-                    (r.comparator='at_most' and r.value_numeric is not null and e.value_numeric is not null and e.value_numeric<=r.value_numeric and (r.unit is null or e.unit is null or lower(e.unit)=lower(r.unit)))
+                    (r.comparator='at_most' and r.value_numeric is not null and e.value_numeric is not null and e.value_numeric<=r.value_numeric and (r.unit is null or e.unit is null or lower(e.unit)=lower(r.unit))) or
+                    (r.comparator='not_equals' and ((r.value_boolean is not null and e.value_boolean is distinct from r.value_boolean) or (r.value_numeric is not null and e.value_numeric is not null and e.value_numeric<>r.value_numeric) or (r.value_text is not null and e.value_text is not null and lower(e.value_text)<>lower(r.value_text)) or (r.value_json is not null and e.value_json<>r.value_json)))
                   ))),'[]'::jsonb) cap_missing,
       coalesce((select jsonb_agg(jsonb_build_object('type','workflow_product','key',pr.product_kind,'name',initcap(replace(pr.product_kind,'_',' ')),'workflow_slug',pw.slug,'application_role',pr.application_role,'gate_mode','profile_gate','requirement_level','required','notes',pr.notes) order by pr.product_kind)
                 from cleaning.workflow_product_requirements pr
