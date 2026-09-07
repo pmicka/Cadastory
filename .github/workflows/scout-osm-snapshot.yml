@@ -8,7 +8,11 @@ on:
         required: false
         default: ""
       resume_region:
-        description: "Optional failed region to finalize without downloading or re-uploading"
+        description: "Legacy-compatible region to resume without downloading or re-uploading"
+        required: false
+        default: ""
+      finalize_only_region:
+        description: "Optional region to finalize only; skips download and upload"
         required: false
         default: ""
 
@@ -34,6 +38,13 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
           SCOUT_OSM_REGIONS: ${{ inputs.regions }}
           SCOUT_OSM_BATCH_SIZE: "500"
+          SCOUT_OSM_FINALIZE_BATCH_SIZE: "5000"
           SCOUT_OSM_CLEANUP_BATCH_SIZE: "1000"
           SCOUT_OSM_RESUME_REGION: ${{ inputs.resume_region }}
-        run: python scripts/scout_osm_snapshot_loader_retry.py
+          SCOUT_OSM_FINALIZE_ONLY_REGION: ${{ inputs.finalize_only_region }}
+        run: |
+          if [ -n "$SCOUT_OSM_FINALIZE_ONLY_REGION" ]; then
+            python scripts/scout_osm_snapshot_loader_retry.py --finalize-only "$SCOUT_OSM_FINALIZE_ONLY_REGION"
+          else
+            python scripts/scout_osm_snapshot_loader_retry.py
+          fi
