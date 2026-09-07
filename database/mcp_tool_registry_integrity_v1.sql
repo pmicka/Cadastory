@@ -31,8 +31,11 @@ on conflict (tool_name) do update set
 -- present for every active model-visible tool. Capability links are omitted
 -- deliberately: meta/router tools such as scout_get_capabilities may be
 -- intentionally capability-agnostic.
+--
+-- The view intentionally uses owner privileges. Direct access to the source
+-- contract tables remains closed; only service_role receives SELECT on this
+-- diagnostic projection.
 create or replace view agent_contract.v_tool_registry_integrity_v1
-with (security_invoker = true)
 as
 select
   t.tool_name,
@@ -79,15 +82,15 @@ comment on view agent_contract.v_tool_registry_integrity_v1 is
 revoke all on agent_contract.v_tool_registry_integrity_v1 from public, anon, authenticated;
 grant select on agent_contract.v_tool_registry_integrity_v1 to service_role;
 
--- Release/CI-friendly assertion. A deployment can call this in a transaction;
--- it raises if any active model-visible tool is missing a required contract
--- layer, turning registry drift into a release failure rather than a runtime
--- discovery.
+-- Release/CI-friendly assertion. It raises if any active model-visible tool is
+-- missing a required contract layer, turning registry drift into a release
+-- failure rather than a runtime discovery. SECURITY DEFINER is intentionally
+-- narrow: no arguments, no dynamic SQL, empty search_path, service_role only.
 create or replace function agent_contract.assert_tool_registry_integrity_v1()
 returns void
 language plpgsql
 stable
-security invoker
+security definer
 set search_path to ''
 as $function$
 declare
