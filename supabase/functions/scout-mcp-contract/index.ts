@@ -12,9 +12,13 @@ const IMPROVE_URL = `${SUPABASE_URL}/functions/v1/scout-review-mcp`
 const EXPLORE_URL = `${SUPABASE_URL}/functions/v1/scout-explore-mcp`
 const IMPROVE_RESOURCE_URI = 'ui://scout/improve/v1'
 const LEGACY_REVIEW_RESOURCE_URI = 'ui://scout/rapid-review/v1'
+const LENS_RESOURCE_URI = 'ui://scout/lens/v1'
+const TIME_RESOURCE_URI = 'ui://scout/evidence-time-machine/v1'
+const CONSTELLATION_RESOURCE_URI = 'ui://scout/constellations/v1'
 const IMPROVE_TOOLS = new Set(['scout_start_improve_scout','scout_get_improve_scout_state','scout_submit_improvement_answer','scout_review_lead','scout_start_rapid_review','scout_get_rapid_review_state'])
 const EXPLORE_TOOLS = new Set(['scout_get_opportunity_lens_catalog','scout_apply_opportunity_lens','scout_get_opportunity_timeline','scout_get_opportunity_constellation'])
 const IMPROVE_RESOURCES = new Set([IMPROVE_RESOURCE_URI,LEGACY_REVIEW_RESOURCE_URI])
+const EXPLORE_RESOURCES = new Set([LENS_RESOURCE_URI,TIME_RESOURCE_URI,CONSTELLATION_RESOURCE_URI])
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
@@ -51,7 +55,7 @@ function responseFromUpstream(req:Request,upstream:Response,body?:unknown){const
 async function forwardTo(url:string,req:Request,raw?:string,bearer?:string){const h=new Headers(req.headers);if(bearer)h.set('authorization',`Bearer ${bearer}`);h.delete('host');h.delete('content-length');h.delete('cf-connecting-ip');const init:RequestInit={method:req.method,headers:h,redirect:'manual'};if(!['GET','HEAD'].includes(req.method))init.body=raw!==undefined?raw:req.body;return await fetch(url,init)}
 async function fetchRpc(url:string,req:Request,raw:string,bearer?:string){const upstream=await forwardTo(url,req,raw,bearer);if(!upstream.ok)return {upstream,parsed:null};return {upstream,parsed:await parseUpstream(upstream)}}
 function mergeToolEnvelopes(core:RpcEnvelope,...extras:(RpcEnvelope|null)[]){const seen=new Set<string>();const tools:any[]=[];for(const env of [core,...extras])for(const t of env?.result?.tools||[]){if(!t?.name||seen.has(t.name))continue;seen.add(t.name);tools.push(t)}return {...core,result:{...core.result,tools}}}
-function mergeResourceEnvelopes(core:RpcEnvelope|null,improve:RpcEnvelope|null,id:unknown){const seen=new Set<string>();const resources:any[]=[];for(const r of [...(core?.result?.resources||[]),...(improve?.result?.resources||[])]){if(!r?.uri||seen.has(r.uri))continue;seen.add(r.uri);resources.push(r)}return {jsonrpc:'2.0',id:id??null,result:{resources}}}
+function mergeResourceEnvelopes(core:RpcEnvelope|null,id:unknown,...extras:(RpcEnvelope|null)[]){const seen=new Set<string>();const resources:any[]=[];for(const env of [core,...extras])for(const r of env?.result?.resources||[]){if(!r?.uri||seen.has(r.uri))continue;seen.add(r.uri);resources.push(r)}return {jsonrpc:'2.0',id:id??null,result:{resources}}}
 async function audit(connection:Connection,toolName:string,outcome:string,requestBytes:number,httpStatus:number,requestId:string|null,flags:string[]=[]){try{await db.rpc('scout_record_agent_request_event',{p_connection_id:connection.connection_id,p_tool_name:toolName,p_protocol_method:'tools/call',p_outcome:outcome,p_request_bytes:requestBytes,p_argument_keys:['query','service_slug','jurisdiction','limit'],p_privacy_flags:flags,p_duration_ms:0,p_http_status:httpStatus,p_request_id:requestId})}catch{}}
 async function callKnowledge(req:Request,env:RpcEnvelope,raw:string,token:string){const connection=await resolveConnection(token);if(!connection)return jsonResponse({error:'invalid or expired Scout connection'},401);if(!connection.scopes?.includes('knowledge:read')){await audit(connection,'scout_search_knowledge','rejected_scope',raw.length,403,String(env.id??''));return safeError(req,env.id,-32003,'connection does not grant knowledge:read',200)}const args=env?.params?.arguments;if(!args||typeof args!=='object'||Array.isArray(args)){await audit(connection,'scout_search_knowledge','rejected_privacy',raw.length,422,String(env.id??''),['invalid_arguments']);return safeError(req,env.id,-32602,'invalid Scout knowledge arguments',200)}const keys=Object.keys(args),allowed=new Set(['query','service_slug','jurisdiction','limit']);if(keys.some(k=>!allowed.has(k))){await audit(connection,'scout_search_knowledge','rejected_privacy',raw.length,422,String(env.id??''),['unknown_argument']);return safeError(req,env.id,-32602,'Scout rejected fields outside the knowledge-search contract',200)}const query=typeof args.query==='string'?args.query.trim():'';const service=args.service_slug,jurisdiction=args.jurisdiction,limit=args.limit===undefined?10:args.limit;if(!query||query.length>300||looksLikeSecret(query)||!Number.isInteger(limit)||limit<1||limit>20||(service!==undefined&&!validMachine(service))||(jurisdiction!==undefined&&(typeof jurisdiction!=='string'||jurisdiction.length>40))){await audit(connection,'scout_search_knowledge','rejected_privacy',raw.length,422,String(env.id??''),['invalid_or_sensitive_argument']);return safeError(req,env.id,-32602,'invalid or out-of-scope Scout knowledge arguments',200)}const {data,error}=await db.rpc('scout_search_knowledge_internal',{p_query:query,p_service_slug:service??null,p_jurisdiction:jurisdiction??null,p_limit:limit});if(error){await audit(connection,'scout_search_knowledge','error',raw.length,500,String(env.id??''));return safeError(req,env.id,-32603,'Scout knowledge search failed',200)}let payload:any=data;try{const decorated=await db.rpc('scout_decorate_agent_response_v2',{p_connection_id:connection.connection_id,p_tool_name:'scout_search_knowledge',p_payload:data??null});if(!decorated.error)payload=decorated.data}catch{}await audit(connection,'scout_search_knowledge','allowed',raw.length,200,String(env.id??''));return rpcResponse(req,{jsonrpc:'2.0',id:env.id??null,result:{content:[{type:'text',text:JSON.stringify(payload,null,2)}],structuredContent:payload&&typeof payload==='object'&&!Array.isArray(payload)?payload:{result:payload}}})}
 
@@ -66,6 +70,7 @@ Deno.serve(async(req:Request)=>{
   if(env?.method==='tools/call'&&IMPROVE_TOOLS.has(String(env?.params?.name||''))){try{return responseFromUpstream(req,await forwardTo(IMPROVE_URL,req,raw))}catch{return safeError(req,env.id,-32603,'Improve Scout request failed')}}
   if(env?.method==='tools/call'&&EXPLORE_TOOLS.has(String(env?.params?.name||''))){try{return responseFromUpstream(req,await forwardTo(EXPLORE_URL,req,raw))}catch{return safeError(req,env.id,-32603,'Scout exploration request failed')}}
   if(env?.method==='resources/read'&&IMPROVE_RESOURCES.has(String(env?.params?.uri||''))){try{return responseFromUpstream(req,await forwardTo(IMPROVE_URL,req,raw))}catch{return safeError(req,env.id,-32603,'Improve Scout resource failed')}}
+  if(env?.method==='resources/read'&&EXPLORE_RESOURCES.has(String(env?.params?.uri||''))){try{return responseFromUpstream(req,await forwardTo(EXPLORE_URL,req,raw))}catch{return safeError(req,env.id,-32603,'Scout exploration resource failed')}}
   if(env?.method==='tools/list'){
     try{
       const fanout=await prepareFanout(inboundToken,3)
@@ -78,11 +83,11 @@ Deno.serve(async(req:Request)=>{
   }
   if(env?.method==='resources/list'){
     try{
-      const fanout=await prepareFanout(inboundToken,2)
+      const fanout=await prepareFanout(inboundToken,3)
       if(!fanout)return jsonResponse({error:'invalid or expired Scout connection'},401)
-      const [coreToken,improveToken]=fanout.tokens
-      const [coreR,improveR]=await Promise.all([fetchRpc(CORE_URL,req,raw,coreToken),fetchRpc(IMPROVE_URL,req,raw,improveToken)])
-      if(coreR.parsed||improveR.parsed)return rpcResponse(req,mergeResourceEnvelopes(coreR.parsed,improveR.parsed,env.id))
+      const [coreToken,improveToken,exploreToken]=fanout.tokens
+      const [coreR,improveR,exploreR]=await Promise.all([fetchRpc(CORE_URL,req,raw,coreToken),fetchRpc(IMPROVE_URL,req,raw,improveToken),fetchRpc(EXPLORE_URL,req,raw,exploreToken)])
+      if(coreR.parsed||improveR.parsed||exploreR.parsed)return rpcResponse(req,mergeResourceEnvelopes(coreR.parsed,env.id,improveR.parsed,exploreR.parsed))
       return responseFromUpstream(req,coreR.upstream)
     }catch(e){console.error('Scout resource-list merge error',e);return jsonResponse({error:'Scout MCP contract gateway failed'},500)}
   }
