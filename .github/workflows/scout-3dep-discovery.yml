@@ -16,16 +16,15 @@ jobs:
       - uses: actions/checkout@v4
       - name: Inspect current USGS WESM metadata
         run: |
-          python - <<'PY'
-          import csv, io, json, urllib.request
-          url='https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/metadata/WESM.csv'
-          req=urllib.request.Request(url, headers={'User-Agent':'Scout-Cadastory-3DEP-Discovery/1.0'})
-          with urllib.request.urlopen(req, timeout=120) as r:
-              raw=r.read().decode('utf-8-sig', errors='replace')
-          reader=csv.DictReader(io.StringIO(raw))
-          print('WESM_COLUMNS=' + json.dumps(reader.fieldnames))
-          for i,row in enumerate(reader):
-              if i >= 5:
-                  break
-              print('WESM_SAMPLE=' + json.dumps(row, sort_keys=True))
-          PY
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq gdal-bin >/dev/null
+          curl -fsSL -A 'Scout-Cadastory-3DEP-Discovery/1.1' \
+            'https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/metadata/WESM.gpkg' \
+            -o /tmp/WESM.gpkg
+          echo 'WESM_GPKG_SIZE_BYTES='$(stat -c%s /tmp/WESM.gpkg)
+          ogrinfo -ro -so /tmp/WESM.gpkg
+          for layer in $(ogrinfo -ro -so /tmp/WESM.gpkg 2>/dev/null | sed -n 's/^[0-9][0-9]*: \([^ ]*\).*/\1/p'); do
+            echo "WESM_LAYER=$layer"
+            ogrinfo -ro -so /tmp/WESM.gpkg "$layer" | sed -n '1,120p'
+          done
