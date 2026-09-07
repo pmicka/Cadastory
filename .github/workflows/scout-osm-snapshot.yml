@@ -1,0 +1,33 @@
+name: Scout OSM access snapshot
+
+on:
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "Optional comma-separated regions: kentucky,indiana,ohio"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install osmium-tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y osmium-tool
+          python -m pip install --upgrade requests
+
+      - name: Load Scout access snapshot
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_OSM_REGIONS: ${{ inputs.regions }}
+          SCOUT_OSM_BATCH_SIZE: "500"
+        run: python scripts/scout_osm_snapshot_loader.py
