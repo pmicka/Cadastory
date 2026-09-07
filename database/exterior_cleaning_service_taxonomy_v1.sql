@@ -1,14 +1,17 @@
 -- Scout by Cadastory
--- Exterior-cleaning service taxonomy + workflow model.
--- Consolidated source-of-truth migration for production changes deployed 2026-09-07.
+-- Exterior-cleaning service taxonomy + workflow model deployment index.
+-- Production deployed 2026-09-07.
+--
 -- Commercial services describe what the customer buys; workflows describe how the service is executed.
 -- Pressure washing and soft washing are workflows under Building Envelope Cleaning, not separate commercial services.
-
--- This file intentionally consolidates the applied production migrations:
--- exterior_cleaning_service_taxonomy_v1
--- cleaning_workflow_readiness_v1
--- cleaning_taxonomy_onboarding_catalog_v1
--- cleaning_product_kind_taxonomy_v1
--- pure_water_workflow_requirement_deduplicate_v1
-
--- See Supabase migration history for the exact deployment sequence. The database is authoritative for live function bodies.
+--
+-- Applied Supabase migrations, in order:
+--   1. exterior_cleaning_service_taxonomy_v1
+--   2. cleaning_workflow_readiness_v1
+--   3. cleaning_taxonomy_onboarding_catalog_v1
+--   4. cleaning_product_kind_taxonomy_v1
+--   5. pure_water_workflow_requirement_deduplicate_v1
+--
+-- This file is intentionally an index rather than a synthetic squashed migration. Reapplying a hand-squashed
+-- representation after production has evolved risks subtle drift in function bodies, grants, and constraints.
+-- Supabase migration history and the live database definitions are authoritative for the deployed state.
