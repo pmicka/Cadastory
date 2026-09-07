@@ -14,9 +14,9 @@ Optional:
 
 The loader queries Overture cloud GeoParquet by Scout's existing pilot-region
 bounding boxes and transfers only buildings/building parts with useful vertical
-or facade attributes. It does not overwrite canonical building records; the
-service-role RPC stores provenance-aware observations and conservative spatial
-matches instead.
+or facade attributes. Identical Scout AOIs are queried only once. It does not
+overwrite canonical building records; the service-role RPC stores provenance-
+aware observations and conservative spatial matches instead.
 """
 
 from __future__ import annotations
@@ -25,6 +25,7 @@ import json
 import os
 import subprocess
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,6 +41,8 @@ REGION_FILTER = {
 }
 BATCH_SIZE = int(os.getenv("SCOUT_OVERTURE_BATCH_SIZE", "500"))
 TIMEOUT = (30, 300)
+MAX_RPC_ATTEMPTS = 8
+TRANSIENT_HTTP = {408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524}
 
 if not 1 <= BATCH_SIZE <= 1000:
     raise SystemExit("SCOUT_OVERTURE_BATCH_SIZE must be between 1 and 1000")
@@ -50,22 +53,58 @@ SUPABASE_SESSION.headers.update(
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "User-Agent": "Scout-Cadastory-Overture-Building-Attributes/1.0",
+        "User-Agent": "Scout-Cadastory-Overture-Building-Attributes/1.1",
     }
 )
 
 
+def _retry_delay(attempt: int, response: requests.Response | None = None) -> float:
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return min(60.0, max(1.0, float(retry_after)))
+            except ValueError:
+                pass
+    return float(min(30, 2 ** attempt))
+
+
 def rpc(name: str, payload: dict | None = None):
-    response = SUPABASE_SESSION.post(
-        f"{SUPABASE_URL}/rest/v1/rpc/{name}",
-        json=payload or {},
-        timeout=TIMEOUT,
-    )
-    if not response.ok:
-        raise RuntimeError(
-            f"RPC {name} failed: HTTP {response.status_code}: {response.text[:1200]}"
+    url = f"{SUPABASE_URL}/rest/v1/rpc/{name}"
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_RPC_ATTEMPTS + 1):
+        response = None
+        try:
+            response = SUPABASE_SESSION.post(
+                url,
+                json=payload or {},
+                timeout=TIMEOUT,
+            )
+            if response.ok:
+                return response.json()
+            if response.status_code not in TRANSIENT_HTTP:
+                raise RuntimeError(
+                    f"RPC {name} failed: HTTP {response.status_code}: {response.text[:1200]}"
+                )
+            last_error = RuntimeError(
+                f"RPC {name} transient HTTP {response.status_code}: {response.text[:300]}"
+            )
+        except requests.RequestException as exc:
+            last_error = exc
+
+        if attempt >= MAX_RPC_ATTEMPTS:
+            break
+        delay = _retry_delay(attempt, response)
+        print(
+            f"RPC {name} transient failure; retry {attempt}/{MAX_RPC_ATTEMPTS - 1} "
+            f"in {delay:.0f}s: {last_error}",
+            flush=True,
         )
-    return response.json()
+        time.sleep(delay)
+
+    raise RuntimeError(
+        f"RPC {name} failed after {MAX_RPC_ATTEMPTS} attempts: {last_error}"
+    ) from last_error
 
 
 def run(*args: str) -> str:
@@ -93,8 +132,23 @@ def sql_string(value: str) -> str:
     return value.replace("'", "''")
 
 
-def export_region_kind(region: dict, feature_kind: str, destination: Path) -> None:
-    minx, miny, maxx, maxy = [float(value) for value in region["bbox"]]
+def deduplicated_aois(regions: list[dict]) -> list[dict]:
+    grouped: dict[tuple[float, float, float, float], set[str]] = {}
+    for region in regions:
+        bbox = tuple(float(v) for v in region["bbox"])
+        grouped.setdefault(bbox, set()).add(str(region["region_slug"]))
+    return [
+        {
+            "bbox": list(bbox),
+            "region_slugs": sorted(slugs),
+            "aoi_slug": "+".join(sorted(slugs)),
+        }
+        for bbox, slugs in grouped.items()
+    ]
+
+
+def export_aoi_kind(aoi: dict, feature_kind: str, destination: Path) -> None:
+    minx, miny, maxx, maxy = [float(value) for value in aoi["bbox"]]
     parquet = (
         "s3://overturemaps-us-west-2/release/"
         f"{RELEASE}/theme=buildings/type={feature_kind}/*"
@@ -133,6 +187,7 @@ INSTALL httpfs;
 LOAD spatial;
 LOAD httpfs;
 SET s3_region='us-west-2';
+SET geometry_always_xy=true;
 COPY (
   SELECT {select_fields}
   FROM read_parquet('{sql_string(parquet)}', filename=true, hive_partitioning=1)
@@ -145,7 +200,7 @@ COPY (
 WITH (FORMAT GDAL, DRIVER 'GeoJSONSeq', SRS 'EPSG:4326');
 """
     print(
-        f"Overture {region['region_slug']} {feature_kind}: querying release {RELEASE}",
+        f"Overture AOI {aoi['aoi_slug']} {feature_kind}: querying release {RELEASE}",
         flush=True,
     )
     subprocess.run(["duckdb", "-c", sql], check=True)
@@ -156,22 +211,13 @@ def normalize_material(raw: object) -> str | None:
         return None
     value = str(raw).strip().lower()
     allowed = {
-        "brick",
-        "cement_block",
-        "clay",
-        "concrete",
-        "glass",
-        "metal",
-        "plaster",
-        "plastic",
-        "stone",
-        "timber_framing",
-        "wood",
+        "brick", "cement_block", "clay", "concrete", "glass", "metal",
+        "plaster", "plastic", "stone", "timber_framing", "wood",
     }
     return value if value in allowed else None
 
 
-def iter_payload(path: Path, feature_kind: str, region_slug: str):
+def iter_payload(path: Path, feature_kind: str, aoi: dict):
     with path.open("r", encoding="utf-8") as handle:
         for raw_line in handle:
             raw_line = raw_line.strip().lstrip("\x1e")
@@ -209,7 +255,8 @@ def iter_payload(path: Path, feature_kind: str, region_slug: str):
                 "confidence": 0.90,
                 "attributes": {
                     "overture_release": RELEASE,
-                    "region_slug": region_slug,
+                    "aoi_slug": aoi["aoi_slug"],
+                    "region_slugs": aoi["region_slugs"],
                     "parent_building_id": props.get("building_id"),
                 },
             }
@@ -259,19 +306,24 @@ def main() -> None:
     if not regions:
         raise SystemExit("No Scout pilot regions matched SCOUT_OVERTURE_REGIONS")
 
+    aois = deduplicated_aois(regions)
+    print(
+        f"Scout configured {len(regions)} region rows -> {len(aois)} unique Overture AOI(s)",
+        flush=True,
+    )
     source_ts = release_timestamp()
     totals = [0, 0, 0, 0]
 
     with tempfile.TemporaryDirectory(prefix="scout-overture-buildings-") as temp_dir:
         work = Path(temp_dir)
-        for region in regions:
+        for aoi_index, aoi in enumerate(aois, start=1):
             for feature_kind in ("building", "building_part"):
-                output = work / f"{region['region_slug']}-{feature_kind}.geojsonseq"
-                export_region_kind(region, feature_kind, output)
+                output = work / f"aoi-{aoi_index}-{feature_kind}.geojsonseq"
+                export_aoi_kind(aoi, feature_kind, output)
                 if not output.exists() or output.stat().st_size == 0:
                     continue
                 result = upload_features(
-                    iter_payload(output, feature_kind, region["region_slug"]),
+                    iter_payload(output, feature_kind, aoi),
                     source_ts,
                 )
                 totals = [a + b for a, b in zip(totals, result)]
