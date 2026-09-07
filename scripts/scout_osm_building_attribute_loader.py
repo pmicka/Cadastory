@@ -12,9 +12,11 @@ Optional:
   - SCOUT_OSM_BUILDING_BATCH_SIZE=500
 
 This is intentionally separate from Scout's site-access snapshot loader. It
-extracts only explicit building attributes and sends them through Scout's
-provenance-aware building-attribute ingestion RPC. It never infers a material
-from building type and never treats a missing OSM tag as evidence of absence.
+extracts only explicit building attributes inside Scout's current canonical
+building coverage extents and sends them through the provenance-aware building-
+attribute ingestion RPC. States without canonical building footprints are
+skipped automatically. It never infers a material from building type and never
+treats a missing OSM tag as evidence of absence.
 """
 
 from __future__ import annotations
@@ -52,12 +54,12 @@ SUPABASE_SESSION.headers.update(
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "User-Agent": "Scout-Cadastory-OSM-Building-Attributes/1.1",
+        "User-Agent": "Scout-Cadastory-OSM-Building-Attributes/1.2",
     }
 )
 DOWNLOAD_SESSION = requests.Session()
 DOWNLOAD_SESSION.headers.update(
-    {"User-Agent": "Scout-Cadastory-OSM-Building-Attributes/1.1"}
+    {"User-Agent": "Scout-Cadastory-OSM-Building-Attributes/1.2"}
 )
 
 
@@ -307,12 +309,12 @@ def upload(features, timestamp: str) -> tuple[int, int, int, int]:
 
 def main() -> None:
     require_osmium()
-    config = rpc("internal_get_site_access_snapshot_loader_config")
+    config = rpc("internal_get_building_attribute_loader_config")
     regions = config["regions"]
     if REGION_FILTER:
         regions = [r for r in regions if r["region_slug"] in REGION_FILTER]
     if not regions:
-        raise SystemExit("No Scout pilot regions matched SCOUT_OSM_BUILDING_REGIONS")
+        raise SystemExit("No canonical Scout building regions matched SCOUT_OSM_BUILDING_REGIONS")
 
     totals = [0, 0, 0, 0]
     for region in regions:
