@@ -7,6 +7,10 @@ on:
         description: "Optional comma-separated regions: kentucky,indiana,ohio"
         required: false
         default: ""
+      resume_region:
+        description: "Optional failed region to finalize without downloading or re-uploading"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -30,4 +34,6 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
           SCOUT_OSM_REGIONS: ${{ inputs.regions }}
           SCOUT_OSM_BATCH_SIZE: "500"
+          SCOUT_OSM_CLEANUP_BATCH_SIZE: "1000"
+          SCOUT_OSM_RESUME_REGION: ${{ inputs.resume_region }}
         run: python scripts/scout_osm_snapshot_loader_retry.py
