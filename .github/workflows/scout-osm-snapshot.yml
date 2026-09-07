@@ -30,4 +30,4 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
           SCOUT_OSM_REGIONS: ${{ inputs.regions }}
           SCOUT_OSM_BATCH_SIZE: "500"
-        run: python scripts/scout_osm_snapshot_loader.py
+        run: python scripts/scout_osm_snapshot_loader_retry.py
