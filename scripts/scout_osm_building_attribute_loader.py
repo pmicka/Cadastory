@@ -25,6 +25,7 @@ import os
 import re
 import subprocess
 import tempfile
+import time
 from datetime import timezone
 from pathlib import Path
 
@@ -39,6 +40,8 @@ REGION_FILTER = {
 }
 BATCH_SIZE = int(os.getenv("SCOUT_OSM_BUILDING_BATCH_SIZE", "500"))
 TIMEOUT = (30, 300)
+MAX_RPC_ATTEMPTS = 8
+TRANSIENT_HTTP = {408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524}
 
 if not 1 <= BATCH_SIZE <= 1000:
     raise SystemExit("SCOUT_OSM_BUILDING_BATCH_SIZE must be between 1 and 1000")
@@ -49,26 +52,58 @@ SUPABASE_SESSION.headers.update(
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "User-Agent": "Scout-Cadastory-OSM-Building-Attributes/1.0",
+        "User-Agent": "Scout-Cadastory-OSM-Building-Attributes/1.1",
     }
 )
 DOWNLOAD_SESSION = requests.Session()
 DOWNLOAD_SESSION.headers.update(
-    {"User-Agent": "Scout-Cadastory-OSM-Building-Attributes/1.0"}
+    {"User-Agent": "Scout-Cadastory-OSM-Building-Attributes/1.1"}
 )
 
 
+def _retry_delay(attempt: int, response: requests.Response | None = None) -> float:
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return min(60.0, max(1.0, float(retry_after)))
+            except ValueError:
+                pass
+    return float(min(30, 2 ** attempt))
+
+
 def rpc(name: str, payload: dict | None = None):
-    response = SUPABASE_SESSION.post(
-        f"{SUPABASE_URL}/rest/v1/rpc/{name}",
-        json=payload or {},
-        timeout=TIMEOUT,
-    )
-    if not response.ok:
-        raise RuntimeError(
-            f"RPC {name} failed: HTTP {response.status_code}: {response.text[:1200]}"
+    url = f"{SUPABASE_URL}/rest/v1/rpc/{name}"
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_RPC_ATTEMPTS + 1):
+        response = None
+        try:
+            response = SUPABASE_SESSION.post(url, json=payload or {}, timeout=TIMEOUT)
+            if response.ok:
+                return response.json()
+            if response.status_code not in TRANSIENT_HTTP:
+                raise RuntimeError(
+                    f"RPC {name} failed: HTTP {response.status_code}: {response.text[:1200]}"
+                )
+            last_error = RuntimeError(
+                f"RPC {name} transient HTTP {response.status_code}: {response.text[:300]}"
+            )
+        except requests.RequestException as exc:
+            last_error = exc
+
+        if attempt >= MAX_RPC_ATTEMPTS:
+            break
+        delay = _retry_delay(attempt, response)
+        print(
+            f"RPC {name} transient failure; retry {attempt}/{MAX_RPC_ATTEMPTS - 1} "
+            f"in {delay:.0f}s: {last_error}",
+            flush=True,
         )
-    return response.json()
+        time.sleep(delay)
+
+    raise RuntimeError(
+        f"RPC {name} failed after {MAX_RPC_ATTEMPTS} attempts: {last_error}"
+    ) from last_error
 
 
 def run(*args: str) -> str:
@@ -110,11 +145,8 @@ def download(url: str, destination: Path) -> tuple[str | None, str | None]:
 def source_timestamp(pbf: Path, last_modified: str | None) -> str:
     try:
         value = run(
-            "osmium",
-            "fileinfo",
-            "-g",
-            "header.option.osmosis_replication_timestamp",
-            str(pbf),
+            "osmium", "fileinfo", "-g",
+            "header.option.osmosis_replication_timestamp", str(pbf),
         ).strip()
         if value:
             return value
@@ -135,32 +167,14 @@ def prepare_geojsonseq(source_pbf: Path, bbox: list[float], work: Path) -> Path:
     exported = work / "building-attributes.geojsonseq"
     bbox_arg = ",".join(str(value) for value in bbox)
 
+    run("osmium", "extract", "-b", bbox_arg, "-s", "complete_ways", "-O", "-o", str(clipped), str(source_pbf))
     run(
-        "osmium", "extract",
-        "-b", bbox_arg,
-        "-s", "complete_ways",
-        "-O",
-        "-o", str(clipped),
-        str(source_pbf),
+        "osmium", "tags-filter", "-O", "-o", str(filtered), str(clipped),
+        "nwr/building:levels", "nwr/height", "nwr/building:material", "nwr/facade:material",
     )
     run(
-        "osmium", "tags-filter",
-        "-O",
-        "-o", str(filtered),
-        str(clipped),
-        "nwr/building:levels",
-        "nwr/height",
-        "nwr/building:material",
-        "nwr/facade:material",
-    )
-    run(
-        "osmium", "export",
-        "-f", "geojsonseq",
-        "-x", "print_record_separator=false",
-        "-a", "type,id",
-        "-O",
-        "-o", str(exported),
-        str(filtered),
+        "osmium", "export", "-f", "geojsonseq", "-x", "print_record_separator=false",
+        "-a", "type,id", "-O", "-o", str(exported), str(filtered),
     )
     return exported
 
@@ -196,20 +210,11 @@ def normalize_material(value: object) -> tuple[str | None, str | None]:
         return None, None
     raw = str(value).strip().lower()
     aliases = {
-        "brick": "brick",
-        "bricks": "brick",
-        "concrete": "concrete",
-        "cement_block": "cement_block",
-        "concrete_blocks": "cement_block",
-        "glass": "glass",
-        "metal": "metal",
-        "plaster": "plaster",
-        "stucco": "plaster",
-        "stone": "stone",
-        "limestone": "stone",
-        "sandstone": "stone",
-        "wood": "wood",
-        "timber": "wood",
+        "brick": "brick", "bricks": "brick", "concrete": "concrete",
+        "cement_block": "cement_block", "concrete_blocks": "cement_block",
+        "glass": "glass", "metal": "metal", "plaster": "plaster",
+        "stucco": "plaster", "stone": "stone", "limestone": "stone",
+        "sandstone": "stone", "wood": "wood", "timber": "wood",
         "timber_framing": "timber_framing",
     }
     return aliases.get(raw), raw
@@ -287,8 +292,7 @@ def upload(features, timestamp: str) -> tuple[int, int, int, int]:
         unmatched += int(result.get("unmatched", 0))
         invalid += int(result.get("invalid", 0))
         print(
-            f"submitted={submitted:,} matched={matched:,} "
-            f"unmatched={unmatched:,} invalid={invalid:,}",
+            f"submitted={submitted:,} matched={matched:,} unmatched={unmatched:,} invalid={invalid:,}",
             flush=True,
         )
 
