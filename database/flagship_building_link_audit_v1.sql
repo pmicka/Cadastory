@@ -2,7 +2,8 @@
 --
 -- Facility geocodes are not building identity. This view surfaces shared links,
 -- documented story/height conflicts and distant links before any physical
--- evidence is promoted into canonical building enrichment.
+-- evidence is promoted into canonical building enrichment. Explicitly
+-- reconciled links are distinguished from raw geocode-distance warnings.
 
 create or replace view intelligence.v_flagship_building_link_audit_v1
 with (security_invoker=true) as
@@ -39,6 +40,7 @@ select
   a.resolved_story_status,
   a.resolved_story_source_slug,
   case
+    when f.evidence->>'building_link_status'='unresolved_merged_footprint' then 'unresolved_merged_footprint'
     when f.building_source_record_id is null then 'unlinked'
     when f.stated_levels is not null
       and a.resolved_story_count is not null
@@ -46,6 +48,11 @@ select
     when f.stated_levels is not null
       and f.stated_levels >= 10
       and coalesce(a.resolved_height_m,0) < 30 then 'documented_height_conflict'
+    when f.evidence->>'building_link_status'='reconciled_existing_evidence'
+      and f.stated_levels is not null
+      and a.resolved_story_count is not null
+      and abs(f.stated_levels-a.resolved_story_count) <= 2
+      and coalesce(s.shared_link_count,0)=1 then 'reconciled_verified'
     when coalesce(s.shared_link_count,0) > 1 then 'shared_facility_link'
     when f.building_match_distance_m > 100 then 'distant_facility_link'
     when f.stated_levels is not null
@@ -71,4 +78,4 @@ revoke all on intelligence.v_flagship_building_link_audit_v1 from public,anon,au
 grant select on intelligence.v_flagship_building_link_audit_v1 to service_role;
 
 comment on view intelligence.v_flagship_building_link_audit_v1 is
-  'Audits flagship facility-to-building links before physical evidence promotion. Facility geocodes are not treated as building identity; shared links, documented story/height conflicts and distant links are surfaced for reconciliation.';
+  'Audits flagship facility-to-building links before physical evidence promotion. Explicitly reconciled links remain distinguishable from raw geocode-distance warnings; unresolved merged footprints are quarantined.';
