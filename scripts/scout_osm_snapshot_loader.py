@@ -11,6 +11,8 @@ Requirements:
 Optional:
   - SCOUT_OSM_REGIONS=kentucky,indiana,ohio
   - SCOUT_OSM_BATCH_SIZE=500
+  - SCOUT_OSM_CLEANUP_BATCH_SIZE=1000
+  - SCOUT_OSM_RESUME_REGION=indiana (finalize a failed timeout import without re-uploading)
 
 This loader intentionally has no recurring schedule. It downloads Geofabrik
 regional .osm.pbf files, clips them to Scout's server-supplied pilot bbox,
@@ -39,10 +41,18 @@ REGION_FILTER = {
     if x.strip()
 }
 BATCH_SIZE = int(os.getenv("SCOUT_OSM_BATCH_SIZE", "500"))
+CLEANUP_BATCH_SIZE = int(os.getenv("SCOUT_OSM_CLEANUP_BATCH_SIZE", "1000"))
+RESUME_REGION = os.getenv("SCOUT_OSM_RESUME_REGION", "").strip().lower()
 TIMEOUT = (30, 300)
 
 if not 1 <= BATCH_SIZE <= 1000:
     raise SystemExit("SCOUT_OSM_BATCH_SIZE must be between 1 and 1000")
+if not 1 <= CLEANUP_BATCH_SIZE <= 5000:
+    raise SystemExit("SCOUT_OSM_CLEANUP_BATCH_SIZE must be between 1 and 5000")
+if RESUME_REGION and REGION_FILTER:
+    raise SystemExit(
+        "SCOUT_OSM_RESUME_REGION cannot be combined with SCOUT_OSM_REGIONS"
+    )
 
 SUPABASE_SESSION = requests.Session()
 SUPABASE_SESSION.headers.update(
@@ -202,6 +212,32 @@ def iter_payload_features(path: Path):
             }
 
 
+
+def drain_snapshot_cleanup(import_id: str):
+    """Finish bounded post-import cleanup before the snapshot becomes usable."""
+    while True:
+        result = rpc(
+            "internal_process_site_access_snapshot_cleanup",
+            {
+                "p_import_id": import_id,
+                "p_batch_size": CLEANUP_BATCH_SIZE,
+            },
+        )
+        print("Snapshot cleanup:", json.dumps(result, indent=2), flush=True)
+
+        if result.get("complete"):
+            return result
+        if result.get("skipped"):
+            raise RuntimeError(
+                "Snapshot cleanup did not run: "
+                f"{result.get('reason', result.get('state', 'unknown reason'))}"
+            )
+        if not result.get("has_more"):
+            raise RuntimeError(
+                "Snapshot cleanup returned neither completion nor a continuation"
+            )
+
+
 def upload_region(region: dict):
     slug = region["region_slug"]
     print(f"\n=== {slug.upper()} ===", flush=True)
@@ -266,6 +302,8 @@ def upload_region(region: dict):
                     },
                 },
             )
+            cleanup = drain_snapshot_cleanup(import_id)
+            finished["cleanup"] = cleanup
             print(json.dumps(finished, indent=2), flush=True)
         except Exception as exc:
             try:
@@ -278,6 +316,29 @@ def upload_region(region: dict):
 
 
 def main():
+    if RESUME_REGION:
+        print(
+            "Scout snapshot loader recovery; "
+            f"region={RESUME_REGION}; cleanup_batch={CLEANUP_BATCH_SIZE}",
+            flush=True,
+        )
+        recovered = rpc(
+            "internal_resume_latest_site_access_snapshot_import",
+            {
+                "p_region_slug": RESUME_REGION,
+                "p_attributes": {
+                    "loader": "osmium-tool-v1",
+                    "recovery": "bounded-finalizer-resume",
+                },
+            },
+        )
+        print("Recovered finalizer:", json.dumps(recovered, indent=2), flush=True)
+        cleanup = drain_snapshot_cleanup(recovered["import_id"])
+        print("Recovered cleanup:", json.dumps(cleanup, indent=2), flush=True)
+        link = rpc("internal_refresh_site_access_snapshot_links")
+        print("\nLink refresh:", json.dumps(link, indent=2), flush=True)
+        return
+
     require_osmium()
     config = rpc("internal_get_site_access_snapshot_loader_config")
     regions = config["regions"]
