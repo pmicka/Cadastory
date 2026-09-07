@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from datetime import date, datetime, timezone
 
 import requests
@@ -28,16 +29,13 @@ SERVICE_KEY = os.environ["SUPABASE_SERVICE_ROLE_KEY"]
 BATCH_SIZE = int(os.getenv("SCOUT_NRHP_BATCH_SIZE", "500"))
 TIMEOUT = (30, 180)
 PAGE_SIZE = 2000
+MAX_RPC_ATTEMPTS = 8
+TRANSIENT_HTTP = {408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524}
 
 if not 1 <= BATCH_SIZE <= 1000:
     raise SystemExit("SCOUT_NRHP_BATCH_SIZE must be between 1 and 1000")
 
-STATE_NAMES = {
-    "KY": "Kentucky",
-    "IN": "Indiana",
-    "OH": "Ohio",
-}
-
+STATE_NAMES = {"KY": "Kentucky", "IN": "Indiana", "OH": "Ohio"}
 POINT_LAYER = (
     "https://mapservices.nps.gov/arcgis/rest/services/"
     "cultural_resources/nrhp_locations/MapServer/0"
@@ -53,24 +51,56 @@ SUPABASE_SESSION.headers.update(
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "User-Agent": "Scout-Cadastory-NRHP-Loader/1.1",
+        "User-Agent": "Scout-Cadastory-NRHP-Loader/1.2",
     }
 )
 NPS_SESSION = requests.Session()
-NPS_SESSION.headers.update({"User-Agent": "Scout-Cadastory-NRHP-Loader/1.1"})
+NPS_SESSION.headers.update({"User-Agent": "Scout-Cadastory-NRHP-Loader/1.2"})
+
+
+def _retry_delay(attempt: int, response: requests.Response | None = None) -> float:
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after:
+            try:
+                return min(60.0, max(1.0, float(retry_after)))
+            except ValueError:
+                pass
+    return float(min(30, 2 ** attempt))
 
 
 def rpc(name: str, payload: dict | None = None):
-    response = SUPABASE_SESSION.post(
-        f"{SUPABASE_URL}/rest/v1/rpc/{name}",
-        json=payload or {},
-        timeout=TIMEOUT,
-    )
-    if not response.ok:
-        raise RuntimeError(
-            f"RPC {name} failed: HTTP {response.status_code}: {response.text[:1200]}"
+    url = f"{SUPABASE_URL}/rest/v1/rpc/{name}"
+    last_error: Exception | None = None
+    for attempt in range(1, MAX_RPC_ATTEMPTS + 1):
+        response = None
+        try:
+            response = SUPABASE_SESSION.post(url, json=payload or {}, timeout=TIMEOUT)
+            if response.ok:
+                return response.json()
+            if response.status_code not in TRANSIENT_HTTP:
+                raise RuntimeError(
+                    f"RPC {name} failed: HTTP {response.status_code}: {response.text[:1200]}"
+                )
+            last_error = RuntimeError(
+                f"RPC {name} transient HTTP {response.status_code}: {response.text[:300]}"
+            )
+        except requests.RequestException as exc:
+            last_error = exc
+
+        if attempt >= MAX_RPC_ATTEMPTS:
+            break
+        delay = _retry_delay(attempt, response)
+        print(
+            f"RPC {name} transient failure; retry {attempt}/{MAX_RPC_ATTEMPTS - 1} "
+            f"in {delay:.0f}s: {last_error}",
+            flush=True,
         )
-    return response.json()
+        time.sleep(delay)
+
+    raise RuntimeError(
+        f"RPC {name} failed after {MAX_RPC_ATTEMPTS} attempts: {last_error}"
+    ) from last_error
 
 
 def pilot_bbox() -> list[float]:
@@ -80,20 +110,15 @@ def pilot_bbox() -> list[float]:
     if not boxes:
         raise RuntimeError("Scout loader config did not provide a pilot bounding box")
     return [
-        min(float(b[0]) for b in boxes),
-        min(float(b[1]) for b in boxes),
-        max(float(b[2]) for b in boxes),
-        max(float(b[3]) for b in boxes),
+        min(float(b[0]) for b in boxes), min(float(b[1]) for b in boxes),
+        max(float(b[2]) for b in boxes), max(float(b[3]) for b in boxes),
     ]
 
 
 def fetch_layer(layer_url: str, bbox: list[float]):
     minx, miny, maxx, maxy = bbox
     envelope = {
-        "xmin": minx,
-        "ymin": miny,
-        "xmax": maxx,
-        "ymax": maxy,
+        "xmin": minx, "ymin": miny, "xmax": maxx, "ymax": maxy,
         "spatialReference": {"wkid": 4326},
     }
     offset = 0
@@ -136,7 +161,6 @@ def parse_cert_date(value: object) -> str | None:
         except (OverflowError, OSError, ValueError):
             return None
     text = str(value).strip()
-    # NPS currently publishes CertDate as a human-readable string in the spatial layer.
     for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%Y%m%d"):
         try:
             return datetime.strptime(text, fmt).date().isoformat()
@@ -173,10 +197,8 @@ def normalize_feature(feature: dict, geometry_kind: str) -> dict | None:
 
     object_id = props.get("OBJECTID")
     reference_number = (
-        props.get("NRIS_Refnum")
-        or props.get("NRIS_Refnu")
-        or props.get("PROPERTY_ID")
-        or props.get("PROPERTY_I")
+        props.get("NRIS_Refnum") or props.get("NRIS_Refnu")
+        or props.get("PROPERTY_ID") or props.get("PROPERTY_I")
     )
     stable_id = str(reference_number or props.get("CR_ID") or object_id or "").strip()
     if not stable_id:
