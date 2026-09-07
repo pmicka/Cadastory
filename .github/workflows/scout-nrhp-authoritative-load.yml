@@ -1,0 +1,23 @@
+name: Scout authoritative NRHP load
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  nrhp:
+    if: ${{ github.event.issue.title == '[ops] Run Scout authoritative NRHP load' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - run: python -m pip install --upgrade requests
+      - name: Load authoritative NPS NRHP points and polygons
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_NRHP_BATCH_SIZE: "100"
+        run: python scripts/scout_nrhp_historic_resource_loader.py
