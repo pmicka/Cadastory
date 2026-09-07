@@ -15,6 +15,10 @@ const EXPOSURE_CONTRACT='scout-exposure-v1'
 const ENUMERATION_CONTRACT='scout-enumeration-v1'
 const RESOURCE_URI='ui://scout/improve/v1'
 const LEGACY_RESOURCE_URI='ui://scout/rapid-review/v1'
+// Parked by product decision. Keep this fail-closed at the implementation
+// boundary so host visibility, routing drift, or a guessed endpoint cannot
+// reactivate Improve Scout. Reactivation requires an intentional code change.
+const IMPROVE_SCOUT_ACTIVE=false
 
 type Connection={connection_id:string;organization_id?:string|null;scopes?:string[];expires_at?:string|null}
 async function authenticate(req:Request):Promise<Connection|null>{
@@ -65,4 +69,4 @@ function makeServer(connection:Connection){
   return server
 }
 function headers(base?:HeadersInit){const h=new Headers(base);h.set('access-control-allow-origin','*');h.set('access-control-allow-headers','authorization,content-type,mcp-protocol-version,mcp-session-id,x-request-id');h.set('access-control-allow-methods','GET,POST,DELETE,OPTIONS');h.set('cache-control','no-store, max-age=0');h.set('x-content-type-options','nosniff');h.set('referrer-policy','no-referrer');return h}
-Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response(null,{status:204,headers:headers()});const connection=await authenticate(req);if(!connection)return Response.json({error:'invalid or missing Scout connection'},{status:401,headers:headers()});try{const server=makeServer(connection);const transport=new WebStandardStreamableHTTPServerTransport();await server.connect(transport);const response=await transport.handleRequest(req);return new Response(response.body,{status:response.status,statusText:response.statusText,headers:headers(response.headers)})}catch(e){console.error('Improve Scout MCP error',e);return Response.json({error:'Improve Scout request failed'},{status:500,headers:headers()})}})
+Deno.serve(async(req:Request)=>{if(req.method==='OPTIONS')return new Response(null,{status:204,headers:headers()});if(!IMPROVE_SCOUT_ACTIVE)return Response.json({error:'Improve Scout is inactive'},{status:404,headers:headers()});const connection=await authenticate(req);if(!connection)return Response.json({error:'invalid or missing Scout connection'},{status:401,headers:headers()});try{const server=makeServer(connection);const transport=new WebStandardStreamableHTTPServerTransport();await server.connect(transport);const response=await transport.handleRequest(req);return new Response(response.body,{status:response.status,statusText:response.statusText,headers:headers(response.headers)})}catch(e){console.error('Improve Scout MCP error',e);return Response.json({error:'Improve Scout request failed'},{status:500,headers:headers()})}})
