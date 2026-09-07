@@ -65,5 +65,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
-          SCOUT_NRHP_BATCH_SIZE: "100"
+          SCOUT_NRHP_BATCH_SIZE: "20"
         run: python scripts/scout_nrhp_historic_resource_loader.py
