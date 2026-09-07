@@ -12,11 +12,12 @@ Optional:
   - SCOUT_OVERTURE_REGIONS=kentucky,indiana,ohio
   - SCOUT_OVERTURE_BATCH_SIZE=500
 
-The loader queries Overture cloud GeoParquet by Scout's existing pilot-region
-bounding boxes and transfers only buildings/building parts with useful vertical
-or facade attributes. Identical Scout AOIs are queried only once. It does not
-overwrite canonical building records; the service-role RPC stores provenance-
-aware observations and conservative spatial matches instead.
+The loader queries Overture cloud GeoParquet only within Scout's current
+canonical-building coverage extents and transfers buildings/building parts with
+useful vertical or facade attributes. States without a canonical building
+substrate are skipped automatically. Identical AOIs are queried only once. It
+does not overwrite canonical building records; the service-role RPC stores
+provenance-aware observations and conservative spatial matches instead.
 """
 
 from __future__ import annotations
@@ -53,7 +54,7 @@ SUPABASE_SESSION.headers.update(
         "apikey": SERVICE_KEY,
         "Authorization": f"Bearer {SERVICE_KEY}",
         "Content-Type": "application/json",
-        "User-Agent": "Scout-Cadastory-Overture-Building-Attributes/1.1",
+        "User-Agent": "Scout-Cadastory-Overture-Building-Attributes/1.2",
     }
 )
 
@@ -299,16 +300,16 @@ def upload_features(features, source_timestamp: str) -> tuple[int, int, int, int
 
 def main() -> None:
     require_duckdb()
-    config = rpc("internal_get_site_access_snapshot_loader_config")
+    config = rpc("internal_get_building_attribute_loader_config")
     regions = config["regions"]
     if REGION_FILTER:
         regions = [r for r in regions if r["region_slug"] in REGION_FILTER]
     if not regions:
-        raise SystemExit("No Scout pilot regions matched SCOUT_OVERTURE_REGIONS")
+        raise SystemExit("No canonical Scout building regions matched SCOUT_OVERTURE_REGIONS")
 
     aois = deduplicated_aois(regions)
     print(
-        f"Scout configured {len(regions)} region rows -> {len(aois)} unique Overture AOI(s)",
+        f"Scout configured {len(regions)} canonical region rows -> {len(aois)} unique Overture AOI(s)",
         flush=True,
     )
     source_ts = release_timestamp()
