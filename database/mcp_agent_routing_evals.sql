@@ -36,6 +36,22 @@ $constraint$;
 comment on column agent_eval.results.evaluation_signals is
   'Bounded routing-evaluation signals only. Never store prompt text, model reasoning, raw MCP payloads, external data, or operator chat here.';
 
+-- The evaluation tables are internal. Make their existing service-role-only
+-- access explicit without granting any public table privileges.
+do $policy$
+begin
+  if not exists (select 1 from pg_policies where schemaname='agent_eval' and tablename='golden_cases' and policyname='golden_cases_service_role_only') then
+    execute 'create policy golden_cases_service_role_only on agent_eval.golden_cases for all to service_role using (true) with check (true)';
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='agent_eval' and tablename='runs' and policyname='runs_service_role_only') then
+    execute 'create policy runs_service_role_only on agent_eval.runs for all to service_role using (true) with check (true)';
+  end if;
+  if not exists (select 1 from pg_policies where schemaname='agent_eval' and tablename='results' and policyname='results_service_role_only') then
+    execute 'create policy results_service_role_only on agent_eval.results for all to service_role using (true) with check (true)';
+  end if;
+end
+$policy$;
+
 -- Historical direct-signal case is retained but deactivated: the product feature is parked.
 update agent_eval.golden_cases
 set active=false,
