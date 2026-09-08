@@ -1,0 +1,27 @@
+name: Scout bridge surface-work load
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  bridge-surface-work:
+    if: ${{ github.event.issue.title == '[ops] Run Scout bridge surface-work load' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install loader dependencies
+        run: python -m pip install --upgrade requests beautifulsoup4 pypdf
+      - name: Load authoritative KYTC and INDOT bridge surface-work evidence
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_BRIDGE_SURFACE_SOURCE: both
+          SCOUT_BRIDGE_SURFACE_MAX_DOCUMENTS: "40"
+          SCOUT_BRIDGE_SURFACE_LOOKBACK_YEARS: "5"
+          SCOUT_BRIDGE_SURFACE_BATCH_SIZE: "100"
+        run: python scripts/scout_bridge_surface_work_loader.py
