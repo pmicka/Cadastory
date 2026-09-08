@@ -1,4 +1,4 @@
-name: Scout USAspending physical FM task orders
+name: Scout USAspending qualified parent vehicles
 
 on:
   schedule:
@@ -11,23 +11,23 @@ permissions:
   contents: read
 
 concurrency:
-  group: scout-usaspending-physical-fm
+  group: scout-usaspending-parent-vehicles
   cancel-in-progress: false
 
 jobs:
-  usaspending-physical-fm:
+  usaspending-parent-vehicles:
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event.issue.title == '[ops] Run Scout USAspending physical FM' }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
-      - name: Refresh qualified physical-FM parent targets
+      - name: Refresh qualified parent vehicle targets
         env:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           curl --fail --silent --show-error --retry 3 --max-time 75 \
-            -X POST "$SUPABASE_URL/rest/v1/rpc/internal_refresh_usaspending_physical_fm_parent_idvs" \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/internal_refresh_usaspending_parent_vehicle_targets" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
@@ -44,7 +44,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
         run: python scripts/scout_usaspending_parent_idv_loader.py
-      - name: Collect qualified physical-FM child awards
+      - name: Collect qualified parent vehicle child awards
         env:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
