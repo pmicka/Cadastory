@@ -1,0 +1,27 @@
+name: Scout INDOT bridge project notices v2
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+jobs:
+  indot-bridge-project-notices:
+    if: ${{ github.event.issue.title == '[ops] Run Scout INDOT bridge project notices v2' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install loader dependencies
+        run: python -m pip install --upgrade requests beautifulsoup4 pypdf
+      - name: Load authoritative INDOT Notice-to-Highway-Contractors bridge project context
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_INDOT_NTC_LOOKBACK_YEARS: "5"
+          SCOUT_INDOT_NTC_MAX_DOCUMENTS: "120"
+          SCOUT_INDOT_NTC_MAX_PAGES: "300"
+          SCOUT_INDOT_NTC_BATCH_SIZE: "100"
+        run: python scripts/scout_indot_bridge_project_notice_loader_v2.py
