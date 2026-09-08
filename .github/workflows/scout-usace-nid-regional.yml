@@ -1,0 +1,32 @@
+name: Scout USACE NID regional refresh
+
+on:
+  schedule:
+    - cron: '37 8 * * 1'
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-usace-nid-regional
+  cancel-in-progress: false
+
+jobs:
+  usace-nid-regional:
+    if: ${{ github.event_name == 'schedule' || github.event.issue.title == '[ops] Run Scout regional NID' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install collector dependencies
+        run: python -m pip install --upgrade requests
+      - name: Refresh KY-IN-OH USACE NID coverage
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_NID_STATES: "Kentucky,Indiana,Ohio"
+          SCOUT_NID_BATCH_SIZE: "100"
+          SCOUT_NID_PAGE_SIZE: "1000"
+        run: python scripts/scout_usace_nid_regional_loader.py
