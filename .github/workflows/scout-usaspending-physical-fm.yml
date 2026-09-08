@@ -34,11 +34,16 @@ jobs:
             -d '{}'
       - name: Install collector dependencies
         run: python -m pip install --upgrade requests
-      - name: Resolve parent IDV identifiers
+      - name: Enrich unresolved parent IDV identifiers
         env:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
-        run: python scripts/scout_usaspending_parent_idv_resolver.py
+        run: python scripts/scout_usaspending_parent_idv_resolver_v2.py
+      - name: Collect authoritative parent IDV identity
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+        run: python scripts/scout_usaspending_parent_idv_loader.py
       - name: Collect qualified physical-FM child awards
         env:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
