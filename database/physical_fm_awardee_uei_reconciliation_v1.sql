@@ -45,7 +45,7 @@ select
   n.solicitation_number,
   n.title,
   n.parent_piid,
-  n.sam_award_numbers,
+  n.award_numbers as sam_award_numbers,
   n.sam_award_number_count,
   n.sam_awardee_count,
   n.sam_single_awardee_raw,
