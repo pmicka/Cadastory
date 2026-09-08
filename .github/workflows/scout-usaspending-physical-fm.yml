@@ -1,0 +1,33 @@
+name: Scout USAspending physical FM task orders
+
+on:
+  schedule:
+    - cron: '7 10 * * *'
+  workflow_dispatch:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-usaspending-physical-fm
+  cancel-in-progress: false
+
+jobs:
+  usaspending-physical-fm:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || github.event.issue.title == '[ops] Run Scout USAspending physical FM' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install collector dependencies
+        run: python -m pip install --upgrade requests
+      - name: Collect qualified physical-FM child awards
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_USASPENDING_BATCH_SIZE: "25"
+          SCOUT_USASPENDING_PAGE_SIZE: "100"
+          SCOUT_USASPENDING_REQUEST_DELAY: "0.10"
+        run: python scripts/scout_usaspending_physical_fm_loader.py
