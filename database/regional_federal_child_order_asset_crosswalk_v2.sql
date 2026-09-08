@@ -39,7 +39,13 @@ where alias_key in (
   'cannelton_locks_and_dam','markland_locks_and_dam','wolf_creek_dam_bridge','cagles_mill_bridge'
 );
 
-create or replace view research.v_federal_infrastructure_asset_crosswalk_status as
+-- These are research-only views with no production dependency. Recreate rather
+-- than CREATE OR REPLACE so the v2 facility-context columns can be inserted
+-- without PostgreSQL's positional view-column compatibility restriction.
+drop view if exists research.v_federal_infrastructure_asset_crosswalk_queue;
+drop view if exists research.v_federal_infrastructure_asset_crosswalk_status;
+
+create view research.v_federal_infrastructure_asset_crosswalk_status as
 with observed as (
   select
     i.alias_key,
@@ -192,7 +198,7 @@ left join facility_nid f using(alias_key)
 left join bridge_context b using(alias_key)
 where a.active;
 
-create or replace view research.v_federal_infrastructure_asset_crosswalk_queue as
+create view research.v_federal_infrastructure_asset_crosswalk_queue as
 select *
 from research.v_federal_infrastructure_asset_crosswalk_status
 where substantive_task_orders > 0
