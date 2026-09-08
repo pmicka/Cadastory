@@ -1,0 +1,46 @@
+name: Scout OSM targeted building identity
+
+on:
+  workflow_dispatch:
+    inputs:
+      regions:
+        description: "Optional comma-separated regions: kentucky,indiana"
+        required: false
+        default: ""
+      max_targets_per_region:
+        description: "Optional bounded test size per region; 0 means all"
+        required: false
+        default: "0"
+  push:
+    branches:
+      - main
+    paths:
+      - "scripts/scout_osm_building_identity_loader.py"
+      - ".github/workflows/scout-osm-building-identity.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install osmium-tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y osmium-tool
+          python -m pip install --upgrade requests
+
+      - name: Load targeted OSM building identity cache
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_OSM_BUILDING_REGIONS: ${{ github.event_name == 'workflow_dispatch' && inputs.regions || '' }}
+          SCOUT_OSM_BUILDING_MAX_TARGETS_PER_REGION: ${{ github.event_name == 'workflow_dispatch' && inputs.max_targets_per_region || '0' }}
+          SCOUT_OSM_BUILDING_BATCH_SIZE: "100"
+          SCOUT_OSM_BUILDING_TILE_DEGREES: "0.08"
+        run: |
+          python scripts/scout_osm_building_identity_loader.py
