@@ -5,6 +5,13 @@ Research/identity support only. This collector widens raw NID coverage to the
 three supported states so federal navigation assets referenced by task orders can
 be resolved deterministically before any opportunity or relationship promotion.
 
+NIDID is not guaranteed to be unique at feature granularity. For the normal case
+we preserve the historical Scout source_native_id = NIDID. If a NIDID occurs on
+multiple ArcGIS features, each colliding feature receives the deterministic key
+`<NIDID>::OBJECTID:<OBJECTID>`. This preserves every source feature without
+silently overwriting one duplicate with another while avoiding unnecessary
+identity churn for the non-colliding corpus.
+
 Required env:
   SUPABASE_URL
   SUPABASE_SERVICE_ROLE_KEY
@@ -17,6 +24,7 @@ Optional env:
 """
 from __future__ import annotations
 
+from collections import Counter
 import hashlib
 import json
 import math
@@ -43,13 +51,13 @@ LOUISVILLE_LON = -85.7585
 PILOT_RADIUS_MILES = 100.0
 
 session = requests.Session()
-session.headers.update({"User-Agent": "Scout-Cadastory-USACE-NID-Regional/1.0"})
+session.headers.update({"User-Agent": "Scout-Cadastory-USACE-NID-Regional/1.1"})
 supabase = requests.Session()
 supabase.headers.update({
     "apikey": SERVICE_KEY,
     "Authorization": f"Bearer {SERVICE_KEY}",
     "Content-Type": "application/json",
-    "User-Agent": "Scout-Cadastory-USACE-NID-Regional/1.0",
+    "User-Agent": "Scout-Cadastory-USACE-NID-Regional/1.1",
 })
 
 
@@ -113,7 +121,7 @@ def set_quality(status: str, reason: str, metadata: dict[str, Any]) -> None:
         "p_source_slug": SOURCE_SLUG,
         "p_status": status,
         "p_reason": reason,
-        "p_validation_version": "usace-nid-regional-v1",
+        "p_validation_version": "usace-nid-regional-v2",
         "p_metadata": metadata,
     })
 
@@ -176,12 +184,25 @@ def fetch_features(where: str, expected_count: int) -> list[dict[str, Any]]:
     return features
 
 
-def normalize_feature(feature: dict[str, Any], observed_at: str) -> dict[str, Any]:
+def base_nid_id(feature: dict[str, Any]) -> str:
+    attrs = feature.get("attributes") or {}
+    value = str(attrs.get("NIDID") or attrs.get("FEDERAL_ID") or "").strip()
+    if not value:
+        raise RuntimeError("NID feature missing NIDID/FEDERAL_ID")
+    return value
+
+
+def object_id(feature: dict[str, Any]) -> str:
+    attrs = feature.get("attributes") or {}
+    value = str(attrs.get("OBJECTID") or "").strip()
+    if not value:
+        raise RuntimeError("NID feature missing OBJECTID")
+    return value
+
+
+def normalize_feature(feature: dict[str, Any], observed_at: str, native_id: str) -> dict[str, Any]:
     attrs = feature.get("attributes") or {}
     geom = feature.get("geometry") or {}
-    native_id = str(attrs.get("NIDID") or attrs.get("FEDERAL_ID") or "").strip()
-    if not native_id:
-        raise RuntimeError("NID feature missing NIDID/FEDERAL_ID")
     lat = attrs.get("LATITUDE")
     lon = attrs.get("LONGITUDE")
     if lat is None:
@@ -199,7 +220,7 @@ def normalize_feature(feature: dict[str, Any], observed_at: str) -> dict[str, An
         "source_url": ARCGIS_URL,
         "observed_at": observed_at,
         "content_hash": content_hash(feature),
-        "parser_version": "usace-nid-regional-v1",
+        "parser_version": "usace-nid-regional-v2",
         "provisional_entity_type": "dam",
         "longitude": lon_f,
         "latitude": lat_f,
@@ -214,11 +235,37 @@ def main() -> None:
     try:
         expected = source_count(where)
         features = fetch_features(where, expected)
-        by_id: dict[str, dict[str, Any]] = {}
+        if len(features) != expected:
+            raise RuntimeError(f"NID pagination mismatch: expected {expected:,}, received {len(features):,}")
+
+        base_ids = [base_nid_id(feature) for feature in features]
+        object_ids = [object_id(feature) for feature in features]
+        base_counts = Counter(base_ids)
+        duplicate_base_ids = {key: count for key, count in base_counts.items() if count > 1}
+
+        if len(set(object_ids)) != expected:
+            raise RuntimeError(
+                f"NID OBJECTID identity mismatch: expected {expected:,}, unique OBJECTIDs {len(set(object_ids)):,}"
+            )
+
+        items: list[dict[str, Any]] = []
+        emitted_ids: set[str] = set()
         state_counts: dict[str, int] = {}
         navigation_count = 0
-        for feature in features:
-            item = normalize_feature(feature, observed_at)
+        duplicate_feature_count = 0
+
+        for feature, base_id, oid in zip(features, base_ids, object_ids):
+            if base_counts[base_id] == 1:
+                native_id = base_id
+            else:
+                native_id = f"{base_id}::OBJECTID:{oid}"
+                duplicate_feature_count += 1
+            if native_id in emitted_ids:
+                raise RuntimeError(f"NID derived source identity collision: {native_id}")
+            emitted_ids.add(native_id)
+
+            item = normalize_feature(feature, observed_at, native_id)
+            items.append(item)
             attrs = feature.get("attributes") or {}
             state = str(attrs.get("STATE") or "").strip()
             state_counts[state] = state_counts.get(state, 0) + 1
@@ -227,17 +274,15 @@ def main() -> None:
             locks = attrs.get("NUMBER_OF_LOCKS")
             if primary == "navigation" or "navigation" in purposes or (locks not in (None, "", 0, "0")):
                 navigation_count += 1
-            by_id[item["source_native_id"]] = item
 
-        if len(features) != expected:
-            raise RuntimeError(f"NID pagination mismatch: expected {expected:,}, received {len(features):,}")
-        if len(by_id) != expected:
-            raise RuntimeError(f"NID identity mismatch: expected {expected:,}, unique NID IDs {len(by_id):,}")
+        if len(items) != expected or len(emitted_ids) != expected:
+            raise RuntimeError(
+                f"NID derived identity mismatch: expected {expected:,}, items {len(items):,}, unique source IDs {len(emitted_ids):,}"
+            )
         missing_states = [s for s in STATES if state_counts.get(s, 0) == 0]
         if missing_states:
             raise RuntimeError(f"NID returned zero records for requested states: {missing_states}")
 
-        items = list(by_id.values())
         inserted = 0
         for start in range(0, len(items), BATCH_SIZE):
             batch = items[start:start + BATCH_SIZE]
@@ -247,15 +292,18 @@ def main() -> None:
         stats = {
             "states": STATES,
             "source_count": expected,
-            "unique_records": len(items),
+            "unique_source_records": len(items),
             "new_raw_versions": inserted,
             "navigation_or_lock_records": navigation_count,
             "state_counts": state_counts,
+            "duplicate_nidid_groups": len(duplicate_base_ids),
+            "features_in_duplicate_nidid_groups": duplicate_feature_count,
+            "identity_method": "NIDID_when_unique_else_NIDID_plus_OBJECTID",
             "arcgis_url": ARCGIS_URL,
         }
         set_quality(
             "healthy",
-            "USACE NID KY/IN/OH regional refresh passed count, pagination, identity, and per-state coverage checks.",
+            "USACE NID KY/IN/OH regional refresh passed count, pagination, OBJECTID identity, collision-preserving NID identity, and per-state coverage checks.",
             stats,
         )
         print(json.dumps(stats, indent=2, sort_keys=True), flush=True)
