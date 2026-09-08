@@ -55,6 +55,13 @@ with source_rows as (
     r.supported_states,
     r.local_child_notice_count
   from research.v_usaspending_regional_parent_vehicle_targets r
+), regional_states as (
+  select
+    s.parent_piid,
+    array_agg(distinct x order by x) as regional_supported_states
+  from source_rows s
+  cross join lateral unnest(coalesce(s.regional_supported_states,'{}'::text[])) x
+  group by s.parent_piid
 ), grouped as (
   select
     s.parent_piid,
@@ -78,22 +85,26 @@ with source_rows as (
       else 'usaspending_exact_piid_search_required'
     end as identifier_resolution,
     array_agg(distinct s.target_reason order by s.target_reason) as target_reasons,
-    case
-      when bool_or(s.regional_supported_states is not null)
-      then array(
-        select distinct x
-        from unnest(array_cat_agg(coalesce(s.regional_supported_states,'{}'::text[]))) x
-        where x is not null
-        order by x
-      )
-      else null::text[]
-    end as regional_supported_states,
     sum(s.local_child_notice_count) as local_child_notice_count
   from source_rows s
   where nullif(btrim(s.parent_piid),'') is not null
   group by s.parent_piid
 )
-select * from grouped;
+select
+  g.parent_piid,
+  g.program_key,
+  g.program_title,
+  g.program_scope_class,
+  g.site_scope_status,
+  g.has_surface_work_scope,
+  g.fpds_agency_code,
+  g.parent_generated_award_id,
+  g.identifier_resolution,
+  g.target_reasons,
+  rs.regional_supported_states,
+  g.local_child_notice_count
+from grouped g
+left join regional_states rs using(parent_piid);
 
 comment on view research.v_usaspending_parent_vehicle_targets is
   'Research-only union of qualified USAspending parent-IDV targets. Regional inclusion requires explicit supported-area child-work evidence; prospective solicitations/RFIs are not included until awarded parent PIIDs exist.';
