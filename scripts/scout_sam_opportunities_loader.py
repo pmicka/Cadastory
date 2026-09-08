@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """Populate Scout's registered SAM Contract Opportunities source.
 
-Uses SAM.gov's public daily full Contract Opportunities CSV extract, so the
-initial/current snapshot does not require a SAM API key. Only Scout-relevant
-rows are retained in Supabase; the downloaded national CSV is temporary.
+Uses SAM.gov's public full Contract Opportunities CSV extract for bootstrap and
+refresh without requiring an API key. The file is historical, not a current-only
+snapshot: Scout therefore preserves source history while deriving current notice
+state from lifecycle dates. SAM's exported `Active` field is retained as source
+metadata but is not sufficient by itself to mean an opportunity is currently open.
 
 Required env:
   SUPABASE_URL
@@ -24,7 +26,7 @@ import os
 import re
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -76,15 +78,13 @@ MILITARY_RE = re.compile(
 )
 
 session = requests.Session()
-session.headers.update({
-    "User-Agent": "Scout-Cadastory-SAM-Collector/1.0",
-})
+session.headers.update({"User-Agent": "Scout-Cadastory-SAM-Collector/1.1"})
 supabase = requests.Session()
 supabase.headers.update({
     "apikey": SERVICE_KEY,
     "Authorization": f"Bearer {SERVICE_KEY}",
     "Content-Type": "application/json",
-    "User-Agent": "Scout-Cadastory-SAM-Collector/1.0",
+    "User-Agent": "Scout-Cadastory-SAM-Collector/1.1",
 })
 
 
@@ -100,7 +100,7 @@ def first(row: dict[str, str], *keys: str) -> str:
     return ""
 
 
-def iso_datetime(value: str) -> str | None:
+def parse_datetime(value: str) -> datetime | None:
     value = clean(value)
     if not value:
         return None
@@ -108,9 +108,13 @@ def iso_datetime(value: str) -> str | None:
         dt = date_parser.parse(value)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc).isoformat()
+        return dt.astimezone(timezone.utc)
     except (ValueError, TypeError, OverflowError):
         return None
+
+
+def iso(dt: datetime | None) -> str | None:
+    return dt.isoformat() if dt is not None else None
 
 
 def boolish(value: str) -> bool:
@@ -141,9 +145,7 @@ def rpc(name: str, payload: dict[str, Any]) -> Any:
         try:
             response = supabase.post(url, json=payload, timeout=TIMEOUT)
             if response.ok:
-                if not response.text:
-                    return None
-                return response.json()
+                return response.json() if response.text else None
             if response.status_code not in TRANSIENT_HTTP:
                 raise RuntimeError(f"RPC {name} HTTP {response.status_code}: {response.text[:1500]}")
             last_error = RuntimeError(f"RPC {name} transient HTTP {response.status_code}: {response.text[:400]}")
@@ -160,7 +162,7 @@ def set_quality(status: str, reason: str, metadata: dict[str, Any]) -> None:
         "p_source_slug": SOURCE_SLUG,
         "p_status": status,
         "p_reason": reason,
-        "p_validation_version": "sam-opportunities-v1",
+        "p_validation_version": "sam-opportunities-v2",
         "p_metadata": metadata,
     })
 
@@ -188,6 +190,7 @@ def download_to_temp() -> tuple[Path, int]:
 
 
 def strategic_keep(row: dict[str, str]) -> bool:
+    """Retain nationally useful FM/surface-work evidence without all DoD task orders."""
     if not INCLUDE_STRATEGIC_NATIONAL:
         return False
     agency = " ".join([first(row, "Department/Ind.Agency"), first(row, "Sub-Tier"), first(row, "Office")])
@@ -196,16 +199,38 @@ def strategic_keep(row: dict[str, str]) -> bool:
     surface = bool(SURFACE_RE.search(text))
     military = bool(MILITARY_RE.search(agency))
     vehicle = bool(VEHICLE_RE.search(text))
-    return (military and (fm or surface or vehicle)) or (fm and vehicle)
+    return (military and (fm or surface)) or (fm and vehicle)
 
 
-def normalize(row: dict[str, str]) -> dict[str, Any] | None:
+def lifecycle_state(row: dict[str, str], observed_at: datetime) -> tuple[bool, bool, datetime | None, datetime | None, datetime | None]:
+    posted_at = parse_datetime(first(row, "PostedDate"))
+    response_deadline = parse_datetime(first(row, "ResponseDeadLine", "ResponseDeadline"))
+    archive_at = parse_datetime(first(row, "ArchiveDate"))
+    source_active_value = first(row, "Active")
+    source_active = boolish(source_active_value) if source_active_value else True
+
+    # The full export includes historical rows whose Active field is still Yes.
+    # Prefer archive lifecycle; otherwise deadline; otherwise a conservative recent-post fallback.
+    if archive_at is not None:
+        current_notice = source_active and archive_at >= observed_at
+    elif response_deadline is not None:
+        current_notice = source_active and response_deadline >= observed_at
+    elif posted_at is not None:
+        current_notice = source_active and posted_at >= observed_at - timedelta(days=30)
+    else:
+        current_notice = False
+
+    response_open = response_deadline is not None and response_deadline >= observed_at
+    return current_notice, response_open, posted_at, response_deadline, archive_at
+
+
+def normalize(row: dict[str, str], observed_at: datetime) -> dict[str, Any] | None:
     notice_id = first(row, "NoticeId")
     title = first(row, "Title")
     if not notice_id or not title:
         return None
     active_value = first(row, "Active")
-    active = boolish(active_value) if active_value else True
+    current_notice, response_open, posted_at, response_deadline, archive_at = lifecycle_state(row, observed_at)
     state = first(row, "PopState", "State").upper()
     canonical_url = first(row, "Link", "AdditionalInfoLink") or f"https://sam.gov/opp/{notice_id}/view"
     normalized = {
@@ -221,10 +246,10 @@ def normalize(row: dict[str, str]) -> dict[str, Any] | None:
         "naics_code": first(row, "NaicsCode") or None,
         "psc_code": first(row, "ClassificationCode", "ProductServiceCode") or None,
         "set_aside": first(row, "SetASide", "SetAside") or None,
-        "posted_at": iso_datetime(first(row, "PostedDate")),
-        "response_deadline": iso_datetime(first(row, "ResponseDeadLine", "ResponseDeadline")),
-        "archive_at": iso_datetime(first(row, "ArchiveDate")),
-        "active": active,
+        "posted_at": iso(posted_at),
+        "response_deadline": iso(response_deadline),
+        "archive_at": iso(archive_at),
+        "active": current_notice,
         "place_city": first(row, "PopCity") or None,
         "place_state": state or None,
         "place_zip": first(row, "PopZip", "PopZipCode") or None,
@@ -245,6 +270,8 @@ def normalize(row: dict[str, str]) -> dict[str, Any] | None:
             "set_aside_code": first(row, "SetASideCode") or None,
             "additional_info_link": first(row, "AdditionalInfoLink") or None,
             "active_source_value": active_value or None,
+            "response_window_open": response_open,
+            "current_state_method": "archive_then_deadline_then_recent_post",
         },
     }
     return {
@@ -256,8 +283,9 @@ def normalize(row: dict[str, str]) -> dict[str, Any] | None:
     }
 
 
-def load(path: Path, observed_at: str) -> dict[str, int]:
-    total = active_rows = local_rows = strategic_rows = invalid = 0
+def load(path: Path, observed_at_text: str) -> dict[str, int]:
+    observed_at = date_parser.parse(observed_at_text).astimezone(timezone.utc)
+    total = source_active_rows = local_rows = strategic_rows = current_notice_rows = response_open_rows = invalid = 0
     retained: dict[str, dict[str, Any]] = {}
     with path.open("r", encoding="utf-8-sig", errors="replace", newline="") as fh:
         reader = csv.DictReader(fh)
@@ -267,16 +295,14 @@ def load(path: Path, observed_at: str) -> dict[str, int]:
             raise RuntimeError(f"SAM extract schema drift; missing required headers: {missing}")
         for row in reader:
             total += 1
-            active_value = first(row, "Active")
-            if active_value and not boolish(active_value):
-                continue
-            active_rows += 1
+            if boolish(first(row, "Active")):
+                source_active_rows += 1
             state = first(row, "PopState", "State").upper()
             local = state in STATES
             strategic = strategic_keep(row)
             if not local and not strategic:
                 continue
-            item = normalize(row)
+            item = normalize(row, observed_at)
             if item is None:
                 invalid += 1
                 continue
@@ -284,14 +310,18 @@ def load(path: Path, observed_at: str) -> dict[str, int]:
                 local_rows += 1
             elif strategic:
                 strategic_rows += 1
+            if item["normalized"]["active"]:
+                current_notice_rows += 1
+            if item["normalized"]["attributes"]["response_window_open"]:
+                response_open_rows += 1
             retained[item["source_native_id"]] = item
 
     if total < MIN_TOTAL_ROWS:
         raise RuntimeError(f"SAM extract row count implausibly low: {total:,}")
-    if active_rows == 0:
-        raise RuntimeError("SAM extract produced zero active rows")
     if local_rows == 0:
-        raise RuntimeError(f"SAM extract produced zero local rows for states {sorted(STATES)}")
+        raise RuntimeError(f"SAM extract produced zero retained local rows for states {sorted(STATES)}")
+    if current_notice_rows == 0:
+        raise RuntimeError("SAM lifecycle derivation produced zero current notices")
     if not retained:
         raise RuntimeError("SAM scope selector retained zero opportunities")
 
@@ -302,26 +332,30 @@ def load(path: Path, observed_at: str) -> dict[str, int]:
         result = rpc("internal_ingest_procurement_opportunity_batch", {
             "p_source_slug": SOURCE_SLUG,
             "p_records": batch,
-            "p_observed_at": observed_at,
-        })
-        raw_inserted += int((result or {}).get("raw_inserted", 0))
-        upserted += int((result or {}).get("opportunities_upserted", 0))
+            "p_observed_at": observed_at_text,
+        }) or {}
+        raw_inserted += int(result.get("raw_inserted", 0))
+        upserted += int(result.get("opportunities_upserted", 0))
         print(f"SAM upload {min(start+BATCH_SIZE,len(items)):,}/{len(items):,}", flush=True)
 
+    # Rows not retained by the current scope selector remain historical evidence but
+    # cannot remain current/actionable.
     closed = int(rpc("internal_finalize_procurement_opportunity_snapshot", {
         "p_source_slug": SOURCE_SLUG,
-        "p_snapshot_observed_at": observed_at,
+        "p_snapshot_observed_at": observed_at_text,
     }) or 0)
     return {
         "total_rows": total,
-        "active_rows": active_rows,
+        "source_active_rows": source_active_rows,
         "local_rows": local_rows,
         "strategic_national_rows": strategic_rows,
         "retained_unique": len(items),
+        "current_notice_rows": current_notice_rows,
+        "response_open_rows": response_open_rows,
         "invalid_retained": invalid,
         "raw_inserted": raw_inserted,
         "opportunities_upserted": upserted,
-        "closed_stale": closed,
+        "closed_stale_or_out_of_scope": closed,
     }
 
 
@@ -335,7 +369,7 @@ def main() -> None:
         stats["states"] = sorted(STATES)
         set_quality(
             "healthy",
-            "Public SAM Contract Opportunities full extract passed schema, size, row-count, local-scope and identity checks.",
+            "SAM full Contract Opportunities extract passed schema/size/identity checks; current notice state is derived from archive/deadline lifecycle rather than the unreliable exported Active field.",
             stats,
         )
         print(json.dumps(stats, indent=2, sort_keys=True), flush=True)
