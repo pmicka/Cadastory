@@ -19,8 +19,8 @@ insert into research.surface_work_source_capabilities (
   reviewed_at
 ) values (
   'regional_federal_child_orders',
-  'research_view',
-  'research.v_regional_federal_child_order_intelligence',
+  'source_slug',
+  'usaspending',
   'partial',
   'strong',
   'strong',
@@ -28,8 +28,8 @@ insert into research.surface_work_source_capabilities (
   'partial',
   'medium',
   'strong',
-  'Verified supported-area federal parent-vehicle child orders currently contain 31 normalized records, 20 substantive orders and two explicit paint/surface-work orders. Wolf Creek Dam Bridge is a true on-asset superstructure-painting project; McAlpine Locks and Dam is a component fabrication/test/paint/delivery order and is explicitly separated from local asset-cleaning evidence. Named navigation assets can be crosswalked to authoritative NID identities where available.',
-  'Award descriptions can name an asset while place of performance reflects fabrication or delivery rather than the asset site. Exact bridge/internal-structure identities are not always present in NBI/NID. Do not propagate contractor-to-asset relationships beyond the verified child order, and do not infer local cleaning from component painting or generic parent-vehicle eligibility.',
+  'The USAspending-derived federal task-order corpus is normalized through research.v_regional_federal_child_order_intelligence. Verified supported-area parent-vehicle child orders currently contain 31 normalized records, 20 substantive orders and two explicit paint/surface-work orders. Wolf Creek Dam Bridge is a true on-asset superstructure-painting project; McAlpine Locks and Dam is a component fabrication/test/paint/delivery order and is explicitly separated from local asset-cleaning evidence. Named navigation assets can be crosswalked to authoritative NID identities where available.',
+  'Award descriptions can name an asset while place of performance reflects fabrication or delivery rather than the asset site. Exact bridge/internal-structure identities are not always present in NBI/NID. Use the normalized regional child-order layer rather than raw USAspending keyword matches. Do not propagate contractor-to-asset relationships beyond the verified child order, and do not infer local cleaning from component painting or generic parent-vehicle eligibility.',
   now()
 )
 on conflict (capability_key) do update set
