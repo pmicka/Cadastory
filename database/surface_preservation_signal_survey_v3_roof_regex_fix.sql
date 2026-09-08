@@ -1,5 +1,6 @@
 -- Follow-up correction for surface_preservation_signal_survey_v3.sql.
--- Keeps explicit roof recoat/restoration detection whitespace-neutral.
+-- Keeps explicit roof recoat/restoration detection whitespace-neutral and allows
+-- short descriptive phrases such as "recoating the metal roof".
 -- Research-only.
 
 create or replace view research.v_roof_treatment_observability_probe as
@@ -10,7 +11,7 @@ with raw as (
   where s.slug in ('kde-district-facility-plans','indiana-dlgf-school-capital-projects','kentucky-transparency-contracts')
 ), source_counts as (
   select
-    count(*) filter(where lc ~ '(roof restoration|restore[^a-z]{0,20}roof|roof recover|roof re-cover|recover[^a-z]{0,20}roof|roof resurfacing|roof membrane coating|fluid[- ]applied roof|silicone[^a-z]{0,20}roof|acrylic[^a-z]{0,20}roof|elastomeric[^a-z]{0,20}roof|recoat(ing)?[^a-z]{0,45}(metal )?roof|roof[^a-z]{0,45}recoat(ing)?)')::bigint as explicit_restoration_scope,
+    count(*) filter(where lc ~ '(roof restoration|restore[^a-z]{0,20}roof|roof recover|roof re-cover|recover[^a-z]{0,20}roof|roof resurfacing|roof membrane coating|fluid[- ]applied roof|silicone[^a-z]{0,20}roof|acrylic[^a-z]{0,20}roof|elastomeric[^a-z]{0,20}roof|recoat(ing)?.{0,60}roof|roof.{0,60}recoat(ing)?)')::bigint as explicit_restoration_scope,
     count(*) filter(where lc ~ '(roof replacement|replace[^a-z]{0,20}roof|re-roof|reroof)')::bigint as explicit_replacement_scope,
     count(*) filter(where lc ~ '(roof repair|roofing repair|repair[^a-z]{0,20}roof)')::bigint as explicit_repair_scope
   from raw
