@@ -17,6 +17,7 @@ Optional environment:
   - SCOUT_OSM_BUILDING_BATCH_SIZE=100
   - SCOUT_OSM_BUILDING_TILE_DEGREES=0.08
   - SCOUT_OSM_BUILDING_MAX_TARGETS_PER_REGION=0  # 0 = all
+  - SCOUT_OSM_BUILDING_EXTRACTS_PER_PASS=12
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ REGION_FILTER = {
 BATCH_SIZE = int(os.getenv("SCOUT_OSM_BUILDING_BATCH_SIZE", "100"))
 TILE_DEGREES = float(os.getenv("SCOUT_OSM_BUILDING_TILE_DEGREES", "0.08"))
 MAX_TARGETS_PER_REGION = int(os.getenv("SCOUT_OSM_BUILDING_MAX_TARGETS_PER_REGION", "0"))
+EXTRACTS_PER_PASS = int(os.getenv("SCOUT_OSM_BUILDING_EXTRACTS_PER_PASS", "12"))
 TIMEOUT = (30, 300)
 
 if not 1 <= BATCH_SIZE <= 500:
@@ -53,6 +55,8 @@ if not 0.02 <= TILE_DEGREES <= 0.25:
     raise SystemExit("SCOUT_OSM_BUILDING_TILE_DEGREES must be between 0.02 and 0.25")
 if MAX_TARGETS_PER_REGION < 0:
     raise SystemExit("SCOUT_OSM_BUILDING_MAX_TARGETS_PER_REGION must be >= 0")
+if not 1 <= EXTRACTS_PER_PASS <= 30:
+    raise SystemExit("SCOUT_OSM_BUILDING_EXTRACTS_PER_PASS must be between 1 and 30")
 
 SUPABASE_SESSION = requests.Session()
 SUPABASE_SESSION.headers.update(
@@ -262,57 +266,68 @@ def process_region(region: dict):
 
         extract_dir = work / "extracts"
         config_path = work / "extract-config.json"
-        write_extract_config(tiles, extract_dir, config_path)
-        run("osmium", "extract", "-c", str(config_path), "-O", str(source_pbf))
 
         accepted = 0
         skipped = 0
         seen: set[tuple[str, str]] = set()
         batch: list[dict] = []
 
-        for tile in tiles:
-            tile_pbf = extract_dir / f"tile-{tile['id']:04d}.osm.pbf"
-            if not tile_pbf.exists() or tile_pbf.stat().st_size == 0:
-                continue
-            buildings_pbf = work / f"buildings-{tile['id']:04d}.osm.pbf"
-            buildings_geojson = work / f"buildings-{tile['id']:04d}.geojsonseq"
-            run(
-                "osmium",
-                "tags-filter",
-                "-O",
-                "-o",
-                str(buildings_pbf),
-                str(tile_pbf),
-                "w/building",
-                "r/building",
+        for pass_start in range(0, len(tiles), EXTRACTS_PER_PASS):
+            pass_tiles = tiles[pass_start : pass_start + EXTRACTS_PER_PASS]
+            pass_number = pass_start // EXTRACTS_PER_PASS + 1
+            total_passes = math.ceil(len(tiles) / EXTRACTS_PER_PASS)
+            print(
+                f"{region_slug}: extraction pass {pass_number}/{total_passes} "
+                f"({len(pass_tiles)} tiles)",
+                flush=True,
             )
-            run(
-                "osmium",
-                "export",
-                "-f",
-                "geojsonseq",
-                "-x",
-                "print_record_separator=false",
-                "-a",
-                "type,id",
-                "-O",
-                "-o",
-                str(buildings_geojson),
-                str(buildings_pbf),
-            )
-            for feature in iter_building_features(buildings_geojson):
-                key = (feature["osm_type"], feature["osm_id"])
-                if key in seen:
+            write_extract_config(pass_tiles, extract_dir, config_path)
+            run("osmium", "extract", "-c", str(config_path), "-O", str(source_pbf))
+
+            for tile in pass_tiles:
+                tile_pbf = extract_dir / f"tile-{tile['id']:04d}.osm.pbf"
+                if not tile_pbf.exists() or tile_pbf.stat().st_size == 0:
                     continue
-                seen.add(key)
-                batch.append(feature)
-                if len(batch) >= BATCH_SIZE:
-                    result = upload_batch(region_slug, source_ts, batch)
-                    accepted += int(result.get("accepted", 0))
-                    skipped += int(result.get("skipped", 0))
-                    batch = []
-            buildings_pbf.unlink(missing_ok=True)
-            buildings_geojson.unlink(missing_ok=True)
+                buildings_pbf = work / f"buildings-{tile['id']:04d}.osm.pbf"
+                buildings_geojson = work / f"buildings-{tile['id']:04d}.geojsonseq"
+                run(
+                    "osmium",
+                    "tags-filter",
+                    "-O",
+                    "-o",
+                    str(buildings_pbf),
+                    str(tile_pbf),
+                    "w/building",
+                    "r/building",
+                )
+                run(
+                    "osmium",
+                    "export",
+                    "-f",
+                    "geojsonseq",
+                    "-x",
+                    "print_record_separator=false",
+                    "-a",
+                    "type,id",
+                    "-O",
+                    "-o",
+                    str(buildings_geojson),
+                    str(buildings_pbf),
+                )
+                for feature in iter_building_features(buildings_geojson):
+                    key = (feature["osm_type"], feature["osm_id"])
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    batch.append(feature)
+                    if len(batch) >= BATCH_SIZE:
+                        result = upload_batch(region_slug, source_ts, batch)
+                        accepted += int(result.get("accepted", 0))
+                        skipped += int(result.get("skipped", 0))
+                        batch = []
+                tile_pbf.unlink(missing_ok=True)
+                buildings_pbf.unlink(missing_ok=True)
+                buildings_geojson.unlink(missing_ok=True)
 
         if batch:
             result = upload_batch(region_slug, source_ts, batch)
