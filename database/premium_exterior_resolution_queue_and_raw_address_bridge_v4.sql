@@ -310,7 +310,5 @@ begin
 end;
 $$;
 
-revoke all on function intelligence.promote_premium_exterior_raw_address_geometry_bridge_v1(uuid,text) from public, anon, authenticated;
--- The live function signature is (uuid, uuid); revoke/grant it explicitly below.
 revoke all on function intelligence.promote_premium_exterior_raw_address_geometry_bridge_v1(uuid,uuid) from public, anon, authenticated;
 grant execute on function intelligence.promote_premium_exterior_raw_address_geometry_bridge_v1(uuid,uuid) to service_role;
