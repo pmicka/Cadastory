@@ -44,7 +44,7 @@ async function loadMapTargets():Promise<SandboxMapTarget[]>{
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'2.1.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'2.1.1'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
     description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 may frame a bounded real Scout exemplar property or regional property group; it does not render opportunity overlays.',
@@ -52,10 +52,14 @@ function makeServer(){
     outputSchema:z.object({surface:z.literal('scout_component_sandbox'),version:z.literal('v1'),business_data:z.literal(true),interaction_scope:z.literal('ephemeral_only')}),
     annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     _meta:{ui:{resourceUri:RESOURCE_URI},'ui/resourceUri':RESOURCE_URI,'openai/outputTemplate':RESOURCE_URI,'openai/widgetAccessible':true,'openai/toolInvocation/invoking':'Opening Scout preview…','openai/toolInvocation/invoked':'Scout preview opened.'}
-  },async()=>({
-    content:[{type:'text',text:'Scout component sandbox v1. Owner-only developer preview; slide 2 frames a bounded real exemplar property or regional group and renders no opportunity overlays.'}],
-    structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'}
-  }))
+  },async()=>{
+    const widgetSessionId=crypto.randomUUID()
+    return {
+      content:[{type:'text',text:'Scout component sandbox v1. Owner-only developer preview; slide 2 frames a bounded real exemplar property or regional group and renders no opportunity overlays.'}],
+      structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},
+      _meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}
+    }
+  })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
     const targets=await loadMapTargets()
     return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 chooses a bounded real exemplar property or regional property-management group and auto-fits a static basemap; no opportunity overlays are rendered.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
