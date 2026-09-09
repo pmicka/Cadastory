@@ -1,0 +1,38 @@
+name: Scout Indiana livestock PLSS locations
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_records:
+        description: "Maximum current Indiana livestock operations to process (1-500)"
+        required: false
+        default: "250"
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-indiana-livestock-plss-locations
+  cancel-in-progress: false
+
+jobs:
+  locate:
+    if: ${{ github.event_name != 'issues' || github.event.issue.title == '[ops] Run Scout Indiana livestock PLSS locations' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: python -m pip install --upgrade requests xlrd shapely
+      - name: Verify PLSS loader logic
+        env:
+          SCOUT_SELF_TEST: "1"
+        run: python scripts/scout_indiana_livestock_plss_loader.py
+      - name: Resolve current livestock permit locations
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_IN_PLSS_MAX_RECORDS: ${{ github.event.inputs.max_records || '250' }}
+        run: python scripts/scout_indiana_livestock_plss_loader.py
