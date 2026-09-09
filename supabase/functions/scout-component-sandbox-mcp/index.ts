@@ -10,7 +10,7 @@ import {
   type SandboxMapTerritory,
   type SandboxContactCard,
   type SandboxContactRoute,
-} from './component_v14.ts'
+} from './component_v15.ts'
 import { handleVcardDownloadRequest, prepareVcardDownload } from './vcard_download.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -19,7 +19,7 @@ try { const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}'); SER
 if (!SERVICE_KEY) throw new Error('Scout component sandbox service credential is unavailable')
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession:false, autoRefreshToken:false } })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v2'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v3'
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const VCARD_TOOL_NAME = 'scout_prepare_contact_vcard_download'
 const BASEMAP_ORIGIN = 'https://tile.openstreetmap.org'
@@ -165,7 +165,7 @@ async function loadMapTargets():Promise<SandboxMapTarget[]>{
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'3.3.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'3.4.0'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
     description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. Named people in verified routing rows are person-level contact targets: tapping a sufficiently resolved name opens an in-card confirmation and prepares a standard .vcf with the person, organization, role, direct channels when available, and the verified routing instruction as notes. Organization-level names remain separately downloadable only when they contain useful importable organization contact data. Missing enrichment remains explicit rather than fabricated.',
@@ -192,7 +192,7 @@ function makeServer(){
   })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
     const targets=await loadMapTargets()
-    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN],redirectDomains:[DOWNLOAD_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card. Named-person routing rows are tappable when Scout can defensibly resolve a person name plus organization/title and routing evidence. After confirmation, an app-only server helper rebuilds the vCard from canonical Scout data and returns a short-lived encrypted HTTPS download; no contact file is persisted. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN],redirect_domains:[DOWNLOAD_ORIGIN]}}}]}
+    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card. Named-person routing rows are tappable when Scout can defensibly resolve a person name plus organization/title and routing evidence. After confirmation, an app-only server helper rebuilds the vCard from canonical Scout data and returns a short-lived encrypted HTTPS download; no contact file is persisted. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN],redirect_domains:[DOWNLOAD_ORIGIN]}}}]}
   })
   return server
 }
