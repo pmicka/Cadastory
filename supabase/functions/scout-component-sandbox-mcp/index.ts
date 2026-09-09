@@ -10,7 +10,7 @@ import {
   type SandboxMapTerritory,
   type SandboxContactCard,
   type SandboxContactRoute,
-} from './component_v11.ts'
+} from './component_v12.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -162,7 +162,7 @@ async function loadMapTargets():Promise<SandboxMapTarget[]>{
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'3.0.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'3.1.0'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
     description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. Named people in verified routing rows are person-level contact targets: tapping a sufficiently resolved name opens an in-card confirmation and prepares a standard .vcf with the person, organization, role, direct channels when available, and the verified routing instruction as notes. Organization-level names remain separately downloadable only when they contain useful importable organization contact data. Missing enrichment remains explicit rather than fabricated.',
