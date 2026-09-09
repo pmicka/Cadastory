@@ -8,7 +8,7 @@ on:
       batch_size:
         description: "Jobs to claim (1-50)"
         required: false
-        default: "6"
+        default: "20"
       rule_pack:
         description: "Optional rule pack filter"
         required: false
@@ -46,7 +46,7 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
-          SCOUT_DOCUMENT_BATCH_SIZE: ${{ github.event.inputs.batch_size || '6' }}
+          SCOUT_DOCUMENT_BATCH_SIZE: ${{ github.event.inputs.batch_size || '20' }}
           SCOUT_DOCUMENT_RULE_PACK: ${{ github.event.inputs.rule_pack || '' }}
           SCOUT_DOCUMENT_MAX_BYTES: "41943040"
           SCOUT_BUYER_MAX_SEARCHES: "2"
