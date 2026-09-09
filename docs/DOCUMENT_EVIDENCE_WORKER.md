@@ -24,6 +24,12 @@ The durable queue and evidence tables are:
 - `research.document_evidence_findings`
 - `research.document_evidence_job_candidates` (one clustered buyer job to many base opportunities)
 
+The demo-enrichment layer additionally uses:
+
+- `research.demo_exemplar_priorities_v1` — private manual priority pins; these are boosts, not a portfolio freeze;
+- `research.v_demo_exemplar_enrichment_queue_v1` — manual pins plus dynamic water-tank, exterior-cleaning, specialty-facade, and premium-facade candidates; and
+- `research.v_demo_exemplar_account_queue_v1` — property-management, facilities-management, builder/contractor, engineering/inspection, and other multi-opportunity accounts.
+
 Service-role-only RPCs are:
 
 - `internal_seed_document_evidence_jobs()`
@@ -31,8 +37,9 @@ Service-role-only RPCs are:
 - `internal_complete_document_evidence_job(job_id, outcome, findings, error)`
 - `internal_seed_buyer_document_evidence_jobs(cluster_limit)`
 - `internal_complete_buyer_document_evidence_job(job_id, outcome, findings, error)`
+- `internal_seed_exemplar_document_evidence_jobs()`
 
-## Initial rule packs
+## Rule packs
 
 ### `water_tank_morphology_v1`
 
@@ -76,15 +83,67 @@ The worker checks existing first-party roots and performs at most two bounded pu
 
 Ambiguous or bounded-no-result work becomes `exhausted` with an explicit reason and a 90-day `requery_after`. A changed candidate/source fingerprint can reopen it sooner. The linked buyer queue rows are blocked with `research_exhausted` context rather than being immediately reclaimed.
 
+High-leverage demo accounts may receive **one** bounded deeper retry after normal exhaustion. The retry is explicitly marked `demo_exemplar_retry_used=true`, raises the attempt budget only to three, and cannot reopen indefinitely.
+
+### `surface_work_condition_v1`
+
+This is an **evidence-only** rule pack for demo-exemplar enrichment. It searches exact subject/organization/address context for public text that can narrow or close missing surface-work facts, including:
+
+- explicit exterior/facade, brick, EIFS, masonry, limestone, glass, or window cleaning;
+- algae, mold/mildew, moss, lichen, other organic growth, staining/soiling, efflorescence, corrosion/rust, coating failure, or paint failure;
+- exterior painting/repainting and coating/recoating;
+- surface preparation, including explicit cleaning prior to paint/coating;
+- tuckpointing/repointing, facade/masonry restoration or rehabilitation, and sealant work; and
+- nearby/current project-year context when the source explicitly states it.
+
+The identity threshold remains strict. This pack **never auto-applies** a visible-condition, chemistry, cleaning-need, or project-status fact into a canonical table. A textual finding is durable provenance that can support a later specialist resolver or human/visual verification. It must not convert a generic cleaning proxy into a claim that a facade is visibly dirty.
+
+### `account_portfolio_context_v1`
+
+This is an **evidence-only** rule pack for account-level demo enrichment. It looks for public first-party evidence of:
+
+- portfolio/property/community/project/location rosters;
+- explicit portfolio counts;
+- property/facilities management and operating context;
+- procurement, purchasing, vendor/supplier, subcontractor/trade-partner, or prequalification routes;
+- service-area/market coverage; and
+- project portfolios and current/recent project rosters.
+
+It does not create organizations, owners, buyers, people, inferred contacts, or property crosswalks. Findings remain provenance until the existing organization/contact, property-portfolio, building-identity, or buyer-resolution contracts accept them.
+
+## Demo exemplar routing
+
+The exemplar system is deliberately broader than the document worker. Every exemplar records `desired_evidence` and `worker_routes` so missing facts are sent to the strongest existing Scout subsystem instead of being invented by a generic worker.
+
+Typical routing is:
+
+| Missing evidence | Authoritative/primary route |
+| --- | --- |
+| Water-tank morphology/support geometry | `water_tank_morphology_v1` |
+| Facade material / glazing | `facade_material_glazing_v1` + facade attribute views |
+| Textual cleaning/paint/coating/condition evidence | `surface_work_condition_v1` |
+| Buyer/contact/procurement route | `buyer_organization_contact_v1` |
+| Account portfolio/project context | `account_portfolio_context_v1` |
+| Property roster / property-to-account crosswalk | property portfolio resolver / account research queues |
+| Exact premium-building identity | building identity/reconciliation subsystem |
+| Mapped site access/staging | site-access enrichment pipeline |
+| Actual visible staining/condition | facade visual verification pipeline; document text cannot substitute for visual evidence |
+| Water-source/hose/staging execution | building-cleaning water/hose/preflight decisioning |
+| Chemistry/operator fit | chemistry decisioning; document worker does not infer product suitability |
+
+This separation is intentional. The goal is maximum attainable completeness without weakening provenance or turning a document crawler into an all-purpose classifier.
+
 ## Retry and failure budget
 
-A document-classification job gets at most three claims by default. Buyer jobs get two claims, with a seven-day evidence retry and 90-day exhausted requery interval. Later attempts may use broader source discovery. No-evidence claims are retried after a backoff; repeated failures eventually become `exhausted`. Conflicting direct evidence becomes `needs_review` immediately.
+A document-classification job gets at most three claims by default. Buyer jobs get two claims, with a seven-day evidence retry and 90-day exhausted requery interval, except for the single bounded high-leverage exemplar retry described above. Later attempts may use broader source discovery. No-evidence claims are retried after a backoff; repeated failures eventually become `exhausted`. Conflicting direct evidence becomes `needs_review` immediately.
 
 This is deliberate: the worker must not grind indefinitely or turn weak evidence into a classification merely to reduce a backlog count.
 
 ## GitHub Actions
 
-`.github/workflows/scout-document-evidence.yml` runs every two hours with single-run concurrency and may also be invoked manually. Opening an issue titled exactly:
+`.github/workflows/scout-document-evidence.yml` runs every two hours with single-run concurrency and may also be invoked manually. It now executes `scripts/scout_document_evidence_runner.py`, which supports all five rule packs while reusing the original worker's acquisition, PDF extraction, hashing, and no-media-retention behavior.
+
+Opening an issue titled exactly:
 
 `[ops] Run Scout document evidence worker`
 
@@ -102,4 +161,4 @@ New domains should reuse acquisition/indexing and add a rule pack with:
 - the narrow set of server-side auto-apply mappings; and
 - a queue seeding rule.
 
-Do not let a Python rule pack name arbitrary database tables/columns. Server-side RPCs must continue to validate each supported write path explicitly.
+Do not let a Python rule pack name arbitrary database tables/columns. Server-side RPCs must continue to validate each supported write path explicitly. Evidence-only packs are preferred when the correct canonical write path belongs to another Scout subsystem.
