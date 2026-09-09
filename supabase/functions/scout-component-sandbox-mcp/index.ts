@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.0.0'
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@modelcontextprotocol/ext-apps@2.0.0/server'
 import * as z from 'npm:zod@4.2.0/v4'
-import { buildComponentSandboxHtml, type SandboxMapTarget } from './component_v2.ts'
+import { buildComponentSandboxHtml, type SandboxMapMember, type SandboxMapTarget } from './component_v3.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -14,6 +14,7 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession:f
 const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const BASEMAP_ORIGIN = 'https://tile.openstreetmap.org'
+const PROPERTY_TYPES = new Set(['multifamily','senior_living','hotel','office','retail','industrial','residential'])
 
 async function authenticateOwner(req:Request){
   const match=(req.headers.get('authorization')||'').match(/^Bearer\s+(.+)$/i)
@@ -27,13 +28,30 @@ async function authenticateOwner(req:Request){
   return user
 }
 
+function normalizeMember(value:any):SandboxMapMember|null{
+  if(!value||typeof value.key!=='string'||typeof value.label!=='string')return null
+  const lat=Number(value.lat),lon=Number(value.lon)
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat < -90||lat > 90||lon < -180||lon > 180)return null
+  const propertyType=PROPERTY_TYPES.has(String(value.property_type))?String(value.property_type):'residential'
+  return {
+    key:value.key.slice(0,180),
+    label:value.label.slice(0,180),
+    property_type:propertyType as SandboxMapMember['property_type'],
+    property_type_label:typeof value.property_type_label==='string'?value.property_type_label.slice(0,160):'Residential property',
+    city:typeof value.city==='string'?value.city.slice(0,100):null,
+    state:typeof value.state==='string'?value.state.slice(0,20):null,
+    lon,lat
+  }
+}
+
 function normalizeTarget(value:any):SandboxMapTarget|null{
   if(!value||!['property','group'].includes(value.kind)||typeof value.key!=='string'||typeof value.label!=='string')return null
   const scopeCount=Number(value.scope_count)
   const minLon=Number(value.min_lon),minLat=Number(value.min_lat),maxLon=Number(value.max_lon),maxLat=Number(value.max_lat)
   if(!Number.isInteger(scopeCount)||scopeCount<1||![minLon,minLat,maxLon,maxLat].every(Number.isFinite))return null
   if(minLon < -180 || maxLon > 180 || minLat < -90 || maxLat > 90)return null
-  return {kind:value.kind,key:value.key,label:value.label.slice(0,160),scope_count:scopeCount,min_lon:minLon,min_lat:minLat,max_lon:maxLon,max_lat:maxLat}
+  const members=Array.isArray(value.members)?value.members.map(normalizeMember).filter((x):x is SandboxMapMember=>!!x).slice(0,80):[]
+  return {kind:value.kind,key:value.key,label:value.label.slice(0,160),scope_count:scopeCount,min_lon:minLon,min_lat:minLat,max_lon:maxLon,max_lat:maxLat,members}
 }
 
 async function loadMapTargets():Promise<SandboxMapTarget[]>{
@@ -44,10 +62,10 @@ async function loadMapTargets():Promise<SandboxMapTarget[]>{
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'2.1.1'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'2.2.0'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
-    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 may frame a bounded real Scout exemplar property or regional property group; it does not render opportunity overlays.',
+    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 frames a bounded real Scout exemplar property or a focused regional property-group cluster with typed portfolio nodes; it does not render opportunity overlays.',
     inputSchema:z.object({}),
     outputSchema:z.object({surface:z.literal('scout_component_sandbox'),version:z.literal('v1'),business_data:z.literal(true),interaction_scope:z.literal('ephemeral_only')}),
     annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
@@ -55,14 +73,14 @@ function makeServer(){
   },async()=>{
     const widgetSessionId=crypto.randomUUID()
     return {
-      content:[{type:'text',text:'Scout component sandbox v1. Owner-only developer preview; slide 2 frames a bounded real exemplar property or regional group and renders no opportunity overlays.'}],
+      content:[{type:'text',text:'Scout component sandbox v1. Owner-only developer preview; group exemplars use a focused regional cluster with typed property nodes and no opportunity overlays.'}],
       structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},
       _meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}
     }
   })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
     const targets=await loadMapTargets()
-    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 chooses a bounded real exemplar property or regional property-management group and auto-fits a static basemap; the chosen exemplar and local control state survive host remounts. No opportunity overlays are rendered.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
+    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Single properties auto-fit tightly; property-management groups focus on their strongest regional cluster and render typed portfolio nodes with local count clustering. Widget state survives host remounts. No opportunity overlays are rendered.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
   })
   return server
 }
