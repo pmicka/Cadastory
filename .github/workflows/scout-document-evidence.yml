@@ -40,7 +40,7 @@ jobs:
           pdftotext -v
 
       - name: Verify rule packs
-        run: python scripts/scout_document_evidence_runner.py --self-test
+        run: python scripts/scout_document_evidence_entrypoint.py --self-test
 
       - name: Process evidence queue
         env:
@@ -51,4 +51,4 @@ jobs:
           SCOUT_DOCUMENT_MAX_BYTES: "41943040"
           SCOUT_BUYER_MAX_SEARCHES: "2"
           SCOUT_BUYER_MAX_PAGES: "8"
-        run: python scripts/scout_document_evidence_runner.py
+        run: python scripts/scout_document_evidence_entrypoint.py
