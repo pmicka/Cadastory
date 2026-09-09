@@ -21,9 +21,8 @@ const nativeDownloadHelpers=`let scoutMcpDownloadAppPromise=null;
 async function scoutMcpDownloadApp(){
   if(!scoutMcpDownloadAppPromise){
     scoutMcpDownloadAppPromise=import('https://unpkg.com/@modelcontextprotocol/ext-apps@2.0.0/app-with-deps').then(async mod=>{
-      const app=new mod.App({name:'Scout Component Sandbox',version:'3.6.0'},{},{autoResize:false,strict:true});
+      const app=new mod.App({name:'Scout Component Sandbox',version:'3.7.0'},{},{autoResize:false,strict:true});
       await app.connect();
-      if(!app.getHostCapabilities?.()?.downloadFile)throw new Error('host_download_file_unsupported');
       return app;
     }).catch(error=>{scoutMcpDownloadAppPromise=null;throw error});
   }
@@ -31,7 +30,7 @@ async function scoutMcpDownloadApp(){
 }
 `
 
-const newDownload="async function downloadCurrentVcard(){const card=currentContactCard;if(!card||!vcardEligibility(card))return;const content=buildVcard(card),filename=vcardFilename(card),download=document.getElementById('contactVcardDownload'),copy=document.getElementById('contactVcardCopy'),live=document.getElementById('live'),originalLabel=download?.textContent||'Download .vcf';if(download){download.disabled=true;download.textContent='Saving…'}if(copy)copy.textContent='Preparing '+filename+' for ChatGPT…';try{const app=await scoutMcpDownloadApp();const result=await app.downloadFile({contents:[{type:'resource',resource:{uri:'file:///'+filename,mimeType:'text/vcard',text:content}}]});if(result?.isError)throw new Error('host_download_file_rejected');hideVcardPrompt();if(live)live.textContent='Contact file handed to ChatGPT.'}catch(error){console.error('Scout in-app vCard download failed',error);if(copy)copy.textContent=String(error?.message||'').includes('host_download_file_unsupported')?'This ChatGPT client does not currently support in-app file downloads.':'ChatGPT could not save the contact file in-app. Please try again.';if(live)live.textContent='In-app contact download failed.'}finally{if(download){download.disabled=false;download.textContent=originalLabel}}}"
+const newDownload="async function downloadCurrentVcard(){const card=currentContactCard;if(!card||!vcardEligibility(card))return;const content=buildVcard(card),filename=vcardFilename(card),download=document.getElementById('contactVcardDownload'),copy=document.getElementById('contactVcardCopy'),live=document.getElementById('live'),originalLabel=download?.textContent||'Download .vcf';if(download){download.disabled=true;download.textContent='Saving…'}if(copy)copy.textContent='Preparing '+filename+' for ChatGPT…';try{const app=await scoutMcpDownloadApp();const result=await app.downloadFile({contents:[{type:'resource',resource:{uri:'file:///'+filename,mimeType:'text/vcard',text:content}}]});if(result?.isError)throw new Error('host_download_file_rejected');hideVcardPrompt();if(live)live.textContent='Contact file handed to ChatGPT.'}catch(error){console.error('Scout in-app vCard download failed',error);if(copy){const message=String(error?.message||'');copy.textContent=/method not found|unsupported|not implemented|ui\\/download-file/i.test(message)?'This ChatGPT client rejected the native in-app file download request.':'ChatGPT could not save the contact file in-app. Please try again.'}if(live)live.textContent='In-app contact download failed.'}finally{if(download){download.disabled=false;download.textContent=originalLabel}}}"
 
 export function buildComponentSandboxHtml(targets: SandboxMapTarget[] = []) {
   let html=buildComponentSandboxHtmlV16(targets as unknown as SandboxMapTargetV16[])
