@@ -10,7 +10,7 @@ import {
   type SandboxMapTerritory,
   type SandboxContactCard,
   type SandboxContactRoute,
-} from './component_v10.ts'
+} from './component_v11.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -162,21 +162,21 @@ async function loadMapTargets():Promise<SandboxMapTarget[]>{
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'2.9.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'3.0.0'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
-    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. When a lead has a stable identity plus at least one importable phone, email, URL, website, supplier route, or address, the contact name becomes a .vcf download affordance with an in-card confirmation prompt. Routing instructions alone do not qualify. Missing enrichment remains explicit rather than fabricated. No opportunity overlays are rendered.',
+    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. Named people in verified routing rows are person-level contact targets: tapping a sufficiently resolved name opens an in-card confirmation and prepares a standard .vcf with the person, organization, role, direct channels when available, and the verified routing instruction as notes. Organization-level names remain separately downloadable only when they contain useful importable organization contact data. Missing enrichment remains explicit rather than fabricated.',
     inputSchema:z.object({}),
     outputSchema:z.object({surface:z.literal('scout_component_sandbox'),version:z.literal('v1'),business_data:z.literal(true),interaction_scope:z.literal('ephemeral_only')}),
     annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     _meta:{ui:{resourceUri:RESOURCE_URI},'ui/resourceUri':RESOURCE_URI,'openai/outputTemplate':RESOURCE_URI,'openai/widgetAccessible':true,'openai/toolInvocation/invoking':'Opening Scout preview…','openai/toolInvocation/invoked':'Scout preview opened.'}
   },async()=>{
     const widgetSessionId=crypto.randomUUID()
-    return {content:[{type:'text',text:'Scout component sandbox v1. Slide 3 previews a progressive contact card and can prepare a standard .vcf contact file when the lead contains enough importable contact data.'}],structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},_meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}}
+    return {content:[{type:'text',text:'Scout component sandbox v1. Named people in contact routing rows can now be saved as person-level .vcf contacts when Scout has a defensible name plus organization/title and routing evidence.'}],structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},_meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}}
   })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
     const targets=await loadMapTargets()
-    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card. A sufficiently resolved contact name is tappable and opens an in-card confirmation before generating a standard .vcf file locally from the already-authorized widget payload; thin leads and routing-instruction-only records remain non-downloadable. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
+    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card. Named-person routing rows are tappable when Scout can defensibly resolve a person name plus organization/title and routing evidence; confirmation then generates a standard .vcf locally, preserving routing instructions as notes without misrepresenting them as direct phone/email. Organization-level downloads remain available only when useful direct organization contact fields exist. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
   })
   return server
 }
