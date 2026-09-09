@@ -1,6 +1,8 @@
 name: Scout livestock document evidence worker
 
 on:
+  schedule:
+    - cron: "47 */2 * * *"
   workflow_dispatch:
     inputs:
       batch_size:
