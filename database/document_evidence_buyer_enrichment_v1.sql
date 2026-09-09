@@ -331,7 +331,7 @@ begin
       union
       select a.organization_id from core.organization_aliases a
         where public.scout_normalize_business_name(a.alias)=public.scout_normalize_business_name(v_job.organization_name)
-    ) select count(*),min(id) into v_match_count,v_org_id from matches;
+    ) select count(*),(array_agg(id order by id))[1] into v_match_count,v_org_id from matches;
     if v_match_count<>1 then v_org_id:=null; end if;
   end if;
 
