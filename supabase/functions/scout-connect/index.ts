@@ -15,6 +15,9 @@ const METADATA_URL = `${RESOURCE_URL}/oauth-protected-resource`
 const AUTH_SERVER = `${SUPABASE_URL}/auth/v1`
 const CORE_URL = `${SUPABASE_URL}/functions/v1/scout-mcp-contract`
 const OPS_URL = `${SUPABASE_URL}/functions/v1/scout-ops-contract`
+const SANDBOX_URL = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp`
+const SANDBOX_TOOL = 'scout_preview_component_sandbox'
+const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v1'
 const OPS_TOOLS = new Set(['scout_submit_business_signal','scout_get_action_intents','scout_update_action_intent','scout_reject_public_equipment_candidates'])
 
 const publicHeaders = {
@@ -163,6 +166,11 @@ async function recordToolDimensions(userId:string,clientId:string,connectionId:s
   }
 }
 
+async function isOwnerUser(userId:string){const {data,error}=await admin.rpc('scout_is_owner_user_internal',{p_user_id:userId});return !error&&data===true}
+function sandboxTool(){return {name:SANDBOX_TOOL,title:'Preview Scout Component Sandbox',description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. It uses placeholder content and no business data.',inputSchema:{type:'object',properties:{},additionalProperties:false},outputSchema:{type:'object',properties:{surface:{type:'string',enum:['scout_component_sandbox']},version:{type:'string',enum:['v1']},business_data:{type:'boolean',enum:[false]},interaction_scope:{type:'string',enum:['ephemeral_only']}},required:['surface','version','business_data','interaction_scope'],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},_meta:{ui:{resourceUri:SANDBOX_RESOURCE_URI},'ui/resourceUri':SANDBOX_RESOURCE_URI,'openai/outputTemplate':SANDBOX_RESOURCE_URI,'openai/widgetAccessible':true}}}
+function sandboxResource(){return {uri:SANDBOX_RESOURCE_URI,name:'scout-component-sandbox',title:'Scout Component Sandbox',description:'Owner-only static Scout MCP App component preview.',mimeType:'text/html;profile=mcp-app'}}
+function methodNotFound(rpcBody:any){return json({jsonrpc:'2.0',id:rpcBody?.id??null,error:{code:-32601,message:'Method not found'}})}
+
 async function issueProxy(connectionId:string){
   const {data,error}=await admin.rpc('scout_issue_connection_proxy_token_internal',{p_connection_id:connectionId,p_ttl_seconds:120})
   if(error||!data?.token)throw new Error('Scout could not prepare authenticated MCP request')
@@ -195,13 +203,21 @@ async function fetchRpcJson(url:string,req:Request,bearer:string,raw:string){
     return JSON.parse(text)
   }catch{return null}
 }
-async function mergedToolsList(req:Request,connectionId:string,raw:string){
+async function mergedToolsList(req:Request,connectionId:string,raw:string,owner:boolean){
   const [coreToken,opsToken]=await Promise.all([issueProxy(connectionId),issueProxy(connectionId)])
   const [core,ops]=await Promise.all([fetchRpcJson(CORE_URL,req,coreToken,raw),fetchRpcJson(OPS_URL,req,opsToken,raw)])
   if(!core?.result?.tools)return null
   const seen=new Set<string>(); const tools:any[]=[]
   for(const t of [...(core.result.tools||[]),...(ops?.result?.tools||[])]){if(!t?.name||seen.has(t.name))continue;seen.add(t.name);tools.push(t)}
+  if(owner&&!seen.has(SANDBOX_TOOL))tools.push(sandboxTool())
   return {...core,result:{...core.result,tools}}
+}
+async function mergedResourcesList(req:Request,connectionId:string,raw:string,owner:boolean){
+  const core=await fetchRpcJson(CORE_URL,req,await issueProxy(connectionId),raw)
+  if(!core?.result?.resources)return core
+  const resources=[...(core.result.resources||[])]
+  if(owner&&!resources.some((r:any)=>String(r?.uri||'')===SANDBOX_RESOURCE_URI))resources.push(sandboxResource())
+  return {...core,result:{...core.result,resources}}
 }
 
 type RoutingManifest={version?:string;policies?:Array<{title?:unknown;body?:unknown;priority?:unknown}>;tools?:Array<Record<string,unknown>>}
@@ -222,7 +238,7 @@ async function getRoutingManifest():Promise<RoutingManifest|null>{
   routingCache={until:Date.now()+30000,manifest}
   return manifest
 }
-function compilePublicInstructions(base:unknown,manifest:RoutingManifest){
+function compilePublicInstructions(base:unknown,manifest:RoutingManifest,owner:boolean){
   const root=routingText(base,18000)
   const lines=['PUBLIC ROUTING (generated from Scout routing and capability contracts):']
   const policies=Array.isArray(manifest.policies)?[...manifest.policies]:[]
@@ -234,6 +250,7 @@ function compilePublicInstructions(base:unknown,manifest:RoutingManifest){
   const groups=new Map<string,Array<Record<string,unknown>>>()
   for(const row of Array.isArray(manifest.tools)?manifest.tools:[]){
     if(!row||typeof row!=='object')continue
+    if(!owner&&routingText(row.tool_name,160)===SANDBOX_TOOL)continue
     const group=routingText(row.instruction_group,80)||'other'
     const rows=groups.get(group)||[];rows.push(row);groups.set(group,rows)
   }
@@ -266,13 +283,13 @@ function compilePublicInstructions(base:unknown,manifest:RoutingManifest){
   const compiled=lines.join('\n')
   return root?root+'\n\n'+compiled:compiled
 }
-async function composedInitialize(req:Request,connectionId:string,raw:string){
+async function composedInitialize(req:Request,connectionId:string,raw:string,owner:boolean){
   const [core,manifest]=await Promise.all([
     fetchRpcJson(CORE_URL,req,await issueProxy(connectionId),raw),
     getRoutingManifest()
   ])
   if(!core?.result||!manifest)return core
-  return {...core,result:{...core.result,instructions:compilePublicInstructions(core.result.instructions,manifest)}}
+  return {...core,result:{...core.result,instructions:compilePublicInstructions(core.result.instructions,manifest,owner)}}
 }
 
 Deno.serve(async(req:Request)=>{
@@ -294,6 +311,7 @@ Deno.serve(async(req:Request)=>{
   if(claimError)return json({error:'forbidden',error_description:'This Google account is not approved for Scout.'},403)
   const {data:connection,error:bindError}=await admin.rpc('scout_resolve_oauth_agent_connection_internal',{p_user_id:user.id,p_oauth_client_id:clientId})
   if(bindError||!connection?.connection_id){const reason=connection?.reason==='oauth_consent_not_active'?'OAuth consent is not active for this Scout connection.':(bindError?.message||'Scout provider connection could not be resolved');return json({error:'forbidden',error_description:reason},403)}
+  const owner=await isOwnerUser(user.id)
 
   let raw:string|undefined
   let rpcBody:any=null
@@ -302,10 +320,21 @@ Deno.serve(async(req:Request)=>{
     try{rpcBody=JSON.parse(raw)}catch{/* let core return protocol error */}
     if(rpcBody)await recordToolDimensions(user.id,clientId,connection.connection_id,rpcBody)
     if(!Array.isArray(rpcBody)&&rpcBody?.method==='initialize'){
-      try{const initialized=await composedInitialize(req,connection.connection_id,raw);if(initialized)return json(initialized)}catch(e){console.error('initialize routing composition failed',e)}
+      try{const initialized=await composedInitialize(req,connection.connection_id,raw,owner);if(initialized)return json(initialized)}catch(e){console.error('initialize routing composition failed',e)}
     }
     if(!Array.isArray(rpcBody)&&rpcBody?.method==='tools/list'){
-      try{const merged=await mergedToolsList(req,connection.connection_id,raw);if(merged)return json(merged)}catch(e){console.error('tools/list merge failed',e)}
+      try{const merged=await mergedToolsList(req,connection.connection_id,raw,owner);if(merged)return json(merged)}catch(e){console.error('tools/list merge failed',e)}
+    }
+    if(!Array.isArray(rpcBody)&&rpcBody?.method==='resources/list'){
+      try{const merged=await mergedResourcesList(req,connection.connection_id,raw,owner);if(merged)return json(merged)}catch(e){console.error('resources/list merge failed',e)}
+    }
+    if(!Array.isArray(rpcBody)&&rpcBody?.method==='tools/call'&&String(rpcBody?.params?.name||'')===SANDBOX_TOOL){
+      if(!owner)return methodNotFound(rpcBody)
+      try{return await forwardTo(SANDBOX_URL,req,token,raw)}catch{return json({error:'server_error',error_description:'Scout component sandbox request could not be prepared.'},500)}
+    }
+    if(!Array.isArray(rpcBody)&&rpcBody?.method==='resources/read'&&String(rpcBody?.params?.uri||'')===SANDBOX_RESOURCE_URI){
+      if(!owner)return methodNotFound(rpcBody)
+      try{return await forwardTo(SANDBOX_URL,req,token,raw)}catch{return json({error:'server_error',error_description:'Scout component sandbox resource could not be prepared.'},500)}
     }
     if(!Array.isArray(rpcBody)&&rpcBody?.method==='tools/call'&&OPS_TOOLS.has(String(rpcBody?.params?.name||''))){
       try{return await forwardTo(OPS_URL,req,await issueProxy(connection.connection_id),raw)}catch{return json({error:'server_error',error_description:'Scout operations MCP request could not be prepared.'},500)}
