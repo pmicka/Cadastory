@@ -93,7 +93,7 @@ begin
       md5(concat_ws('|',cluster_key,count(*)::text,max(priority)::text,
         string_agg(candidate_key,',' order by candidate_key),
         string_agg(coalesce(buyer_hint,''),',' order by candidate_key))) input_fingerprint,
-      (100000-(max(priority)*300+least(count(*),100)*150+
+      (-(max(priority)*300+least(count(*),100)*150+
         count(*) filter(where commercial_scale_status='documented')*100+
         case when bool_or(time_sensitive) then 20000 else 0 end))::integer worker_priority
     from eligible group by cluster_key
