@@ -1,0 +1,45 @@
+name: Scout livestock document evidence worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Livestock jobs to claim (1-25)"
+        required: false
+        default: "6"
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-livestock-document-evidence-worker
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    if: ${{ github.event_name != 'issues' || github.event.issue.title == '[ops] Run Scout livestock document evidence worker' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install document tooling
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+          python -m pip install --upgrade requests
+          pdftotext -v
+
+      - name: Verify livestock rule pack
+        run: python scripts/scout_livestock_document_evidence_entrypoint.py --self-test
+
+      - name: Process livestock evidence queue
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_DOCUMENT_BATCH_SIZE: ${{ github.event.inputs.batch_size || '6' }}
+          SCOUT_DOCUMENT_MAX_BYTES: "41943040"
+        run: python scripts/scout_livestock_document_evidence_entrypoint.py
