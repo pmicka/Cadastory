@@ -1,24 +1,33 @@
 #!/usr/bin/env python3
 """Bounded orchestration entrypoint for Scout's document evidence worker.
 
-Base domain seeding, buyer seeding, and demo-exemplar prioritization are intentionally
-separate RPCs so each phase gets its own transaction/HTTP timeout budget. The rule-pack
-implementation remains in scout_document_evidence_runner.py.
+Base domain seeding, agriculture buyer/contact seeding, general buyer seeding, and
+demo-exemplar prioritization are intentionally separate RPCs so each phase gets its
+own transaction/HTTP timeout budget. The rule-pack implementation remains in
+scout_document_evidence_runner.py.
 
 A production identity guard is installed for short/generic surface exemplar names so a
 name such as "GARRETT" cannot match an unrelated business page merely because the token
 appears there. Generic names require corroborating buyer/address context or an explicit
 subject phrase such as "Garrett Tank".
+
+Agricultural buyer jobs reuse the conservative buyer_organization_contact_v1 rule pack.
+Farm operator bridge candidates are search hints only: they are never added to
+known_parties and therefore cannot become identity aliases merely because a landholder
+and a phone-bearing farm candidate share a mailing address.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import time
+from urllib.parse import parse_qs, unquote, urlparse
 
 import scout_document_evidence_runner as runner
 
 base = runner.base
 _ORIGINAL_SURFACE_IDENTITY = runner._surface_identity
+_ORIGINAL_BUYER_SEARCH_RESULTS = base.discover_buyer_search_results
 
 
 def _strict_surface_identity(job: dict, text: str) -> float:
@@ -57,8 +66,66 @@ def _strict_surface_identity(job: dict, text: str) -> float:
     return min(score, 0.70)
 
 
-# analyze_page_extended resolves this module global at call time.
+def _agriculture_aware_buyer_search_results(job: dict) -> list[str]:
+    ctx = job.get("context") or {}
+    if ctx.get("research_domain") != "agriculture":
+        return _ORIGINAL_BUYER_SEARCH_RESULTS(job)
+    if base.BUYER_MAX_SEARCHES < 1:
+        return []
+
+    org = str(job.get("organization_name") or ctx.get("organization_name") or "").strip()
+    address = str((ctx.get("addresses") or [""])[0] or "").strip()
+    bridge_candidates = ctx.get("agriculture_operator_bridge_candidates") or []
+    bridge_name = ""
+    for candidate in bridge_candidates:
+        if isinstance(candidate, dict) and candidate.get("search_hint_only") is True:
+            bridge_name = str(candidate.get("operator_name") or "").strip()
+            if bridge_name:
+                break
+
+    queries: list[str] = []
+    if org:
+        queries.append(f'"{org}" farm agriculture contact phone')
+    if bridge_name and address:
+        # Search-only corroboration. The bridge name is deliberately not an identity alias.
+        queries.append(f'"{bridge_name}" "{address}" farm')
+    elif address:
+        queries.append(f'"{address}" farm operator agriculture')
+
+    results: list[str] = []
+    for query in queries[: base.BUYER_MAX_SEARCHES]:
+        try:
+            response = base.SESSION.get(
+                "https://html.duckduckgo.com/html/",
+                params={"q": query},
+                timeout=(12, 30),
+                allow_redirects=True,
+            )
+            response.raise_for_status()
+            parser = base.parse_html(response.content)
+            for href, _ in parser.links:
+                if href.startswith("//duckduckgo.com/l/?"):
+                    href = "https:" + href
+                if "duckduckgo.com/l/" in href:
+                    href = unquote(parse_qs(urlparse(href).query).get("uddg", [""])[0])
+                parsed = urlparse(href)
+                if (
+                    parsed.scheme in {"http", "https"}
+                    and parsed.hostname
+                    and "duckduckgo.com" not in parsed.hostname
+                ):
+                    results.append(href.split("#", 1)[0])
+                if len(results) >= base.BUYER_MAX_PAGES * 2:
+                    break
+        except Exception as exc:
+            print(f"agriculture buyer search failed: {type(exc).__name__}: {exc}", flush=True)
+        time.sleep(0.4)
+    return list(dict.fromkeys(results))
+
+
+# analyze_page_extended and process_buyer_job resolve these module globals at call time.
 runner._surface_identity = _strict_surface_identity
+base.discover_buyer_search_results = _agriculture_aware_buyer_search_results
 
 
 def _entrypoint_self_test() -> None:
@@ -78,7 +145,24 @@ def _entrypoint_self_test() -> None:
 
     corroborated = "Meade County Water District Garrett Tank exterior coating rehabilitation."
     assert _strict_surface_identity(generic, corroborated) >= 0.95
-    print("entrypoint identity self-test passed")
+
+    agriculture = {
+        "organization_name": "Example Family Farms LLC",
+        "context": {
+            "research_domain": "agriculture",
+            "addresses": ["100 Farm Road, Example KY 40000"],
+            "known_parties": ["Example Family Farms LLC"],
+            "agriculture_operator_bridge_candidates": [
+                {
+                    "operator_name": "Example Farm",
+                    "search_hint_only": True,
+                    "not_identity_alias": True,
+                }
+            ],
+        },
+    }
+    assert "Example Farm" not in agriculture["context"]["known_parties"]
+    print("entrypoint identity/agriculture guard self-test passed")
 
 
 def main() -> None:
@@ -103,6 +187,12 @@ def main() -> None:
 
     seed = base.rpc("internal_seed_document_evidence_jobs")
     print(f"seed={json.dumps(seed, sort_keys=True)}", flush=True)
+
+    agriculture_queue_seed = base.rpc("internal_seed_agricultural_buyer_enrichment")
+    print(f"agriculture_queue_seed={json.dumps(agriculture_queue_seed, sort_keys=True)}", flush=True)
+
+    agriculture_buyer_seed = base.rpc("internal_seed_agricultural_buyer_document_evidence_jobs")
+    print(f"agriculture_buyer_seed={json.dumps(agriculture_buyer_seed, sort_keys=True)}", flush=True)
 
     buyer_seed = base.rpc("internal_seed_buyer_document_evidence_jobs")
     print(f"buyer_seed={json.dumps(buyer_seed, sort_keys=True)}", flush=True)
