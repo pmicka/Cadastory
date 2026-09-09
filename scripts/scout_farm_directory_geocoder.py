@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Bounded U.S. Census geocoder for Scout Kentucky farm-directory evidence.
+"""Bounded U.S. Census geocoder for Scout Kentucky livestock-farm evidence.
 
-Reads candidates only through the existing service-role queue RPC and writes
+Reads livestock candidates only through the service-role queue RPC and writes
 results only through the validated farm-directory geocode upsert RPC.
 No third-party map data or transient response bodies are persisted.
 """
@@ -18,10 +18,10 @@ import requests
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "").rstrip("/")
 SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-MAX_RECORDS = max(1, min(int(os.getenv("SCOUT_FARM_GEOCODE_MAX_RECORDS", "100")), 500))
-QUEUE_SIZE = max(1, min(int(os.getenv("SCOUT_FARM_GEOCODE_QUEUE_SIZE", "50")), 100))
+MAX_RECORDS = max(1, min(int(os.getenv("SCOUT_FARM_GEOCODE_MAX_RECORDS", "300")), 500))
+QUEUE_SIZE = max(1, min(int(os.getenv("SCOUT_FARM_GEOCODE_QUEUE_SIZE", "100")), 500))
 TIMEOUT = (15, 45)
-USER_AGENT = "Scout-Cadastory-Farm-Geocoder/1.0 (+U.S.-Census-public-geocoder)"
+USER_AGENT = "Scout-Cadastory-Farm-Geocoder/1.1 (+U.S.-Census-public-geocoder)"
 CENSUS_URL = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
 KY_BBOX = (-89.75, -81.75, 36.35, 39.35)  # lon_min, lon_max, lat_min, lat_max
 
@@ -162,8 +162,7 @@ def main() -> None:
     seen: set[str] = set()
     stats = {"matched": 0, "no_match": 0, "error": 0, "processed": 0}
     while stats["processed"] < MAX_RECORDS:
-        queue = rpc("internal_get_farm_directory_geocode_queue", {
-            "p_crop_name": None,
+        queue = rpc("internal_get_livestock_farm_geocode_queue", {
             "p_limit": min(QUEUE_SIZE, MAX_RECORDS - stats["processed"]),
         }) or []
         fresh = [row for row in queue if str(row.get("candidate_id")) not in seen]
