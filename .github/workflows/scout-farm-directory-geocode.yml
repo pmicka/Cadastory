@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       max_records:
-        description: "Maximum farm addresses to process (1-500)"
+        description: "Maximum livestock farm addresses to process (1-500)"
         required: false
-        default: "100"
+        default: "300"
   issues:
     types: [opened]
 
@@ -28,10 +28,10 @@ jobs:
         run: python -m pip install --upgrade requests
       - name: Verify geocoder logic
         run: python scripts/scout_farm_directory_geocoder.py --self-test
-      - name: Geocode farm directory addresses
+      - name: Geocode livestock farm directory addresses
         env:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
-          SCOUT_FARM_GEOCODE_MAX_RECORDS: ${{ github.event.inputs.max_records || '100' }}
-          SCOUT_FARM_GEOCODE_QUEUE_SIZE: "50"
+          SCOUT_FARM_GEOCODE_MAX_RECORDS: ${{ github.event.inputs.max_records || '300' }}
+          SCOUT_FARM_GEOCODE_QUEUE_SIZE: "100"
         run: python scripts/scout_farm_directory_geocoder.py
