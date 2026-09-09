@@ -16,7 +16,7 @@ import xlrd
 
 IDEM_URL = "https://www.in.gov/dA/a65b5e6a25/permits_issued.xls?language_id=1"
 PLSS_URL = "https://gisdata.in.gov/server/rest/services/Hosted/PLSS_1/FeatureServer/3/query"
-USER_AGENT = "Scout-Cadastory-IDEM-CFO-Probe/1.1"
+USER_AGENT = "Scout-Cadastory-IDEM-CFO-Probe/1.2"
 KNOWN_FARM_IDS = {"6394", "4494", "4695", "372", "1939"}
 KNOWN_NAMES = {
     "50 west llc",
@@ -91,14 +91,17 @@ def plss_lookup(section: str, township: str, range_value: str) -> dict[str, obje
 
     twp, twpd = t
     rng, rngd = rg
-    where = f"twp={twp} AND twpd='{twpd}' AND rng={rng} AND rngd='{rngd}' AND parcel_id='{sec}'"
+    # Query only the township/range server-side, then filter the small section set
+    # client-side. This avoids brittle compound predicates on the hosted layer.
+    where = f"twp={twp} AND twpd='{twpd}' AND rng={rng} AND rngd='{rngd}'"
     response = requests.get(
         PLSS_URL,
         params={
-            "f": "geojson",
+            "f": "json",
             "where": where,
-            "outFields": "objectid_1,meridian,twp,twpd,rng,rngd,parcel_id",
+            "outFields": "objectid_12,meridian,twp,twpd,rng,rngd,parcel_id",
             "returnGeometry": "true",
+            "returnCentroid": "true",
             "outSR": "4326",
         },
         headers={"User-Agent": USER_AGENT},
@@ -106,34 +109,31 @@ def plss_lookup(section: str, township: str, range_value: str) -> dict[str, obje
     )
     response.raise_for_status()
     payload = response.json()
-    features = payload.get("features") or []
-    summaries = []
-    for feature in features[:5]:
-        props = feature.get("properties") or {}
-        geometry = feature.get("geometry") or {}
-        coords = geometry.get("coordinates") or []
-        flat: list[tuple[float, float]] = []
-        for polygon in coords:
-            rings = polygon if geometry.get("type") == "MultiPolygon" else coords
-            for ring in rings:
-                for point in ring:
-                    if isinstance(point, list) and len(point) >= 2 and isinstance(point[0], (int, float)):
-                        flat.append((float(point[0]), float(point[1])))
-            if geometry.get("type") != "MultiPolygon":
-                break
-        if flat:
-            lon = sum(p[0] for p in flat) / len(flat)
-            lat = sum(p[1] for p in flat) / len(flat)
-        else:
-            lon = lat = None
-        summaries.append({
-            "objectid": props.get("objectid_1"),
-            "meridian": props.get("meridian"),
-            "section": props.get("parcel_id"),
-            "approx_lon": round(lon, 6) if lon is not None else None,
-            "approx_lat": round(lat, 6) if lat is not None else None,
+    if payload.get("error"):
+        return {"status": "arcgis_error", "error": payload["error"].get("message")}
+
+    features = []
+    for feature in payload.get("features") or []:
+        attrs = feature.get("attributes") or {}
+        if str(attrs.get("parcel_id") or "").strip() != str(sec):
+            continue
+        centroid = feature.get("centroid") or {}
+        lon = centroid.get("x")
+        lat = centroid.get("y")
+        if lon is None or lat is None:
+            rings = (feature.get("geometry") or {}).get("rings") or []
+            points = [p for ring in rings for p in ring if isinstance(p, list) and len(p) >= 2]
+            if points:
+                lon = sum(float(p[0]) for p in points) / len(points)
+                lat = sum(float(p[1]) for p in points) / len(points)
+        features.append({
+            "objectid": attrs.get("objectid_12"),
+            "meridian": attrs.get("meridian"),
+            "section": attrs.get("parcel_id"),
+            "approx_lon": round(float(lon), 6) if lon is not None else None,
+            "approx_lat": round(float(lat), 6) if lat is not None else None,
         })
-    return {"status": "ok", "feature_count": len(features), "features": summaries}
+    return {"status": "ok", "feature_count": len(features), "features": features[:5]}
 
 
 def main() -> None:
