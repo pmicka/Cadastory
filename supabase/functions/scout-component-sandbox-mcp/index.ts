@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.0.0'
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@modelcontextprotocol/ext-apps@2.0.0/server'
 import * as z from 'npm:zod@4.2.0/v4'
-import { buildComponentSandboxHtml, type SandboxMapTarget } from './component.ts'
+import { buildComponentSandboxHtml, type SandboxMapTarget } from './component_v2.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -62,7 +62,7 @@ function makeServer(){
   })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
     const targets=await loadMapTargets()
-    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 chooses a bounded real exemplar property or regional property-management group and auto-fits a static basemap; no opportunity overlays are rendered.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
+    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 chooses a bounded real exemplar property or regional property-management group and auto-fits a static basemap; the chosen exemplar and local control state survive host remounts. No opportunity overlays are rendered.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
   })
   return server
 }
