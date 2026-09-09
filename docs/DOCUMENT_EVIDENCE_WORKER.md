@@ -96,7 +96,7 @@ This is an **evidence-only** rule pack for demo-exemplar enrichment. It searches
 - tuckpointing/repointing, facade/masonry restoration or rehabilitation, and sealant work; and
 - nearby/current project-year context when the source explicitly states it.
 
-The identity threshold remains strict. This pack **never auto-applies** a visible-condition, chemistry, cleaning-need, or project-status fact into a canonical table. A textual finding is durable provenance that can support a later specialist resolver or human/visual verification. It must not convert a generic cleaning proxy into a claim that a facade is visibly dirty.
+The identity threshold remains strict. Short or generic exemplar names additionally require corroborating buyer/organization/address context or an explicit subject phrase (for example, `GARRETT TANK`); a bare shared token cannot establish identity. Manually pinned exemplars are backfilled with already-resolved buyer and geography context for this purpose. This pack **never auto-applies** a visible-condition, chemistry, cleaning-need, or project-status fact into a canonical table. A textual finding is durable provenance that can support a later specialist resolver or human/visual verification. It must not convert a generic cleaning proxy into a claim that a facade is visibly dirty.
 
 ### `account_portfolio_context_v1`
 
@@ -141,7 +141,7 @@ This is deliberate: the worker must not grind indefinitely or turn weak evidence
 
 ## GitHub Actions
 
-`.github/workflows/scout-document-evidence.yml` runs every two hours with single-run concurrency and may also be invoked manually. It now executes `scripts/scout_document_evidence_runner.py`, which supports all five rule packs while reusing the original worker's acquisition, PDF extraction, hashing, and no-media-retention behavior.
+`.github/workflows/scout-document-evidence.yml` runs every two hours with single-run concurrency and may also be invoked manually. Production runs execute `scripts/scout_document_evidence_entrypoint.py`. The entrypoint installs the strict generic-name identity guard, then invokes base-domain seeding, buyer seeding, and exemplar-priority seeding as **separate bounded RPCs** before claiming work. Rule-pack processing remains in `scripts/scout_document_evidence_runner.py`, which reuses the original worker's acquisition, PDF extraction, hashing, and no-media-retention behavior.
 
 Opening an issue titled exactly:
 
