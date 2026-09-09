@@ -1,10 +1,37 @@
 import {
   buildComponentSandboxHtml as buildComponentSandboxHtmlV6,
-  type SandboxMapMember,
-  type SandboxMapTarget,
+  type SandboxMapTarget as SandboxMapTargetV6,
 } from './component_v6.ts'
 
-export type { SandboxMapMember, SandboxMapTarget }
+export type SandboxMapMemberType =
+  | 'multifamily'
+  | 'senior_living'
+  | 'hotel'
+  | 'office'
+  | 'retail'
+  | 'industrial'
+  | 'residential'
+  | 'dealership'
+  | 'water_tank_elevated'
+  | 'water_tank_standpipe'
+  | 'water_tank_ground_storage'
+  | 'water_tank_other'
+  | 'other'
+
+export type SandboxMapMember = {
+  key: string
+  label: string
+  property_type: SandboxMapMemberType
+  property_type_label: string
+  city?: string | null
+  state?: string | null
+  lon: number
+  lat: number
+}
+
+export type SandboxMapTarget = Omit<SandboxMapTargetV6,'members'> & {
+  members?: SandboxMapMember[]
+}
 
 function replaceRequired(source:string, needle:string, replacement:string, label:string){
   if(!source.includes(needle))throw new Error('Scout component sandbox v7 transform failed: '+label)
@@ -29,7 +56,7 @@ const newLegendJs=`function renderLegend(){const el=document.getElementById('map
 const placeholderCircleCss=`.circle{width:44px;height:44px;border-radius:50%;background:color-mix(in srgb,var(--card) 76%,transparent);margin:0 auto 16px}`
 
 export function buildComponentSandboxHtml(targets: SandboxMapTarget[] = []) {
-  let html=buildComponentSandboxHtmlV6(targets)
+  let html=buildComponentSandboxHtmlV6(targets as unknown as SandboxMapTargetV6[])
   html=replaceRequired(html,oldNodeTypeColors,newNodeTypeColors,'portfolio member node colors')
   html=replaceRequired(html,oldLegendTypeColors,newLegendTypeColors,'portfolio member legend colors')
   html=replaceRequired(html,oldTypeLabel,newTypeLabel,'portfolio member labels')
