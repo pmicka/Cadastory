@@ -10,7 +10,7 @@ import {
   type SandboxMapTerritory,
   type SandboxContactCard,
   type SandboxContactRoute,
-} from './component_v13.ts'
+} from './component_v16.ts'
 import { handleVcardDownloadRequest, prepareVcardDownload } from './vcard_download.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -21,8 +21,8 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession:f
 
 const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
 const TOOL_NAME = 'scout_preview_component_sandbox'
-const VCARD_TOOL_NAME = 'scout_prepare_contact_vcard_download'
 const BASEMAP_ORIGIN = 'https://tile.openstreetmap.org'
+const DOWNLOAD_ORIGIN = new URL(SUPABASE_URL).origin
 const PROPERTY_TYPES = new Set([
   'multifamily','senior_living','hotel','office','retail','industrial','residential',
   'dealership','water_tank_elevated','water_tank_standpipe','water_tank_ground_storage','water_tank_other','other'
@@ -163,35 +163,41 @@ async function loadMapTargets():Promise<SandboxMapTarget[]>{
   return data.map(normalizeTarget).filter((x):x is SandboxMapTarget=>!!x)
 }
 
+async function attachPreparedVcardDownloads(targets:SandboxMapTarget[]):Promise<SandboxMapTarget[]>{
+  await Promise.all(targets.map(async target=>{
+    const card:any=target.contact_card
+    if(!card)return
+    try{
+      const base=await prepareVcardDownload(targets,target.key,null,SUPABASE_URL,SERVICE_KEY)
+      if(base?.download_url)card.prepared_download_url=base.download_url
+      const routes=Array.isArray(card.routes)?card.routes.slice(0,2):[]
+      await Promise.all(routes.map(async(route:any)=>{
+        try{
+          const prepared=await prepareVcardDownload(targets,target.key,String(route.key||''),SUPABASE_URL,SERVICE_KEY)
+          if(prepared?.download_url)route.prepared_download_url=prepared.download_url
+        }catch(error){console.error('Scout component sandbox route vCard preparation failed',target.key,route?.key,error)}
+      }))
+    }catch(error){console.error('Scout component sandbox vCard preparation failed',target.key,error)}
+  }))
+  return targets
+}
+
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'3.2.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'3.5.0'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
-    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. Named people in verified routing rows are person-level contact targets: tapping a sufficiently resolved name opens an in-card confirmation and prepares a standard .vcf with the person, organization, role, direct channels when available, and the verified routing instruction as notes. Organization-level names remain separately downloadable only when they contain useful importable organization contact data. Missing enrichment remains explicit rather than fabricated.',
+    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. Named people in verified routing rows are person-level contact targets. Eligible contact downloads are prepared during resource rendering as short-lived encrypted HTTPS capabilities, so the widget does not need a second MCP tool call when the user confirms a .vcf download. Missing enrichment remains explicit rather than fabricated.',
     inputSchema:z.object({}),
     outputSchema:z.object({surface:z.literal('scout_component_sandbox'),version:z.literal('v1'),business_data:z.literal(true),interaction_scope:z.literal('ephemeral_only')}),
     annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     _meta:{ui:{resourceUri:RESOURCE_URI},'ui/resourceUri':RESOURCE_URI,'openai/outputTemplate':RESOURCE_URI,'openai/widgetAccessible':true,'openai/toolInvocation/invoking':'Opening Scout preview…','openai/toolInvocation/invoked':'Scout preview opened.'}
   },async()=>{
     const widgetSessionId=crypto.randomUUID()
-    return {content:[{type:'text',text:'Scout component sandbox v1. Named people in contact routing rows can be saved as person-level .vcf contacts when Scout has defensible identity and routing evidence.'}],structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},_meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}}
-  })
-  registerAppTool(server,VCARD_TOOL_NAME,{
-    title:'Prepare contact vCard download',
-    description:'App-only helper that prepares a short-lived vCard download for the currently previewed Scout contact. Hidden from the model.',
-    inputSchema:z.object({target_key:z.string().min(1).max(180),route_key:z.string().max(180).nullable().optional()}),
-    outputSchema:z.object({download_url:z.string(),file_name:z.string()}),
-    annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
-    _meta:{ui:{visibility:['app']}}
-  },async({target_key,route_key})=>{
-    const targets=await loadMapTargets()
-    const prepared=await prepareVcardDownload(targets,target_key,route_key??null,SUPABASE_URL,SERVICE_KEY)
-    if(!prepared)return {content:[{type:'text',text:JSON.stringify({error:'contact_not_downloadable'})}],isError:true}
-    return {content:[{type:'text',text:JSON.stringify(prepared)}],structuredContent:prepared}
+    return {content:[{type:'text',text:'Scout component sandbox v1. Eligible contact cards include short-lived prepared .vcf download capabilities; no contact file is persisted.'}],structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},_meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}}
   })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
-    const targets=await loadMapTargets()
-    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card. Named-person routing rows are tappable when Scout can defensibly resolve a person name plus organization/title and routing evidence. After confirmation, an app-only server helper rebuilds the vCard from canonical Scout data and returns a short-lived encrypted HTTPS download; no contact file is persisted. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
+    const targets=await attachPreparedVcardDownloads(await loadMapTargets())
+    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card. Eligible organization and named-person contacts carry short-lived encrypted HTTPS .vcf download capabilities prepared while the resource renders; pressing Download only opens that vetted URL and does not invoke another MCP tool. No contact file is persisted. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN],redirect_domains:[DOWNLOAD_ORIGIN]}}}]}
   })
   return server
 }
