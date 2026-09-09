@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.0.0'
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@modelcontextprotocol/ext-apps@2.0.0/server'
 import * as z from 'npm:zod@4.2.0/v4'
-import { buildComponentSandboxHtml, type SandboxMapMember, type SandboxMapTarget } from './component_v3.ts'
+import { buildComponentSandboxHtml, type SandboxMapMember, type SandboxMapTarget } from './component_v4.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -62,10 +62,10 @@ async function loadMapTargets():Promise<SandboxMapTarget[]>{
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'2.2.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'2.3.0'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
-    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 frames a bounded real Scout exemplar property or a focused regional property-group cluster with typed portfolio nodes; it does not render opportunity overlays.',
+    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 frames a bounded real Scout exemplar property or a focused regional property-group cluster. Group maps use semi-transparent color-coded numbered circles; clustering occurs only within the same property type and different types may overlap. No opportunity overlays are rendered.',
     inputSchema:z.object({}),
     outputSchema:z.object({surface:z.literal('scout_component_sandbox'),version:z.literal('v1'),business_data:z.literal(true),interaction_scope:z.literal('ephemeral_only')}),
     annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
@@ -73,14 +73,14 @@ function makeServer(){
   },async()=>{
     const widgetSessionId=crypto.randomUUID()
     return {
-      content:[{type:'text',text:'Scout component sandbox v1. Owner-only developer preview; group exemplars use a focused regional cluster with typed property nodes and no opportunity overlays.'}],
+      content:[{type:'text',text:'Scout component sandbox v1. Owner-only developer preview; group exemplars use focused regional clusters with type-separated numbered property circles and no opportunity overlays.'}],
       structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},
       _meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}
     }
   })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
     const targets=await loadMapTargets()
-    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Single properties auto-fit tightly; property-management groups focus on their strongest regional cluster and render typed portfolio nodes with local count clustering. Widget state survives host remounts. No opportunity overlays are rendered.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
+    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Single properties auto-fit tightly; property-management groups focus on their strongest regional cluster and render semi-transparent numbered circles clustered independently by property type. Different property types may overlap. Widget state survives host remounts. No opportunity overlays are rendered.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
   })
   return server
 }
