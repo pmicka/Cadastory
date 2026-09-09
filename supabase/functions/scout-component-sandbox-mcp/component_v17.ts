@@ -20,7 +20,7 @@ const oldDownload="async function downloadCurrentVcard(){const card=currentConta
 const nativeDownloadHelpers=`let scoutMcpDownloadAppPromise=null;
 async function scoutMcpDownloadApp(){
   if(!scoutMcpDownloadAppPromise){
-    scoutMcpDownloadAppPromise=import('https://esm.sh/@modelcontextprotocol/ext-apps@2.0.0/app-with-deps?bundle&target=es2022').then(async mod=>{
+    scoutMcpDownloadAppPromise=import('https://unpkg.com/@modelcontextprotocol/ext-apps@2.0.0/app-with-deps').then(async mod=>{
       const app=new mod.App({name:'Scout Component Sandbox',version:'3.6.0'},{},{autoResize:false,strict:true});
       await app.connect();
       if(!app.getHostCapabilities?.()?.downloadFile)throw new Error('host_download_file_unsupported');
