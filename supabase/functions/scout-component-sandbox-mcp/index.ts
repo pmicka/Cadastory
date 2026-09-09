@@ -10,7 +10,7 @@ import {
   type SandboxMapTerritory,
   type SandboxContactCard,
   type SandboxContactRoute,
-} from './component_v9.ts'
+} from './component_v10.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -162,21 +162,21 @@ async function loadMapTargets():Promise<SandboxMapTarget[]>{
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'2.8.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'2.9.0'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
-    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card that works from identity-only leads through fully enriched organizations: direct channels, departmental routes, supplier/procurement paths, switchboards, and named routing instructions are optional normalized routes. Missing enrichment is shown explicitly rather than fabricated. No opportunity overlays are rendered.',
+    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. When a lead has a stable identity plus at least one importable phone, email, URL, website, supplier route, or address, the contact name becomes a .vcf download affordance with an in-card confirmation prompt. Routing instructions alone do not qualify. Missing enrichment remains explicit rather than fabricated. No opportunity overlays are rendered.',
     inputSchema:z.object({}),
     outputSchema:z.object({surface:z.literal('scout_component_sandbox'),version:z.literal('v1'),business_data:z.literal(true),interaction_scope:z.literal('ephemeral_only')}),
     annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
     _meta:{ui:{resourceUri:RESOURCE_URI},'ui/resourceUri':RESOURCE_URI,'openai/outputTemplate':RESOURCE_URI,'openai/widgetAccessible':true,'openai/toolInvocation/invoking':'Opening Scout preview…','openai/toolInvocation/invoked':'Scout preview opened.'}
   },async()=>{
     const widgetSessionId=crypto.randomUUID()
-    return {content:[{type:'text',text:'Scout component sandbox v1. Slide 3 now previews a progressive contact card that remains valid before contact enrichment and adds verified routes as Scout resolves them.'}],structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},_meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}}
+    return {content:[{type:'text',text:'Scout component sandbox v1. Slide 3 previews a progressive contact card and can prepare a standard .vcf contact file when the lead contains enough importable contact data.'}],structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},_meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}}
   })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
     const targets=await loadMapTargets()
-    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card: the lead identity always renders; verified phone, email, web, supplier/procurement, department, switchboard, or routing-instruction paths appear only when present; missing contact enrichment is an explicit pending state rather than a blank or invented contact. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
+    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card. A sufficiently resolved contact name is tappable and opens an in-card confirmation before generating a standard .vcf file locally from the already-authorized widget payload; thin leads and routing-instruction-only records remain non-downloadable. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]}
   })
   return server
 }
