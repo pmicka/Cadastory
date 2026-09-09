@@ -453,3 +453,62 @@ Production influence requires explicit promotion of the exact claim/use pair aft
 Unknowns remain unknown. Failed hypotheses remain useful research history. Operator expertise remains valuable even when it is not universal.
 
 That is the intended Field Calibration Loop: a durable mechanism for keeping the human in the loop while allowing Scout's decisioning to become progressively more evidence-backed over time.
+
+---
+
+## 16. Pinned research idea: JIT multispectral water/wetness context + 3DEP
+
+**Status:** Pinned hypothesis only. No production ranking effect. No user-facing feature is implied by this note.
+
+A potentially valuable job-planning research path is to combine terrain/elevation context from 3DEP with transient multispectral reflectance-derived water/wetness context from suitable satellite or aerial imagery.
+
+The motivating idea is that the two evidence families answer different questions:
+
+- **3DEP** can describe terrain geometry, relative elevation, drainage tendency, depressions, slope, and where water may plausibly flow or collect.
+- **Multispectral reflectance** can sometimes help identify observed open water or relative wetness using spectral behavior and derived indices such as NDWI/MNDWI or other source-appropriate water masks.
+
+The combination may therefore support hypotheses such as:
+
+- mapped or terrain-predicted drainage features that also show recent spectral evidence of water/wetness are more operationally relevant than either signal alone;
+- recent water/wetness context may improve job planning around staging, route selection, access, hose placement, ground conditions, or equipment positioning;
+- terrain-derived drainage expectations can help interpret noisy or coarse spectral detections;
+- spectral observations can corroborate or challenge static mapped hydrology/context layers.
+
+### JIT/transient posture
+
+If pursued, this should initially follow the same restrained pattern proposed for overhead utilities:
+
+- retrieve only a geographically bounded area around a specific job or planning target;
+- use the imagery/derived raster values as transient planning evidence where practical;
+- avoid turning the capability into a broad user-addressable imagery or water-search product;
+- prefer storing narrowly scoped derived operational conclusions, provenance, timestamps, source identity, and uncertainty rather than retaining bulky source imagery;
+- do not use the mere presence of a spectral water/wetness signal as a production difficulty penalty.
+
+Source-media retention should continue to follow Scout's normal storage discipline: if temporary imagery is needed only to derive structured facts, process it ephemerally and retain the derived evidence rather than the media itself unless there is a separate justified retention need.
+
+### Calibration path
+
+This idea should enter the Field Calibration Loop as a family of claim-specific hypotheses rather than as one monolithic feature.
+
+Examples:
+
+- `recent_surface_water_context`
+- `terrain_spectral_drainage_concordance`
+- `wet_ground_access_risk`
+- `staging_zone_wetness_constraint`
+- `route_wetness_constraint`
+
+Each derived claim should be evaluated against retrospective operator examples and, when possible, prospective completed-job outcomes.
+
+The important test is not whether NDWI/MNDWI or another water classifier can detect water in principle. The test is whether the specific derived feature improves Scout's operational prediction for the intended job-planning use.
+
+Potential field outcomes include:
+
+- operator-reported wet/soft ground,
+- inaccessible or undesirable staging area,
+- route changes caused by standing water or saturated ground,
+- increased setup time,
+- equipment-placement constraints,
+- or no meaningful operational effect despite a detected water/wetness signal.
+
+As with other Field Calibration Loop features, source authority and intuitive plausibility do not authorize production ranking. Promotion requires explicit evidence for the exact claim/use pair.
