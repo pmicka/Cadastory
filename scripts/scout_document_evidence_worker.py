@@ -13,8 +13,10 @@ Required:
 
 Optional:
   SCOUT_DOCUMENT_BATCH_SIZE=6
-  SCOUT_DOCUMENT_RULE_PACK=water_tank_morphology_v1|facade_material_glazing_v1
+  SCOUT_DOCUMENT_RULE_PACK=water_tank_morphology_v1|facade_material_glazing_v1|buyer_organization_contact_v1
   SCOUT_DOCUMENT_MAX_BYTES=41943040
+  SCOUT_BUYER_MAX_SEARCHES=2
+  SCOUT_BUYER_MAX_PAGES=8
 """
 from __future__ import annotations
 
@@ -29,7 +31,7 @@ import re
 import subprocess
 import tempfile
 import time
-from urllib.parse import urljoin, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
 import urllib.robotparser
 
 import requests
@@ -39,6 +41,8 @@ SERVICE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
 BATCH_SIZE = int(os.getenv("SCOUT_DOCUMENT_BATCH_SIZE", "6"))
 RULE_PACK = os.getenv("SCOUT_DOCUMENT_RULE_PACK") or None
 MAX_BYTES = int(os.getenv("SCOUT_DOCUMENT_MAX_BYTES", str(40 * 1024 * 1024)))
+BUYER_MAX_SEARCHES = int(os.getenv("SCOUT_BUYER_MAX_SEARCHES", "2"))
+BUYER_MAX_PAGES = int(os.getenv("SCOUT_BUYER_MAX_PAGES", "8"))
 TIMEOUT = (20, 120)
 TRANSIENT_HTTP = {408, 425, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524}
 USER_AGENT = "Scout-Cadastory-Document-Evidence/1.0 (+public-evidence; no-source-media-retention)"
@@ -208,6 +212,194 @@ def document_authority(url: str) -> str:
     if host.endswith(".gov"):
         return f"Public agency source ({host})"
     return host or "Public source"
+
+
+def official_domain_for_job(job: dict, url: str) -> bool:
+    host = (urlparse(url).hostname or "").lower().removeprefix("www.")
+    if not host:
+        return False
+    for root in job.get("source_roots") or []:
+        root_host = (urlparse(str(root)).hostname or "").lower().removeprefix("www.")
+        if root_host and (host == root_host or host.endswith("." + root_host)):
+            return True
+    return False
+
+
+def buyer_identity_confidence(job: dict, text: str, url: str) -> float:
+    ctx = job.get("context") or {}
+    names = [job.get("organization_name"), ctx.get("organization_name")]
+    names.extend(ctx.get("known_parties") or [])
+    ntext = " " + norm(text) + " "
+    exact_name = any(
+        len(norm(name)) >= 5 and f" {norm(name)} " in ntext
+        for name in names if name
+    )
+    if official_domain_for_job(job, url) and exact_name:
+        return 0.995
+    if exact_name:
+        return 0.96
+    addresses = [norm(a) for a in (ctx.get("addresses") or []) if norm(a)]
+    if any(f" {a} " in ntext for a in addresses):
+        return 0.90  # address alone is deliberately insufficient for auto-application
+    return 0.45
+
+
+def contact_scope_for_link(href: str, anchor: str) -> str | None:
+    value = norm(href + " " + anchor)
+    ordered = (
+        ("supplier_registration", ("supplier registration", "vendor registration", "become a supplier", "ariba")),
+        ("procurement", ("procurement", "purchasing", "bids and proposals", "solicitations")),
+        ("physical_plant", ("physical plant",)),
+        ("facility_operations", ("facility operations", "facilities operations")),
+        ("facilities", ("facilities", "facility management")),
+        ("maintenance", ("maintenance",)),
+        ("capital_projects", ("capital projects", "capital planning")),
+        ("planning_design_construction", ("planning design construction",)),
+        ("project_construction", ("construction", "project management")),
+        ("business_affairs", ("business affairs",)),
+        ("general_switchboard", ("contact us", "contact", "main office", "corporate office")),
+    )
+    for scope, phrases in ordered:
+        if any(phrase in value for phrase in phrases):
+            return scope
+    return None
+
+
+def buyer_page_finding(job: dict, data: bytes, final: str, content_type: str | None) -> dict | None:
+    if content_type and "pdf" in content_type.lower():
+        return None
+    parser = parse_html(data)
+    identity = buyer_identity_confidence(job, parser.text, final)
+    routes: list[dict] = []
+    seen: set[tuple[str, str, str]] = set()
+    for href, anchor in parser.links:
+        absolute = urljoin(final, href)
+        scope = contact_scope_for_link(href, anchor)
+        channel = None
+        value = None
+        if href.lower().startswith("mailto:"):
+            channel, value = "email", href.split(":", 1)[1].split("?", 1)[0].strip()
+            scope = scope or contact_scope_for_link(value, anchor) or "other"
+        elif href.lower().startswith("tel:"):
+            channel, value = "phone", href.split(":", 1)[1].strip()
+            scope = scope or "general_switchboard"
+        elif scope and absolute.startswith(("http://", "https://")):
+            channel, value = "url", absolute.split("#", 1)[0]
+        if not channel or not value or not scope:
+            continue
+        key = (scope, channel, value.lower())
+        if key in seen:
+            continue
+        seen.add(key)
+        routes.append({
+            "contact_scope": scope,
+            "channel_type": channel,
+            "contact_value": value[:1000],
+            "label": anchor[:300] or None,
+            "department_name": anchor[:300] if scope not in {"general_switchboard", "other"} else None,
+            "stability_class": "institutional" if channel == "url" else "departmental",
+            "confidence": 0.86 if official_domain_for_job(job, final) else 0.72,
+        })
+        if len(routes) >= 8:
+            break
+    names = [job.get("organization_name")] + list((job.get("context") or {}).get("known_parties") or [])
+    pats = [re.compile(re.escape(str(n)), re.I) for n in names if n and len(str(n)) >= 4]
+    excerpt = excerpt_around(parser.text, pats, 700) if pats else ""
+    if not excerpt:
+        excerpt = " ".join(parser.text.split())[:1400]
+    if not routes and identity < 0.90:
+        return None
+    codes = ["buyer.organization_identity"] if identity >= 0.95 else ["buyer.site_identity_signal"]
+    codes.extend(sorted({"buyer.route." + r["contact_scope"] for r in routes}))
+    source_sha = sha256_bytes(data)
+    return {
+        "fingerprint": finding_fingerprint(str(job["id"]), final, None, codes, excerpt),
+        "source_url": final,
+        "source_authority": document_authority(final),
+        "source_kind": "public_web_page",
+        "document_title": Path(urlparse(final).path).name or final,
+        "page_number": None,
+        "evidence_excerpt": excerpt,
+        "evidence_codes": codes,
+        "extracted_values": {"contact_routes": routes},
+        "confidence": 0.95 if identity >= 0.95 else 0.75,
+        "identity_confidence": identity,
+        "decision_state": "documented" if identity >= 0.95 else "signal_to_investigate",
+        "source_sha256": source_sha,
+        "observed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "auto_apply": bool(routes and identity >= 0.95),
+    }
+
+
+def discover_buyer_search_results(job: dict) -> list[str]:
+    if BUYER_MAX_SEARCHES < 1:
+        return []
+    ctx = job.get("context") or {}
+    org = job.get("organization_name") or ctx.get("organization_name") or ""
+    address = (ctx.get("addresses") or [""])[0]
+    queries = []
+    if org:
+        queries.append(f'"{org}" facilities procurement vendor contact')
+    if address:
+        queries.append(f'"{address}" owner operator property management')
+    results: list[str] = []
+    for query in queries[:BUYER_MAX_SEARCHES]:
+        try:
+            response = SESSION.get(
+                "https://html.duckduckgo.com/html/",
+                params={"q": query}, timeout=(12, 30), allow_redirects=True,
+            )
+            response.raise_for_status()
+            parser = parse_html(response.content)
+            for href, _ in parser.links:
+                if href.startswith("//duckduckgo.com/l/?"):
+                    href = "https:" + href
+                if "duckduckgo.com/l/" in href:
+                    href = unquote(parse_qs(urlparse(href).query).get("uddg", [""])[0])
+                parsed = urlparse(href)
+                if parsed.scheme in {"http", "https"} and parsed.hostname and "duckduckgo.com" not in parsed.hostname:
+                    results.append(href.split("#", 1)[0])
+                if len(results) >= BUYER_MAX_PAGES * 2:
+                    break
+        except Exception as exc:
+            print(f"buyer search failed: {exc}", flush=True)
+        time.sleep(0.4)
+    return list(dict.fromkeys(results))
+
+
+def process_buyer_job(job: dict) -> tuple[str, list[dict], str | None]:
+    urls: list[str] = []
+    for root in job.get("source_roots") or []:
+        if isinstance(root, str) and root.startswith(("http://", "https://")):
+            urls.append(root)
+            try:
+                urls.extend(discover_from_root(root, job))
+            except Exception as exc:
+                print(f"buyer root discovery failed {root}: {exc}", flush=True)
+    urls.extend(discover_buyer_search_results(job))
+    urls = list(dict.fromkeys(urls))[:BUYER_MAX_PAGES]
+    findings: list[dict] = []
+    errors: list[str] = []
+    for url in urls:
+        try:
+            data, final, content_type = fetch(url)
+            finding = buyer_page_finding(job, data, final, content_type)
+            if finding:
+                findings.append(finding)
+        except Exception as exc:
+            errors.append(f"{url}: {exc}")
+        time.sleep(0.2)
+    applicable = [f for f in findings if f.get("auto_apply")]
+    if applicable:
+        # Each page remains an independently auditable finding; persistence upserts reusable routes.
+        return "completed", findings, None
+    ctx = job.get("context") or {}
+    if findings or (ctx.get("addresses") and not job.get("organization_name")):
+        reason = "property/site identity or responsibility remains ambiguous; await new authoritative evidence"
+        return "research_exhausted", findings, reason
+    if urls and errors and len(errors) >= len(urls):
+        return "failed", [], "; ".join(errors[:6])
+    return "no_evidence", findings, None
 
 
 def pdf_pages(data: bytes, work: Path) -> tuple[list[str], str | None]:
@@ -669,6 +861,8 @@ def process_document(job: dict, url: str, work: Path) -> tuple[list[dict], str |
 
 
 def process_job(job: dict) -> tuple[str, list[dict], str | None]:
+    if job.get("rule_pack") == "buyer_organization_contact_v1":
+        return process_buyer_job(job)
     urls: list[str] = []
     errors: list[str] = []
     for root in job.get("source_roots") or []:
@@ -734,6 +928,20 @@ def self_test() -> None:
     auto2, conflict2 = aggregate_auto_candidate(facade, [f2])
     assert auto2 and not conflict2
     assert "facade.material.brick" in auto2["evidence_codes"]
+
+    buyer = {
+        "id": "00000000-0000-0000-0000-000000000003",
+        "rule_pack": "buyer_organization_contact_v1",
+        "organization_name": "Example University",
+        "source_roots": ["https://www.example.edu/"],
+        "context": {"known_parties": ["Example University"], "addresses": ["100 Campus Drive"]},
+    }
+    buyer_html = b'''<html><body><h1>Example University Facilities</h1>
+      <a href="/procurement/vendor-registration">Vendor registration</a>
+      <a href="mailto:facilities@example.edu">Facilities email</a></body></html>'''
+    bf = buyer_page_finding(buyer, buyer_html, "https://www.example.edu/facilities", "text/html")
+    assert bf and bf["identity_confidence"] >= 0.95 and bf["auto_apply"]
+    assert all(r["stability_class"] != "role_holder" for r in bf["extracted_values"]["contact_routes"])
     print("self-test passed")
 
 
@@ -750,7 +958,8 @@ def main() -> None:
         raise SystemExit("SCOUT_DOCUMENT_BATCH_SIZE must be between 1 and 50")
     require_poppler()
     seed = rpc("internal_seed_document_evidence_jobs")
-    print(f"seed={json.dumps(seed, sort_keys=True)}", flush=True)
+    buyer_seed = rpc("internal_seed_buyer_document_evidence_jobs")
+    print(f"seed={json.dumps(seed, sort_keys=True)} buyer_seed={json.dumps(buyer_seed, sort_keys=True)}", flush=True)
     jobs = rpc("internal_claim_document_evidence_jobs", {"p_limit": BATCH_SIZE, "p_rule_pack": RULE_PACK})
     print(f"claimed={len(jobs)}", flush=True)
     for job in jobs:
@@ -759,7 +968,12 @@ def main() -> None:
             outcome, findings, error = process_job(job)
         except Exception as exc:
             outcome, findings, error = "failed", [], f"unhandled worker error: {type(exc).__name__}: {exc}"
-        result = rpc("internal_complete_document_evidence_job", {
+        completion_rpc = (
+            "internal_complete_buyer_document_evidence_job"
+            if job.get("rule_pack") == "buyer_organization_contact_v1"
+            else "internal_complete_document_evidence_job"
+        )
+        result = rpc(completion_rpc, {
             "p_job_id": job["id"], "p_outcome": outcome, "p_findings": findings, "p_error": error,
         })
         print(f"complete={json.dumps(result, sort_keys=True)}", flush=True)

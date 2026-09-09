@@ -49,4 +49,6 @@ jobs:
           SCOUT_DOCUMENT_BATCH_SIZE: ${{ github.event.inputs.batch_size || '6' }}
           SCOUT_DOCUMENT_RULE_PACK: ${{ github.event.inputs.rule_pack || '' }}
           SCOUT_DOCUMENT_MAX_BYTES: "41943040"
+          SCOUT_BUYER_MAX_SEARCHES: "2"
+          SCOUT_BUYER_MAX_PAGES: "8"
         run: python scripts/scout_document_evidence_worker.py

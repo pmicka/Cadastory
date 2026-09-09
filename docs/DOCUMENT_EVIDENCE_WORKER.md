@@ -22,12 +22,15 @@ The durable queue and evidence tables are:
 
 - `research.document_evidence_jobs`
 - `research.document_evidence_findings`
+- `research.document_evidence_job_candidates` (one clustered buyer job to many base opportunities)
 
 Service-role-only RPCs are:
 
 - `internal_seed_document_evidence_jobs()`
 - `internal_claim_document_evidence_jobs(limit, rule_pack)`
 - `internal_complete_document_evidence_job(job_id, outcome, findings, error)`
+- `internal_seed_buyer_document_evidence_jobs(cluster_limit)`
+- `internal_complete_buyer_document_evidence_job(job_id, outcome, findings, error)`
 
 ## Initial rule packs
 
@@ -58,9 +61,24 @@ The first pass is seeded only from Scout's **high-priority** facade verification
 
 The existing coarse facade-material taxonomy remains the canonical building attribute. More specific terms such as EIFS, precast concrete, metal panels, or limestone are retained in the finding/extracted-value provenance even when mapped to a coarser canonical material.
 
+### `buyer_organization_contact_v1`
+
+Buyer work is clustered by an already-resolved organization, an exact named project party, or—only when neither exists—normalized site address. Priority combines time sensitivity, documented commercial scale, queue priority, and the number of opportunities a reusable organization result can unlock.
+
+The worker checks existing first-party roots and performs at most two bounded public-web searches and eight page fetches per cluster. It extracts organization identity signals and durable facilities, procurement, supplier-registration, or general contact routes. Server-side persistence is deliberately stricter than extraction:
+
+- a route may attach only to an existing organization ID or one unique exact canonical-name/alias match;
+- automated research never creates an organization, a person, or an inferred personal email;
+- generic routes are capped below `0.90` confidence and cannot become `VERIFIED DIRECT`;
+- address-only evidence and proximity remain investigatory and never become buyer assignments;
+- owner, operator, tenant, property manager, contractor, broker, and buyer roles are not collapsed; and
+- buyer normalization plus a buyer-only spine projection update the canonical route state without rerunning unrelated classifiers or changing opportunity scores.
+
+Ambiguous or bounded-no-result work becomes `exhausted` with an explicit reason and a 90-day `requery_after`. A changed candidate/source fingerprint can reopen it sooner. The linked buyer queue rows are blocked with `research_exhausted` context rather than being immediately reclaimed.
+
 ## Retry and failure budget
 
-A job gets at most three claims by default. Later attempts may use broader source discovery. No-evidence claims are retried after a backoff; repeated failures eventually become `exhausted`. Conflicting direct evidence becomes `needs_review` immediately.
+A document-classification job gets at most three claims by default. Buyer jobs get two claims, with a seven-day evidence retry and 90-day exhausted requery interval. Later attempts may use broader source discovery. No-evidence claims are retried after a backoff; repeated failures eventually become `exhausted`. Conflicting direct evidence becomes `needs_review` immediately.
 
 This is deliberate: the worker must not grind indefinitely or turn weak evidence into a classification merely to reduce a backlog count.
 
