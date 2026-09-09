@@ -4,6 +4,11 @@
 Base domain seeding, buyer seeding, and demo-exemplar prioritization are intentionally
 separate RPCs so each phase gets its own transaction/HTTP timeout budget. The rule-pack
 implementation remains in scout_document_evidence_runner.py.
+
+A production identity guard is installed for short/generic surface exemplar names so a
+name such as "GARRETT" cannot match an unrelated business page merely because the token
+appears there. Generic names require corroborating buyer/address context or an explicit
+subject phrase such as "Garrett Tank".
 """
 from __future__ import annotations
 
@@ -13,6 +18,67 @@ import json
 import scout_document_evidence_runner as runner
 
 base = runner.base
+_ORIGINAL_SURFACE_IDENTITY = runner._surface_identity
+
+
+def _strict_surface_identity(job: dict, text: str) -> float:
+    score = _ORIGINAL_SURFACE_IDENTITY(job, text)
+    name = str(job.get("display_name") or "").strip()
+    nname = base.norm(name)
+    name_tokens = [token for token in nname.split() if token]
+
+    # Long/specific names retain the original conservative identity behavior.
+    generic_name = len(nname) < 12 or len(name_tokens) <= 1
+    if not generic_name:
+        return score
+
+    ntext = " " + base.norm(text) + " "
+    ctx = job.get("context") or {}
+    corroborators = [
+        job.get("organization_name"),
+        ctx.get("organization_name"),
+        ctx.get("buyer_name"),
+        ctx.get("system_name"),
+        ctx.get("address_text"),
+        ctx.get("site_address_text"),
+    ]
+    for value in corroborators:
+        nvalue = base.norm(value)
+        if len(nvalue) >= 6 and f" {nvalue} " in ntext:
+            return max(score, 0.96)
+
+    candidate_key = str(ctx.get("candidate_key") or job.get("subject_key") or "")
+    if candidate_key.startswith("water_tank:") and nname:
+        for phrase in (f" {nname} tank ", f" {nname} water tank "):
+            if phrase in ntext:
+                return max(score, 0.96)
+
+    # A bare short/generic token is insufficient identity evidence.
+    return min(score, 0.70)
+
+
+# analyze_page_extended resolves this module global at call time.
+runner._surface_identity = _strict_surface_identity
+
+
+def _entrypoint_self_test() -> None:
+    generic = {
+        "id": "00000000-0000-0000-0000-000000000103",
+        "rule_pack": "surface_work_condition_v1",
+        "display_name": "GARRETT",
+        "organization_name": "Meade County Water District",
+        "subject_key": "water_tank:00000000-0000-0000-0000-000000000104",
+        "context": {
+            "candidate_key": "water_tank:00000000-0000-0000-0000-000000000104",
+            "buyer_name": "Meade County Water District",
+        },
+    }
+    unrelated = "Garrett Paint provides residential painting, coatings, and pressure washing."
+    assert _strict_surface_identity(generic, unrelated) < 0.90
+
+    corroborated = "Meade County Water District Garrett Tank exterior coating rehabilitation."
+    assert _strict_surface_identity(generic, corroborated) >= 0.95
+    print("entrypoint identity self-test passed")
 
 
 def main() -> None:
@@ -23,6 +89,7 @@ def main() -> None:
     if args.self_test:
         base.self_test()
         runner.self_test()
+        _entrypoint_self_test()
         return
 
     if not base.SUPABASE_URL or not base.SERVICE_KEY:
