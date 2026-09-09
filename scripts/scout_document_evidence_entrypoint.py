@@ -14,7 +14,8 @@ subject phrase such as "Garrett Tank".
 Agricultural buyer jobs reuse the conservative buyer_organization_contact_v1 rule pack.
 Farm operator bridge candidates are search hints only: they are never added to
 known_parties and therefore cannot become identity aliases merely because a landholder
-and a phone-bearing farm candidate share a mailing address.
+and a phone-bearing farm candidate share a mailing address. A small agriculture-specific
+claim lane prevents the global evidence backlog from starving farm contact work.
 """
 from __future__ import annotations
 
@@ -200,11 +201,20 @@ def main() -> None:
     exemplar_seed = base.rpc("internal_seed_exemplar_document_evidence_jobs")
     print(f"exemplar_seed={json.dumps(exemplar_seed, sort_keys=True)}", flush=True)
 
-    jobs = base.rpc(
+    agriculture_jobs: list[dict] = []
+    if not base.RULE_PACK or base.RULE_PACK == "buyer_organization_contact_v1":
+        agriculture_jobs = base.rpc("internal_claim_agricultural_buyer_document_evidence_jobs")
+
+    general_jobs = base.rpc(
         "internal_claim_document_evidence_jobs",
         {"p_limit": base.BATCH_SIZE, "p_rule_pack": base.RULE_PACK},
     )
-    print(f"claimed={len(jobs)}", flush=True)
+    agriculture_ids = {job["id"] for job in agriculture_jobs}
+    jobs = agriculture_jobs + [job for job in general_jobs if job["id"] not in agriculture_ids]
+    print(
+        f"claimed_agriculture={len(agriculture_jobs)} claimed_general={len(general_jobs)} claimed_total={len(jobs)}",
+        flush=True,
+    )
 
     for job in jobs:
         pack = job.get("rule_pack")
