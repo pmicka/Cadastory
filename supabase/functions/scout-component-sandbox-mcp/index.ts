@@ -13,6 +13,7 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession:f
 
 const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
 const TOOL_NAME = 'scout_preview_component_sandbox'
+const BASEMAP_ORIGIN = 'https://tile.openstreetmap.org'
 
 async function authenticateOwner(req:Request){
   const match=(req.headers.get('authorization')||'').match(/^Bearer\s+(.+)$/i)
@@ -27,7 +28,7 @@ async function authenticateOwner(req:Request){
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'2.0.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'2.0.1'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
     description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. It uses placeholder content and no business data.',
@@ -40,7 +41,7 @@ function makeServer(){
     structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:false,interaction_scope:'ephemeral_only'}
   }))
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>({
-    contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:COMPONENT_SANDBOX_HTML,_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[]}},'openai/widgetDescription':'Owner-only Scout component sandbox for testing inline card controls and interaction density.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[]}}}]
+    contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:COMPONENT_SANDBOX_HTML,_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox for testing inline card controls and interaction density. Slide 2 is a non-interactive basemap-only rendering test with no Scout data overlays.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN]}}}]
   }))
   return server
 }
