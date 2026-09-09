@@ -23,6 +23,7 @@ The durable queue and evidence tables are:
 - `research.document_evidence_jobs`
 - `research.document_evidence_findings`
 - `research.document_evidence_job_candidates` (one clustered buyer job to many base opportunities)
+- `agriculture.farm_operator_field_bridge_candidates` (candidate-only phone-bearing operator-to-field bridge evidence; never an automatic operator assignment)
 
 The demo-enrichment layer additionally uses:
 
@@ -38,6 +39,9 @@ Service-role-only RPCs are:
 - `internal_seed_buyer_document_evidence_jobs(cluster_limit)`
 - `internal_complete_buyer_document_evidence_job(job_id, outcome, findings, error)`
 - `internal_seed_exemplar_document_evidence_jobs()`
+- `internal_seed_agricultural_buyer_enrichment()`
+- `internal_seed_agricultural_buyer_document_evidence_jobs()`
+- `internal_claim_agricultural_buyer_document_evidence_jobs()`
 
 ## Rule packs
 
@@ -85,6 +89,34 @@ Ambiguous or bounded-no-result work becomes `exhausted` with an explicit reason 
 
 High-leverage demo accounts may receive **one** bounded deeper retry after normal exhaustion. The retry is explicitly marked `demo_exemplar_retry_used=true`, raises the attempt budget only to three, and cannot reopen indefinitely.
 
+#### Agriculture buyer/contact lane
+
+Agricultural opportunities reuse `buyer_organization_contact_v1`; Scout does not maintain a parallel farm identity/contact system. Each worker run first refreshes the current agriculture buyer queue with `internal_seed_agricultural_buyer_enrichment()`, then materializes farm clusters with `internal_seed_agricultural_buyer_document_evidence_jobs()`.
+
+The phone-bearing operator-to-field bridge is deliberately candidate-only:
+
+- the current deterministic bridge requires an **exact normalized full mailing-address match** between a phone-bearing farm/operator candidate and a field-linked landholder;
+- matching is evaluated through the field graph, so a bridge can support opportunities normalized through another linked farm candidate without converting source IDs into identity aliases;
+- bridge rows live in `agriculture.farm_operator_field_bridge_candidates` with RLS enabled and no public/anon/authenticated access;
+- a bridge operator name is passed to the worker only as `agriculture_operator_bridge_candidates` search context with `search_hint_only=true` and `not_identity_alias=true`;
+- bridge operator names are never inserted into `known_parties` solely because of the address match;
+- address equality, parcel/field linkage, or geographic proximity never auto-promotes an operator, buyer organization, person, or contact route; and
+- any accepted route must independently satisfy the same organization/contact evidence and persistence rules as every other buyer job.
+
+Agriculture uses farm-aware search phrasing (`farm`, `agriculture`, `operator`, `contact`, `phone`) rather than the facilities/procurement wording used for commercial buildings. The same bounded research limits still apply: at most two searches and eight page fetches per cluster.
+
+To prevent the global evidence backlog from starving agriculture, each unattended run reserves a small claim lane through `internal_claim_agricultural_buyer_document_evidence_jobs()`. The production lane currently claims up to **two agriculture buyer/contact jobs per run**, in addition to the normal general evidence batch. Duplicate job IDs are removed before processing.
+
+Production validation on 2026-09-09 established the initial operating baseline:
+
+- 250 current agricultural opportunity records were seeded into buyer enrichment;
+- 63 agricultural buyer/contact clusters were materialized;
+- the exact-address bridge produced 8 active field-level bridge rows involving 2 phone-bearing operators and reaching 12 current agricultural opportunities;
+- a live GitHub Actions run claimed 2 agriculture jobs plus the normal 6-job general batch; and
+- both initial agriculture jobs correctly re-queued after producing no sufficiently trustworthy new route, rather than forcing an identity/contact assignment.
+
+These counts are a validation snapshot, not a fixed portfolio contract; subsequent runs may change them as the source graph and opportunity set evolve.
+
 ### `surface_work_condition_v1`
 
 This is an **evidence-only** rule pack for demo-exemplar enrichment. It searches exact subject/organization/address context for public text that can narrow or close missing surface-work facts, including:
@@ -123,6 +155,7 @@ Typical routing is:
 | Facade material / glazing | `facade_material_glazing_v1` + facade attribute views |
 | Textual cleaning/paint/coating/condition evidence | `surface_work_condition_v1` |
 | Buyer/contact/procurement route | `buyer_organization_contact_v1` |
+| Agriculture buyer/operator/contact route | agriculture buyer/contact lane + `buyer_organization_contact_v1` |
 | Account portfolio/project context | `account_portfolio_context_v1` |
 | Property roster / property-to-account crosswalk | property portfolio resolver / account research queues |
 | Exact premium-building identity | building identity/reconciliation subsystem |
@@ -137,11 +170,25 @@ This separation is intentional. The goal is maximum attainable completeness with
 
 A document-classification job gets at most three claims by default. Buyer jobs get two claims, with a seven-day evidence retry and 90-day exhausted requery interval, except for the single bounded high-leverage exemplar retry described above. Later attempts may use broader source discovery. No-evidence claims are retried after a backoff; repeated failures eventually become `exhausted`. Conflicting direct evidence becomes `needs_review` immediately.
 
+Agriculture buyer jobs use the same buyer retry/exhaustion semantics. The reserved agriculture claim lane changes scheduling fairness only; it does not increase evidence budgets, loosen identity thresholds, or grant additional automatic write authority.
+
 This is deliberate: the worker must not grind indefinitely or turn weak evidence into a classification merely to reduce a backlog count.
 
 ## GitHub Actions
 
-`.github/workflows/scout-document-evidence.yml` runs every two hours with single-run concurrency and may also be invoked manually. Production runs execute `scripts/scout_document_evidence_entrypoint.py`. The entrypoint installs the strict generic-name identity guard, then invokes base-domain seeding, buyer seeding, and exemplar-priority seeding as **separate bounded RPCs** before claiming work. Rule-pack processing remains in `scripts/scout_document_evidence_runner.py`, which reuses the original worker's acquisition, PDF extraction, hashing, and no-media-retention behavior.
+`.github/workflows/scout-document-evidence.yml` runs every two hours with single-run concurrency and may also be invoked manually. Production runs execute `scripts/scout_document_evidence_entrypoint.py`.
+
+The entrypoint installs the strict generic-name identity guard, then invokes these phases as **separate bounded RPCs** so each gets its own transaction/HTTP timeout budget:
+
+1. base-domain evidence seeding;
+2. agriculture buyer-queue refresh and phone-bearing operator/field bridge refresh;
+3. agriculture buyer/contact job seeding;
+4. general buyer job seeding;
+5. exemplar-priority seeding;
+6. the reserved agriculture buyer/contact claim lane; and
+7. the normal general evidence claim batch.
+
+Agriculture jobs reuse the normal buyer completion path. The entrypoint de-duplicates agriculture job IDs from the general claimed set before processing. Rule-pack processing remains in `scripts/scout_document_evidence_runner.py`, which reuses the original worker's acquisition, PDF extraction, hashing, and no-media-retention behavior.
 
 Opening an issue titled exactly:
 
@@ -150,6 +197,18 @@ Opening an issue titled exactly:
 also triggers one run, matching Scout's existing operations pattern.
 
 The workflow installs Poppler at runtime and uploads no artifacts.
+
+## Release checks
+
+Changes to this worker's database/runtime contracts are not considered complete until the standard Scout assertions pass:
+
+```sql
+select agent_contract.assert_tool_registry_integrity_v1();
+select agent_contract.assert_architecture_doctrine_v1();
+select agent_privacy.assert_rls_posture_v1();
+```
+
+After the agriculture buyer/contact bridge, agriculture seeding, and reserved claim-lane changes, all three assertions passed in production on 2026-09-09.
 
 ## Adding another domain
 
