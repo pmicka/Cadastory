@@ -1,0 +1,40 @@
+name: Scout document evidence worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size: {description: "Bounded job count", required: false, default: "3"}
+      rule_pack: {description: "Optional rule-pack filter", required: false, default: ""}
+      min_priority: {description: "Minimum queue priority", required: false, default: "0"}
+      dry_run: {description: "Claim and print without checkpoint writes", type: boolean, required: false, default: false}
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-document-evidence-worker
+  cancel-in-progress: false
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install document tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends poppler-utils
+          python -m pip install --upgrade "requests==2.32.5"
+      - name: Process bounded queue batch
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_DOCUMENT_BATCH_SIZE: ${{ inputs.batch_size || '3' }}
+          SCOUT_DOCUMENT_RULE_PACK: ${{ inputs.rule_pack || '' }}
+          SCOUT_DOCUMENT_MIN_PRIORITY: ${{ inputs.min_priority || '0' }}
+          SCOUT_DOCUMENT_DRY_RUN: ${{ inputs.dry_run || 'false' }}
+          SCOUT_DOCUMENT_MAX_SOURCE_BYTES: "52428800"
+        run: python scripts/scout_document_evidence_worker.py
