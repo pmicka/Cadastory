@@ -1,21 +1,22 @@
 #!/usr/bin/env python3
-"""Transient probe of Indiana IDEM's current issued CFO/CAFO workbook.
+"""Transient probe of Indiana IDEM CFO/CAFO location keys.
 
-Downloads the public XLS into memory, inspects schema/selected known farm rows,
-prints only derived field-presence/schema diagnostics, then exits. The source
-workbook is not persisted or uploaded as an artifact.
+Downloads the current public issued-project XLS into memory, inspects schema and
+selected known farm rows, then resolves their Section/Township/Range keys against
+Indiana's public PLSS section FeatureServer. No source workbook or GIS response
+is retained as an artifact.
 """
 from __future__ import annotations
 
 import json
 import re
-from io import BytesIO
 
 import requests
 import xlrd
 
-URL = "https://www.in.gov/dA/a65b5e6a25/permits_issued.xls?language_id=1"
-USER_AGENT = "Scout-Cadastory-IDEM-CFO-Probe/1.0"
+IDEM_URL = "https://www.in.gov/dA/a65b5e6a25/permits_issued.xls?language_id=1"
+PLSS_URL = "https://gisdata.in.gov/server/rest/services/Hosted/PLSS_1/FeatureServer/3/query"
+USER_AGENT = "Scout-Cadastory-IDEM-CFO-Probe/1.1"
 KNOWN_FARM_IDS = {"6394", "4494", "4695", "372", "1939"}
 KNOWN_NAMES = {
     "50 west llc",
@@ -43,7 +44,6 @@ def classify_header(header: str) -> list[str]:
         "farm_id": ("farm id", "farmid"),
         "tempo_id": ("tempo", "agency interest", "ai id", "program id"),
         "operation_name": ("operation name", "farm name", "facility name", "operation"),
-        "owner": ("owner", "operator"),
         "address": ("address", "street"),
         "city": ("city",),
         "state": ("state",),
@@ -63,28 +63,89 @@ def classify_header(header: str) -> list[str]:
 
 
 def find_header_row(sheet: xlrd.sheet.Sheet) -> tuple[int, list[str]]:
-    best_row = 0
-    best_headers: list[str] = []
-    best_score = -1
+    best_row, best_headers, best_score = 0, [], -1
     for r in range(min(sheet.nrows, 25)):
         headers = [as_text(sheet.cell_value(r, c)) for c in range(sheet.ncols)]
         score = sum(bool(classify_header(h)) for h in headers)
         if score > best_score:
-            best_score = score
-            best_row = r
-            best_headers = headers
+            best_row, best_headers, best_score = r, headers, score
     return best_row, best_headers
 
 
+def parse_directional(value: str) -> tuple[int, str] | None:
+    m = re.match(r"^\s*0*(\d+)\s*([NSEW])\b", value or "", re.I)
+    if not m:
+        return None
+    return int(m.group(1)), m.group(2).upper()
+
+
+def plss_lookup(section: str, township: str, range_value: str) -> dict[str, object]:
+    t = parse_directional(township)
+    rg = parse_directional(range_value)
+    try:
+        sec = int(float(section))
+    except (TypeError, ValueError):
+        return {"status": "invalid_plss_key"}
+    if not t or not rg or not 1 <= sec <= 36:
+        return {"status": "invalid_plss_key"}
+
+    twp, twpd = t
+    rng, rngd = rg
+    where = f"twp={twp} AND twpd='{twpd}' AND rng={rng} AND rngd='{rngd}' AND parcel_id='{sec}'"
+    response = requests.get(
+        PLSS_URL,
+        params={
+            "f": "geojson",
+            "where": where,
+            "outFields": "objectid_1,meridian,twp,twpd,rng,rngd,parcel_id",
+            "returnGeometry": "true",
+            "outSR": "4326",
+        },
+        headers={"User-Agent": USER_AGENT},
+        timeout=(20, 60),
+    )
+    response.raise_for_status()
+    payload = response.json()
+    features = payload.get("features") or []
+    summaries = []
+    for feature in features[:5]:
+        props = feature.get("properties") or {}
+        geometry = feature.get("geometry") or {}
+        coords = geometry.get("coordinates") or []
+        flat: list[tuple[float, float]] = []
+        for polygon in coords:
+            rings = polygon if geometry.get("type") == "MultiPolygon" else coords
+            for ring in rings:
+                for point in ring:
+                    if isinstance(point, list) and len(point) >= 2 and isinstance(point[0], (int, float)):
+                        flat.append((float(point[0]), float(point[1])))
+            if geometry.get("type") != "MultiPolygon":
+                break
+        if flat:
+            lon = sum(p[0] for p in flat) / len(flat)
+            lat = sum(p[1] for p in flat) / len(flat)
+        else:
+            lon = lat = None
+        summaries.append({
+            "objectid": props.get("objectid_1"),
+            "meridian": props.get("meridian"),
+            "section": props.get("parcel_id"),
+            "approx_lon": round(lon, 6) if lon is not None else None,
+            "approx_lat": round(lat, 6) if lat is not None else None,
+        })
+    return {"status": "ok", "feature_count": len(features), "features": summaries}
+
+
 def main() -> None:
-    response = requests.get(URL, headers={"User-Agent": USER_AGENT}, timeout=(20, 60))
+    response = requests.get(IDEM_URL, headers={"User-Agent": USER_AGENT}, timeout=(20, 60))
     response.raise_for_status()
     if len(response.content) > 25 * 1024 * 1024:
         raise RuntimeError("unexpectedly large workbook")
 
     book = xlrd.open_workbook(file_contents=response.content, on_demand=True)
     output: dict[str, object] = {
-        "source_url": URL.split("?")[0],
+        "source_url": IDEM_URL.split("?")[0],
+        "plss_source_url": PLSS_URL.rsplit("/query", 1)[0],
         "workbook_bytes": len(response.content),
         "sheet_names": book.sheet_names(),
         "sheets": [],
@@ -110,10 +171,15 @@ def main() -> None:
             if farm_id not in KNOWN_FARM_IDS and norm(name) not in KNOWN_NAMES:
                 continue
             selected: dict[str, object] = {"row": r + 1, "farm_id": farm_id, "operation_name": name}
-            for tag in ("tempo_id", "county", "address", "city", "state", "zip", "latitude", "longitude", "section", "township", "range"):
+            for tag in ("tempo_id", "county", "section", "township", "range"):
                 col = tagged.get(tag)
                 if col is not None:
                     selected[tag] = as_text(sheet.cell_value(r, col))
+            selected["plss_lookup"] = plss_lookup(
+                str(selected.get("section") or ""),
+                str(selected.get("township") or ""),
+                str(selected.get("range") or ""),
+            )
             matches.append(selected)
 
         output["sheets"].append({
