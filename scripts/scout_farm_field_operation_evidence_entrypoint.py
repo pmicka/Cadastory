@@ -56,7 +56,7 @@ def main() -> None:
             )
 
         result = base.rpc(
-            "internal_complete_farm_field_operation_evidence_job",
+            "internal_complete_farm_field_operation_evidence_job_v2",
             {
                 "p_job_id": job["id"],
                 "p_outcome": outcome,
