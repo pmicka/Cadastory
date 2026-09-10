@@ -1,4 +1,4 @@
-import { App } from "@modelcontextprotocol/ext-apps/app-with-deps";
+import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-with-deps";
 import { normalizeScoutSandboxExemplars } from "./contract";
 
 const status = document.querySelector<HTMLElement>("[data-scout-status]");
@@ -48,4 +48,6 @@ app.onerror = (error) => {
   if (detail) detail.textContent = "The UI is visible, but the host bridge reported an error.";
 };
 
-await app.connect();
+app.onteardown = async () => ({});
+
+await app.connect(new PostMessageTransport());

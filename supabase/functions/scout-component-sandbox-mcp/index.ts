@@ -29,7 +29,7 @@ const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
-const RPC_LIMIT_PER_KIND = 2
+const RPC_LIMIT_PER_KIND = 1
 
 const exemplarSchema = z.object({
   name: z.string().min(1).max(160),

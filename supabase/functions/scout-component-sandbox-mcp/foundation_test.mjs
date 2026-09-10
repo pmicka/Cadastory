@@ -11,10 +11,13 @@ const [view, server, generated, connectGateway, contractGateway] = await Promise
   readFile(new URL("../scout-mcp-contract/index.ts", directory), "utf8"),
 ]);
 
-assert.equal((view.match(/\.connect\(\)/g) || []).length, 1);
-assert.ok(view.indexOf("app.ontoolinput") < view.indexOf("app.connect()"));
-assert.ok(view.indexOf("app.ontoolresult") < view.indexOf("app.connect()"));
-assert.ok(view.indexOf("app.onerror") < view.indexOf("app.connect()"));
+assert.equal((view.match(/\.connect\(/g) || []).length, 1);
+assert.ok(view.indexOf("app.ontoolinput") < view.indexOf("app.connect("));
+assert.ok(view.indexOf("app.ontoolresult") < view.indexOf("app.connect("));
+assert.ok(view.indexOf("app.onerror") < view.indexOf("app.connect("));
+assert.ok(view.indexOf("app.onteardown") < view.indexOf("app.connect("));
+assert.ok(view.includes("new PostMessageTransport()"));
+assert.equal(view.includes("app.connect();"), false);
 assert.equal(view.includes("window.openai"), false);
 assert.equal(generated.includes("https://unpkg.com"), false);
 assert.equal(generated.includes("https://cdn."), false);
@@ -79,6 +82,7 @@ assert.equal(view.includes("innerHTML"), false);
 assert.ok(view.includes("normalizeScoutSandboxExemplars"));
 assert.ok(server.includes("normalizeScoutSandboxRpcExemplars(data)"));
 assert.ok(server.includes("business_data: true"));
+assert.ok(server.includes("const RPC_LIMIT_PER_KIND = 1"));
 for (const source of [server, connectGateway, contractGateway]) {
   assert.ok(source.includes("ui://scout/component-sandbox/v1"));
   assert.ok(source.includes("ui://scout/component-sandbox/v2"));
