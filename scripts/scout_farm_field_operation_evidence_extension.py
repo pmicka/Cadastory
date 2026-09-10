@@ -3,9 +3,9 @@
 
 This rule pack researches whether a known livestock farm can be tied to one of
 Scout's already-ranked pasture candidates. Parcel ownership and proximity remain
-supporting context only; automatic bridge corroboration requires an exact candidate
-property-address match plus explicit operation/lease/management/grazing/pasture-use
-language. Source media remains transient.
+supporting context only; automatic bridge corroboration requires an exact numbered
+candidate property-address match plus explicit operation/lease/management/grazing/
+pasture-use language. Source media remains transient.
 """
 from __future__ import annotations
 
@@ -43,11 +43,26 @@ _SUFFIX = {
     "circle": "cir", "cir": "cir", "parkway": "pkwy", "pkwy": "pkwy",
     "route": "rte", "rte": "rte",
 }
+_ROUTE_HINTS = {"us", "state", "ky", "in", "oh", "sr", "rte"}
 
 
 def _canonical_tokens(value: object) -> list[str]:
     tokens = base.norm(value).split()
     return [_SUFFIX.get(token, token) for token in tokens]
+
+
+def _has_numbered_property_address(value: object) -> bool:
+    """Require a plausible street number, not merely a numbered highway/route name."""
+    tokens = _canonical_tokens(value)
+    if not tokens:
+        return False
+    if tokens[0].isdigit() and 1 <= len(tokens[0]) <= 6:
+        return True
+    if len(tokens) >= 3 and tokens[-1].isdigit() and 1 <= len(tokens[-1]) <= 6:
+        if any(token in _ROUTE_HINTS for token in tokens[:-1]) or tokens[-2] == "hwy":
+            return False
+        return tokens[-2] in {"rd", "st", "ln", "dr", "ave", "blvd", "ct", "cir", "pkwy", "pl"}
+    return False
 
 
 def _address_variants(value: object) -> list[str]:
@@ -124,6 +139,10 @@ def _field_matches(job: dict, text: str) -> list[dict[str, object]]:
         property_match = None
         property_variant = None
         for address in raw.get("property_addresses") or []:
+            # Road-name-only assessor records are useful context but are never exact
+            # field-attribution anchors.
+            if not _has_numbered_property_address(address):
+                continue
             matched, variant = _exact_address_in_text(address, text)
             if matched:
                 property_match = str(address)
@@ -154,6 +173,7 @@ def _best_field_match(job: dict, text: str) -> dict[str, object] | None:
     matches = _field_matches(job, text)
     if not matches:
         return None
+
     def key(item: dict[str, object]) -> tuple[int, int, int]:
         field = item["field"]
         assert isinstance(field, dict)
@@ -161,6 +181,7 @@ def _best_field_match(job: dict, text: str) -> dict[str, object] | None:
         rank = int(field.get("candidate_rank") or 999)
         distance = int(field.get("distance_m") or 999999)
         return specificity, rank, distance
+
     return sorted(matches, key=key)[0]
 
 
@@ -243,10 +264,11 @@ def analyze_page_extended(
         "matched_property_address_variant": field_match.get("property_variant"),
         "matched_parcel_owner": matched_owner,
         "matched_parcel_mailing_address": matched_mailing,
-        "field_specificity": "exact_property_address" if exact_property else "parcel_context_only",
+        "field_specificity": "exact_numbered_property_address" if exact_property else "parcel_context_only",
         "operation_semantics": operation_codes,
         "ownership_language_present": ownership,
         "ownership_alone_never_establishes_operation": True,
+        "road_name_only_never_establishes_operation": True,
         "source_media_retention": "transient_only",
     }
 
@@ -277,14 +299,14 @@ def _search_queries(job: dict) -> list[str]:
     county = str(ctx.get("county_name") or "").strip()
     state = str(ctx.get("state_code") or "").strip()
     fields = [x for x in (ctx.get("candidate_fields") or []) if isinstance(x, dict)]
-    fields.sort(key=lambda x: (0 if x.get("property_addresses") else 1, int(x.get("candidate_rank") or 999)))
+    fields.sort(key=lambda x: (0 if any(_has_numbered_property_address(a) for a in (x.get("property_addresses") or [])) else 1, int(x.get("candidate_rank") or 999)))
 
     property_address = ""
     owner = ""
     if fields:
-        addresses = fields[0].get("property_addresses") or []
+        addresses = [str(a).strip() for a in (fields[0].get("property_addresses") or []) if _has_numbered_property_address(a)]
         owners = fields[0].get("parcel_owner_names") or []
-        property_address = str(addresses[0]).strip() if addresses else ""
+        property_address = addresses[0] if addresses else ""
         owner = str(owners[0]).strip() if owners else ""
 
     best_address = str((ctx.get("addresses") or [""])[0] or "").strip()
@@ -378,6 +400,22 @@ def self_test() -> None:
         "Grazing",
     )
     assert reversed_match is not None and "property.address_exact_candidate" in reversed_match["evidence_codes"]
+
+    road_only_job = dict(job)
+    road_only_job["context"] = dict(job["context"])
+    road_only_job["context"]["candidate_fields"] = [dict(job["context"]["candidate_fields"][0])]
+    road_only_job["context"]["candidate_fields"][0]["property_addresses"] = ["Pasture Road"]
+    road_only_job["context"]["candidate_fields"][0]["parcel_owner_names"] = []
+    road_only_job["context"]["candidate_fields"][0]["parcel_mailing_addresses"] = []
+    road_only = analyze_page_extended(
+        road_only_job,
+        "Example Cattle Farm operates pasture along Pasture Road.",
+        "https://example.com/road-only",
+        "pqr",
+        None,
+        "Road-only",
+    )
+    assert road_only is None
 
     generic = {
         "id": "00000000-0000-0000-0000-000000000303",
