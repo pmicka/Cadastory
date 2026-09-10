@@ -41,7 +41,7 @@ window.__scoutMcpAppReady=(async()=>{
   document.documentElement.dataset.scoutMcpApp='connecting';
   try{
     const mod=await import('https://unpkg.com/@modelcontextprotocol/ext-apps@2.0.0/app-with-deps');
-    const app=new mod.App({name:'Scout Component Sandbox',version:'4.0.0'},{},{autoResize:false,strict:true});
+    const app=new mod.App({name:'Scout Component Sandbox',version:'4.0.0'},{},{autoResize:true,strict:true});
     app.ontoolinput=(input)=>window.dispatchEvent(new CustomEvent('scout:mcp-tool-input',{detail:input}));
     app.ontoolresult=(result)=>window.dispatchEvent(new CustomEvent('scout:mcp-tool-result',{detail:result}));
     app.onhostcontextchanged=(context)=>window.dispatchEvent(new CustomEvent('scout:mcp-host-context',{detail:context}));
