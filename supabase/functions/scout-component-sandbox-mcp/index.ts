@@ -19,7 +19,7 @@ try { const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}'); SER
 if (!SERVICE_KEY) throw new Error('Scout component sandbox service credential is unavailable')
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession:false, autoRefreshToken:false } })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v2'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v3'
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const BASEMAP_ORIGIN = 'https://tile.openstreetmap.org'
 const IMAGERY_ORIGIN = 'https://imagery.nationalmap.gov'
@@ -185,7 +185,7 @@ async function attachPreparedVcardDownloads(targets:SandboxMapTarget[]):Promise<
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'3.9.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'3.9.1'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
     description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 1 shows on-demand aerial orthoimagery for single-property exemplars without Scout image storage or image analysis. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. Eligible contact names can be exported as standard .vcf files through the MCP Apps host-native download channel, without opening a browser. Missing enrichment remains explicit rather than fabricated.',
