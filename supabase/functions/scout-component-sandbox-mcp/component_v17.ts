@@ -33,13 +33,17 @@ async function scoutMcpDownloadApp(){
 const newDownload="async function downloadCurrentVcard(){const card=currentContactCard;if(!card||!vcardEligibility(card))return;const content=buildVcard(card),filename=vcardFilename(card),download=document.getElementById('contactVcardDownload'),copy=document.getElementById('contactVcardCopy'),live=document.getElementById('live'),originalLabel=download?.textContent||'Download .vcf';if(download){download.disabled=true;download.textContent='Saving…'}if(copy)copy.textContent='Preparing '+filename+' for ChatGPT…';try{const app=await scoutMcpDownloadApp();const result=await app.downloadFile({contents:[{type:'resource',resource:{uri:'file:///'+filename,mimeType:'text/vcard',text:content}}]});if(result?.isError)throw new Error('host_download_file_rejected');hideVcardPrompt();if(live)live.textContent='Contact file handed to ChatGPT.'}catch(error){console.error('Scout in-app vCard download failed',error);if(copy){const message=String(error?.message||'');copy.textContent=/method not found|unsupported|not implemented|ui\\/download-file/i.test(message)?'This ChatGPT client rejected the native in-app file download request.':'ChatGPT could not save the contact file in-app. Please try again.'}if(live)live.textContent='In-app contact download failed.'}finally{if(download){download.disabled=false;download.textContent=originalLabel}}}"
 
 const oldCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:16px;touch-action:pan-x}'
-const newCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;border-radius:16px;touch-action:pan-x;overscroll-behavior-x:contain}'
-const lastSlideSnapCss='.slide:last-child{scroll-snap-align:end}'
+const newCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:none;scrollbar-width:none;border-radius:16px;touch-action:pan-x;overscroll-behavior-x:contain}'
+const oldScrollHandler=`let scrollFrame=0;carousel.addEventListener('scroll',()=>{cancelAnimationFrame(scrollFrame);scrollFrame=requestAnimationFrame(()=>updatePager(true))},{passive:true});`
+const gentleScrollHandler=`let scrollFrame=0,settleTimer=0,settling=false;
+function carouselSnapLeft(slide,index){const max=Math.max(0,carousel.scrollWidth-carousel.clientWidth),desired=index===slides.length-1?slide.offsetLeft+slide.offsetWidth-carousel.clientWidth:slide.offsetLeft;return Math.max(0,Math.min(max,desired))}
+function settleCarousel(){if(restoring||settling)return;let bestLeft=carousel.scrollLeft,bestDistance=Infinity;for(let i=0;i<slides.length;i++){const left=carouselSnapLeft(slides[i],i),distance=Math.abs(left-carousel.scrollLeft);if(distance<bestDistance){bestDistance=distance;bestLeft=left}}const threshold=Math.min(24,carousel.clientWidth*.065);if(bestDistance<1.5||bestDistance>threshold)return;settling=true;const reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;carousel.scrollTo({left:bestLeft,behavior:reduce?'auto':'smooth'});setTimeout(()=>{settling=false;updatePager(true)},220)}
+carousel.addEventListener('scroll',()=>{cancelAnimationFrame(scrollFrame);scrollFrame=requestAnimationFrame(()=>updatePager(true));if(!settling){clearTimeout(settleTimer);settleTimer=setTimeout(settleCarousel,140)}},{passive:true});`
 
 export function buildComponentSandboxHtml(targets: SandboxMapTarget[] = []) {
   let html=buildComponentSandboxHtmlV16(targets as unknown as SandboxMapTargetV16[])
   html=replaceRequired(html,oldDownload,nativeDownloadHelpers+newDownload,'native MCP Apps vCard download')
-  html=replaceRequired(html,oldCarousel,newCarousel,'proximity carousel snap')
-  html=replaceRequired(html,'</style>',lastSlideSnapCss+'</style>','reachable final carousel snap')
+  html=replaceRequired(html,oldCarousel,newCarousel,'free carousel drag behavior')
+  html=replaceRequired(html,oldScrollHandler,gentleScrollHandler,'threshold-based carousel settle')
   return html
 }
