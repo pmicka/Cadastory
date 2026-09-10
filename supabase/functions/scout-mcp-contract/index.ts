@@ -16,8 +16,8 @@ const LEGACY_REVIEW_RESOURCE_URI = 'ui://scout/rapid-review/v1'
 const LENS_RESOURCE_URI = 'ui://scout/lens/v1'
 const TIME_RESOURCE_URI = 'ui://scout/evidence-time-machine/v1'
 const CONSTELLATION_RESOURCE_URI = 'ui://scout/constellations/v1'
-const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v2'
-const SANDBOX_LEGACY_RESOURCE_URI = 'ui://scout/component-sandbox/v1'
+const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v3'
+const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v2','ui://scout/component-sandbox/v1']
 const SANDBOX_TOOL = 'scout_preview_component_sandbox'
 const IMPROVE_TOOLS = new Set(['scout_start_improve_scout','scout_get_improve_scout_state','scout_submit_improvement_answer','scout_review_lead','scout_start_rapid_review','scout_get_rapid_review_state'])
 const EXPLORE_TOOLS = new Set(['scout_get_opportunity_lens_catalog','scout_apply_opportunity_lens','scout_get_opportunity_timeline','scout_get_opportunity_constellation'])
@@ -101,7 +101,7 @@ Deno.serve(async(req:Request)=>{
     try{const upstream=await forwardTo(CORE_URL,req,raw);const parsed=await parseUpstream(upstream);return responseFromUpstream(req,upstream,enrichInitialize(parsed)??undefined)}catch(e){console.error('Scout initialize enrichment error',e);return jsonResponse({error:'Scout MCP contract gateway failed'},500)}
   }
   if(env?.method==='tools/call'&&env?.params?.name===SANDBOX_TOOL)return await forwardOwnerSandbox(req,env,raw,inboundToken)
-  if(env?.method==='resources/read'&&[SANDBOX_RESOURCE_URI,SANDBOX_LEGACY_RESOURCE_URI].includes(String(env?.params?.uri||'')))return await forwardOwnerSandbox(req,env,raw,inboundToken)
+  if(env?.method==='resources/read'&&[SANDBOX_RESOURCE_URI,...SANDBOX_COMPATIBILITY_RESOURCE_URIS].includes(String(env?.params?.uri||'')))return await forwardOwnerSandbox(req,env,raw,inboundToken)
   if(env?.method==='tools/call'&&env?.params?.name==='scout_search_knowledge')return await callKnowledge(req,env,raw,inboundToken)
   if(env?.method==='tools/call'&&IMPROVE_TOOLS.has(String(env?.params?.name||''))){try{return responseFromUpstream(req,await forwardTo(IMPROVE_URL,req,raw))}catch{return safeError(req,env.id,-32603,'Improve Scout request failed')}}
   if(env?.method==='tools/call'&&EXPLORE_TOOLS.has(String(env?.params?.name||''))){try{return responseFromUpstream(req,await forwardTo(EXPLORE_URL,req,raw))}catch{return safeError(req,env.id,-32603,'Scout exploration request failed')}}

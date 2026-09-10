@@ -5,6 +5,7 @@ const status = document.querySelector<HTMLElement>("[data-scout-status]");
 const detail = document.querySelector<HTMLElement>("[data-scout-detail]");
 const count = document.querySelector<HTMLElement>("[data-scout-count]");
 const list = document.querySelector<HTMLUListElement>("[data-scout-exemplars]");
+let toolResultReceived = false;
 
 function displayValue(value: string | null) {
   return value ?? "Not available";
@@ -36,6 +37,7 @@ app.ontoolinput = () => {
 };
 
 app.ontoolresult = (result) => {
+  toolResultReceived = true;
   const foundation = result?.structuredContent?.foundation;
   if (status) status.textContent = foundation === "ready" ? "Scout View ready" : "Scout View connected";
   if (detail) detail.textContent = "Real Scout data reached this View through structured tool content.";
@@ -51,3 +53,7 @@ app.onerror = (error) => {
 app.onteardown = async () => ({});
 
 await app.connect(new PostMessageTransport());
+if (!toolResultReceived) {
+  if (status) status.textContent = "Scout View connected";
+  if (detail) detail.textContent = "MCP Apps host bridge initialized; waiting for the tool result.";
+}

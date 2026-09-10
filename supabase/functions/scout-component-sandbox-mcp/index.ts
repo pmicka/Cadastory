@@ -23,8 +23,11 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v2'
-const LEGACY_RESOURCE_URI = 'ui://scout/component-sandbox/v1'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v3'
+const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v2',
+  'ui://scout/component-sandbox/v1',
+] as const
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
@@ -111,26 +114,27 @@ function makeServer() {
     }),
   )
 
-  // Compatibility alias for hosts that cached Step 1 tool metadata.
-  registerAppResource(
-    server,
-    'scout-ui-foundation-v1-compatibility',
-    LEGACY_RESOURCE_URI,
-    { mimeType: RESOURCE_MIME_TYPE },
-    async () => ({
-      contents: [{
-        uri: LEGACY_RESOURCE_URI,
-        mimeType: RESOURCE_MIME_TYPE,
-        text: SCOUT_VIEW_HTML,
-        _meta: {
-          ui: {
-            prefersBorder: false,
-            csp: { connectDomains: [], resourceDomains: [] },
+  for (const compatibilityUri of COMPATIBILITY_RESOURCE_URIS) {
+    registerAppResource(
+      server,
+      `scout-ui-foundation-${compatibilityUri.endsWith('/v2') ? 'v2' : 'v1'}-compatibility`,
+      compatibilityUri,
+      { mimeType: RESOURCE_MIME_TYPE },
+      async () => ({
+        contents: [{
+          uri: compatibilityUri,
+          mimeType: RESOURCE_MIME_TYPE,
+          text: SCOUT_VIEW_HTML,
+          _meta: {
+            ui: {
+              prefersBorder: false,
+              csp: { connectDomains: [], resourceDomains: [] },
+            },
           },
-        },
-      }],
-    }),
-  )
+        }],
+      }),
+    )
+  }
 
   registerAppTool(
     server,

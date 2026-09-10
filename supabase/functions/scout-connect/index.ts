@@ -17,8 +17,8 @@ const CORE_URL = `${SUPABASE_URL}/functions/v1/scout-mcp-contract`
 const OPS_URL = `${SUPABASE_URL}/functions/v1/scout-ops-contract`
 const SANDBOX_URL = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp`
 const SANDBOX_TOOL = 'scout_preview_component_sandbox'
-const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v2'
-const SANDBOX_LEGACY_RESOURCE_URI = 'ui://scout/component-sandbox/v1'
+const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v3'
+const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v2','ui://scout/component-sandbox/v1']
 const OPS_TOOLS = new Set(['scout_submit_business_signal','scout_get_action_intents','scout_update_action_intent','scout_reject_public_equipment_candidates'])
 
 const publicHeaders = {
@@ -333,7 +333,7 @@ Deno.serve(async(req:Request)=>{
       if(!owner)return methodNotFound(rpcBody)
       try{return await forwardTo(SANDBOX_URL,req,token,raw)}catch{return json({error:'server_error',error_description:'Scout component sandbox request could not be prepared.'},500)}
     }
-    if(!Array.isArray(rpcBody)&&rpcBody?.method==='resources/read'&&[SANDBOX_RESOURCE_URI,SANDBOX_LEGACY_RESOURCE_URI].includes(String(rpcBody?.params?.uri||''))){
+    if(!Array.isArray(rpcBody)&&rpcBody?.method==='resources/read'&&[SANDBOX_RESOURCE_URI,...SANDBOX_COMPATIBILITY_RESOURCE_URIS].includes(String(rpcBody?.params?.uri||''))){
       if(!owner)return methodNotFound(rpcBody)
       try{return await forwardTo(SANDBOX_URL,req,token,raw)}catch{return json({error:'server_error',error_description:'Scout component sandbox resource could not be prepared.'},500)}
     }
