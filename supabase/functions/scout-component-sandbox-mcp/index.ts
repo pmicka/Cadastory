@@ -19,16 +19,49 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
 
 const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
 const TOOL_NAME = 'scout_preview_component_sandbox'
+const PRIVACY_CONTRACT = 'privacy-contract-v2'
+const EXPOSURE_CONTRACT = 'scout-exposure-v1'
+const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
+
+async function isOwnerConnection(connectionId: string) {
+  const { data: binding, error: bindingError } = await admin
+    .schema('commerce')
+    .from('oauth_agent_connection_bindings')
+    .select('user_id')
+    .eq('connection_id', connectionId)
+    .limit(1)
+    .maybeSingle()
+  if (bindingError || !binding?.user_id) return false
+  const { data: owner, error: ownerError } = await admin
+    .schema('commerce')
+    .from('scout_account_allowlist')
+    .select('user_id')
+    .eq('user_id', binding.user_id)
+    .eq('account_role', 'owner')
+    .eq('status', 'active')
+    .limit(1)
+    .maybeSingle()
+  return !ownerError && !!owner?.user_id
+}
 
 async function authenticateOwner(req: Request) {
   const match = (req.headers.get('authorization') || '').match(/^Bearer\s+(.+)$/i)
   if (!match) return null
   const { data, error } = await admin.auth.getUser(match[1].trim())
-  if (error || !data.user?.id) return null
-  const { data: owner, error: ownerError } = await admin.rpc('scout_is_owner_user_internal', {
-    p_user_id: data.user.id,
+  if (!error && data.user?.id) {
+    const { data: owner, error: ownerError } = await admin.rpc('scout_is_owner_user_internal', {
+      p_user_id: data.user.id,
+    })
+    if (!ownerError && owner === true) return data.user
+  }
+  const { data: connection, error: connectionError } = await admin.rpc('scout_resolve_agent_connection_v4', {
+    p_token: match[1].trim(),
+    p_privacy_contract: PRIVACY_CONTRACT,
+    p_exposure_contract: EXPOSURE_CONTRACT,
+    p_enumeration_contract: ENUMERATION_CONTRACT,
   })
-  return !ownerError && owner === true ? data.user : null
+  if (connectionError || !connection?.connection_id) return null
+  return await isOwnerConnection(String(connection.connection_id)) ? connection : null
 }
 
 function makeServer() {
