@@ -10,6 +10,22 @@ import {
 export type { SandboxMapMember, SandboxMapTerritory, SandboxContactCard, SandboxContactRoute }
 export type SandboxMapTarget = SandboxMapTargetV18
 
+function replaceRequired(source:string, needle:string, replacement:string, label:string){
+  if(!source.includes(needle))throw new Error('Scout component sandbox v17 transform failed: '+label)
+  return source.replace(needle,replacement)
+}
+
+const oldCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:16px;touch-action:pan-x}'
+const newCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;border-radius:16px;touch-action:pan-x;overscroll-behavior-x:contain}.carousel::after{content:\'\';flex:0 0 14%;height:1px}'
+const oldSlide='.slide{position:relative;min-width:86%;height:200px;'
+const newSlide='.slide{position:relative;flex:0 0 86%;min-width:0;height:200px;'
+const oldNarrowSlide='.slide{min-width:92%;height:190px}'
+const newNarrowSlide='.carousel::after{flex-basis:8%}.slide{flex-basis:92%;height:190px}'
+
 export function buildComponentSandboxHtml(targets: SandboxMapTarget[] = []) {
-  return buildComponentSandboxHtmlV18(targets as unknown as SandboxMapTargetV18[])
+  let html=buildComponentSandboxHtmlV18(targets as unknown as SandboxMapTargetV18[])
+  html=replaceRequired(html,oldCarousel,newCarousel,'carousel snap behavior')
+  html=replaceRequired(html,oldSlide,newSlide,'deterministic carousel card width')
+  html=replaceRequired(html,oldNarrowSlide,newNarrowSlide,'narrow carousel geometry')
+  return html
 }
