@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "scripts": {
+    "build": "node build-view.mjs",
+    "test": "node foundation_test.mjs"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/ext-apps": "2.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.9"
+  }
+}

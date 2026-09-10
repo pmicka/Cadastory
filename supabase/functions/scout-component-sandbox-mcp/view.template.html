@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>Scout UI foundation</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: transparent; }
+      body { padding: 12px; }
+      main {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 20px;
+        border: 1px solid light-dark(#d8dfd7, #3a423b);
+        border-radius: 16px;
+        background: light-dark(#ffffff, #1b1f1c);
+        color: light-dark(#172018, #f0f4f0);
+      }
+      .eyebrow { margin: 0 0 8px; color: light-dark(#55705a, #98b79e); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: 22px; line-height: 1.2; }
+      p { margin: 10px 0 0; color: light-dark(#657067, #b5beb6); font-size: 14px; line-height: 1.45; }
+    </style>
+  </head>
+  <body>
+    <main aria-labelledby="scout-title">
+      <p class="eyebrow">Scout by Cadastory</p>
+      <h1 id="scout-title" data-scout-status>Scout View rendered</h1>
+      <p data-scout-detail>Establishing the MCP Apps host connection.</p>
+    </main>
+    <script type="module">/*__SCOUT_VIEW_BUNDLE__*/</script>
+  </body>
+</html>
