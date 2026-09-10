@@ -17,7 +17,7 @@ const CORE_URL = `${SUPABASE_URL}/functions/v1/scout-mcp-contract`
 const OPS_URL = `${SUPABASE_URL}/functions/v1/scout-ops-contract`
 const SANDBOX_URL = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp`
 const SANDBOX_TOOL = 'scout_preview_component_sandbox'
-const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v2'
+const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v1'
 const OPS_TOOLS = new Set(['scout_submit_business_signal','scout_get_action_intents','scout_update_action_intent','scout_reject_public_equipment_candidates'])
 
 const publicHeaders = {

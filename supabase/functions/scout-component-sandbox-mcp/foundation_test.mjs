@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { build } from "esbuild";
 
 const directory = new URL("./", import.meta.url);
-const [view, server, generated] = await Promise.all([
+const [view, server, generated, connectGateway, contractGateway] = await Promise.all([
   readFile(new URL("view.ts", directory), "utf8"),
   readFile(new URL("index.ts", directory), "utf8"),
   readFile(new URL("view.generated.ts", directory), "utf8"),
+  readFile(new URL("../scout-connect/index.ts", directory), "utf8"),
+  readFile(new URL("../scout-mcp-contract/index.ts", directory), "utf8"),
 ]);
 
 assert.equal((view.match(/\.connect\(\)/g) || []).length, 1);
@@ -77,5 +79,10 @@ assert.equal(view.includes("innerHTML"), false);
 assert.ok(view.includes("normalizeScoutSandboxExemplars"));
 assert.ok(server.includes("normalizeScoutSandboxRpcExemplars(data)"));
 assert.ok(server.includes("business_data: true"));
+for (const source of [server, connectGateway, contractGateway]) {
+  assert.ok(source.includes("ui://scout/component-sandbox/v1"));
+  assert.equal(source.includes("ui://scout/component-sandbox/v2"), false);
+}
+assert.ok(server.includes("SCOUT_SANDBOX_RESULT_VERSION"));
 
 console.log("Scout MCP Apps foundation and bounded data-contract checks passed.");

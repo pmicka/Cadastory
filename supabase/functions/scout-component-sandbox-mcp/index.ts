@@ -23,7 +23,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v2'
+// Keep the View URI stable across additive UI/data-envelope changes. ChatGPT clients
+// may cache tool metadata independently from a newly deployed MCP gateway.
+const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
