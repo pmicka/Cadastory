@@ -38,6 +38,9 @@ const oldSlide='.slide{position:relative;min-width:86%;height:200px;'
 const newSlide='.slide{position:relative;min-width:100%;height:200px;'
 const oldNarrowSlide='.slide{min-width:92%;height:190px}'
 const newNarrowSlide='.slide{min-width:100%;height:190px}'
+const oldScrollHandler=`let scrollFrame=0;carousel.addEventListener('scroll',()=>{cancelAnimationFrame(scrollFrame);scrollFrame=requestAnimationFrame(()=>updatePager(true))},{passive:true});`
+const settledScrollHandler=`let scrollFrame=0,slidePersistTimer=0;
+carousel.addEventListener('scroll',()=>{cancelAnimationFrame(scrollFrame);scrollFrame=requestAnimationFrame(()=>updatePager(false));clearTimeout(slidePersistTimer);slidePersistTimer=setTimeout(()=>updatePager(true),180)},{passive:true});`
 
 export function buildComponentSandboxHtml(targets: SandboxMapTarget[] = []) {
   let html=buildComponentSandboxHtmlV16(targets as unknown as SandboxMapTargetV16[])
@@ -45,5 +48,6 @@ export function buildComponentSandboxHtml(targets: SandboxMapTarget[] = []) {
   html=replaceRequired(html,oldCarousel,newCarousel,'contained carousel overscroll')
   html=replaceRequired(html,oldSlide,newSlide,'full-width carousel tile')
   html=replaceRequired(html,oldNarrowSlide,newNarrowSlide,'full-width narrow carousel tile')
+  html=replaceRequired(html,oldScrollHandler,settledScrollHandler,'settled carousel state persistence')
   return html
 }
