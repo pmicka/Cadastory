@@ -3,6 +3,12 @@ import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.0.0'
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@modelcontextprotocol/ext-apps@2.0.0/server'
 import * as z from 'npm:zod@4.2.0/v4'
+import {
+  normalizeScoutSandboxRpcExemplars,
+  SCOUT_SANDBOX_MAX_EXEMPLARS,
+  SCOUT_SANDBOX_RESULT_VERSION,
+  type ScoutSandboxResult,
+} from './contract.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -17,11 +23,28 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v2'
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
+const RPC_LIMIT_PER_KIND = 2
+
+const exemplarSchema = z.object({
+  name: z.string().min(1).max(160),
+  kind: z.enum(['property', 'group']),
+  archetype: z.string().min(1).max(100).nullable(),
+  resolution_status: z.string().min(1).max(100).nullable(),
+})
+
+async function loadScoutSandboxExemplars() {
+  const { data, error } = await admin.rpc('scout_get_component_sandbox_map_targets_v3_internal', {
+    p_property_limit: RPC_LIMIT_PER_KIND,
+    p_group_limit: RPC_LIMIT_PER_KIND,
+  })
+  if (error) throw new Error('Scout exemplar data is unavailable')
+  return normalizeScoutSandboxRpcExemplars(data)
+}
 
 async function isOwnerConnection(connectionId: string) {
   const { data: binding, error: bindingError } = await admin
@@ -65,7 +88,7 @@ async function authenticateOwner(req: Request) {
 }
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '1.0.0' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.0.0' })
 
   registerAppResource(
     server,
@@ -96,10 +119,11 @@ function makeServer() {
       inputSchema: z.object({}),
       outputSchema: z.object({
         surface: z.literal('scout_component_sandbox'),
-        version: z.literal('v1'),
-        business_data: z.literal(false),
+        version: z.literal(SCOUT_SANDBOX_RESULT_VERSION),
+        business_data: z.literal(true),
         interaction_scope: z.literal('ephemeral_only'),
         foundation: z.literal('ready'),
+        exemplars: z.array(exemplarSchema).max(SCOUT_SANDBOX_MAX_EXEMPLARS),
       }),
       annotations: {
         readOnlyHint: true,
@@ -109,16 +133,21 @@ function makeServer() {
       },
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
-    async () => ({
-      content: [{ type: 'text', text: 'The minimal Scout MCP Apps View is ready to render.' }],
-      structuredContent: {
+    async () => {
+      const exemplars = await loadScoutSandboxExemplars()
+      const structuredContent: ScoutSandboxResult = {
         surface: 'scout_component_sandbox' as const,
-        version: 'v1' as const,
-        business_data: false as const,
+        version: SCOUT_SANDBOX_RESULT_VERSION,
+        business_data: true,
         interaction_scope: 'ephemeral_only' as const,
         foundation: 'ready' as const,
-      },
-    }),
+        exemplars,
+      }
+      return {
+        content: [{ type: 'text', text: `The Scout MCP Apps View received ${exemplars.length} bounded real exemplar${exemplars.length === 1 ? '' : 's'}.` }],
+        structuredContent,
+      }
+    },
   )
 
   return server

@@ -25,6 +25,11 @@
       .eyebrow { margin: 0 0 8px; color: light-dark(#55705a, #98b79e); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
       h1 { margin: 0; font-size: 22px; line-height: 1.2; }
       p { margin: 10px 0 0; color: light-dark(#657067, #b5beb6); font-size: 14px; line-height: 1.45; }
+      ul { margin: 14px 0 0; padding: 0; list-style: none; }
+      li { padding: 10px 0; border-top: 1px solid light-dark(#e7ebe7, #303731); }
+      li strong, li span { display: block; }
+      li strong { font-size: 14px; }
+      li span { margin-top: 3px; color: light-dark(#657067, #b5beb6); font-size: 12px; line-height: 1.4; }
     </style>
   </head>
   <body>
@@ -32,6 +37,8 @@
       <p class="eyebrow">Scout by Cadastory</p>
       <h1 id="scout-title" data-scout-status>Scout View rendered</h1>
       <p data-scout-detail>Establishing the MCP Apps host connection.</p>
+      <p data-scout-count>Waiting for bounded Scout exemplars.</p>
+      <ul data-scout-exemplars aria-label="Scout exemplars"></ul>
     </main>
     <script type="module">/*__SCOUT_VIEW_BUNDLE__*/</script>
   </body>

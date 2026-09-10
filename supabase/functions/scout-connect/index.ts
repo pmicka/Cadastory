@@ -17,7 +17,7 @@ const CORE_URL = `${SUPABASE_URL}/functions/v1/scout-mcp-contract`
 const OPS_URL = `${SUPABASE_URL}/functions/v1/scout-ops-contract`
 const SANDBOX_URL = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp`
 const SANDBOX_TOOL = 'scout_preview_component_sandbox'
-const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v1'
+const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v2'
 const OPS_TOOLS = new Set(['scout_submit_business_signal','scout_get_action_intents','scout_update_action_intent','scout_reject_public_equipment_candidates'])
 
 const publicHeaders = {
@@ -167,7 +167,7 @@ async function recordToolDimensions(userId:string,clientId:string,connectionId:s
 }
 
 async function isOwnerUser(userId:string){const {data,error}=await admin.rpc('scout_is_owner_user_internal',{p_user_id:userId});return !error&&data===true}
-function sandboxTool(){return {name:SANDBOX_TOOL,title:'Preview Scout UI Foundation',description:'Owner-only read-only developer tool that renders the minimal Scout MCP Apps View. Call only when the Scout owner explicitly asks to test or preview the Scout sandbox UI foundation.',inputSchema:{type:'object',properties:{},additionalProperties:false},outputSchema:{type:'object',properties:{surface:{type:'string',enum:['scout_component_sandbox']},version:{type:'string',enum:['v1']},business_data:{type:'boolean',enum:[false]},interaction_scope:{type:'string',enum:['ephemeral_only']},foundation:{type:'string',enum:['ready']}},required:['surface','version','business_data','interaction_scope','foundation'],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},_meta:{ui:{resourceUri:SANDBOX_RESOURCE_URI}}}}
+function sandboxTool(){return {name:SANDBOX_TOOL,title:'Preview Scout UI Foundation',description:'Owner-only read-only developer tool that renders the minimal Scout MCP Apps View with a bounded set of real Scout exemplars. Call only when the Scout owner explicitly asks to test or preview the Scout sandbox UI foundation.',inputSchema:{type:'object',properties:{},additionalProperties:false},outputSchema:{type:'object',properties:{surface:{type:'string',enum:['scout_component_sandbox']},version:{type:'string',enum:['v2']},business_data:{type:'boolean',enum:[true]},interaction_scope:{type:'string',enum:['ephemeral_only']},foundation:{type:'string',enum:['ready']},exemplars:{type:'array',maxItems:4,items:{type:'object',properties:{name:{type:'string',minLength:1,maxLength:160},kind:{type:'string',enum:['property','group']},archetype:{type:['string','null'],minLength:1,maxLength:100},resolution_status:{type:['string','null'],minLength:1,maxLength:100}},required:['name','kind','archetype','resolution_status'],additionalProperties:false}}},required:['surface','version','business_data','interaction_scope','foundation','exemplars'],additionalProperties:false},annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},_meta:{ui:{resourceUri:SANDBOX_RESOURCE_URI}}}}
 function sandboxResource(){return {uri:SANDBOX_RESOURCE_URI,name:'scout-ui-foundation',title:'Scout UI Foundation',description:'Owner-only minimal Scout MCP Apps View used to verify rendering and host-bridge delivery.',mimeType:'text/html;profile=mcp-app'}}
 function methodNotFound(rpcBody:any){return json({jsonrpc:'2.0',id:rpcBody?.id??null,error:{code:-32601,message:'Method not found'}})}
 
