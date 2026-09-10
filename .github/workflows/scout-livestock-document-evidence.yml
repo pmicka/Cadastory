@@ -35,8 +35,8 @@ jobs:
           python -m pip install --upgrade requests
           pdftotext -v
 
-      - name: Verify livestock rule pack
-        run: python scripts/scout_livestock_document_evidence_entrypoint.py --self-test
+      - name: Verify livestock rule pack and source coverage
+        run: python scripts/scout_livestock_document_evidence_coverage_entrypoint.py --self-test
 
       - name: Process livestock evidence queue
         env:
@@ -44,4 +44,4 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
           SCOUT_DOCUMENT_BATCH_SIZE: ${{ github.event.inputs.batch_size || '6' }}
           SCOUT_DOCUMENT_MAX_BYTES: "41943040"
-        run: python scripts/scout_livestock_document_evidence_entrypoint.py
+        run: python scripts/scout_livestock_document_evidence_coverage_entrypoint.py
