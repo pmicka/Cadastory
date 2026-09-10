@@ -16,16 +16,13 @@ function replaceRequired(source:string, needle:string, replacement:string, label
 }
 
 const oldCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:16px;touch-action:pan-x}'
-const newCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;border-radius:16px;touch-action:pan-x;overscroll-behavior-x:contain}.carousel::after{content:\'\';flex:0 0 14%;height:1px}'
-const oldSlide='.slide{position:relative;min-width:86%;height:200px;'
-const newSlide='.slide{position:relative;flex:0 0 86%;min-width:0;height:200px;'
+const newCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;border-radius:16px;touch-action:pan-x;overscroll-behavior-x:contain;padding-right:14%}'
 const oldNarrowSlide='.slide{min-width:92%;height:190px}'
-const newNarrowSlide='.carousel::after{flex-basis:8%}.slide{flex-basis:92%;height:190px}'
+const newNarrowSlide='.carousel{padding-right:8%}.slide{min-width:92%;height:190px}'
 
 export function buildComponentSandboxHtml(targets: SandboxMapTarget[] = []) {
   let html=buildComponentSandboxHtmlV18(targets as unknown as SandboxMapTargetV18[])
-  html=replaceRequired(html,oldCarousel,newCarousel,'carousel snap behavior')
-  html=replaceRequired(html,oldSlide,newSlide,'deterministic carousel card width')
-  html=replaceRequired(html,oldNarrowSlide,newNarrowSlide,'narrow carousel geometry')
+  html=replaceRequired(html,oldCarousel,newCarousel,'carousel snap behavior with end padding')
+  html=replaceRequired(html,oldNarrowSlide,newNarrowSlide,'narrow carousel end padding')
   return html
 }
