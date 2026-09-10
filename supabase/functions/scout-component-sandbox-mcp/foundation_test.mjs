@@ -81,8 +81,11 @@ assert.ok(server.includes("normalizeScoutSandboxRpcExemplars(data)"));
 assert.ok(server.includes("business_data: true"));
 for (const source of [server, connectGateway, contractGateway]) {
   assert.ok(source.includes("ui://scout/component-sandbox/v1"));
-  assert.equal(source.includes("ui://scout/component-sandbox/v2"), false);
+  assert.ok(source.includes("ui://scout/component-sandbox/v2"));
 }
+assert.ok(server.includes("scout-ui-foundation-v1-compatibility"));
+assert.ok(connectGateway.includes("SANDBOX_LEGACY_RESOURCE_URI"));
+assert.ok(contractGateway.includes("SANDBOX_LEGACY_RESOURCE_URI"));
 assert.ok(server.includes("SCOUT_SANDBOX_RESULT_VERSION"));
 
 console.log("Scout MCP Apps foundation and bounded data-contract checks passed.");

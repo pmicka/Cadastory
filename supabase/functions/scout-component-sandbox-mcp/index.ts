@@ -23,9 +23,8 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-// Keep the View URI stable across additive UI/data-envelope changes. ChatGPT clients
-// may cache tool metadata independently from a newly deployed MCP gateway.
-const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v2'
+const LEGACY_RESOURCE_URI = 'ui://scout/component-sandbox/v1'
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
@@ -100,6 +99,27 @@ function makeServer() {
     async () => ({
       contents: [{
         uri: RESOURCE_URI,
+        mimeType: RESOURCE_MIME_TYPE,
+        text: SCOUT_VIEW_HTML,
+        _meta: {
+          ui: {
+            prefersBorder: false,
+            csp: { connectDomains: [], resourceDomains: [] },
+          },
+        },
+      }],
+    }),
+  )
+
+  // Compatibility alias for hosts that cached Step 1 tool metadata.
+  registerAppResource(
+    server,
+    'scout-ui-foundation-v1-compatibility',
+    LEGACY_RESOURCE_URI,
+    { mimeType: RESOURCE_MIME_TYPE },
+    async () => ({
+      contents: [{
+        uri: LEGACY_RESOURCE_URI,
         mimeType: RESOURCE_MIME_TYPE,
         text: SCOUT_VIEW_HTML,
         _meta: {
