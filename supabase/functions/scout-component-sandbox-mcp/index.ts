@@ -19,11 +19,10 @@ try { const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}'); SER
 if (!SERVICE_KEY) throw new Error('Scout component sandbox service credential is unavailable')
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession:false, autoRefreshToken:false } })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v2'
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const BASEMAP_ORIGIN = 'https://tile.openstreetmap.org'
 const MCP_APP_SDK_ORIGIN = 'https://unpkg.com'
-const DOWNLOAD_ORIGIN = new URL(SUPABASE_URL).origin
 const PROPERTY_TYPES = new Set([
   'multifamily','senior_living','hotel','office','retail','industrial','residential',
   'dealership','water_tank_elevated','water_tank_standpipe','water_tank_ground_storage','water_tank_other','other'
@@ -184,21 +183,28 @@ async function attachPreparedVcardDownloads(targets:SandboxMapTarget[]):Promise<
 }
 
 function makeServer(){
-  const server=new McpServer({name:'Scout Component Sandbox',version:'3.6.0'})
+  const server=new McpServer({name:'Scout Component Sandbox',version:'4.0.0'})
   registerAppTool(server,TOOL_NAME,{
     title:'Preview Scout Component Sandbox',
-    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. Eligible contact names can be exported as standard .vcf files through the MCP Apps host-native download channel, without opening a browser. Missing enrichment remains explicit rather than fabricated.',
+    description:'Owner-only read-only developer preview of the Scout MCP App component sandbox. Call only when the Scout owner explicitly asks to preview, surface, inspect, or test the sandbox UI. Slide 2 shows bounded property/portfolio geography. Slide 3 is a progressive lead contact card. Missing enrichment remains explicit rather than fabricated.',
     inputSchema:z.object({}),
     outputSchema:z.object({surface:z.literal('scout_component_sandbox'),version:z.literal('v1'),business_data:z.literal(true),interaction_scope:z.literal('ephemeral_only')}),
     annotations:{readOnlyHint:true,destructiveHint:false,idempotentHint:true,openWorldHint:false},
-    _meta:{ui:{resourceUri:RESOURCE_URI},'ui/resourceUri':RESOURCE_URI,'openai/outputTemplate':RESOURCE_URI,'openai/widgetAccessible':true,'openai/toolInvocation/invoking':'Opening Scout preview…','openai/toolInvocation/invoked':'Scout preview opened.'}
+    _meta:{ui:{resourceUri:RESOURCE_URI}}
   },async()=>{
-    const widgetSessionId=crypto.randomUUID()
-    return {content:[{type:'text',text:'Scout component sandbox v1. Eligible lead contacts use host-mediated in-app .vcf downloads; no contact file is persisted by Scout.'}],structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'},_meta:{'openai/widgetSessionId':widgetSessionId,viewUUID:widgetSessionId}}
+    return {
+      content:[{type:'text',text:'Scout component sandbox v1. The interactive View uses the standard MCP Apps lifecycle and portable host communication.'}],
+      structuredContent:{surface:'scout_component_sandbox',version:'v1',business_data:true,interaction_scope:'ephemeral_only'}
+    }
   })
   registerAppResource(server,'scout-component-sandbox',RESOURCE_URI,{mimeType:RESOURCE_MIME_TYPE},async()=>{
     const targets=await attachPreparedVcardDownloads(await loadMapTargets())
-    return {contents:[{uri:RESOURCE_URI,mimeType:RESOURCE_MIME_TYPE,text:buildComponentSandboxHtml(targets),_meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN,MCP_APP_SDK_ORIGIN]}},'openai/widgetDescription':'Owner-only Scout component sandbox. Slide 2 distinguishes resolved assets from documented portfolio territory. Slide 3 is a normalized contact card. Eligible organization and named-person contacts export standard .vcf files through the MCP Apps host-mediated download channel, keeping the user inside ChatGPT. Widget state survives host remounts.','openai/widgetPrefersBorder':false,'openai/widgetCSP':{connect_domains:[],resource_domains:[BASEMAP_ORIGIN,MCP_APP_SDK_ORIGIN],redirect_domains:[DOWNLOAD_ORIGIN]}}}]}
+    return {contents:[{
+      uri:RESOURCE_URI,
+      mimeType:RESOURCE_MIME_TYPE,
+      text:buildComponentSandboxHtml(targets),
+      _meta:{ui:{prefersBorder:false,csp:{connectDomains:[],resourceDomains:[BASEMAP_ORIGIN,MCP_APP_SDK_ORIGIN]}}}
+    }]}
   })
   return server
 }
