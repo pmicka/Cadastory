@@ -33,14 +33,21 @@ async function scoutMcpDownloadApp(){
 const newDownload="async function downloadCurrentVcard(){const card=currentContactCard;if(!card||!vcardEligibility(card))return;const content=buildVcard(card),filename=vcardFilename(card),download=document.getElementById('contactVcardDownload'),copy=document.getElementById('contactVcardCopy'),live=document.getElementById('live'),originalLabel=download?.textContent||'Download .vcf';if(download){download.disabled=true;download.textContent='Saving…'}if(copy)copy.textContent='Preparing '+filename+' for ChatGPT…';try{const app=await scoutMcpDownloadApp();const result=await app.downloadFile({contents:[{type:'resource',resource:{uri:'file:///'+filename,mimeType:'text/vcard',text:content}}]});if(result?.isError)throw new Error('host_download_file_rejected');hideVcardPrompt();if(live)live.textContent='Contact file handed to ChatGPT.'}catch(error){console.error('Scout in-app vCard download failed',error);if(copy){const message=String(error?.message||'');copy.textContent=/method not found|unsupported|not implemented|ui\\/download-file/i.test(message)?'This ChatGPT client rejected the native in-app file download request.':'ChatGPT could not save the contact file in-app. Please try again.'}if(live)live.textContent='In-app contact download failed.'}finally{if(download){download.disabled=false;download.textContent=originalLabel}}}"
 
 const oldCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:16px;touch-action:pan-x}'
-const newCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x proximity;scrollbar-width:none;border-radius:16px;touch-action:pan-x;overscroll-behavior-x:contain}.carousel::after{content:\'\';flex:0 0 14%;height:1px}'
+const newCarousel='.carousel{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;border-radius:16px;touch-action:pan-x;overscroll-behavior-x:contain}'
+const oldSlide='.slide{position:relative;min-width:86%;height:200px;'
+const newSlide='.slide{position:relative;min-width:100%;height:200px;'
 const oldNarrowSlide='.slide{min-width:92%;height:190px}'
-const newNarrowSlide='.carousel::after{flex-basis:8%}.slide{min-width:92%;height:190px}'
+const newNarrowSlide='.slide{min-width:100%;height:190px}'
+const oldScrollHandler=`let scrollFrame=0;carousel.addEventListener('scroll',()=>{cancelAnimationFrame(scrollFrame);scrollFrame=requestAnimationFrame(()=>updatePager(true))},{passive:true});`
+const settledScrollHandler=`let scrollFrame=0,slidePersistTimer=0;
+carousel.addEventListener('scroll',()=>{cancelAnimationFrame(scrollFrame);scrollFrame=requestAnimationFrame(()=>updatePager(false));clearTimeout(slidePersistTimer);slidePersistTimer=setTimeout(()=>updatePager(true),180)},{passive:true});`
 
 export function buildComponentSandboxHtml(targets: SandboxMapTarget[] = []) {
   let html=buildComponentSandboxHtmlV16(targets as unknown as SandboxMapTargetV16[])
   html=replaceRequired(html,oldDownload,nativeDownloadHelpers+newDownload,'native MCP Apps vCard download')
-  html=replaceRequired(html,oldCarousel,newCarousel,'smooth carousel snap behavior')
-  html=replaceRequired(html,oldNarrowSlide,newNarrowSlide,'narrow carousel trailing space')
+  html=replaceRequired(html,oldCarousel,newCarousel,'contained carousel overscroll')
+  html=replaceRequired(html,oldSlide,newSlide,'full-width carousel tile')
+  html=replaceRequired(html,oldNarrowSlide,newNarrowSlide,'full-width narrow carousel tile')
+  html=replaceRequired(html,oldScrollHandler,settledScrollHandler,'settled carousel state persistence')
   return html
 }
