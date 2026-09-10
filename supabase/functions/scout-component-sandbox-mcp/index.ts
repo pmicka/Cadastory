@@ -19,7 +19,7 @@ try { const keys = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') || '{}'); SER
 if (!SERVICE_KEY) throw new Error('Scout component sandbox service credential is unavailable')
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession:false, autoRefreshToken:false } })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v1'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v2'
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const BASEMAP_ORIGIN = 'https://tile.openstreetmap.org'
 const MCP_APP_SDK_ORIGIN = 'https://unpkg.com'
