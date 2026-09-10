@@ -1,0 +1,47 @@
+name: Scout farm field operation evidence worker
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Farm field-operation jobs to claim (1-25)"
+        required: false
+        default: "6"
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-farm-field-operation-evidence-worker
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    if: ${{ github.event_name != 'issues' || github.event.issue.title == '[ops] Run Scout farm field operation evidence worker' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install document tooling
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
+          python -m pip install --upgrade requests
+          pdftotext -v
+
+      - name: Verify farm field-operation rule pack and source coverage
+        run: python scripts/scout_farm_field_operation_evidence_coverage_entrypoint.py --self-test
+
+      - name: Process farm field-operation evidence queue
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_DOCUMENT_BATCH_SIZE: ${{ github.event.inputs.batch_size || '6' }}
+          SCOUT_DOCUMENT_MAX_BYTES: "41943040"
+        run: python scripts/scout_farm_field_operation_evidence_coverage_entrypoint.py
