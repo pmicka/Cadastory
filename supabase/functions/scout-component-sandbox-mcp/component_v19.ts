@@ -27,29 +27,31 @@ function exemplarPropertyImageBounds(target,aspect){
   if(![minLon,maxLon,minLat,maxLat].every(Number.isFinite))return null;
   if(maxLon<minLon){const v=minLon;minLon=maxLon;maxLon=v}if(maxLat<minLat){const v=minLat;minLat=maxLat;maxLat=v}
   const centerLon=(minLon+maxLon)/2,centerLat=(minLat+maxLat)/2,metersPerDegLat=111320,metersPerDegLon=Math.max(15000,111320*Math.cos(centerLat*Math.PI/180));
-  let widthM=Math.max((maxLon-minLon)*metersPerDegLon,150),heightM=Math.max((maxLat-minLat)*metersPerDegLat,105);
-  widthM*=1.28;heightM*=1.28;
+  let widthM=Math.max((maxLon-minLon)*metersPerDegLon*1.28,150),heightM=Math.max((maxLat-minLat)*metersPerDegLat*1.28,105);
+  widthM=Math.min(widthM,900);heightM=Math.min(heightM,360);
   const targetAspect=Math.max(1,Number(aspect)||2.4),currentAspect=widthM/heightM;
-  if(currentAspect<targetAspect)widthM=heightM*targetAspect;else heightM=widthM/targetAspect;
+  if(currentAspect<targetAspect)widthM=Math.min(900,heightM*targetAspect);else heightM=Math.min(360,widthM/targetAspect);
+  if(widthM/heightM<targetAspect)widthM=heightM*targetAspect;else if(widthM/heightM>targetAspect)heightM=widthM/targetAspect;
   const halfLon=widthM/metersPerDegLon/2,halfLat=heightM/metersPerDegLat/2;
   return{minLon:centerLon-halfLon,maxLon:centerLon+halfLon,minLat:centerLat-halfLat,maxLat:centerLat+halfLat};
 }
 function renderPropertyImage(){
   const canvas=document.getElementById('propertyImageCanvas'),empty=document.getElementById('propertyImageEmpty'),label=document.getElementById('propertyImageLabel'),attribution=document.getElementById('propertyImageAttribution');
   if(!canvas||!empty||!label||!attribution)return;
-  canvas.querySelectorAll('img').forEach(node=>node.remove());
   const key=String(mapTarget?.key||''),isExemplarProperty=mapTarget?.kind==='property'&&!key.startsWith('fallback:');
   label.textContent=isExemplarProperty?(mapTarget?.label||'Aerial property view'):'Property imagery';
-  if(!isExemplarProperty){empty.hidden=false;empty.innerHTML='<b>No single property image</b><span>Portfolio and fallback frames do not fabricate a representative property. Imagery enrichment is limited to single-property exemplars.</span>';attribution.hidden=true;canvas.setAttribute('aria-label','Property imagery unavailable for this non-property exemplar');return}
+  if(!isExemplarProperty){canvas.querySelectorAll('img').forEach(node=>node.remove());delete canvas.dataset.src;empty.hidden=false;empty.innerHTML='<b>No single property image</b><span>Portfolio and fallback frames do not fabricate a representative property. Imagery enrichment is limited to single-property exemplars.</span>';attribution.hidden=true;canvas.setAttribute('aria-label','Property imagery unavailable for this non-property exemplar');return}
   const w=Math.max(320,canvas.clientWidth||484),h=Math.max(180,canvas.clientHeight||200),bounds=exemplarPropertyImageBounds(mapTarget,w/h);
-  if(!bounds){empty.hidden=false;empty.innerHTML='<b>Imagery unavailable</b><span>This exemplar does not have a defensible geographic frame for imagery retrieval.</span>';attribution.hidden=true;return}
-  empty.hidden=false;empty.innerHTML='<b>Aerial property view</b><span>Loading current exemplar imagery…</span>';attribution.hidden=false;
+  if(!bounds){canvas.querySelectorAll('img').forEach(node=>node.remove());delete canvas.dataset.src;empty.hidden=false;empty.innerHTML='<b>Imagery unavailable</b><span>This exemplar does not have a defensible geographic frame for imagery retrieval.</span>';attribution.hidden=true;return}
   const dpr=Math.min(2,Math.max(1,Number(window.devicePixelRatio)||1)),sizeW=Math.min(1200,Math.round(w*dpr)),sizeH=Math.min(600,Math.round(h*dpr));
-  const params=new URLSearchParams({f:'image',bbox:[bounds.minLon,bounds.minLat,bounds.maxLon,bounds.maxLat].map(v=>v.toFixed(8)).join(','),bboxSR:'4326',imageSR:'4326',size:sizeW+','+sizeH,format:'jpg',compressionQuality:'82',interpolation:'RSP_BilinearInterpolation',renderingRule:JSON.stringify({rasterFunction:'NaturalColor'})});
+  const params=new URLSearchParams({f:'image',bbox:[bounds.minLon,bounds.minLat,bounds.maxLon,bounds.maxLat].map(v=>v.toFixed(8)).join(','),bboxSR:'4326',imageSR:'4326',size:sizeW+','+sizeH,format:'jpg',compressionQuality:'82',interpolation:'RSP_BilinearInterpolation',renderingRule:JSON.stringify({rasterFunction:'NaturalColor'})}),src=SCOUT_EXEMPLAR_IMAGERY_URL+'?'+params.toString(),existing=canvas.querySelector('img');
+  attribution.hidden=false;
+  if(existing&&canvas.dataset.src===src){if(existing.complete&&existing.naturalWidth>0)empty.hidden=true;return}
+  canvas.querySelectorAll('img').forEach(node=>node.remove());canvas.dataset.src=src;empty.hidden=false;empty.innerHTML='<b>Aerial property view</b><span>Loading current exemplar imagery…</span>';
   const img=document.createElement('img');img.alt='';img.decoding='async';img.loading='eager';img.referrerPolicy='no-referrer';
   img.onload=()=>{empty.hidden=true;canvas.setAttribute('aria-label','Aerial orthoimagery for '+String(mapTarget?.label||'property exemplar')+'. Source: USGS and USDA, The National Map.')};
-  img.onerror=()=>{img.remove();empty.hidden=false;empty.innerHTML='<b>Imagery unavailable</b><span>The external orthoimagery service did not return an image for this exemplar.</span>';attribution.hidden=true;canvas.setAttribute('aria-label','Aerial imagery unavailable for '+String(mapTarget?.label||'property exemplar'))};
-  img.src=SCOUT_EXEMPLAR_IMAGERY_URL+'?'+params.toString();canvas.prepend(img);
+  img.onerror=()=>{img.remove();delete canvas.dataset.src;empty.hidden=false;empty.innerHTML='<b>Imagery unavailable</b><span>The external orthoimagery service did not return an image for this exemplar.</span>';attribution.hidden=true;canvas.setAttribute('aria-label','Aerial imagery unavailable for '+String(mapTarget?.label||'property exemplar'))};
+  img.src=src;canvas.prepend(img);
 }
 function renderStaticMap(){if(!mapTarget)return;renderPropertyImage();renderContactCard();const map=`
 
