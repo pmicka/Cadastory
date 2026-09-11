@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
+import { build, transform } from "esbuild";
 
 const directory = new URL("./", import.meta.url);
 const [view, server, generated, buildView, connectGateway, contractGateway] = await Promise.all([
@@ -80,5 +80,16 @@ assert.ok(generated.includes("opportunity"));
 assert.equal(generated.includes("Scout lifecycle"), false);
 assert.equal((generated.match(/<!doctype html>/g) || []).length, 1);
 assert.equal((generated.match(/window\.openai/g) || []).length, 0);
+
+const exportPrefix = "export const SCOUT_VIEW_HTML = ";
+const exportStart = generated.indexOf(exportPrefix);
+assert.notEqual(exportStart, -1);
+const htmlLiteral = generated.slice(exportStart + exportPrefix.length).trim().replace(/;$/, "");
+const html = JSON.parse(htmlLiteral);
+assert.equal((html.match(/<!doctype html>/g) || []).length, 1);
+assert.equal(html.includes("window.openai"), false);
+const scriptMatch = html.match(/<script type="module">([\s\S]*?)<\/script>/);
+assert.ok(scriptMatch?.[1]);
+await transform(scriptMatch[1], { loader: "js", format: "esm", target: "es2022" });
 
 console.log("Scout opportunity-card MCP Apps lifecycle checks passed.");
