@@ -1,0 +1,10 @@
+{
+  "sourceCommit": "b0b2f31b47927453b324fe3e0222e4fa2ec7e007",
+  "sourcePath": "supabase/functions/scout-component-sandbox-mcp/view.generated.ts",
+  "htmlBytes": 604262,
+  "htmlSha256": "933122929aa8a43f329a60906b3f56af58fbeaef04eb849b3afd8da4cf844ec0",
+  "encodedBytes": 805684,
+  "chunkSize": 48000,
+  "chunkCount": 17,
+  "reconstructedSha256": "933122929aa8a43f329a60906b3f56af58fbeaef04eb849b3afd8da4cf844ec0"
+}
