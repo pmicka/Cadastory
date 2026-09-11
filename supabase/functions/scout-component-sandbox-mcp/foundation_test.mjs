@@ -31,6 +31,8 @@ assert.ok(server.includes("scout_get_component_sandbox_opportunity_v1_internal")
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_v3_internal"), false);
 assert.ok(server.includes("names: z.array"));
 assert.ok(server.includes("opportunity: z.object"));
+assert.ok(connectGateway.includes("opportunity:{type:'object'"));
+assert.ok(contractGateway.includes("opportunity:{type:'object'"));
 assert.equal(server.includes("exemplars:"), false);
 assert.ok(buildView.includes('template.replace("/*__SCOUT_VIEW_BUNDLE__*/", () => bundle)'));
 
@@ -69,7 +71,7 @@ assert.equal(normalizeScoutSandboxOpportunity({ ...exemplar, confidence: 2 }), n
 assert.equal(normalizeScoutSandboxOpportunity({ ...exemplar, name: "" }), null);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
