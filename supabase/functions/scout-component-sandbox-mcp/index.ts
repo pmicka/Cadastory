@@ -18,8 +18,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v8'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v9'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v8',
   'ui://scout/component-sandbox/v7',
   'ui://scout/component-sandbox/v6',
   'ui://scout/component-sandbox/v5',

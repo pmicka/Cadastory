@@ -1,23 +1,19 @@
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
 
+const TOTAL_STAGES = 8
 const status = document.querySelector<HTMLElement>('[data-scout-status]')
-const detail = document.querySelector<HTMLElement>('[data-scout-detail]')
-const count = document.querySelector<HTMLElement>('[data-scout-count]')
-const diagnostics = document.querySelector<HTMLUListElement>('[data-scout-diagnostics]')
+const progressLine = document.querySelector<HTMLElement>('[data-scout-progress]')
 const list = document.querySelector<HTMLUListElement>('[data-scout-exemplars]')
-const rows = new Map<string, HTMLLIElement>()
+let currentStage = 0
 
-function checkpoint(id: string, state: 'pending' | 'pass' | 'fail', message: string) {
-  if (!diagnostics) return
-  let row = rows.get(id)
-  if (!row) {
-    row = document.createElement('li')
-    rows.set(id, row)
-    diagnostics.append(row)
-  }
-  const marker = state === 'pass' ? '✓' : state === 'fail' ? '✕' : '○'
-  row.textContent = `${marker} ${message}`
-  row.dataset.state = state
+function progress(stage: number, message: string, state: 'pass' | 'pending' | 'fail' = 'pass') {
+  currentStage = Math.max(currentStage, Math.min(stage, TOTAL_STAGES))
+  if (!progressLine) return
+  const prefix = state === 'fail'
+    ? `Scout stopped at ${currentStage}/${TOTAL_STAGES}`
+    : `Scout lifecycle ${currentStage}/${TOTAL_STAGES}`
+  progressLine.textContent = `${prefix} · ${message.slice(0, 160)}`
+  progressLine.dataset.state = state
 }
 
 function cleanName(value: unknown) {
@@ -30,60 +26,54 @@ function renderNames(value: unknown) {
   const names = Array.isArray(value)
     ? value.map(cleanName).filter((name): name is string => name !== null).slice(0, 2)
     : []
-  checkpoint('render', names.length ? 'pass' : 'fail', `Names rendered: ${names.length}`)
-  if (status) status.textContent = names.length ? 'Scout lifecycle complete' : 'Scout tool result had no valid names'
-  if (detail) detail.textContent = 'Diagnostic remains visible below.'
-  if (count) count.textContent = names.length
-    ? `${names.length} real Scout name${names.length === 1 ? '' : 's'} received`
-    : 'No valid names were returned.'
-  if (!list) return
-  list.replaceChildren(...names.map((value) => {
-    const item = document.createElement('li')
-    const name = document.createElement('strong')
-    name.textContent = value
-    item.append(name)
-    return item
-  }))
+  if (!names.length) {
+    progress(8, 'Tool result contained no valid names', 'fail')
+    return
+  }
+  if (list) {
+    list.replaceChildren(...names.map((value) => {
+      const item = document.createElement('li')
+      const name = document.createElement('strong')
+      name.textContent = value
+      item.append(name)
+      return item
+    }))
+  }
+  if (status) status.textContent = 'Scout'
+  progress(8, `Ready · ${names.length} names rendered`)
 }
 
-checkpoint('script', 'pass', 'View script started')
+progress(1, 'View script started')
 const app = new App({ name: 'scout-ui-foundation', version: '2.0.0' })
-checkpoint('app', 'pass', 'SDK App created')
+progress(2, 'SDK App created')
 
-app.ontoolinput = () => checkpoint('input', 'pass', 'Tool input received')
+app.ontoolinput = () => progress(6, 'Tool input received')
 app.ontoolresult = (result) => {
   const content = result?.structuredContent
   const keys = content && typeof content === 'object' ? Object.keys(content).sort().join(', ') : 'none'
-  checkpoint('result', 'pass', `Tool result received; keys: ${keys}`)
+  progress(7, `Tool result received · keys: ${keys}`)
   renderNames(content?.names)
 }
 app.onerror = (error) => {
-  checkpoint('sdk-error', 'fail', `SDK error: ${error instanceof Error ? error.message : String(error)}`)
-  if (status) status.textContent = 'Scout lifecycle error'
+  progress(currentStage, `SDK error: ${error instanceof Error ? error.message : String(error)}`, 'fail')
 }
-app.onteardown = async () => {
-  checkpoint('teardown', 'pass', 'Teardown requested')
-  return {}
-}
-checkpoint('handlers', 'pass', 'Lifecycle handlers registered')
+app.onteardown = async () => ({})
+progress(3, 'Lifecycle handlers registered')
 
-window.addEventListener('error', (event) => checkpoint('page-error', 'fail', `Page error: ${event.message || 'unknown'}`))
-window.addEventListener('unhandledrejection', (event) => checkpoint('rejection', 'fail', `Rejected: ${event.reason instanceof Error ? event.reason.message : String(event.reason)}`))
+window.addEventListener('error', (event) => progress(currentStage, `Page error: ${event.message || 'unknown'}`, 'fail'))
+window.addEventListener('unhandledrejection', (event) => {
+  progress(currentStage, `Rejected: ${event.reason instanceof Error ? event.reason.message : String(event.reason)}`, 'fail')
+})
 
 const transport = new PostMessageTransport()
-checkpoint('transport', 'pass', 'PostMessageTransport created')
-checkpoint('connect', 'pending', 'SDK initialization handshake pending')
-const pendingTimer = window.setTimeout(() => checkpoint('connect', 'pending', 'SDK initialization still pending after 3 seconds'), 3000)
+progress(4, 'Transport created', 'pending')
+const pendingTimer = window.setTimeout(() => progress(4, 'SDK initialization still pending', 'pending'), 3000)
 
 try {
   await app.connect(transport)
   window.clearTimeout(pendingTimer)
-  checkpoint('connect', 'pass', 'SDK initialization handshake completed')
-  if (status) status.textContent = 'Scout View connected'
-  if (detail) detail.textContent = 'Waiting for the tool result notification.'
+  progress(5, 'SDK initialization complete')
 } catch (error) {
   window.clearTimeout(pendingTimer)
-  checkpoint('connect', 'fail', `SDK initialization failed: ${error instanceof Error ? error.message : String(error)}`)
-  if (status) status.textContent = 'Scout connection failed'
+  progress(4, `SDK initialization failed: ${error instanceof Error ? error.message : String(error)}`, 'fail')
 }
-
