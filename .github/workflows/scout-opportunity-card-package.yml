@@ -35,7 +35,7 @@ jobs:
           const htmlSha256 = crypto.createHash('sha256').update(htmlBytes).digest('hex')
           const compressed = zlib.gzipSync(htmlBytes, { level: 9, mtime: 0 })
           const encoded = compressed.toString('base64')
-          const chunkSize = 16000
+          const chunkSize = 8000
           const chunks = []
           for (let offset = 0; offset < encoded.length; offset += chunkSize) {
             chunks.push(encoded.slice(offset, offset + chunkSize))
