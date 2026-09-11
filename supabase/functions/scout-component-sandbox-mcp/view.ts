@@ -86,3 +86,4 @@ try {
   checkpoint('connect', 'fail', `SDK initialization failed: ${error instanceof Error ? error.message : String(error)}`)
   if (status) status.textContent = 'Scout connection failed'
 }
+
