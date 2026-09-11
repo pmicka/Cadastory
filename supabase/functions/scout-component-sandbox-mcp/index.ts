@@ -51,24 +51,10 @@ async function loadScoutSandboxExemplars() {
 }
 
 async function isOwnerConnection(connectionId: string) {
-  const { data: binding, error: bindingError } = await admin
-    .schema('commerce')
-    .from('oauth_agent_connection_bindings')
-    .select('user_id')
-    .eq('connection_id', connectionId)
-    .limit(1)
-    .maybeSingle()
-  if (bindingError || !binding?.user_id) return false
-  const { data: owner, error: ownerError } = await admin
-    .schema('commerce')
-    .from('scout_account_allowlist')
-    .select('user_id')
-    .eq('user_id', binding.user_id)
-    .eq('account_role', 'owner')
-    .eq('status', 'active')
-    .limit(1)
-    .maybeSingle()
-  return !ownerError && !!owner?.user_id
+  const { data, error } = await admin.rpc('scout_is_owner_connection_internal', {
+    p_connection_id: connectionId,
+  })
+  return !error && data === true
 }
 
 async function authenticateOwner(req: Request) {

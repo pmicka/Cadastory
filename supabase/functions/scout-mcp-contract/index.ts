@@ -60,10 +60,8 @@ function validMachine(s:unknown,max=120){return typeof s==='string'&&s.length<=m
 async function readBody(req:Request){const declared=Number(req.headers.get('content-length')||0);if(declared>MAX_BODY_BYTES)throw new Error('request_too_large');const text=await req.text();if(new TextEncoder().encode(text).byteLength>MAX_BODY_BYTES)throw new Error('request_too_large');return text}
 async function resolveConnection(token:string):Promise<Connection|null>{const {data,error}=await db.rpc('scout_resolve_agent_connection_v4',{p_token:token,p_privacy_contract:PRIVACY_CONTRACT,p_exposure_contract:EXPOSURE_CONTRACT,p_enumeration_contract:ENUMERATION_CONTRACT});if(error||!data?.connection_id)return null;return data as Connection}
 async function isOwnerConnection(connectionId:string):Promise<boolean>{
-  const {data:binding,error:bindingError}=await db.schema('commerce').from('oauth_agent_connection_bindings').select('user_id').eq('connection_id',connectionId).limit(1).maybeSingle()
-  if(bindingError||!binding?.user_id)return false
-  const {data:owner,error:ownerError}=await db.schema('commerce').from('scout_account_allowlist').select('user_id').eq('user_id',binding.user_id).eq('account_role','owner').eq('status','active').limit(1).maybeSingle()
-  return !ownerError&&!!owner?.user_id
+  const {data,error}=await db.rpc('scout_is_owner_connection_internal',{p_connection_id:connectionId})
+  return !error&&data===true
 }
 async function issueProxy(connectionId:string){const {data,error}=await db.rpc('scout_issue_connection_proxy_token_internal',{p_connection_id:connectionId,p_ttl_seconds:120});if(error||!data?.token)throw new Error('Scout contract gateway could not prepare upstream authentication');return String(data.token)}
 async function prepareFanout(token:string,count:number):Promise<{connection:Connection;tokens:string[]}|null>{const connection=await resolveConnection(token);if(!connection)return null;const tokens=await Promise.all(Array.from({length:count},()=>issueProxy(connection.connection_id)));return {connection,tokens}}
