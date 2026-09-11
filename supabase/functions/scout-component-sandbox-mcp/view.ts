@@ -1,4 +1,4 @@
-import { App, PostMessageTransport } from "@modelcontextprotocol/ext-apps/app-with-deps";
+import { App } from "@modelcontextprotocol/ext-apps/app-with-deps";
 import { normalizeScoutSandboxExemplars } from "./contract";
 
 const status = document.querySelector<HTMLElement>("[data-scout-status]");
@@ -52,7 +52,7 @@ app.onerror = (error) => {
 
 app.onteardown = async () => ({});
 
-await app.connect(new PostMessageTransport());
+await app.connect();
 if (!toolResultReceived) {
   if (status) status.textContent = "Scout View connected";
   if (detail) detail.textContent = "MCP Apps host bridge initialized; waiting for the tool result.";
