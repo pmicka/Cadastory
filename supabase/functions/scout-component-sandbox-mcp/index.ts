@@ -3,12 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.0.0'
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@modelcontextprotocol/ext-apps@2.0.0/server'
 import * as z from 'npm:zod@4.2.0/v4'
-import {
-  normalizeScoutSandboxRpcExemplars,
-  SCOUT_SANDBOX_MAX_EXEMPLARS,
-  SCOUT_SANDBOX_RESULT_VERSION,
-  type ScoutSandboxResult,
-} from './contract.ts'
+import { normalizeScoutSandboxNames, type ScoutSandboxResult } from './contract.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -23,8 +18,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v5'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v6'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v5',
   'ui://scout/component-sandbox/v4',
   'ui://scout/component-sandbox/v3',
   'ui://scout/component-sandbox/v2',
@@ -34,22 +30,10 @@ const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
-const RPC_LIMIT_PER_KIND = 1
-
-const exemplarSchema = z.object({
-  name: z.string().min(1).max(160),
-  kind: z.enum(['property', 'group']),
-  archetype: z.string().min(1).max(100).nullable(),
-  resolution_status: z.string().min(1).max(100).nullable(),
-})
-
-async function loadScoutSandboxExemplars() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_map_targets_v3_internal', {
-    p_property_limit: RPC_LIMIT_PER_KIND,
-    p_group_limit: RPC_LIMIT_PER_KIND,
-  })
-  if (error) throw new Error('Scout exemplar data is unavailable')
-  return normalizeScoutSandboxRpcExemplars(data)
+async function loadScoutSandboxNames() {
+  const { data, error } = await admin.rpc('scout_get_component_sandbox_names_v1_internal')
+  if (error) throw new Error('Scout exemplar names are unavailable')
+  return normalizeScoutSandboxNames(data)
 }
 
 async function isOwnerConnection(connectionId: string) {
@@ -133,11 +117,7 @@ function makeServer() {
       inputSchema: z.object({}),
       outputSchema: z.object({
         surface: z.literal('scout_component_sandbox'),
-        version: z.literal(SCOUT_SANDBOX_RESULT_VERSION),
-        business_data: z.literal(true),
-        interaction_scope: z.literal('ephemeral_only'),
-        foundation: z.literal('ready'),
-        exemplars: z.array(exemplarSchema).max(SCOUT_SANDBOX_MAX_EXEMPLARS),
+        names: z.array(z.string().min(1).max(160)).max(2),
       }),
       annotations: {
         readOnlyHint: true,
@@ -148,17 +128,13 @@ function makeServer() {
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
     async () => {
-      const exemplars = await loadScoutSandboxExemplars()
+      const names = await loadScoutSandboxNames()
       const structuredContent: ScoutSandboxResult = {
-        surface: 'scout_component_sandbox' as const,
-        version: SCOUT_SANDBOX_RESULT_VERSION,
-        business_data: true,
-        interaction_scope: 'ephemeral_only' as const,
-        foundation: 'ready' as const,
-        exemplars,
+        surface: 'scout_component_sandbox',
+        names,
       }
       return {
-        content: [{ type: 'text', text: `The Scout MCP Apps View received ${exemplars.length} bounded real exemplar${exemplars.length === 1 ? '' : 's'}.` }],
+        content: [{ type: 'text', text: `Scout returned ${names.length} real exemplar name${names.length === 1 ? '' : 's'}.` }],
         structuredContent,
       }
     },

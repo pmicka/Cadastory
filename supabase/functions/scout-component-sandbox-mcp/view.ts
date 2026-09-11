@@ -1,67 +1,53 @@
-const status = document.querySelector<HTMLElement>("[data-scout-status]");
-const detail = document.querySelector<HTMLElement>("[data-scout-detail]");
-const count = document.querySelector<HTMLElement>("[data-scout-count]");
-const list = document.querySelector<HTMLUListElement>("[data-scout-exemplars]");
+import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
 
-function cleanText(value: unknown, maxLength: number) {
-  if (typeof value !== "string") return null;
-  const cleaned = value.trim();
-  return cleaned.length > 0 && cleaned.length <= maxLength ? cleaned : null;
+const status = document.querySelector<HTMLElement>('[data-scout-status]')
+const detail = document.querySelector<HTMLElement>('[data-scout-detail]')
+const count = document.querySelector<HTMLElement>('[data-scout-count]')
+const list = document.querySelector<HTMLUListElement>('[data-scout-exemplars]')
+
+function cleanName(value: unknown) {
+  if (typeof value !== 'string') return null
+  const name = value.trim()
+  return name.length > 0 && name.length <= 160 ? name : null
 }
 
-function normalizeExemplars(value: unknown) {
-  if (!Array.isArray(value)) return [];
-  return value.map((raw) => {
-    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-    const item = raw as Record<string, unknown>;
-    const name = cleanText(item.name, 160);
-    const kind = item.kind === "property" || item.kind === "group" ? item.kind : null;
-    if (!name || !kind) return null;
-    return {
-      name,
-      kind,
-      archetype: cleanText(item.archetype, 100),
-      resolution_status: cleanText(item.resolution_status, 100),
-    };
-  }).filter((item): item is NonNullable<typeof item> => item !== null).slice(0, 4);
+function renderNames(value: unknown) {
+  const names = Array.isArray(value)
+    ? value.map(cleanName).filter((name): name is string => name !== null).slice(0, 2)
+    : []
+
+  if (status) status.textContent = 'Scout View ready'
+  if (detail) detail.textContent = 'Real Scout names reached this View through structured tool content.'
+  if (count) count.textContent = names.length === 0
+    ? 'No valid names were returned.'
+    : `${names.length} real Scout name${names.length === 1 ? '' : 's'} received`
+
+  if (!list) return
+  const items = names.map((value) => {
+    const item = document.createElement('li')
+    const name = document.createElement('strong')
+    name.textContent = value
+    item.append(name)
+    return item
+  })
+  list.replaceChildren(...items)
 }
 
-function displayValue(value: string | null) {
-  return value ?? "Not available";
+const app = new App({ name: 'scout-ui-foundation', version: '2.0.0' })
+
+app.ontoolinput = () => {
+  if (status) status.textContent = 'Scout View connected'
+  if (detail) detail.textContent = 'Tool input received through the MCP Apps host bridge.'
 }
-
-function renderExemplars(value: unknown) {
-  const exemplars = normalizeExemplars(value);
-  if (status) status.textContent = "Scout View ready";
-  if (detail) detail.textContent = "Real Scout data reached this View through the standard MCP Apps tool-result notification.";
-  if (count) count.textContent = exemplars.length === 0
-    ? "No valid exemplars were returned."
-    : `${exemplars.length} real Scout exemplar${exemplars.length === 1 ? "" : "s"} received`;
-  if (!list) return;
-  const items = exemplars.map((exemplar) => {
-    const item = document.createElement("li");
-    const name = document.createElement("strong");
-    const details = document.createElement("span");
-    name.textContent = exemplar.name;
-    details.textContent = `${exemplar.kind} · Archetype: ${displayValue(exemplar.archetype)} · Resolution: ${displayValue(exemplar.resolution_status)}`;
-    item.append(name, details);
-    return item;
-  });
-  list.replaceChildren(...items);
+app.ontoolresult = (result) => renderNames(result?.structuredContent?.names)
+app.onerror = (error) => {
+  console.error('Scout MCP Apps View error', error)
+  if (status) status.textContent = 'Scout View rendered'
+  if (detail) detail.textContent = 'The UI is visible, but the host bridge reported an error.'
 }
+app.onteardown = async () => ({})
 
-window.addEventListener("message", (event) => {
-  if (event.source !== window.parent) return;
-  const message = event.data;
-  if (!message || message.jsonrpc !== "2.0") return;
-  if (message.method === "ui/notifications/tool-input") {
-    if (status) status.textContent = "Scout View connected";
-    if (detail) detail.textContent = "Tool input reached the standard MCP Apps bridge listener.";
-  }
-  if (message.method === "ui/notifications/tool-result") {
-    renderExemplars(message.params?.structuredContent?.exemplars);
-  }
-}, { passive: true });
+await app.connect(new PostMessageTransport())
 
-if (status) status.textContent = "Scout View listening";
-if (detail) detail.textContent = "Standard MCP Apps tool-result listener ready.";
+if (status) status.textContent = 'Scout View connected'
+if (detail) detail.textContent = 'MCP Apps host bridge initialized; waiting for the tool result.'

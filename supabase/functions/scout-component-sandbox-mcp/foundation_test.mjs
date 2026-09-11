@@ -11,17 +11,22 @@ const [view, server, generated, connectGateway, contractGateway] = await Promise
   readFile(new URL("../scout-mcp-contract/index.ts", directory), "utf8"),
 ]);
 
-assert.equal(view.includes("App"), false);
-assert.equal(view.includes(".connect("), false);
-assert.ok(view.includes('ui/notifications/tool-input'));
-assert.ok(view.includes('ui/notifications/tool-result'));
+assert.equal((view.match(/\.connect\(/g) || []).length, 1);
+assert.ok(view.indexOf("app.ontoolinput") < view.indexOf("app.connect("));
+assert.ok(view.indexOf("app.ontoolresult") < view.indexOf("app.connect("));
+assert.ok(view.indexOf("app.onerror") < view.indexOf("app.connect("));
+assert.ok(view.indexOf("app.onteardown") < view.indexOf("app.connect("));
+assert.ok(view.includes("new PostMessageTransport()"));
 assert.equal(view.includes("window.openai"), false);
+assert.equal(view.includes("innerHTML"), false);
 assert.equal(generated.includes("https://unpkg.com"), false);
 assert.equal(generated.includes("https://cdn."), false);
-assert.equal(server.includes("'openai/outputTemplate'"), false);
-assert.equal(server.includes("'ui/resourceUri'"), false);
 assert.ok(server.includes("_meta: { ui: { resourceUri: RESOURCE_URI } }"));
-assert.ok(server.includes("RESOURCE_MIME_TYPE"));
+assert.equal(server.includes("'openai/outputTemplate'"), false);
+assert.ok(server.includes("scout_get_component_sandbox_names_v1_internal"));
+assert.equal(server.includes("scout_get_component_sandbox_map_targets_v3_internal"), false);
+assert.ok(server.includes("names: z.array"));
+assert.equal(server.includes("exemplars:"), false);
 
 const contractBuild = await build({
   entryPoints: [new URL("contract.ts", directory).pathname],
@@ -32,65 +37,17 @@ const contractBuild = await build({
   write: false,
 });
 const contractUrl = `data:text/javascript;base64,${Buffer.from(contractBuild.outputFiles[0].text).toString("base64")}`;
-const {
-  SCOUT_SANDBOX_MAX_EXEMPLARS,
-  normalizeScoutSandboxExemplar,
-  normalizeScoutSandboxExemplars,
-  normalizeScoutSandboxRpcExemplars,
-} = await import(contractUrl);
+const { SCOUT_SANDBOX_MAX_NAMES, normalizeScoutSandboxNames } = await import(contractUrl);
+assert.deepEqual(normalizeScoutSandboxNames(["  Denton Floyd  ", "PNC Tower"]), ["Denton Floyd", "PNC Tower"]);
+assert.deepEqual(normalizeScoutSandboxNames([null, "", "x".repeat(161), "Valid"]), ["Valid"]);
+assert.equal(normalizeScoutSandboxNames(Array.from({ length: 10 }, (_, i) => `Name ${i}`)).length, SCOUT_SANDBOX_MAX_NAMES);
 
-assert.deepEqual(normalizeScoutSandboxRpcExemplars([{
-  kind: "group",
-  label: "  Example Group  ",
-  portfolio_archetype: "hotel_management",
-  contact_card: { resolution_status: "organization_resolved" },
-}]), [{
-  name: "Example Group",
-  kind: "group",
-  archetype: "hotel_management",
-  resolution_status: "organization_resolved",
-}]);
-assert.deepEqual(normalizeScoutSandboxRpcExemplars([{
-  kind: "property",
-  label: "Example Property",
-  contact_card: { organization_type: "hotel", resolution_status: "lead_identified" },
-}]), [{
-  name: "Example Property",
-  kind: "property",
-  archetype: "hotel",
-  resolution_status: "lead_identified",
-}]);
-assert.deepEqual(normalizeScoutSandboxExemplar({ name: "Valid", kind: "group" }), {
-  name: "Valid",
-  kind: "group",
-  archetype: null,
-  resolution_status: null,
-});
-for (const malformed of [null, [], {}, { name: "", kind: "group" }, { name: "x", kind: "unknown" }, { name: "x".repeat(161), kind: "property" }]) {
-  assert.doesNotThrow(() => normalizeScoutSandboxExemplar(malformed));
-  assert.equal(normalizeScoutSandboxExemplar(malformed), null);
-}
-assert.deepEqual(normalizeScoutSandboxExemplars({ exemplars: [] }), []);
-assert.equal(normalizeScoutSandboxExemplars(Array.from({ length: 20 }, (_, index) => ({
-  name: `Example ${index}`,
-  kind: "property",
-}))).length, SCOUT_SANDBOX_MAX_EXEMPLARS);
-assert.equal(view.includes("innerHTML"), false);
-assert.ok(view.includes("normalizeScoutSandboxExemplars"));
-assert.ok(server.includes("normalizeScoutSandboxRpcExemplars(data)"));
-assert.ok(server.includes("business_data: true"));
-assert.ok(server.includes("const RPC_LIMIT_PER_KIND = 1"));
 for (const source of [server, connectGateway, contractGateway]) {
-  assert.ok(source.includes("ui://scout/component-sandbox/v1"));
-  assert.ok(source.includes("ui://scout/component-sandbox/v2"));
-  assert.ok(source.includes("ui://scout/component-sandbox/v3"));
-  assert.ok(source.includes("ui://scout/component-sandbox/v4"));
-  assert.ok(source.includes("ui://scout/component-sandbox/v5"));
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6"]) {
+    assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
+  }
 }
-assert.ok(server.includes("COMPATIBILITY_RESOURCE_URIS"));
-assert.ok(connectGateway.includes("SANDBOX_COMPATIBILITY_RESOURCE_URIS"));
-assert.ok(contractGateway.includes("SANDBOX_COMPATIBILITY_RESOURCE_URIS"));
-assert.ok(generated.includes("Scout View v5 loaded"));
-assert.ok(server.includes("SCOUT_SANDBOX_RESULT_VERSION"));
+assert.ok(generated.includes("Scout View v6 loaded"));
+assert.ok(generated.includes("structuredContent?.names"));
 
-console.log("Scout MCP Apps foundation and bounded data-contract checks passed.");
+console.log("Scout names-only MCP Apps lifecycle checks passed.");
