@@ -20,8 +20,21 @@ import chunk18 from './view-chunks/chunk18.ts'
 import chunk19 from './view-chunks/chunk19.ts'
 import chunk20 from './view-chunks/chunk20.ts'
 import chunk21 from './view-chunks/chunk21.ts'
+import chunk22 from './view-chunks/chunk22.ts'
+import chunk23 from './view-chunks/chunk23.ts'
+import chunk24 from './view-chunks/chunk24.ts'
+import chunk25 from './view-chunks/chunk25.ts'
+import chunk26 from './view-chunks/chunk26.ts'
+import chunk27 from './view-chunks/chunk27.ts'
+import chunk28 from './view-chunks/chunk28.ts'
+import chunk29 from './view-chunks/chunk29.ts'
+import chunk30 from './view-chunks/chunk30.ts'
+import chunk31 from './view-chunks/chunk31.ts'
+import chunk32 from './view-chunks/chunk32.ts'
+import chunk33 from './view-chunks/chunk33.ts'
+import chunk34 from './view-chunks/chunk34.ts'
 
-const encoded = [chunk00, chunk01, chunk02, chunk03, chunk04, chunk05, chunk06, chunk07, chunk08, chunk09, chunk10, chunk11, chunk12, chunk13, chunk14, chunk15, chunk16, chunk17, chunk18, chunk19, chunk20, chunk21].join('')
+const encoded = [chunk00, chunk01, chunk02, chunk03, chunk04, chunk05, chunk06, chunk07, chunk08, chunk09, chunk10, chunk11, chunk12, chunk13, chunk14, chunk15, chunk16, chunk17, chunk18, chunk19, chunk20, chunk21, chunk22, chunk23, chunk24, chunk25, chunk26, chunk27, chunk28, chunk29, chunk30, chunk31, chunk32, chunk33, chunk34].join('')
 const compressed = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))
 const stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))
 export const SCOUT_VIEW_HTML = await new Response(stream).text()

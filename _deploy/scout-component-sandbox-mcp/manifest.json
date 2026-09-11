@@ -5,7 +5,7 @@
   "htmlSha256": "933122929aa8a43f329a60906b3f56af58fbeaef04eb849b3afd8da4cf844ec0",
   "compressedBytes": 130469,
   "encodedBytes": 173960,
-  "chunkSize": 8000,
-  "chunkCount": 22,
+  "chunkSize": 5000,
+  "chunkCount": 35,
   "reconstructedSha256": "933122929aa8a43f329a60906b3f56af58fbeaef04eb849b3afd8da4cf844ec0"
 }
