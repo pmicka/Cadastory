@@ -11,13 +11,10 @@ const [view, server, generated, connectGateway, contractGateway] = await Promise
   readFile(new URL("../scout-mcp-contract/index.ts", directory), "utf8"),
 ]);
 
-assert.equal((view.match(/\.connect\(/g) || []).length, 1);
-assert.ok(view.indexOf("app.ontoolinput") < view.indexOf("app.connect("));
-assert.ok(view.indexOf("app.ontoolresult") < view.indexOf("app.connect("));
-assert.ok(view.indexOf("app.onerror") < view.indexOf("app.connect("));
-assert.ok(view.indexOf("app.onteardown") < view.indexOf("app.connect("));
-assert.equal(view.includes("PostMessageTransport"), false);
-assert.ok(view.includes("app.connect();"));
+assert.equal(view.includes("App"), false);
+assert.equal(view.includes(".connect("), false);
+assert.ok(view.includes('ui/notifications/tool-input'));
+assert.ok(view.includes('ui/notifications/tool-result'));
 assert.equal(view.includes("window.openai"), false);
 assert.equal(generated.includes("https://unpkg.com"), false);
 assert.equal(generated.includes("https://cdn."), false);
@@ -88,11 +85,12 @@ for (const source of [server, connectGateway, contractGateway]) {
   assert.ok(source.includes("ui://scout/component-sandbox/v2"));
   assert.ok(source.includes("ui://scout/component-sandbox/v3"));
   assert.ok(source.includes("ui://scout/component-sandbox/v4"));
+  assert.ok(source.includes("ui://scout/component-sandbox/v5"));
 }
 assert.ok(server.includes("COMPATIBILITY_RESOURCE_URIS"));
 assert.ok(connectGateway.includes("SANDBOX_COMPATIBILITY_RESOURCE_URIS"));
 assert.ok(contractGateway.includes("SANDBOX_COMPATIBILITY_RESOURCE_URIS"));
-assert.ok(generated.includes("Scout View v4 loaded"));
+assert.ok(generated.includes("Scout View v5 loaded"));
 assert.ok(server.includes("SCOUT_SANDBOX_RESULT_VERSION"));
 
 console.log("Scout MCP Apps foundation and bounded data-contract checks passed.");

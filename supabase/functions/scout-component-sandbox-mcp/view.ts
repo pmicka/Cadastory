@@ -1,18 +1,39 @@
-import { App } from "@modelcontextprotocol/ext-apps/app-with-deps";
-import { normalizeScoutSandboxExemplars } from "./contract";
-
 const status = document.querySelector<HTMLElement>("[data-scout-status]");
 const detail = document.querySelector<HTMLElement>("[data-scout-detail]");
 const count = document.querySelector<HTMLElement>("[data-scout-count]");
 const list = document.querySelector<HTMLUListElement>("[data-scout-exemplars]");
-let toolResultReceived = false;
+
+function cleanText(value: unknown, maxLength: number) {
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim();
+  return cleaned.length > 0 && cleaned.length <= maxLength ? cleaned : null;
+}
+
+function normalizeExemplars(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.map((raw) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const item = raw as Record<string, unknown>;
+    const name = cleanText(item.name, 160);
+    const kind = item.kind === "property" || item.kind === "group" ? item.kind : null;
+    if (!name || !kind) return null;
+    return {
+      name,
+      kind,
+      archetype: cleanText(item.archetype, 100),
+      resolution_status: cleanText(item.resolution_status, 100),
+    };
+  }).filter((item): item is NonNullable<typeof item> => item !== null).slice(0, 4);
+}
 
 function displayValue(value: string | null) {
   return value ?? "Not available";
 }
 
 function renderExemplars(value: unknown) {
-  const exemplars = normalizeScoutSandboxExemplars(value);
+  const exemplars = normalizeExemplars(value);
+  if (status) status.textContent = "Scout View ready";
+  if (detail) detail.textContent = "Real Scout data reached this View through the standard MCP Apps tool-result notification.";
   if (count) count.textContent = exemplars.length === 0
     ? "No valid exemplars were returned."
     : `${exemplars.length} real Scout exemplar${exemplars.length === 1 ? "" : "s"} received`;
@@ -29,31 +50,18 @@ function renderExemplars(value: unknown) {
   list.replaceChildren(...items);
 }
 
-const app = new App({ name: "scout-ui-foundation", version: "2.0.0" });
+window.addEventListener("message", (event) => {
+  if (event.source !== window.parent) return;
+  const message = event.data;
+  if (!message || message.jsonrpc !== "2.0") return;
+  if (message.method === "ui/notifications/tool-input") {
+    if (status) status.textContent = "Scout View connected";
+    if (detail) detail.textContent = "Tool input reached the standard MCP Apps bridge listener.";
+  }
+  if (message.method === "ui/notifications/tool-result") {
+    renderExemplars(message.params?.structuredContent?.exemplars);
+  }
+}, { passive: true });
 
-app.ontoolinput = () => {
-  if (status) status.textContent = "Scout View connected";
-  if (detail) detail.textContent = "Tool input received through the MCP Apps host bridge.";
-};
-
-app.ontoolresult = (result) => {
-  toolResultReceived = true;
-  const foundation = result?.structuredContent?.foundation;
-  if (status) status.textContent = foundation === "ready" ? "Scout View ready" : "Scout View connected";
-  if (detail) detail.textContent = "Real Scout data reached this View through structured tool content.";
-  renderExemplars(result?.structuredContent?.exemplars);
-};
-
-app.onerror = (error) => {
-  console.error("Scout MCP Apps View error", error);
-  if (status) status.textContent = "Scout View rendered";
-  if (detail) detail.textContent = "The UI is visible, but the host bridge reported an error.";
-};
-
-app.onteardown = async () => ({});
-
-await app.connect();
-if (!toolResultReceived) {
-  if (status) status.textContent = "Scout View connected";
-  if (detail) detail.textContent = "MCP Apps host bridge initialized; waiting for the tool result.";
-}
+if (status) status.textContent = "Scout View listening";
+if (detail) detail.textContent = "Standard MCP Apps tool-result listener ready.";
