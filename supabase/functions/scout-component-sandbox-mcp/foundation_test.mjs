@@ -87,11 +87,12 @@ for (const source of [server, connectGateway, contractGateway]) {
   assert.ok(source.includes("ui://scout/component-sandbox/v1"));
   assert.ok(source.includes("ui://scout/component-sandbox/v2"));
   assert.ok(source.includes("ui://scout/component-sandbox/v3"));
+  assert.ok(source.includes("ui://scout/component-sandbox/v4"));
 }
 assert.ok(server.includes("COMPATIBILITY_RESOURCE_URIS"));
 assert.ok(connectGateway.includes("SANDBOX_COMPATIBILITY_RESOURCE_URIS"));
 assert.ok(contractGateway.includes("SANDBOX_COMPATIBILITY_RESOURCE_URIS"));
-assert.ok(generated.includes("Scout View v3 loaded"));
+assert.ok(generated.includes("Scout View v4 loaded"));
 assert.ok(server.includes("SCOUT_SANDBOX_RESULT_VERSION"));
 
 console.log("Scout MCP Apps foundation and bounded data-contract checks passed.");
