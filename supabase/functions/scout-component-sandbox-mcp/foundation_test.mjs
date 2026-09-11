@@ -43,11 +43,14 @@ assert.deepEqual(normalizeScoutSandboxNames([null, "", "x".repeat(161), "Valid"]
 assert.equal(normalizeScoutSandboxNames(Array.from({ length: 10 }, (_, i) => `Name ${i}`)).length, SCOUT_SANDBOX_MAX_NAMES);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
-assert.ok(generated.includes("Scout View v6 loaded"));
+assert.ok(generated.includes("Scout diagnostic v7"));
 assert.ok(generated.includes("structuredContent?.names"));
+assert.ok(generated.includes("SDK initialization still pending after 3 seconds"));
+assert.ok(view.includes("new PostMessageTransport()"));
+assert.ok(view.includes("checkpoint('connect'"));
 
 console.log("Scout names-only MCP Apps lifecycle checks passed.");
