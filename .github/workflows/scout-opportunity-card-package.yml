@@ -1,0 +1,83 @@
+name: Package Scout opportunity card for connector deploy
+
+on:
+  push:
+    branches:
+      - scout-opportunity-card-build-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout-opportunity-card-build-20260911
+      - name: Build lossless connector deployment package
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs')
+          const path = require('node:path')
+          const crypto = require('node:crypto')
+
+          const sourcePath = 'supabase/functions/scout-component-sandbox-mcp/view.generated.ts'
+          const source = fs.readFileSync(sourcePath, 'utf8')
+          const prefix = 'export const SCOUT_VIEW_HTML = '
+          const start = source.indexOf(prefix)
+          if (start < 0) throw new Error('SCOUT_VIEW_HTML export not found')
+          const literal = source.slice(start + prefix.length).trim().replace(/;$/, '')
+          const html = JSON.parse(literal)
+          const htmlBytes = Buffer.from(html, 'utf8')
+          const htmlSha256 = crypto.createHash('sha256').update(htmlBytes).digest('hex')
+          const encoded = htmlBytes.toString('base64')
+          const chunkSize = 48000
+          const chunks = []
+          for (let offset = 0; offset < encoded.length; offset += chunkSize) {
+            chunks.push(encoded.slice(offset, offset + chunkSize))
+          }
+
+          const out = '_deploy/scout-component-sandbox-mcp'
+          fs.rmSync(out, { recursive: true, force: true })
+          fs.mkdirSync(path.join(out, 'view-chunks'), { recursive: true })
+          const imports = []
+          const names = []
+          chunks.forEach((chunk, index) => {
+            const name = `chunk${String(index).padStart(2, '0')}`
+            const file = `view-chunks/${name}.ts`
+            fs.writeFileSync(path.join(out, file), `export default ${JSON.stringify(chunk)}\n`)
+            imports.push(`import ${name} from './${file}'`)
+            names.push(name)
+          })
+          const wrapper = `${imports.join('\n')}\n\nconst encoded = [${names.join(', ')}].join('')\nconst bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))\nexport const SCOUT_VIEW_HTML = new TextDecoder().decode(bytes)\n`
+          fs.writeFileSync(path.join(out, 'view.generated.ts'), wrapper)
+
+          const reconstructed = Buffer.from(chunks.join(''), 'base64')
+          if (!reconstructed.equals(htmlBytes)) throw new Error('Deployment package byte reconstruction mismatch')
+          const reconstructedSha256 = crypto.createHash('sha256').update(reconstructed).digest('hex')
+          if (reconstructedSha256 !== htmlSha256) throw new Error('Deployment package SHA-256 mismatch')
+
+          fs.writeFileSync(path.join(out, 'manifest.json'), JSON.stringify({
+            sourceCommit: 'b0b2f31b47927453b324fe3e0222e4fa2ec7e007',
+            sourcePath,
+            htmlBytes: htmlBytes.length,
+            htmlSha256,
+            encodedBytes: encoded.length,
+            chunkSize,
+            chunkCount: chunks.length,
+            reconstructedSha256,
+          }, null, 2) + '\n')
+          NODE
+      - name: Commit deployment package to temporary branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add _deploy/scout-component-sandbox-mcp
+          if git diff --cached --quiet; then
+            echo "Deployment package already current"
+            exit 0
+          fi
+          git commit -m "Package Scout opportunity card for connector deploy"
+          git push origin HEAD:scout-opportunity-card-build-20260911
