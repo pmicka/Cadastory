@@ -22,6 +22,7 @@ jobs:
           const fs = require('node:fs')
           const path = require('node:path')
           const crypto = require('node:crypto')
+          const zlib = require('node:zlib')
 
           const sourcePath = 'supabase/functions/scout-component-sandbox-mcp/view.generated.ts'
           const source = fs.readFileSync(sourcePath, 'utf8')
@@ -32,7 +33,8 @@ jobs:
           const html = JSON.parse(literal)
           const htmlBytes = Buffer.from(html, 'utf8')
           const htmlSha256 = crypto.createHash('sha256').update(htmlBytes).digest('hex')
-          const encoded = htmlBytes.toString('base64')
+          const compressed = zlib.gzipSync(htmlBytes, { level: 9, mtime: 0 })
+          const encoded = compressed.toString('base64')
           const chunkSize = 48000
           const chunks = []
           for (let offset = 0; offset < encoded.length; offset += chunkSize) {
@@ -51,10 +53,10 @@ jobs:
             imports.push(`import ${name} from './${file}'`)
             names.push(name)
           })
-          const wrapper = `${imports.join('\n')}\n\nconst encoded = [${names.join(', ')}].join('')\nconst bytes = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))\nexport const SCOUT_VIEW_HTML = new TextDecoder().decode(bytes)\n`
+          const wrapper = `${imports.join('\n')}\n\nconst encoded = [${names.join(', ')}].join('')\nconst compressed = Uint8Array.from(atob(encoded), (character) => character.charCodeAt(0))\nconst stream = new Blob([compressed]).stream().pipeThrough(new DecompressionStream('gzip'))\nexport const SCOUT_VIEW_HTML = await new Response(stream).text()\n`
           fs.writeFileSync(path.join(out, 'view.generated.ts'), wrapper)
 
-          const reconstructed = Buffer.from(chunks.join(''), 'base64')
+          const reconstructed = zlib.gunzipSync(Buffer.from(chunks.join(''), 'base64'))
           if (!reconstructed.equals(htmlBytes)) throw new Error('Deployment package byte reconstruction mismatch')
           const reconstructedSha256 = crypto.createHash('sha256').update(reconstructed).digest('hex')
           if (reconstructedSha256 !== htmlSha256) throw new Error('Deployment package SHA-256 mismatch')
@@ -64,6 +66,7 @@ jobs:
             sourcePath,
             htmlBytes: htmlBytes.length,
             htmlSha256,
+            compressedBytes: compressed.length,
             encodedBytes: encoded.length,
             chunkSize,
             chunkCount: chunks.length,
@@ -79,5 +82,5 @@ jobs:
             echo "Deployment package already current"
             exit 0
           fi
-          git commit -m "Package Scout opportunity card for connector deploy"
+          git commit -m "Package compressed Scout opportunity card for connector deploy"
           git push origin HEAD:scout-opportunity-card-build-20260911
