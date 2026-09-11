@@ -3,7 +3,11 @@ import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.0.0'
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@modelcontextprotocol/ext-apps@2.0.0/server'
 import * as z from 'npm:zod@4.2.0/v4'
-import { normalizeScoutSandboxNames, type ScoutSandboxResult } from './contract.ts'
+import {
+  normalizeScoutSandboxNames,
+  normalizeScoutSandboxOpportunity,
+  type ScoutSandboxResult,
+} from './contract.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -33,10 +37,19 @@ const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
+
 async function loadScoutSandboxNames() {
   const { data, error } = await admin.rpc('scout_get_component_sandbox_names_v1_internal')
   if (error) throw new Error('Scout exemplar names are unavailable')
   return normalizeScoutSandboxNames(data)
+}
+
+async function loadScoutSandboxOpportunity() {
+  const { data, error } = await admin.rpc('scout_get_component_sandbox_opportunity_v1_internal')
+  if (error) throw new Error('Scout sandbox opportunity is unavailable')
+  const opportunity = normalizeScoutSandboxOpportunity(data)
+  if (!opportunity) throw new Error('Scout sandbox opportunity did not satisfy the bounded contract')
+  return opportunity
 }
 
 async function isOwnerConnection(connectionId: string) {
@@ -115,12 +128,28 @@ function makeServer() {
     server,
     TOOL_NAME,
     {
-      title: 'Preview Scout UI Foundation',
-      description: 'Owner-only read-only developer tool that renders the minimal Scout MCP Apps View. Call only when the Scout owner explicitly asks to test or preview the Scout sandbox UI foundation.',
+      title: 'Preview Scout opportunity card',
+      description: 'Owner-only read-only developer tool that renders the bounded Scout MCP Apps opportunity card. Call only when the Scout owner explicitly asks to test or preview the Scout sandbox UI foundation.',
       inputSchema: z.object({}),
       outputSchema: z.object({
         surface: z.literal('scout_component_sandbox'),
         names: z.array(z.string().min(1).max(160)).max(2),
+        opportunity: z.object({
+          name: z.string().min(1).max(160),
+          address: z.string().min(1).max(240),
+          opportunity_tier: z.string().min(1).max(64),
+          opportunity_score: z.number().int().min(0).max(100),
+          confidence: z.number().min(0).max(1),
+          story_count: z.number().int().min(0).max(1000),
+          height_m: z.number().min(0).max(10000),
+          footprint_sqft: z.number().min(0).max(1_000_000_000),
+          glazing_status: z.string().min(1).max(80),
+          observed_at: z.string().min(1).max(80),
+          target_class: z.string().min(1).max(80),
+          target_subclass: z.string().min(1).max(80),
+          buyer_resolvability: z.string().min(1).max(120),
+          guardrail: z.string().min(1).max(1000),
+        }),
       }),
       annotations: {
         readOnlyHint: true,
@@ -131,13 +160,17 @@ function makeServer() {
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
     async () => {
-      const names = await loadScoutSandboxNames()
+      const [names, opportunity] = await Promise.all([
+        loadScoutSandboxNames(),
+        loadScoutSandboxOpportunity(),
+      ])
       const structuredContent: ScoutSandboxResult = {
         surface: 'scout_component_sandbox',
         names,
+        opportunity,
       }
       return {
-        content: [{ type: 'text', text: `Scout returned ${names.length} real exemplar name${names.length === 1 ? '' : 's'}.` }],
+        content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} opportunity card.` }],
         structuredContent,
       }
     },

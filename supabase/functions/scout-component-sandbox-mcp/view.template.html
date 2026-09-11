@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="color-scheme" content="light dark" />
-    <title>Scout UI foundation</title>
+    <title>Scout opportunity</title>
     <style>
       :root {
         color-scheme: light dark;
@@ -14,30 +14,69 @@
       html, body { margin: 0; padding: 0; background: transparent; }
       body { padding: 12px; }
       main {
-        max-width: 520px;
+        max-width: 560px;
         margin: 0 auto;
         padding: 20px;
-        border: 1px solid light-dark(#d8dfd7, #3a423b);
-        border-radius: 16px;
+        border: 1px solid light-dark(#dfe4df, #363c37);
+        border-radius: 18px;
         background: light-dark(#ffffff, #1b1f1c);
-        color: light-dark(#172018, #f0f4f0);
+        color: light-dark(#172018, #f1f4f1);
+        box-shadow: 0 8px 26px light-dark(rgba(30, 48, 33, .06), rgba(0, 0, 0, .18));
       }
-      .eyebrow { margin: 0 0 8px; color: light-dark(#55705a, #98b79e); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-      h1 { margin: 0; font-size: 22px; line-height: 1.2; }
-      p { margin: 10px 0 0; color: light-dark(#657067, #b5beb6); font-size: 14px; line-height: 1.45; }
-      ul { margin: 14px 0 0; padding: 0; list-style: none; }
-      li { padding: 10px 0; border-top: 1px solid light-dark(#e7ebe7, #303731); }
-      li strong, li span { display: block; }
-      li strong { font-size: 14px; }
-      li span { margin-top: 3px; color: light-dark(#657067, #b5beb6); font-size: 12px; line-height: 1.4; }
+      .topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+      .eyebrow { margin: 0 0 7px; color: light-dark(#58705c, #9bb7a0); font-size: 11px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
+      h1 { margin: 0; font-size: 24px; line-height: 1.16; letter-spacing: -.02em; }
+      .tier { flex: 0 0 auto; margin-top: 1px; padding: 6px 9px; border-radius: 999px; background: light-dark(#eef5ef, #273128); color: light-dark(#33563a, #b7d5bd); font-size: 12px; font-weight: 750; }
+      .address { margin: 9px 0 0; color: light-dark(#647067, #b7c0b8); font-size: 13px; line-height: 1.45; }
+      .summary { margin: 16px 0 0; font-size: 14px; line-height: 1.5; }
+      .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
+      .metric { min-width: 0; padding: 12px; border: 1px solid light-dark(#e5e9e5, #303631); border-radius: 12px; background: light-dark(#fafcf9, #202521); }
+      .metric span { display: block; color: light-dark(#69736b, #aeb7af); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+      .metric strong { display: block; margin-top: 5px; font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
+      .details { margin: 18px 0 0; padding: 0; }
+      .details > div { display: grid; grid-template-columns: 116px 1fr; gap: 12px; padding: 9px 0; border-top: 1px solid light-dark(#e7ebe7, #303631); }
+      dt { color: light-dark(#69736b, #aeb7af); font-size: 12px; }
+      dd { margin: 0; font-size: 12px; font-weight: 650; line-height: 1.4; }
+      .guardrail { margin-top: 17px; padding: 13px 14px; border-radius: 12px; background: light-dark(#f5f7f4, #242925); }
+      .guardrail strong { font-size: 12px; }
+      .guardrail p { margin: 5px 0 0; color: light-dark(#606b62, #b5beb6); font-size: 12px; line-height: 1.48; }
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+      @media (max-width: 430px) {
+        body { padding: 8px; }
+        main { padding: 17px; border-radius: 16px; }
+        .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .details > div { grid-template-columns: 1fr; gap: 3px; }
+      }
     </style>
   </head>
   <body>
-    <main aria-labelledby="scout-title">
-      <p class="eyebrow">Scout by Cadastory</p>
-      <h1 id="scout-title" data-scout-status>Scout</h1>
-      <p data-scout-progress role="status" aria-live="polite">Scout lifecycle 0/8 · View loading</p>
-      <ul data-scout-exemplars aria-label="Scout exemplar names"></ul>
+    <main data-scout-card aria-labelledby="scout-title">
+      <div class="topline">
+        <div>
+          <p class="eyebrow">Scout by Cadastory</p>
+          <h1 id="scout-title" data-scout-title>Scout opportunity</h1>
+        </div>
+        <span class="tier" data-scout-tier>Loading</span>
+      </div>
+      <p class="address" data-scout-address>Loading opportunity…</p>
+      <p class="summary" data-scout-summary></p>
+      <section class="metrics" aria-label="Opportunity metrics">
+        <div class="metric"><span>Score</span><strong data-scout-score>—</strong></div>
+        <div class="metric"><span>Confidence</span><strong data-scout-confidence>—</strong></div>
+        <div class="metric"><span>Stories</span><strong data-scout-stories>—</strong></div>
+        <div class="metric"><span>Height</span><strong data-scout-height>—</strong></div>
+        <div class="metric"><span>Footprint</span><strong data-scout-footprint>—</strong></div>
+        <div class="metric"><span>Facade</span><strong data-scout-facade>—</strong></div>
+      </section>
+      <dl class="details">
+        <div><dt>Observed</dt><dd data-scout-observed>—</dd></div>
+        <div><dt>Buyer / site route</dt><dd data-scout-route>—</dd></div>
+      </dl>
+      <aside class="guardrail">
+        <strong>Scout guardrail</strong>
+        <p data-scout-guardrail>—</p>
+      </aside>
+      <p class="sr-only" data-scout-state role="status" aria-live="polite">Scout View loading</p>
     </main>
     <script type="module">/*__SCOUT_VIEW_BUNDLE__*/</script>
   </body>
