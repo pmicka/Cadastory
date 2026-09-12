@@ -6,7 +6,7 @@ This file is the durable guardrail for incremental map work in `scout-component-
 
 Map work proceeds one opportunity type at a time.
 
-The first and only active map data contract is the bounded **premium exterior / PNC Tower single-site** contract:
+The first active and host-verified map contract is the bounded **premium exterior / PNC Tower single-site** contract:
 
 - RPC: `public.scout_get_component_sandbox_premium_exterior_map_v1_internal()`
 - contract version: `single_site_map_v1`
@@ -14,11 +14,21 @@ The first and only active map data contract is the bounded **premium exterior / 
 - exemplar: `PNC Tower`
 - opportunity id: `0edb82cd-7487-4f72-a036-8faa8a40bd54`
 
-No second opportunity type may be introduced until the PNC single-site map is hardened and verified in ChatGPT.
+The second opportunity type is now staged as **data-contract-only**. It is not exposed through `ScoutSandboxResult`, the tool output schema, the View, or the carousel yet:
 
-## Allowed payload
+- RPC: `public.scout_get_component_sandbox_water_tank_map_v1_internal()`
+- contract version: `water_tank_single_site_map_v1`
+- opportunity type: `water_tank`
+- exemplar: `SOUTH PRESSURE ZONE TANK`
+- water system: `BOWLING GREEN MUNICIPAL UTILITIES`
+- stable WRIS FID: `00AB7B0C8D56F05717FDFCF0B4000001`
+- PWSID: `KY1140038`
 
-The single-site map contract is intentionally narrow:
+No third opportunity type may be introduced until the water-tank single-site path has been integrated and host-verified.
+
+## Premium-exterior allowed payload
+
+The premium-exterior single-site map contract is intentionally narrow:
 
 - opportunity id, name, and address
 - one geocoded site point for provenance/context
@@ -28,11 +38,11 @@ The single-site map contract is intentionally narrow:
 - geometry-source provenance
 - building-link provenance and guardrail
 
-It must not grow portfolio members, clusters, territories, contacts, competitors, heatmaps, route planning, or unrelated opportunity overlays during the PNC single-site phase.
+It must not grow portfolio members, clusters, territories, contacts, competitors, heatmaps, route planning, or unrelated opportunity overlays.
 
 The Census/address geocode is not building identity and must not be rendered as a competing target marker.
 
-## Geometry provenance
+## Premium-exterior geometry provenance
 
 The PNC site point comes from the premium-exterior target record and is documented as a US Census exact-address match.
 
@@ -48,6 +58,32 @@ Important caveats remain explicit:
 
 The current renderer uses the reconciled footprint bounds to frame the map and places the Scout marker at the footprint-bounds center. It does **not** render the Census/address geocode as the target marker. The marker is a locator for the reconciled building geometry, not a claim that the footprint is a current survey, authoritative parcel boundary, or independently verified facade outline.
 
+## Water-tank data-contract-only boundary
+
+The staged water-tank contract is point-based. It must not invent a footprint, tank diameter, service radius, property boundary, access area, or other polygon.
+
+The allowed payload is limited to:
+
+- one WRIS water-tank point and its primary-source provenance
+- stable asset identifiers (`wris_fid`, `pwsid`, tank id/candidate key)
+- tank name, system name, type, capacity, known maintenance dates, and out-of-service state
+- evidence-backed morphology/support geometry
+- geometry evidence kind/confidence/source and the no-media-retention state
+- the trusted-operator cleaning-geometry assessment, clearly separated from the structural evidence
+- one recent linked `REHAB` project record with match method/distance and source-modified timestamp
+- explicit guardrails that the project is a maintenance signal, not proof of an active cleaning procurement opportunity
+
+The initial exemplar is `SOUTH PRESSURE ZONE TANK`, selected because it is inside the supported Louisville radius, has a January 2026 `REHAB / TANK IMPROVEMENTS` record, and has a 0.995-confidence engineering-document classification as `composite_elevated` with `single_pedestal` support and no cross-bracing.
+
+The contract deliberately does **not** copy the broader candidate view's `time_sensitive` field. Timing must remain grounded in the project evidence and be verified before outreach.
+
+Batch 1 must remain data-contract-only:
+
+- `ScoutSandboxResult` keeps the existing PNC `map` field only
+- the component server must not call `scout_get_component_sandbox_water_tank_map_v1_internal()` yet
+- the View must not import or render `normalizeScoutSandboxWaterTankMap()` yet
+- no resource URI bump is required for this batch because the View is unchanged
+
 ## Proven raster-tile renderer
 
 The active renderer is the lightweight raster-tile technique recovered from the previously working Scout map implementation and ported into the current MCP Apps lifecycle.
@@ -55,10 +91,9 @@ The active renderer is the lightweight raster-tile technique recovered from the 
 It must:
 
 - calculate Web Mercator coordinates in ordinary application code
-- choose zoom from the bounded reconciled footprint geometry
+- choose zoom from bounded target geometry/point framing appropriate to the active opportunity type
 - load only the raster tiles required for the current viewport as ordinary 256x256 `<img>` elements
 - position those tiles in the existing carousel viewport
-- place only the bounded PNC Scout marker required for this single-site phase
 - remain non-interactive so carousel swipe is not captured by map pan/zoom
 - recalculate framing on actual host/container size changes through the renderer handle
 - preserve the currently active carousel slide across host/container resize
@@ -89,25 +124,8 @@ The OSM standard tile service is best-effort and not an SLA-backed production de
 
 ## Host verification state
 
-- 2026-09-12 mobile ChatGPT host: **verified working** after refreshing the app with v14. The PNC raster map rendered inside the existing carousel.
-- desktop ChatGPT host: still requires explicit visual verification before the PNC pattern is considered fully hardened.
-
-The first failed v14 attempt that displayed `Site map unavailable` resolved after the app refresh and is treated as a transient/stale host-resource state rather than evidence that the raster renderer architecture failed.
-
-## Hardening boundary after mobile verification
-
-The next resource revision is lifecycle hardening only. It may:
-
-- register `app.onhostcontextchanged` before `connect()` so current MCP Apps container-dimension changes are handled
-- use a local `ResizeObserver` as a layout fallback for actual carousel-width changes
-- preserve the active carousel index across width changes
-- deduplicate same-size renderer refreshes
-- add regression coverage for narrow/mobile and max-card/desktop map widths
-- strengthen teardown assertions
-
-It must not change the PNC data contract, add another opportunity type, add map interaction, alter the Figma-derived card hierarchy, add map controls/layers, or reintroduce deprecated host-specific APIs.
-
-Because this hardening changes the generated View JavaScript, the canonical resource URI must advance rather than silently mutating the already-cached v14 resource.
+- 2026-09-12 Android/mobile ChatGPT host: **v15 verified working** for the PNC premium-exterior raster map after lifecycle hardening deployment.
+- the water-tank contract is not yet exposed to the host and therefore has no host-render verification state.
 
 ## Dead-code policy
 
@@ -123,7 +141,7 @@ The temporary local-scene/context RPC created during the workerless-SVG investig
 
 Old `component_v*` renderers are Git-history archaeology only. Do not restore those files to the current source tree for reference.
 
-The superseded MapLibre experiment must leave no active artifacts after the raster host fix: no `maplibre-gl` dependency/lockfile entries, no MapLibre model module, no OpenFreeMap style constant/CSP origin, no MapLibre CSS build path, and no generated MapLibre bundle content.
+The superseded MapLibre experiment must leave no active artifacts: no `maplibre-gl` dependency/lockfile entries, no MapLibre model module, no OpenFreeMap style constant/CSP origin, no MapLibre CSS build path, and no generated MapLibre bundle content.
 
 Negative regression assertions may name retired APIs/RPCs in order to prevent reintroduction; that is not considered vestigial runtime code.
 
