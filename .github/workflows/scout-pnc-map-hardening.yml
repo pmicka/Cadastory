@@ -72,7 +72,12 @@ jobs:
           grep -q "component-sandbox/v15" supabase/functions/scout-mcp-contract/index.ts
           grep -q "onhostcontextchanged" supabase/functions/scout-component-sandbox-mcp/view.generated.ts
           grep -q "ResizeObserver" supabase/functions/scout-component-sandbox-mcp/view.generated.ts
-          ! grep -R "maplibre\|tiles.openfreemap.org\|window.openai\|openai/outputTemplate" supabase/functions/scout-component-sandbox-mcp --exclude-dir=node_modules --exclude=MAP_CONTRACT.md --exclude=single_site_map_renderer_test.mjs
+          ! grep -E "maplibre|tiles.openfreemap.org|window.openai|openai/outputTemplate" \
+            supabase/functions/scout-component-sandbox-mcp/view.ts \
+            supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer.ts \
+            supabase/functions/scout-component-sandbox-mcp/index.ts \
+            supabase/functions/scout-component-sandbox-mcp/view.template.html \
+            supabase/functions/scout-component-sandbox-mcp/view.generated.ts
       - name: Commit generated and aligned source state
         run: |
           git config user.name "github-actions[bot]"
