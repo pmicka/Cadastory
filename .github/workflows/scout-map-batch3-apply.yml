@@ -1,0 +1,78 @@
+name: Scout map Batch 3 apply
+
+on:
+  push:
+    branches:
+      - scout-pnc-map-integration-batch3-20260912
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout-pnc-map-integration-batch3-20260912
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply bounded Batch 3 changes
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: node batch3_apply.mjs
+      - name: Verify OpenFreeMap style stays on approved origin
+        run: |
+          node --input-type=module <<'NODE'
+          const origin = 'https://tiles.openfreemap.org'
+          const styleUrl = `${origin}/styles/positron`
+          const response = await fetch(styleUrl)
+          if (!response.ok) throw new Error(`OpenFreeMap style HTTP ${response.status}`)
+          const style = await response.json()
+          const urls = [style.glyphs, style.sprite, ...Object.values(style.sources || {}).map((source) => source?.url)].filter(Boolean)
+          for (const url of urls) {
+            if (typeof url !== 'string' || !url.startsWith(origin)) throw new Error(`Unexpected OpenFreeMap style dependency: ${url}`)
+          }
+          console.log(`Verified ${urls.length} style dependencies on ${origin}`)
+          NODE
+      - name: Install exact dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Audit production dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm audit --omit=dev --audit-level=critical
+      - name: Build MCP Apps View
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run build
+      - name: Run sandbox and renderer regression tests
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm test
+      - name: Record generated View size
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: |
+          wc -c view.generated.ts
+          rm -f view.bundle.js view.bundle.css
+      - name: Commit bounded Batch 3 integration
+        run: |
+          git config user.name "scout-batch3-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add \
+            supabase/functions/scout-component-sandbox-mcp/contract.ts \
+            supabase/functions/scout-component-sandbox-mcp/index.ts \
+            supabase/functions/scout-component-sandbox-mcp/view.ts \
+            supabase/functions/scout-component-sandbox-mcp/view.template.html \
+            supabase/functions/scout-component-sandbox-mcp/build-view.mjs \
+            supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
+            supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer.ts \
+            supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs \
+            supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer_test.mjs \
+            supabase/functions/scout-component-sandbox-mcp/MAP_CONTRACT.md \
+            supabase/functions/scout-component-sandbox-mcp/DESIGN_CONTRACT.md \
+            supabase/functions/scout-connect/index.ts \
+            supabase/functions/scout-mcp-contract/index.ts
+          if git diff --cached --quiet; then
+            echo "No integration changes to commit"
+            exit 0
+          fi
+          git commit -m "Integrate bounded PNC map into Scout sandbox"
+          git push origin HEAD:scout-pnc-map-integration-batch3-20260912
