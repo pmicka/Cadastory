@@ -1,3 +1,4 @@
+# Registered one-shot branch build runner.
 name: Scout sandbox parity branch build
 
 on:
