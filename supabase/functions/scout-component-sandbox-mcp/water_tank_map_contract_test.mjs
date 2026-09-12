@@ -98,7 +98,7 @@ for (const mutate of [
   assert.equal(normalizeScoutSandboxWaterTankMap(invalid), null)
 }
 
-// Batch 1 is data-contract only. The live sandbox result/View must not expose or render it yet.
+// Batch 2 adds isolated model/frame code only. The live sandbox result/View must still not expose or render it.
 assert.ok(contractSource.includes('normalizeScoutSandboxWaterTankMap'))
 assert.equal(serverSource.includes('scout_get_component_sandbox_water_tank_map_v1_internal'), false)
 assert.equal(viewSource.includes('normalizeScoutSandboxWaterTankMap'), false)
@@ -116,6 +116,8 @@ for (const deprecated of [
 
 assert.ok(mapContract.includes('SOUTH PRESSURE ZONE TANK'))
 assert.ok(mapContract.includes('water_tank_single_site_map_v1'))
-assert.ok(mapContract.includes('data-contract-only'))
+assert.ok(mapContract.includes('isolated point-renderer batch'))
+assert.ok(mapContract.includes('component server must not call `scout_get_component_sandbox_water_tank_map_v1_internal()` yet'))
+assert.ok(mapContract.includes('view.ts` must not import the water-tank model/renderer yet'))
 
 console.log('Scout water-tank single-site map contract checks passed.')
