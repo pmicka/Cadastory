@@ -23,8 +23,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v13'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v14'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v13',
   'ui://scout/component-sandbox/v12',
   'ui://scout/component-sandbox/v11',
   'ui://scout/component-sandbox/v10',
@@ -42,7 +43,7 @@ const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
-const MAP_RESOURCE_ORIGIN = 'https://tiles.openfreemap.org'
+const MAP_TILE_ORIGIN = 'https://tile.openstreetmap.org'
 
 async function loadScoutSandboxNames() {
   const { data, error } = await admin.rpc('scout_get_component_sandbox_names_v1_internal')
@@ -150,7 +151,7 @@ function makeServer() {
         _meta: {
           ui: {
             prefersBorder: false,
-            csp: { connectDomains: [MAP_RESOURCE_ORIGIN], resourceDomains: [MAP_RESOURCE_ORIGIN] },
+            csp: { resourceDomains: [MAP_TILE_ORIGIN] },
           },
         },
       }],
@@ -171,7 +172,7 @@ function makeServer() {
           _meta: {
             ui: {
               prefersBorder: false,
-              csp: { connectDomains: [MAP_RESOURCE_ORIGIN], resourceDomains: [MAP_RESOURCE_ORIGIN] },
+              csp: { resourceDomains: [MAP_TILE_ORIGIN] },
             },
           },
         }],
