@@ -16,7 +16,7 @@ type ScoutMapHandle = {
   resize: () => void
 }
 
-const SCOUT_RASTER_TILE_TEMPLATE = 'https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'
+const SCOUT_RASTER_TILE_TEMPLATE = 'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png'
 const SCOUT_RASTER_ATTRIBUTION_LABEL = '© OpenStreetMap contributors · HOT'
 const SCOUT_RASTER_ATTRIBUTION_URL = 'https://www.openstreetmap.org/copyright'
 
@@ -316,7 +316,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.5.1' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.5.2' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
