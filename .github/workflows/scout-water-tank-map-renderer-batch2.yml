@@ -50,8 +50,9 @@ jobs:
           deno check supabase/functions/scout-mcp-contract/index.ts
       - name: Assert Batch 2 remains isolated
         run: |
-          grep -q "buildScoutCenteredPointRasterFrame" supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer.ts
+          ! grep -q "buildScoutCenteredPointRasterFrame" supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer.ts
           grep -q "SCOUT_WATER_TANK_POINT_ZOOM = 17" supabase/functions/scout-component-sandbox-mcp/water_tank_map_model.ts
+          grep -q "MAX_MERCATOR_LAT = 85.05112878" supabase/functions/scout-component-sandbox-mcp/water_tank_map_renderer.ts
           grep -q "buildScoutWaterTankRasterFrame" supabase/functions/scout-component-sandbox-mcp/water_tank_map_renderer.ts
           ! grep -q "water_tank_map_renderer" supabase/functions/scout-component-sandbox-mcp/view.ts
           ! grep -q "water_tank_map_model" supabase/functions/scout-component-sandbox-mcp/view.ts
