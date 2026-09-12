@@ -14,7 +14,7 @@ The first active and host-verified map contract is the bounded **premium exterio
 - exemplar: `PNC Tower`
 - opportunity id: `0edb82cd-7487-4f72-a036-8faa8a40bd54`
 
-The second opportunity type is now staged through an **isolated point-renderer batch**. It is still not exposed through `ScoutSandboxResult`, the tool output schema, the View, or the carousel:
+The second opportunity type is the bounded **water tank / SOUTH PRESSURE ZONE TANK single-site** contract:
 
 - RPC: `public.scout_get_component_sandbox_water_tank_map_v1_internal()`
 - contract version: `water_tank_single_site_map_v1`
@@ -24,7 +24,7 @@ The second opportunity type is now staged through an **isolated point-renderer b
 - stable WRIS FID: `00AB7B0C8D56F05717FDFCF0B4000001`
 - PWSID: `KY1140038`
 
-No third opportunity type may be introduced until the water-tank single-site path has been integrated and host-verified.
+No third opportunity type may be introduced until the water-tank single-site path has been host-verified.
 
 ## Premium-exterior allowed payload
 
@@ -60,7 +60,7 @@ The current renderer uses the reconciled footprint bounds to frame the map and p
 
 ## Water-tank bounded data contract
 
-The staged water-tank contract is point-based. It must not invent a footprint, tank diameter, service radius, property boundary, access area, or other polygon.
+The water-tank contract is point-based. It must not invent a footprint, tank diameter, service radius, property boundary, access area, or other polygon.
 
 The allowed payload is limited to:
 
@@ -77,32 +77,49 @@ The initial exemplar is `SOUTH PRESSURE ZONE TANK`, selected because it is insid
 
 The contract deliberately does **not** copy the broader candidate view's `time_sensitive` field. Timing must remain grounded in the project evidence and be verified before outreach.
 
-## Water-tank Batch 2 isolated renderer boundary
+## Water-tank Batch 2 renderer foundation
 
-Batch 2 adds only a pure point-map model and raster-frame calculation. It does not mount a water-tank map in the View.
+Batch 2 added the pure point-map model and raster-frame calculation without changing the live View.
 
-The water-tank renderer:
+The water-tank renderer foundation:
 
 - centers on the exact normalized WRIS asset point
 - places the Scout marker on that same exact WRIS point
 - uses render-only zoom `17` for the initial single-point framing
-- ports the same proven Web Mercator/tile calculation into an isolated pure point-renderer module rather than introducing a second map runtime
-- loads no tiles by itself during model/frame tests; it only calculates the bounded tile set required for a supplied viewport
-- keeps the model point-only and does not synthesize or persist any domain geometry
+- ports the proven Web Mercator/tile calculation into an isolated pure point-renderer module rather than introducing a second map runtime
+- calculates only the bounded tile set required for a supplied viewport
+- keeps the model point-only and does not synthesize or persist domain geometry
 
 The fixed zoom is a presentation choice only. It does not define a service radius, ownership boundary, parcel extent, access envelope, tank diameter, inspection perimeter, or any other real-world spatial claim.
 
-The working PNC `single_site_map_renderer.ts` is deliberately restored to the exact `main` blob for Batch 2. A fresh View build must therefore leave `view.generated.ts` byte-for-byte unchanged. The small duplicated Web Mercator/tile framing kernel in the isolated water-tank module is intentional at this stage: sharing/refactoring the active PNC runtime is deferred until a later integration batch where a View revision is already intentional and can be host-regression-tested.
+The small duplicated Web Mercator/tile framing kernel is intentional. The host-verified PNC renderer remains on its proven code path rather than being refactored merely to deduplicate a small pure-math section.
 
-Batch 2 must remain isolated:
+## Water-tank Batch 3 integration scope
 
-- `ScoutSandboxResult` keeps the existing PNC `map` field only
-- the component server must not call `scout_get_component_sandbox_water_tank_map_v1_internal()` yet
-- `view.ts` must not import the water-tank model/renderer yet
-- the carousel must not receive a water-tank map tile yet
-- the generated View must not contain the water-tank contract/model/renderer
-- no resource URI bump is required because no host-visible View behavior changes
-- no Edge Function deployment occurs in this batch
+Batch 3 is the first host-visible water-tank integration.
+
+The owner-only sandbox tool now selects exactly one opportunity type:
+
+- omitted `opportunity_type` or `premium_exterior` returns the PNC premium-exterior opportunity + map pair
+- `water_tank` returns the SOUTH PRESSURE ZONE TANK opportunity + map pair
+
+The result is a discriminated `opportunity_type` contract. The card and map must always match that type and identity. A water-tank map must never be rendered inside the PNC opportunity card, and a PNC map must never be rendered inside the water-tank card.
+
+For the water-tank path:
+
+- the first media slide remains the map
+- the two remaining slides remain the existing placeholders
+- the map uses the exact WRIS point as center and marker
+- the water system occupies the existing subtitle/address line rather than introducing new card chrome
+- the status pill is the explicit `REHAB` maintenance signal presentation (`Rehab signal`), not a claim of active procurement
+- the metadata line uses engineering-document morphology confidence and linked-project source-modified date
+- the compact summary uses only bounded tank type/capacity/morphology/support/operator-assessment/project-purpose fields
+- the project guardrail remains visible
+- the map remains non-interactive and uses the existing carousel resize/teardown lifecycle
+
+The host-visible View resource advances to `ui://scout/component-sandbox/v16`; v15 and earlier remain compatibility resource aliases. This bump is required because the bundled View and tool contract change materially.
+
+The obsolete `names` field is removed from the v16 result. The corresponding `public.scout_get_component_sandbox_names_v1_internal()` RPC is retired once the v16 Edge Functions are live so production never enters a state where the currently deployed View depends on a dropped RPC.
 
 ## Proven raster-tile renderer
 
@@ -136,7 +153,7 @@ For the bounded owner-only sandbox preview, the raster provider is the OpenStree
 - no `connectDomains` entry is required because the View loads tiles as image resources rather than fetch/XHR/WebSocket traffic
 - every tile `<img>` sets `referrerPolicy = "origin"`
 - the View declares `<meta name="referrer" content="origin">`
-- the renderer does not prefetch adjacent zoom levels or bulk areas; it requests only tiles intersecting the current viewport
+- the renderers do not prefetch adjacent zoom levels or bulk areas; they request only tiles intersecting the current viewport
 - browser caching is left enabled; Scout does not add no-cache headers to tile requests
 - visible attribution is `© OpenStreetMap contributors`
 
@@ -144,9 +161,9 @@ The OSM standard tile service is best-effort and not an SLA-backed production de
 
 ## Host verification state
 
-- mobile ChatGPT host: **verified working** — Android v15 rendered the hardened PNC premium-exterior raster map successfully in the existing carousel on 2026-09-12.
-- desktop ChatGPT host: still requires explicit visual verification before the PNC pattern is considered verified there.
-- the water-tank contract/renderer is not yet exposed to the host and therefore has no host-render verification state.
+- mobile ChatGPT host / PNC premium exterior: **verified working** — Android rendered the hardened v15 PNC raster map successfully in the existing carousel on 2026-09-12.
+- desktop ChatGPT host / PNC premium exterior: still requires explicit visual verification.
+- water-tank v16 integration: **pending host verification** after deployment. No third opportunity type proceeds until SOUTH PRESSURE ZONE TANK renders correctly in the real ChatGPT host.
 
 The earlier transient v14 `Site map unavailable` state resolved after an app refresh and is not treated as a renderer-architecture failure.
 
@@ -161,6 +178,8 @@ The following generalized sandbox map RPCs were removed from the database and mu
 - `public.scout_get_component_sandbox_map_targets_v3_internal(integer, integer)`
 
 The temporary local-scene/context RPC created during the workerless-SVG investigation was also removed and is not part of Scout architecture.
+
+The v16 result no longer carries the old names-only handshake. `public.scout_get_component_sandbox_names_v1_internal()` must be dropped after the v16 runtime is deployed and verified to no longer call it.
 
 Old `component_v*` renderers are Git-history archaeology only. Do not restore those files to the current source tree for reference.
 
