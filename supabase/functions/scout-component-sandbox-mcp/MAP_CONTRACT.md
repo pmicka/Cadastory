@@ -32,7 +32,8 @@ The renderer implementation is `single_site_map_renderer.ts` with pure render-mo
 
 ### Renderer standards
 
-- Map engine: `maplibre-gl` pinned to `5.19.0` from npm.
+- Map engine: `maplibre-gl` pinned to `6.9.0` from npm.
+- Security floor: never use `maplibre-gl <= 6.4.0`; those versions are affected by critical attribution-sanitizer XSS advisory `GHSA-jrc7-96c5-q579` / `CVE-2026-85061`. The upstream fix begins at `6.4.1`; Scout currently pins the newer `6.9.0` release.
 - MapLibre JavaScript and `maplibre-gl/dist/maplibre-gl.css` are bundled locally by the application build; no CDN runtime script or stylesheet is allowed.
 - A future integration must pass an approved `style` into the renderer. Provider selection and the corresponding `_meta.ui.csp` origins are an integration concern, not a renderer default.
 - The map is created with `interactive: false` so carousel gestures cannot be captured by map pan/zoom in the initial single-site experience.
