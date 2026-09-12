@@ -10,6 +10,7 @@ const [
   sharedRendererSource,
   modelSource,
   rendererSource,
+  mountSource,
   mapContract,
   packageJsonText,
 ] = await Promise.all([
@@ -19,18 +20,22 @@ const [
   readFile(new URL('single_site_map_renderer.ts', directory), 'utf8'),
   readFile(new URL('water_tank_map_model.ts', directory), 'utf8'),
   readFile(new URL('water_tank_map_renderer.ts', directory), 'utf8'),
+  readFile(new URL('water_tank_map_mount.ts', directory), 'utf8'),
   readFile(new URL('MAP_CONTRACT.md', directory), 'utf8'),
   readFile(new URL('package.json', directory), 'utf8'),
 ])
 
 const packageJson = JSON.parse(packageJsonText)
 assert.ok(packageJson.scripts.test.includes('water_tank_map_renderer_test.mjs'))
+assert.ok(packageJson.scripts.test.includes('water_tank_map_integration_test.mjs'))
 assert.equal(sharedRendererSource.includes('buildScoutCenteredPointRasterFrame'), false)
+assert.equal(sharedRendererSource.includes('water_tank'), false)
 assert.equal(rendererSource.includes('single_site_map_renderer'), false)
 assert.ok(rendererSource.includes('MAX_MERCATOR_LAT = 85.05112878'))
 assert.ok(rendererSource.includes('TILE_SIZE = 256'))
 assert.ok(rendererSource.includes('ScoutWaterTankRasterFrame'))
 assert.ok(modelSource.includes('SCOUT_WATER_TANK_POINT_ZOOM = 17'))
+assert.ok(mountSource.includes('buildScoutWaterTankRasterFrame'))
 
 for (const source of [modelSource, rendererSource]) {
   assert.equal(source.includes('time_sensitive'), false)
@@ -41,15 +46,15 @@ for (const source of [modelSource, rendererSource]) {
   assert.equal(source.includes('WebGL'), false)
 }
 
-// Batch 2 remains isolated: no server result, View, carousel, or generated View wiring.
-for (const source of [view, server, generated]) {
-  assert.equal(source.includes('water_tank_single_site_map_v1'), false)
-  assert.equal(source.includes('buildScoutWaterTankRasterFrame'), false)
-  assert.equal(source.includes('water_tank_map_renderer'), false)
-}
-assert.equal(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'), false)
+// Batch 3 wires the isolated point renderer into the selected water-tank View path.
+assert.ok(view.includes('mountScoutWaterTankMap'))
+assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))
+assert.ok(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
+assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank']).optional()"))
+assert.ok(generated.includes('water_tank_single_site_map_v1'))
+assert.ok(generated.includes('Rehab signal'))
 
-// The render model is point-only. It must not manufacture domain geometry.
+// The render model/frame remains point-only. It must not manufacture domain geometry.
 for (const forbidden of ['footprint', 'service_radius', 'property_boundary', 'access_area', 'tank_diameter']) {
   assert.equal(modelSource.includes(forbidden), false)
   assert.equal(rendererSource.includes(forbidden), false)
@@ -187,6 +192,6 @@ assert.equal(rendererJs.includes('document.createElement'), false)
 assert.ok(mapContract.includes('SOUTH PRESSURE ZONE TANK'))
 assert.ok(mapContract.includes('render-only zoom `17`'))
 assert.ok(mapContract.includes('does not define a service radius'))
-assert.ok(mapContract.includes('byte-for-byte unchanged'))
+assert.ok(mapContract.includes('Water-tank Batch 3 integration scope'))
 
 console.log(`Scout water-tank point raster checks passed across ${viewportCases.length} viewport widths. JS ${rendererJs.length} bytes.`)
