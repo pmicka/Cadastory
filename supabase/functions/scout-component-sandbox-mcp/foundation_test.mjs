@@ -39,13 +39,21 @@ assert.ok(contractGateway.includes("opportunity:{type:'object'"));
 assert.equal(server.includes("exemplars:"), false);
 assert.ok(buildView.includes('template.replace("/*__SCOUT_VIEW_BUNDLE__*/", () => bundle)'));
 
-for (const source of [view, server, generated, connectGateway, contractGateway, template]) {
-  assert.equal(source.includes("window.openai"), false);
-  assert.equal(source.includes("openai/outputTemplate"), false);
-  assert.equal(source.includes("openai/widgetAccessible"), false);
-  assert.equal(source.includes("openai/widgetDescription"), false);
-  assert.equal(source.includes("openai/widgetCSP"), false);
+const deprecatedSandboxPatterns = [
+  "window.openai",
+  "openai/outputTemplate",
+  "openai/widgetAccessible",
+  "openai/widgetDescription",
+  "openai/widgetCSP",
+];
+for (const source of [view, server, generated, connectGateway, template]) {
+  for (const pattern of deprecatedSandboxPatterns) assert.equal(source.includes(pattern), false);
 }
+const sandboxContractStart = contractGateway.indexOf("function sandboxTool(){");
+const sandboxContractEnd = contractGateway.indexOf("function exploreToolMeta", sandboxContractStart);
+assert.ok(sandboxContractStart >= 0 && sandboxContractEnd > sandboxContractStart);
+const sandboxContractSurface = contractGateway.slice(sandboxContractStart, sandboxContractEnd);
+for (const pattern of deprecatedSandboxPatterns) assert.equal(sandboxContractSurface.includes(pattern), false);
 
 const contractBuild = await build({
   entryPoints: [new URL("contract.ts", directory).pathname],
