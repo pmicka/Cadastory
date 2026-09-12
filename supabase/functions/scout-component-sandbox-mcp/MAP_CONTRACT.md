@@ -2,7 +2,7 @@
 
 This file is the durable guardrail for incremental map work in `scout-component-sandbox-mcp`.
 
-## Current batch scope
+## Current opportunity scope
 
 Map work proceeds one opportunity type at a time.
 
@@ -14,7 +14,36 @@ The first and only active map contract is the bounded **premium exterior / PNC T
 - exemplar: `PNC Tower`
 - opportunity id: `0edb82cd-7487-4f72-a036-8faa8a40bd54`
 
-Batch 1 defines data and guardrails only. It does **not** add a visible map, change the carousel, bump the View URI, or deploy a renderer.
+No second opportunity type may be introduced until the PNC single-site experience is verified in ChatGPT.
+
+## Batch 2 renderer scope
+
+Batch 2 adds the isolated renderer implementation only. It does **not**:
+
+- expose the map payload through the current tool result
+- import the renderer from `view.ts`
+- alter the visible carousel or Figma-derived card
+- choose or hardcode a production basemap/tile provider
+- change MCP resource CSP
+- bump the View URI
+- deploy a new Edge Function version
+
+The renderer implementation is `single_site_map_renderer.ts` with pure render-model construction in `single_site_map_model.ts`.
+
+### Renderer standards
+
+- Map engine: `maplibre-gl` pinned to `5.19.0` from npm.
+- MapLibre JavaScript and `maplibre-gl/dist/maplibre-gl.css` are bundled locally by the application build; no CDN runtime script or stylesheet is allowed.
+- A future integration must pass an approved `style` into the renderer. Provider selection and the corresponding `_meta.ui.csp` origins are an integration concern, not a renderer default.
+- The map is created with `interactive: false` so carousel gestures cannot be captured by map pan/zoom in the initial single-site experience.
+- The renderer visualizes the reconciled building footprint only. The Census address geocode remains provenance/context and is deliberately **not** rendered as a competing point marker because Scout records that the geocode is not itself building identity.
+- Framing uses the contract's exact footprint bounds via `fitBounds`, default padding `24`, default `maxZoom` `19`, and animation duration `0` for deterministic embedded rendering.
+- Provider attribution remains enabled.
+- Resize tracking remains enabled so MapLibre can react to host/container changes.
+- Teardown must call `map.remove()` exactly through the renderer handle; no orphan WebGL/map instance may survive host teardown or a future carousel remount.
+- Footprint styling reuses existing Scout card greens (`#4d6b52` fill and `#263128` outline) rather than creating a new map-specific visual system.
+
+No clustering, grouping, portfolios, territories, contacts, competitors, heatmaps, route planning, markers, popups, map controls, 3D extrusion, or opportunity overlays are allowed in this phase.
 
 ## Allowed payload
 
@@ -76,7 +105,7 @@ The current implementation must remain standards-based:
 - `app.getHostContext()` / `onhostcontextchanged` for host context if needed
 - `app.requestDisplayMode()` only when supported by `availableDisplayModes`
 
-The following deprecated/host-specific patterns must not re-enter the current path:
+The following deprecated/host-specific patterns must not re-enter the current sandbox/map path:
 
 - `window.openai`
 - raw `window.message` lifecycle plumbing
@@ -86,8 +115,6 @@ The following deprecated/host-specific patterns must not re-enter the current pa
 - `openai/widgetCSP`
 - other OpenAI-specific resource/tool metadata used by the prior map iteration
 
-## Renderer boundary
+## Next integration boundary
 
-A future renderer batch may consume `single_site_map_v1`, but Batch 1 does not expose the map payload through the existing tool result and does not alter the visible Figma-derived card.
-
-When a renderer is added, it must start with one PNC site only: no clustering, no grouping, no portfolio semantics, and no second opportunity type until the PNC experience is verified in ChatGPT.
+A later batch may expose `single_site_map_v1` through the sandbox result and replace exactly one approved media placeholder with the PNC map. That integration must preserve the full-width carousel contract and must define an approved basemap provider plus modern `_meta.ui.csp` origins before deployment.
