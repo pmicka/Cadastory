@@ -100,57 +100,6 @@ function tileUrl(template: string, z: number, x: number, y: number) {
     .replace('{y}', String(y))
 }
 
-export function buildScoutCenteredPointRasterFrame(
-  point: { lon: number; lat: number },
-  width: number,
-  height: number,
-  options: Pick<ScoutSingleSiteMapRendererOptions, 'tileUrlTemplate' | 'minZoom' | 'maxZoom'> & { zoom: number },
-): ScoutRasterFrame {
-  const frameWidth = Math.max(280, Math.round(width || 0))
-  const frameHeight = Math.max(180, Math.round(height || 0))
-  const minZoom = options.minZoom ?? DEFAULT_MIN_ZOOM
-  const maxZoom = options.maxZoom ?? DEFAULT_MAX_ZOOM
-  const requestedZoom = Math.round(options.zoom)
-  const zoom = Math.max(minZoom, Math.min(maxZoom, requestedZoom))
-  const world = TILE_SIZE * Math.pow(2, zoom)
-  const centerPxX = worldX(point.lon) * world
-  const centerPxY = worldY(point.lat) * world
-  const left = centerPxX - frameWidth / 2
-  const top = centerPxY - frameHeight / 2
-  const startX = Math.floor(left / TILE_SIZE)
-  const endX = Math.floor((left + frameWidth - 1) / TILE_SIZE)
-  const startY = Math.floor(top / TILE_SIZE)
-  const endY = Math.floor((top + frameHeight - 1) / TILE_SIZE)
-  const tileCount = Math.pow(2, zoom)
-  const tiles: ScoutRasterTile[] = []
-
-  for (let tx = startX; tx <= endX; tx += 1) {
-    for (let ty = startY; ty <= endY; ty += 1) {
-      if (ty < 0 || ty >= tileCount) continue
-      const wrappedX = ((tx % tileCount) + tileCount) % tileCount
-      tiles.push({
-        z: zoom,
-        x: wrappedX,
-        y: ty,
-        left: tx * TILE_SIZE - left,
-        top: ty * TILE_SIZE - top,
-        url: tileUrl(options.tileUrlTemplate, zoom, wrappedX, ty),
-      })
-    }
-  }
-
-  return {
-    zoom,
-    width: frameWidth,
-    height: frameHeight,
-    tiles,
-    marker: {
-      left: frameWidth / 2,
-      top: frameHeight / 2,
-    },
-  }
-}
-
 export function buildScoutSingleSiteRasterFrame(
   data: ScoutSandboxSingleSiteMap,
   width: number,
