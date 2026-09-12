@@ -1,0 +1,78 @@
+name: Scout water tank map integration Batch 3
+
+on:
+  push:
+    branches:
+      - scout-water-tank-map-integration-batch3-20260912
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout-water-tank-map-integration-batch3-20260912
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Align duplicated sandbox gateway schemas
+        run: node scripts/tmp_scout_water_tank_batch3_gateways.mjs
+      - name: Advance foundation regressions to v16
+        run: node scripts/tmp_scout_water_tank_batch3_tests.mjs
+      - name: Install exact UI dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Audit production UI dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm audit --omit=dev
+      - name: Build v16 View
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run build
+      - name: Run sandbox regression suite
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm test
+      - name: Deno check component server
+        run: deno check supabase/functions/scout-component-sandbox-mcp/index.ts
+      - name: Deno check connect gateway
+        run: deno check supabase/functions/scout-connect/index.ts
+      - name: Deno check contract gateway
+        run: deno check supabase/functions/scout-mcp-contract/index.ts
+      - name: Deno check pure water tank modules
+        run: |
+          deno check supabase/functions/scout-component-sandbox-mcp/water_tank_map_model.ts
+          deno check supabase/functions/scout-component-sandbox-mcp/water_tank_map_renderer.ts
+      - name: Assert v16 integration boundaries
+        run: |
+          grep -q "component-sandbox/v16" supabase/functions/scout-component-sandbox-mcp/index.ts
+          grep -q "component-sandbox/v16" supabase/functions/scout-connect/index.ts
+          grep -q "component-sandbox/v16" supabase/functions/scout-mcp-contract/index.ts
+          grep -q "water_tank_single_site_map_v1" supabase/functions/scout-component-sandbox-mcp/view.generated.ts
+          grep -q "Rehab signal" supabase/functions/scout-component-sandbox-mcp/view.generated.ts
+          grep -q "scout_get_component_sandbox_water_tank_map_v1_internal" supabase/functions/scout-component-sandbox-mcp/index.ts
+          ! grep -q "scout_get_component_sandbox_names_v1_internal" supabase/functions/scout-component-sandbox-mcp/index.ts
+          ! grep -E "maplibre|tiles.openfreemap.org|window.openai|openai/outputTemplate|openai/widgetAccessible|openai/widgetDescription|openai/widgetCSP" \
+            supabase/functions/scout-component-sandbox-mcp/view.ts \
+            supabase/functions/scout-component-sandbox-mcp/water_tank_map_mount.ts \
+            supabase/functions/scout-component-sandbox-mcp/index.ts \
+            supabase/functions/scout-component-sandbox-mcp/view.generated.ts
+      - name: Commit generated and aligned source state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs \
+            supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
+            supabase/functions/scout-connect/index.ts \
+            supabase/functions/scout-mcp-contract/index.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "Finalize Scout water tank v16 integration [skip ci]"
+            git push origin HEAD:scout-water-tank-map-integration-batch3-20260912
+          fi
