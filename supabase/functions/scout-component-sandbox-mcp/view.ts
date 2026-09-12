@@ -19,7 +19,9 @@ type ScoutOpportunity = {
   guardrail: string
 }
 
-const SCOUT_MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
+const SCOUT_RASTER_TILE_TEMPLATE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+const SCOUT_RASTER_ATTRIBUTION_LABEL = '© OpenStreetMap contributors'
+const SCOUT_RASTER_ATTRIBUTION_URL = 'https://www.openstreetmap.org/copyright'
 
 const title = document.querySelector<HTMLElement>('[data-scout-title]')
 const tier = document.querySelector<HTMLElement>('[data-scout-tier]')
@@ -161,11 +163,14 @@ function renderMap(value: unknown) {
   let ready = false
   mapState.hidden = false
   mapState.textContent = 'Loading site map…'
+  mapContainer.setAttribute('role', 'img')
   mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
 
   try {
     mapHandle = mountScoutSingleSiteMap(mapContainer, mapData, {
-      style: SCOUT_MAP_STYLE,
+      tileUrlTemplate: SCOUT_RASTER_TILE_TEMPLATE,
+      attributionLabel: SCOUT_RASTER_ATTRIBUTION_LABEL,
+      attributionUrl: SCOUT_RASTER_ATTRIBUTION_URL,
       onReady: () => {
         if (generation !== mapGeneration) return
         ready = true
@@ -210,11 +215,16 @@ function updateCarouselState() {
   }
 }
 
+function handleResize() {
+  updateCarouselState()
+  mapHandle?.resize()
+}
+
 carousel?.addEventListener('scroll', updateCarouselState, { passive: true })
-window.addEventListener('resize', updateCarouselState, { passive: true })
+window.addEventListener('resize', handleResize, { passive: true })
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.1.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.2.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   renderOpportunity(result?.structuredContent?.opportunity)
@@ -222,6 +232,7 @@ app.ontoolresult = (result) => {
 }
 app.onerror = (error) => setState(`Scout SDK error: ${error instanceof Error ? error.message : String(error)}`)
 app.onteardown = async () => {
+  window.removeEventListener('resize', handleResize)
   destroyMap()
   return {}
 }
