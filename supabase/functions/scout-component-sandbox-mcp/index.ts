@@ -25,8 +25,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v17'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v18'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v17',
   'ui://scout/component-sandbox/v16',
   'ui://scout/component-sandbox/v15',
   'ui://scout/component-sandbox/v14',
@@ -48,7 +49,7 @@ const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
-const MAP_TILE_ORIGIN = 'https://tile.openstreetmap.org'
+const MAP_TILE_ORIGIN = 'https://a.tile.openstreetmap.fr'
 
 async function loadScoutSandboxOpportunity() {
   const { data, error } = await admin.rpc('scout_get_component_sandbox_opportunity_v1_internal')
@@ -302,7 +303,7 @@ const swpppSiteResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.0' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.1' })
 
   registerAppResource(
     server,
