@@ -6,7 +6,7 @@ on:
       - scout-pnc-map-renderer-batch2-20260912
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -18,10 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Refresh exact npm lockfile
-        working-directory: supabase/functions/scout-component-sandbox-mcp
-        run: npm install --package-lock-only --ignore-scripts
-      - name: Install exact dependencies
+      - name: Verify exact dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
       - name: Check production dependencies for critical advisories
@@ -30,14 +27,3 @@ jobs:
       - name: Run sandbox and renderer regression tests
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm test
-      - name: Commit refreshed lockfile when needed
-        run: |
-          if git diff --quiet -- supabase/functions/scout-component-sandbox-mcp/package-lock.json; then
-            echo "package-lock.json already current"
-            exit 0
-          fi
-          git config user.name "scout-batch2-bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add supabase/functions/scout-component-sandbox-mcp/package-lock.json
-          git commit -m "Lock safe MapLibre 6.9.0 for Scout map renderer"
-          git push origin HEAD:scout-pnc-map-renderer-batch2-20260912
