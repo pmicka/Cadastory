@@ -3,13 +3,15 @@ import assert from "node:assert/strict";
 import { build, transform } from "esbuild";
 
 const directory = new URL("./", import.meta.url);
-const [view, server, generated, buildView, connectGateway, contractGateway] = await Promise.all([
+const [view, server, generated, buildView, connectGateway, contractGateway, template, designContract] = await Promise.all([
   readFile(new URL("view.ts", directory), "utf8"),
   readFile(new URL("index.ts", directory), "utf8"),
   readFile(new URL("view.generated.ts", directory), "utf8"),
   readFile(new URL("build-view.mjs", directory), "utf8"),
   readFile(new URL("../scout-connect/index.ts", directory), "utf8"),
   readFile(new URL("../scout-mcp-contract/index.ts", directory), "utf8"),
+  readFile(new URL("view.template.html", directory), "utf8"),
+  readFile(new URL("DESIGN_CONTRACT.md", directory), "utf8"),
 ]);
 
 assert.equal((view.match(/\.connect\(/g) || []).length, 1);
@@ -71,15 +73,28 @@ assert.equal(normalizeScoutSandboxOpportunity({ ...exemplar, confidence: 2 }), n
 assert.equal(normalizeScoutSandboxOpportunity({ ...exemplar, name: "" }), null);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
-assert.ok(generated.includes("Scout by Cadastory"));
-assert.ok(generated.includes("Scout guardrail"));
-assert.ok(generated.includes("Buyer / site route"));
-assert.ok(generated.includes("opportunity"));
+assert.ok(designContract.includes("12:7"));
+assert.ok(designContract.includes("visual source of truth"));
+assert.ok(template.includes('class="scout-header"'));
+assert.ok(template.includes('class="carousel-viewport"'));
+assert.ok(template.includes('Save for later'));
+assert.ok(template.includes('Investigate'));
+assert.ok(template.includes('#ffffff'));
+assert.ok(template.includes('border-radius: 24px'));
+assert.equal(template.includes('light-dark('), false);
+assert.equal(template.includes('class="metrics"'), false);
+assert.equal(template.includes('class="details"'), false);
+assert.equal(template.includes('class="guardrail"'), false);
+assert.equal(template.includes('Scout by Cadastory'), false);
 assert.equal(generated.includes("Scout lifecycle"), false);
+assert.ok(generated.includes("Component preview"));
+assert.ok(generated.includes("Media wiring intentionally deferred"));
+assert.ok(generated.includes("Scout guardrail:"));
+assert.ok(generated.includes("opportunity"));
 assert.equal((generated.match(/<!doctype html>/g) || []).length, 1);
 assert.equal((generated.match(/window\.openai/g) || []).length, 0);
 
