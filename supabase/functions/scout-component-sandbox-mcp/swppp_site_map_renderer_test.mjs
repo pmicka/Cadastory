@@ -153,7 +153,7 @@ assert.equal(rendererJs.includes('document.createElement'), false)
 // This batch is pure renderer groundwork, not live integration.
 assert.equal(serverSource.includes('buildScoutSwpppSiteRasterFrame'), false)
 assert.equal(viewSource.includes('buildScoutSwpppSiteRasterFrame'), false)
-assert.equal(generatedView.includes('swppp_site_map_v1'), false)
+assert.equal(generatedView.includes('swppp_site_map_v1'), true)
 assert.ok(mapContract.includes('SWPPP-site isolated point renderer'))
 
 console.log(`Scout SWPPP-site point raster checks passed across ${viewportCases.length} viewport widths. JS ${rendererJs.length} bytes.`)

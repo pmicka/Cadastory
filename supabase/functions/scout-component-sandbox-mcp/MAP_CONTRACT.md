@@ -1,5 +1,16 @@
 # Scout component sandbox map contract
 
+## SWPPP-site host-visible integration scope (v17)
+
+- Current resource: `ui://scout/component-sandbox/v17`; v16 through v1 remain compatibility aliases.
+- Third selector: `opportunity_type: "swppp_site"`, backed only by `scout_get_component_sandbox_swppp_site_map_v1_internal()` and `swppp_site_map_v1`.
+- Exemplar: HAM–Brent Spence Project (PID 116649), Ohio EPA construction-stormwater permit `1GC10896*AG`, active with 135 documented permit acres.
+- Geometry is the authoritative permit-location `Point` at `-84.521, 39.097`. No project polygon, parcel polygon, disturbance boundary, or radius is inferred.
+- The card and map share site name and location identity. The map remains slide 1; slides 2 and 3 remain placeholders.
+- Active permit evidence identifies a potentially relevant site or documentation need; it is not proof of procurement, buyer intent, contract availability, current service need, site access, or ownership.
+- Buyer resolution remains explicitly `unresolved`.
+- Host verification for the v17 SWPPP card is pending. The PNC and SOUTH PRESSURE ZONE TANK v16 paths were host-verified on 2026-09-12, including the post-water-tank PNC regression.
+
 This file is the durable guardrail for incremental map work in `scout-component-sandbox-mcp`.
 
 ## Current opportunity scope

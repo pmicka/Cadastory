@@ -33,9 +33,9 @@ assert.ok(mapContract.includes('HAM-Brent Spence Project (PID 116649)'))
 assert.ok(mapContract.includes('isolated database groundwork only'))
 assert.ok(mapContract.includes('must not fabricate a project polygon'))
 
-// Batch C must not change the live sandbox tool or View.
-assert.equal(serverSource.includes('scout_get_component_sandbox_swppp_site_map_v1_internal'), false)
-assert.equal(viewSource.includes("opportunityType === 'swppp_site'"), false)
+// The isolated contract is now consumed by the v17 host-visible path.
+assert.equal(serverSource.includes('scout_get_component_sandbox_swppp_site_map_v1_internal'), true)
+assert.equal(viewSource.includes("opportunityType === 'swppp_site'"), true)
 
 console.log('Scout SWPPP-site isolated database contract checks passed.')
 

@@ -25,6 +25,7 @@ const [
 ])
 
 for (const source of [server, connectGateway, contractGateway]) {
+  assert.ok(source.includes('ui://scout/component-sandbox/v17'))
   assert.ok(source.includes('ui://scout/component-sandbox/v16'))
   assert.ok(source.includes('ui://scout/component-sandbox/v15'))
   assert.ok(source.includes("opportunity_type"))
@@ -34,13 +35,13 @@ for (const source of [server, connectGateway, contractGateway]) {
 }
 
 assert.ok(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
-assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank']).optional()"))
+assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site']).optional()"))
 assert.ok(server.includes("z.discriminatedUnion('opportunity_type'"))
 assert.ok(server.includes("const selectedType = opportunity_type ?? 'premium_exterior'"))
 assert.ok(server.includes('buildScoutSandboxWaterTankOpportunity'))
 assert.equal(server.includes('names: z.array'), false)
 
-assert.ok(contract.includes("export type ScoutSandboxResult = ScoutSandboxPremiumExteriorResult | ScoutSandboxWaterTankResult"))
+assert.ok(contract.includes("export type ScoutSandboxResult = ScoutSandboxPremiumExteriorResult | ScoutSandboxWaterTankResult | ScoutSandboxSwpppSiteResult"))
 assert.ok(contract.includes('buildScoutSandboxWaterTankOpportunity'))
 assert.equal(contract.includes('normalizeScoutSandboxNames'), false)
 assert.equal(contract.includes('SCOUT_SANDBOX_MAX_NAMES'), false)
@@ -48,7 +49,7 @@ assert.equal(contract.includes('SCOUT_SANDBOX_MAX_NAMES'), false)
 assert.ok(view.includes('mountScoutSingleSiteMap'))
 assert.ok(view.includes('mountScoutWaterTankMap'))
 assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))
-assert.ok(view.includes("version: '2.4.0'"))
+assert.ok(view.includes("version: '2.5.0'"))
 assert.ok(view.includes("opportunityType === 'water_tank'"))
 assert.ok(view.includes('Rehab signal'))
 assert.ok(view.includes('morphology confidence'))

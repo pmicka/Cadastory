@@ -1,4 +1,6 @@
-export type ScoutSandboxOpportunityType = 'premium_exterior' | 'water_tank'
+import type { ScoutSandboxSwpppSiteMap, ScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
+
+export type ScoutSandboxOpportunityType = 'premium_exterior' | 'water_tank' | 'swppp_site'
 
 export type ScoutSandboxPremiumExteriorOpportunity = {
   opportunity_type: 'premium_exterior'
@@ -147,7 +149,14 @@ export type ScoutSandboxWaterTankResult = {
   map: ScoutSandboxWaterTankMap
 }
 
-export type ScoutSandboxResult = ScoutSandboxPremiumExteriorResult | ScoutSandboxWaterTankResult
+export type ScoutSandboxSwpppSiteResult = {
+  surface: 'scout_component_sandbox'
+  opportunity_type: 'swppp_site'
+  opportunity: ScoutSandboxSwpppSiteOpportunity
+  map: ScoutSandboxSwpppSiteMap
+}
+
+export type ScoutSandboxResult = ScoutSandboxPremiumExteriorResult | ScoutSandboxWaterTankResult | ScoutSandboxSwpppSiteResult
 
 function boundedString(value: unknown, maxLength: number) {
   if (typeof value !== 'string') return null

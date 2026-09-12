@@ -203,3 +203,43 @@ export function buildScoutSandboxSwpppSiteOpportunity(map: ScoutSandboxSwpppSite
     guardrail: map.guardrail,
   }
 }
+
+export function normalizeScoutSandboxSwpppSiteOpportunity(value: unknown): ScoutSandboxSwpppSiteOpportunity | null {
+  const source = record(value)
+  if (!source || source.opportunity_type !== 'swppp_site') return null
+
+  const name = boundedString(source.name, 200)
+  const locationLabel = boundedString(source.location_label, 160)
+  const observedAt = boundedString(source.observed_at, 80)
+  const permitNumber = boundedString(source.permit_number, 80)
+  const effectiveDate = boundedString(source.permit_effective_date, 40)
+  const expirationDate = boundedString(source.permit_expiration_date, 40)
+  const documentedTotalAcres = boundedNumber(source.documented_total_acres, 1, 10_000_000)
+  const projectReference = boundedString(source.project_reference, 80)
+  const whyInvestigate = boundedString(source.why_investigate, 1000)
+  const guardrail = boundedString(source.guardrail, 1000)
+
+  if (!name || !locationLabel || !observedAt || !permitNumber || !effectiveDate || !expirationDate) return null
+  if (documentedTotalAcres === null || !projectReference || !whyInvestigate || !guardrail) return null
+  if (source.evidence_status !== 'active_documented_state_construction_permit') return null
+  if (source.permit_status !== 'ACTIVE' || source.permit_type !== 'CONSTRUCTION_STORMWATER') return null
+  if (source.buyer_resolvability !== 'unresolved') return null
+
+  return {
+    opportunity_type: 'swppp_site',
+    name,
+    location_label: locationLabel,
+    evidence_status: 'active_documented_state_construction_permit',
+    observed_at: observedAt,
+    permit_number: permitNumber,
+    permit_status: 'ACTIVE',
+    permit_type: 'CONSTRUCTION_STORMWATER',
+    permit_effective_date: effectiveDate,
+    permit_expiration_date: expirationDate,
+    documented_total_acres: documentedTotalAcres,
+    project_reference: projectReference,
+    buyer_resolvability: 'unresolved',
+    why_investigate: whyInvestigate,
+    guardrail,
+  }
+}
