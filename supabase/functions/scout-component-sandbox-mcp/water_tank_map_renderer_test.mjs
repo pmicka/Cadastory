@@ -25,8 +25,9 @@ const [
 
 const packageJson = JSON.parse(packageJsonText)
 assert.ok(packageJson.scripts.test.includes('water_tank_map_renderer_test.mjs'))
-assert.ok(sharedRendererSource.includes('buildScoutCenteredPointRasterFrame'))
-assert.ok(rendererSource.includes('buildScoutCenteredPointRasterFrame'))
+assert.equal(sharedRendererSource.includes('buildScoutCenteredPointRasterFrame'), false)
+assert.ok(rendererSource.includes('MAX_MERCATOR_LAT = 85.05112878'))
+assert.ok(rendererSource.includes('TILE_SIZE = 256'))
 assert.ok(modelSource.includes('SCOUT_WATER_TANK_POINT_ZOOM = 17'))
 
 for (const source of [modelSource, rendererSource]) {
@@ -119,7 +120,7 @@ const modelUrl = `data:text/javascript;base64,${Buffer.from(modelBuild.outputFil
 const { buildScoutWaterTankPointMapModel, SCOUT_WATER_TANK_POINT_ZOOM } = await import(modelUrl)
 const model = buildScoutWaterTankPointMapModel(exemplar)
 assert.equal(SCOUT_WATER_TANK_POINT_ZOOM, 17)
-assert.deepEqual(model.center, exemplar.site_point && { lon: exemplar.site_point.lon, lat: exemplar.site_point.lat })
+assert.deepEqual(model.center, { lon: exemplar.site_point.lon, lat: exemplar.site_point.lat })
 assert.equal(model.marker.lon, exemplar.site_point.lon)
 assert.equal(model.marker.lat, exemplar.site_point.lat)
 assert.equal(model.marker.source, 'kentucky_wris_water_tank')
@@ -184,5 +185,6 @@ assert.equal(rendererJs.includes('document.createElement'), false)
 assert.ok(mapContract.includes('SOUTH PRESSURE ZONE TANK'))
 assert.ok(mapContract.includes('render-only zoom `17`'))
 assert.ok(mapContract.includes('does not define a service radius'))
+assert.ok(mapContract.includes('byte-for-byte unchanged'))
 
 console.log(`Scout water-tank point raster checks passed across ${viewportCases.length} viewport widths. JS ${rendererJs.length} bytes.`)
