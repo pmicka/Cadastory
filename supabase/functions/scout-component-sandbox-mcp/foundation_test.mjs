@@ -73,7 +73,7 @@ assert.equal(normalizeScoutSandboxOpportunity({ ...exemplar, confidence: 2 }), n
 assert.equal(normalizeScoutSandboxOpportunity({ ...exemplar, name: "" }), null);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
@@ -81,6 +81,11 @@ assert.ok(designContract.includes("12:7"));
 assert.ok(designContract.includes("visual source of truth"));
 assert.ok(template.includes('class="scout-header"'));
 assert.ok(template.includes('class="carousel-viewport"'));
+assert.ok(designContract.includes('100% of the visible carousel viewport width'));
+assert.ok(template.includes('flex: 0 0 100%;'));
+assert.ok(template.includes('gap: 0;'));
+assert.equal(template.includes('flex: 0 0 330px;'), false);
+assert.equal(template.includes('width: 330px;'), false);
 assert.ok(template.includes('Save for later'));
 assert.ok(template.includes('Investigate'));
 assert.ok(template.includes('#ffffff'));

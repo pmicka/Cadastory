@@ -138,19 +138,20 @@
       .carousel-viewport::-webkit-scrollbar { display: none; }
       .carousel-strip {
         display: flex;
-        gap: 16px;
-        width: max-content;
-        min-width: 100%;
+        gap: 0;
+        width: 100%;
         height: 210px;
       }
       .media-slide {
         position: relative;
-        flex: 0 0 330px;
-        width: 330px;
+        flex: 0 0 100%;
+        width: 100%;
+        min-width: 0;
         height: 210px;
         overflow: hidden;
         border-radius: 16px;
         scroll-snap-align: start;
+        scroll-snap-stop: always;
       }
       .media-slide:nth-child(1) { background: #dce4d9; }
       .media-slide:nth-child(2) { background: #e6e0d4; }
@@ -167,7 +168,7 @@
       .media-circle {
         position: absolute;
         top: 64px;
-        left: 143px;
+        left: calc(50% - 22px);
         width: 44px;
         height: 44px;
         border-radius: 50%;
@@ -291,8 +292,6 @@
       @media (max-width: 380px) {
         body { padding: 4px; }
         .scout-card { padding-left: 18px; padding-right: 18px; border-radius: 20px; }
-        .media-slide { flex-basis: calc(100vw - 48px); width: calc(100vw - 48px); }
-        .media-circle { left: calc(50% - 22px); }
         .actions { gap: 8px; }
         .action-secondary, .action-primary { width: auto; flex: 1 1 0; }
       }
