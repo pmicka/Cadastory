@@ -126,6 +126,12 @@ All current construction-stormwater evidence geometry is point geometry. The sel
 
 The permit record identifies a potentially relevant active site or compliance/documentation need. It does not prove active procurement, buyer intent, current service need, site access, ownership, contract availability, or a resolved responsible organization.
 
+## SWPPP-site isolated model foundation
+
+The isolated TypeScript model and strict normalizer consume only `swppp_site_map_v1`. They reject altered opportunity/contract discriminators, mismatched candidate/source identities, non-point geometry semantics, non-active or terminated permits, non-positive permit acreage, alternate sources/authority levels, and any promoted buyer resolution.
+
+The compact opportunity projection carries categorical active permit evidence rather than inventing numeric confidence. It omits `project_type` and `time_sensitive` because neither claim is established by this contract. This model is test-only groundwork until the separate map-frame renderer is complete and the owner approves integration into the live discriminated union and View.
+
 ## Water-tank Batch 3 integration scope
 
 Batch 3 is the first host-visible water-tank integration.
