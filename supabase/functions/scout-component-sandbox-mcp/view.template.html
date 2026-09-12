@@ -153,9 +153,32 @@
         scroll-snap-align: start;
         scroll-snap-stop: always;
       }
-      .media-slide:nth-child(1) { background: #dce4d9; }
+      .media-slide:nth-child(1) { background: #eef1eb; }
       .media-slide:nth-child(2) { background: #e6e0d4; }
       .media-slide:nth-child(3) { background: #d9e1e6; }
+      .scout-map {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+      .scout-map .maplibregl-canvas { pointer-events: none; }
+      .scout-map-state {
+        position: absolute;
+        inset: 0;
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        padding: 16px;
+        background: #eef1eb;
+        color: #657065;
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 16px;
+        text-align: center;
+        pointer-events: none;
+      }
+      .scout-map-state[hidden] { display: none; }
       .media-glyph {
         position: absolute;
         top: 6px;
@@ -296,6 +319,7 @@
         .action-secondary, .action-primary { width: auto; flex: 1 1 0; }
       }
     </style>
+    <style>/*__SCOUT_VIEW_STYLE__*/</style>
   </head>
   <body>
     <main class="scout-card" data-scout-card aria-labelledby="scout-title">
@@ -318,13 +342,11 @@
 
       <p class="media-label">Media</p>
       <div class="carousel-shell">
-        <div class="carousel-viewport" data-scout-carousel aria-label="Scout media placeholders">
+        <div class="carousel-viewport" data-scout-carousel aria-label="Scout opportunity media">
           <div class="carousel-strip">
-            <div class="media-slide">
-              <span class="media-glyph" aria-hidden="true">◇</span>
-              <span class="media-circle" aria-hidden="true"></span>
-              <span class="media-placeholder">Placeholder image 1</span>
-              <span class="media-subtext">Media wiring intentionally deferred</span>
+            <div class="media-slide" aria-label="PNC Tower site map">
+              <div class="scout-map" data-scout-map></div>
+              <div class="scout-map-state" data-scout-map-state>Loading site map…</div>
             </div>
             <div class="media-slide">
               <span class="media-glyph" aria-hidden="true">◇</span>

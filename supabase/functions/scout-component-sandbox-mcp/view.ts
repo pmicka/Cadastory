@@ -1,4 +1,6 @@
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
+import { normalizeScoutSandboxSingleSiteMap } from './contract.ts'
+import { mountScoutSingleSiteMap, type ScoutSingleSiteMapRendererHandle } from './single_site_map_renderer.ts'
 
 type ScoutOpportunity = {
   name: string
@@ -17,6 +19,8 @@ type ScoutOpportunity = {
   guardrail: string
 }
 
+const SCOUT_MAP_STYLE = 'https://tiles.openfreemap.org/styles/positron'
+
 const title = document.querySelector<HTMLElement>('[data-scout-title]')
 const tier = document.querySelector<HTMLElement>('[data-scout-tier]')
 const meta = document.querySelector<HTMLElement>('[data-scout-meta]')
@@ -27,6 +31,10 @@ const state = document.querySelector<HTMLElement>('[data-scout-state]')
 const carousel = document.querySelector<HTMLElement>('[data-scout-carousel]')
 const carouselCount = document.querySelector<HTMLElement>('[data-scout-carousel-count]')
 const carouselDots = Array.from(document.querySelectorAll<HTMLElement>('[data-scout-carousel-dot]'))
+const mapContainer = document.querySelector<HTMLElement>('[data-scout-map]')
+const mapState = document.querySelector<HTMLElement>('[data-scout-map-state]')
+let mapHandle: ScoutSingleSiteMapRendererHandle | null = null
+let mapGeneration = 0
 
 function setState(message: string) {
   if (state) state.textContent = message.slice(0, 200)
@@ -132,6 +140,54 @@ function renderOpportunity(value: unknown) {
   setState(`Scout opportunity ready: ${opportunity.name}`)
 }
 
+function destroyMap() {
+  mapGeneration += 1
+  mapHandle?.destroy()
+  mapHandle = null
+}
+
+function renderMap(value: unknown) {
+  const mapData = normalizeScoutSandboxSingleSiteMap(value)
+  destroyMap()
+  if (!mapContainer || !mapState) return
+  if (!mapData) {
+    mapState.hidden = false
+    mapState.textContent = 'Site map unavailable'
+    setState('Scout single-site map result failed validation')
+    return
+  }
+
+  const generation = ++mapGeneration
+  let ready = false
+  mapState.hidden = false
+  mapState.textContent = 'Loading site map…'
+  mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
+
+  try {
+    mapHandle = mountScoutSingleSiteMap(mapContainer, mapData, {
+      style: SCOUT_MAP_STYLE,
+      onReady: () => {
+        if (generation !== mapGeneration) return
+        ready = true
+        mapState.hidden = true
+        setState(`Scout site map ready: ${mapData.name}`)
+      },
+      onError: (error) => {
+        if (generation !== mapGeneration) return
+        if (!ready) {
+          mapState.hidden = false
+          mapState.textContent = 'Site map unavailable'
+        }
+        setState(`Scout map error: ${error.message}`)
+      },
+    })
+  } catch (error) {
+    mapState.hidden = false
+    mapState.textContent = 'Site map unavailable'
+    setState(`Scout map initialization failed: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
 function updateCarouselState() {
   if (!carousel || !carouselCount || carouselDots.length === 0) return
   const slides = Array.from(carousel.querySelectorAll<HTMLElement>('.media-slide'))
@@ -158,11 +214,17 @@ carousel?.addEventListener('scroll', updateCarouselState, { passive: true })
 window.addEventListener('resize', updateCarouselState, { passive: true })
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.0.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.1.0' })
 app.ontoolinput = () => setState('Scout tool input received')
-app.ontoolresult = (result) => renderOpportunity(result?.structuredContent?.opportunity)
+app.ontoolresult = (result) => {
+  renderOpportunity(result?.structuredContent?.opportunity)
+  renderMap(result?.structuredContent?.map)
+}
 app.onerror = (error) => setState(`Scout SDK error: ${error instanceof Error ? error.message : String(error)}`)
-app.onteardown = async () => ({})
+app.onteardown = async () => {
+  destroyMap()
+  return {}
+}
 
 const transport = new PostMessageTransport()
 try {

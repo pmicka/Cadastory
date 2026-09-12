@@ -22,6 +22,8 @@ assert.ok(view.indexOf("app.onerror") < view.indexOf("app.connect("));
 assert.ok(view.indexOf("app.onteardown") < view.indexOf("app.connect("));
 assert.ok(view.includes("new PostMessageTransport()"));
 assert.ok(view.includes("structuredContent?.opportunity"));
+assert.ok(view.includes("structuredContent?.map"));
+assert.ok(view.includes("mountScoutSingleSiteMap"));
 assert.equal(view.includes("innerHTML"), false);
 assert.equal(generated.includes("https://unpkg.com"), false);
 assert.equal(generated.includes("https://cdn."), false);
@@ -31,13 +33,18 @@ assert.ok(server.includes("scout_get_component_sandbox_opportunity_v1_internal")
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_internal"), false);
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_v2_internal"), false);
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_v3_internal"), false);
-assert.equal(server.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"), false);
+assert.ok(server.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"));
 assert.ok(server.includes("names: z.array"));
 assert.ok(server.includes("opportunity: z.object"));
+assert.ok(server.includes("map: sandboxMapSchema"));
+assert.ok(server.includes("connectDomains: [MAP_RESOURCE_ORIGIN]"));
 assert.ok(connectGateway.includes("opportunity:{type:'object'"));
 assert.ok(contractGateway.includes("opportunity:{type:'object'"));
+assert.ok(connectGateway.includes("map:sandboxMapSchema()"));
+assert.ok(contractGateway.includes("map:sandboxMapSchema()"));
 assert.equal(server.includes("exemplars:"), false);
-assert.ok(buildView.includes('template.replace("/*__SCOUT_VIEW_BUNDLE__*/", () => bundle)'));
+assert.ok(buildView.includes('.replace("/*__SCOUT_VIEW_STYLE__*/", () => css)'));
+assert.ok(buildView.includes('.replace("/*__SCOUT_VIEW_BUNDLE__*/", () => bundle)'));
 
 const deprecatedSandboxPatterns = [
   "window.openai",
@@ -147,7 +154,7 @@ assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { .
 assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { ...mapExemplar.footprint, bounds: { ...mapExemplar.footprint.bounds, east: -86 } } }), null);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
@@ -173,11 +180,15 @@ assert.equal(template.includes('class="metrics"'), false);
 assert.equal(template.includes('class="details"'), false);
 assert.equal(template.includes('class="guardrail"'), false);
 assert.equal(template.includes('Scout by Cadastory'), false);
-assert.equal(template.includes('data-scout-map'), false);
-assert.equal(generated.includes("maplibre"), false);
+assert.ok(template.includes('data-scout-map'));
+assert.ok(template.includes('data-scout-map-state'));
+assert.ok(generated.includes("maplibre"));
+assert.ok(generated.includes("https://tiles.openfreemap.org/styles/positron"));
+assert.equal(generated.includes("Placeholder image 1"), false);
 assert.equal(generated.includes("Scout lifecycle"), false);
 assert.ok(generated.includes("Component preview"));
 assert.ok(generated.includes("Media wiring intentionally deferred"));
+assert.ok(generated.includes("Site map for"));
 assert.ok(generated.includes("Scout guardrail:"));
 assert.ok(generated.includes("opportunity"));
 assert.equal((generated.match(/<!doctype html>/g) || []).length, 1);

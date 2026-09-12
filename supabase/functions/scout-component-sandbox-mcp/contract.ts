@@ -64,6 +64,7 @@ export type ScoutSandboxResult = {
   surface: 'scout_component_sandbox'
   names: string[]
   opportunity: ScoutSandboxOpportunity
+  map: ScoutSandboxSingleSiteMap
 }
 
 function boundedString(value: unknown, maxLength: number) {
