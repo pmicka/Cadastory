@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "build": "node build-view.mjs",
-    "test": "node foundation_test.mjs"
+    "test": "node foundation_test.mjs && node single_site_map_renderer_test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "2.0.0",
