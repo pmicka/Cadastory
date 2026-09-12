@@ -21,7 +21,7 @@ The live MCP Apps View should preserve the card's existing visual hierarchy:
 3. Divider.
 4. Opportunity title.
 5. Status pill plus compact metadata line.
-6. `Media` label and the existing horizontally swipeable placeholder carousel treatment until a specific media/map tile is explicitly approved and wired.
+6. `Media` label and the existing horizontally swipeable carousel treatment.
 7. Carousel count/dots.
 8. One compact factual summary region. Approved Scout guardrail copy may extend this region as muted supporting text; it must not become a separate boxed redesign.
 9. Divider.
@@ -42,16 +42,14 @@ This refinement intentionally supersedes the narrower 330px tile geometry in the
 
 Approved 2026-09-12:
 
-- Scout may resume map work incrementally, one opportunity type at a time.
+- Scout map work proceeds incrementally, one opportunity type at a time.
 - The first map experience is the bounded PNC Tower `premium_exterior` single-site map defined in `MAP_CONTRACT.md`.
-- Map implementation must build on the existing media carousel rather than redesigning the card.
-- Batch 3 replaces exactly one existing media placeholder tile with the PNC map while preserving the full-width carousel geometry, count, dots, and swipe behavior.
+- Map implementation builds on the existing media carousel rather than redesigning the card.
+- Exactly one existing media tile is the PNC map; the other two remain placeholders.
 - The initial map tile is non-interactive so map gestures do not compete with carousel swipe.
 - No portfolio/clustering/territory map semantics are approved by this design decision.
-
-Batch 2 implements the renderer only and intentionally makes no visible View change.
-
-Batch 3 integrates exactly one map tile. It uses OpenFreeMap Positron as a restrained basemap, keeps MapLibre non-interactive, keeps the two remaining placeholders unchanged, and does not add any new map controls or card chrome.
+- The renderer uses the proven raster-tile technique from the prior working map iteration, ported into the current MCP Apps lifecycle.
+- The raster basemap is composed from ordinary image tiles; no MapLibre, WebGL, Web Worker, or custom SVG basemap is part of the approved design path.
 
 ## Approved real-data substitutions
 
@@ -100,8 +98,4 @@ Keep the current standards-based MCP Apps lifecycle:
 - `_meta.ui.resourceUri`
 - current MCP Apps MIME
 
-The generated View must continue to have exactly one `<!doctype html>`, contain no `window.openai`, and preserve callback replacements in `build-view.mjs` for both locally bundled MapLibre CSS and the JavaScript bundle:
-
-`template.replace("/*__SCOUT_VIEW_STYLE__*/", () => css)`
-
-`template.replace("/*__SCOUT_VIEW_BUNDLE__*/", () => bundle)`
+The generated View must continue to have exactly one `<!doctype html>`, contain no `window.openai`, and use `build-view.mjs` only to bundle the standards-based JavaScript into the approved HTML template. The MapLibre-only CSS bundle path is retired and must not be restored unless an explicitly approved future implementation requires a separate generated stylesheet.

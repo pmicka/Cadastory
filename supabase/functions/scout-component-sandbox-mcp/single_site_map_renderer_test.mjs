@@ -7,7 +7,6 @@ const [
   view,
   server,
   rendererSource,
-  modelSource,
   generated,
   template,
   mapContract,
@@ -17,7 +16,6 @@ const [
   readFile(new URL('view.ts', directory), 'utf8'),
   readFile(new URL('index.ts', directory), 'utf8'),
   readFile(new URL('single_site_map_renderer.ts', directory), 'utf8'),
-  readFile(new URL('single_site_map_model.ts', directory), 'utf8'),
   readFile(new URL('view.generated.ts', directory), 'utf8'),
   readFile(new URL('view.template.html', directory), 'utf8'),
   readFile(new URL('MAP_CONTRACT.md', directory), 'utf8'),
@@ -26,7 +24,8 @@ const [
 ])
 
 const packageJson = JSON.parse(packageJsonText)
-assert.equal(packageJson.dependencies['maplibre-gl'], '6.9.0')
+assert.equal('maplibre-gl' in packageJson.dependencies, false)
+assert.equal(packageJson.dependencies['@modelcontextprotocol/ext-apps'], '2.0.0')
 
 const deprecatedPatterns = [
   'window.openai',
@@ -36,37 +35,34 @@ const deprecatedPatterns = [
   'openai/widgetDescription',
   'openai/widgetCSP',
 ]
-for (const source of [rendererSource, modelSource]) {
+for (const source of [rendererSource, view]) {
   for (const pattern of deprecatedPatterns) assert.equal(source.includes(pattern), false)
 }
 
-assert.ok(rendererSource.includes("import { Map as MapLibreMap"))
-assert.ok(rendererSource.includes("from 'maplibre-gl'"))
-assert.ok(rendererSource.includes("maplibre-gl/dist/maplibre-gl.css"))
-assert.ok(rendererSource.includes('interactive: false'))
-assert.ok(rendererSource.includes('attributionControl: {}'))
-assert.ok(rendererSource.includes('trackResize: true'))
-assert.ok(rendererSource.includes('renderWorldCopies: false'))
-assert.ok(rendererSource.includes('map.fitBounds(model.bounds'))
-assert.ok(rendererSource.includes('duration: 0'))
-assert.ok(rendererSource.includes('map.remove()'))
-assert.equal(rendererSource.includes('new maplibregl.Marker'), false)
-assert.equal(rendererSource.includes('.addControl('), false)
-assert.equal(rendererSource.includes('cluster:'), false)
-assert.equal(rendererSource.includes('scout_get_component_sandbox_map_targets'), false)
+for (const retired of ['maplibre', 'MapLibre', 'WebGL', 'new Worker', '<svg']) {
+  assert.equal(rendererSource.includes(retired), false)
+}
+assert.ok(rendererSource.includes("document.createElement('img')"))
+assert.ok(rendererSource.includes("image.referrerPolicy = 'origin'"))
+assert.ok(rendererSource.includes('buildScoutSingleSiteRasterFrame'))
+assert.ok(rendererSource.includes('replaceChildren()'))
+assert.ok(view.includes("https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
+assert.ok(view.includes('mountScoutSingleSiteMap'))
+assert.equal(view.includes('tiles.openfreemap.org'), false)
+assert.equal(view.includes('SCOUT_MAP_STYLE'), false)
+assert.equal(server.includes('tiles.openfreemap.org'), false)
+assert.ok(server.includes("const MAP_TILE_ORIGIN = 'https://tile.openstreetmap.org'"))
+assert.ok(server.includes('csp: { resourceDomains: [MAP_TILE_ORIGIN] }'))
+assert.equal(server.includes('connectDomains: [MAP_TILE_ORIGIN]'), false)
+assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v14'"))
+assert.ok(template.includes('<meta name="referrer" content="origin" />'))
+assert.ok(template.includes('.scout-map img'))
+assert.ok(template.includes('.scout-site-marker'))
+assert.ok(template.includes('.scout-map-attribution'))
+assert.equal(template.includes('maplibregl'), false)
+assert.equal(template.includes('__SCOUT_VIEW_STYLE__'), false)
 
-const modelBuild = await build({
-  entryPoints: [new URL('single_site_map_model.ts', directory).pathname],
-  bundle: true,
-  format: 'esm',
-  platform: 'node',
-  target: 'node24',
-  write: false,
-})
-const modelUrl = `data:text/javascript;base64,${Buffer.from(modelBuild.outputFiles[0].text).toString('base64')}`
-const { buildScoutSingleSiteMapRenderModel } = await import(modelUrl)
-
-const mapExemplar = {
+const exemplar = {
   contract_version: 'single_site_map_v1',
   opportunity_type: 'premium_exterior',
   opportunity_id: '0edb82cd-7487-4f72-a036-8faa8a40bd54',
@@ -113,23 +109,26 @@ const mapExemplar = {
   },
 }
 
-const model = buildScoutSingleSiteMapRenderModel(mapExemplar)
-assert.deepEqual(model.bounds, [
-  [-85.7581632620074, 38.2559260667489],
-  [-85.7567941378868, 38.2565851603231],
-])
-assert.deepEqual(model.center, [
-  (-85.7581632620074 + -85.7567941378868) / 2,
-  (38.2559260667489 + 38.2565851603231) / 2,
-])
-assert.equal(model.footprint.type, 'FeatureCollection')
-assert.equal(model.footprint.features.length, 1)
-assert.equal(model.footprint.features[0].geometry.type, 'Polygon')
-assert.equal(model.footprint.features[0].properties.opportunity_id, mapExemplar.opportunity_id)
-assert.equal(model.footprint.features[0].properties.geometry_source_slug, 'ky-ornl-building-footprints')
-assert.equal(model.footprint.features[0].properties.linkage_status, 'reconciled_existing_evidence')
-assert.equal(JSON.stringify(model.footprint).includes('site_point'), false)
-assert.equal(JSON.stringify(model.footprint).includes('38.256732011411'), false)
+const nodeBuild = await build({
+  entryPoints: [new URL('single_site_map_renderer.ts', directory).pathname],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  target: 'node24',
+  write: false,
+})
+const moduleUrl = `data:text/javascript;base64,${Buffer.from(nodeBuild.outputFiles[0].text).toString('base64')}`
+const { buildScoutSingleSiteRasterFrame } = await import(moduleUrl)
+const frame = buildScoutSingleSiteRasterFrame(exemplar, 366, 210, {
+  tileUrlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+})
+assert.equal(frame.zoom, 17)
+assert.equal(frame.width, 366)
+assert.equal(frame.height, 210)
+assert.equal(frame.tiles.length, 6)
+assert.ok(frame.tiles.every((tile) => /^https:\/\/tile\.openstreetmap\.org\/17\/\d+\/\d+\.png$/.test(tile.url)))
+assert.ok(frame.marker.left > 0 && frame.marker.left < frame.width)
+assert.ok(frame.marker.top > 0 && frame.marker.top < frame.height)
 
 const rendererBuild = await build({
   entryPoints: [new URL('single_site_map_renderer.ts', directory).pathname],
@@ -137,41 +136,23 @@ const rendererBuild = await build({
   format: 'esm',
   platform: 'browser',
   target: 'es2022',
-  outdir: 'out',
   write: false,
   minify: true,
   legalComments: 'none',
-  loader: { '.css': 'css' },
 })
-const rendererJs = rendererBuild.outputFiles.find((file) => file.path.endsWith('.js'))
-const rendererCss = rendererBuild.outputFiles.find((file) => file.path.endsWith('.css'))
-assert.ok(rendererJs?.text)
-assert.ok(rendererCss?.text)
-await transform(rendererJs.text, { loader: 'js', format: 'esm', target: 'es2022' })
-assert.ok(rendererCss.text.includes('.maplibregl-map'))
-assert.ok(rendererCss.text.includes('.maplibregl-canvas'))
-assert.equal(rendererJs.text.includes('window.openai'), false)
-assert.equal(rendererJs.text.includes('openai/outputTemplate'), false)
+const rendererJs = rendererBuild.outputFiles[0]?.text
+assert.ok(rendererJs)
+await transform(rendererJs, { loader: 'js', format: 'esm', target: 'es2022' })
+assert.equal(rendererJs.includes('maplibre'), false)
+assert.equal(rendererJs.includes('Worker'), false)
 
-// Batch 2 is renderer-only. The production View/server must remain untouched.
-assert.ok(view.includes('single_site_map_renderer'))
-assert.ok(view.includes('mountScoutSingleSiteMap'))
-assert.ok(server.includes('scout_get_component_sandbox_premium_exterior_map_v1_internal'))
-assert.ok(template.includes('data-scout-map'))
-assert.ok(generated.includes('maplibre'))
-assert.ok(generated.includes('scout-single-site-footprint'))
+assert.ok(generated.includes('tile.openstreetmap.org'))
+assert.ok(generated.includes('scout-site-marker'))
+assert.equal(generated.includes('maplibre'), false)
+assert.ok(mapContract.includes('proven raster-tile renderer'))
+assert.ok(mapContract.includes('tile.openstreetmap.org'))
+assert.ok(mapContract.includes('no Web Worker'))
+assert.ok(designContract.includes('proven raster-tile technique'))
+assert.equal(designContract.includes('MapLibre non-interactive'), false)
 
-assert.ok(mapContract.includes('Batch 2 adds the isolated renderer implementation only'))
-assert.ok(mapContract.includes('Batch 3 integration scope'))
-assert.ok(mapContract.includes('https://tiles.openfreemap.org/styles/positron'))
-assert.ok(mapContract.includes('maplibre-gl` pinned to `6.9.0'))
-assert.ok(mapContract.includes('never use `maplibre-gl <= 6.4.0`'))
-assert.ok(mapContract.includes('GHSA-jrc7-96c5-q579'))
-assert.ok(mapContract.includes('interactive: false'))
-assert.ok(mapContract.includes('map.remove()'))
-assert.ok(mapContract.includes('does **not**'))
-assert.ok(designContract.includes('Owner-approved map direction'))
-assert.ok(designContract.includes('Batch 2 implements the renderer only'))
-assert.ok(designContract.includes('Batch 3 integrates exactly one map tile'))
-
-console.log(`Scout Batch 2 single-site MapLibre renderer checks passed. JS ${rendererJs.text.length} bytes; CSS ${rendererCss.text.length} bytes.`)
+console.log(`Scout single-site raster renderer checks passed. JS ${rendererJs.length} bytes; ${frame.tiles.length} visible tiles at z${frame.zoom}.`)
