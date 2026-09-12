@@ -69,6 +69,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
             supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs \
+            supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer_test.mjs \
             supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
             supabase/functions/scout-connect/index.ts \
             supabase/functions/scout-mcp-contract/index.ts
