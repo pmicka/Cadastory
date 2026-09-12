@@ -14,7 +14,7 @@ The first active and host-verified map contract is the bounded **premium exterio
 - exemplar: `PNC Tower`
 - opportunity id: `0edb82cd-7487-4f72-a036-8faa8a40bd54`
 
-The second opportunity type is now staged as **data-contract-only**. It is not exposed through `ScoutSandboxResult`, the tool output schema, the View, or the carousel yet:
+The second opportunity type is now staged through an **isolated point-renderer batch**. It is still not exposed through `ScoutSandboxResult`, the tool output schema, the View, or the carousel:
 
 - RPC: `public.scout_get_component_sandbox_water_tank_map_v1_internal()`
 - contract version: `water_tank_single_site_map_v1`
@@ -58,7 +58,7 @@ Important caveats remain explicit:
 
 The current renderer uses the reconciled footprint bounds to frame the map and places the Scout marker at the footprint-bounds center. It does **not** render the Census/address geocode as the target marker. The marker is a locator for the reconciled building geometry, not a claim that the footprint is a current survey, authoritative parcel boundary, or independently verified facade outline.
 
-## Water-tank data-contract-only boundary
+## Water-tank bounded data contract
 
 The staged water-tank contract is point-based. It must not invent a footprint, tank diameter, service radius, property boundary, access area, or other polygon.
 
@@ -77,12 +77,32 @@ The initial exemplar is `SOUTH PRESSURE ZONE TANK`, selected because it is insid
 
 The contract deliberately does **not** copy the broader candidate view's `time_sensitive` field. Timing must remain grounded in the project evidence and be verified before outreach.
 
-Batch 1 must remain data-contract-only:
+## Water-tank Batch 2 isolated renderer boundary
+
+Batch 2 adds only a pure point-map model and raster-frame calculation. It does not mount a water-tank map in the View.
+
+The water-tank renderer:
+
+- centers on the exact normalized WRIS asset point
+- places the Scout marker on that same exact WRIS point
+- uses render-only zoom `17` for the initial single-point framing
+- ports the same proven Web Mercator/tile calculation into an isolated pure point-renderer module rather than introducing a second map runtime
+- loads no tiles by itself during model/frame tests; it only calculates the bounded tile set required for a supplied viewport
+- keeps the model point-only and does not synthesize or persist any domain geometry
+
+The fixed zoom is a presentation choice only. It does not define a service radius, ownership boundary, parcel extent, access envelope, tank diameter, inspection perimeter, or any other real-world spatial claim.
+
+The working PNC `single_site_map_renderer.ts` is deliberately restored to the exact `main` blob for Batch 2. A fresh View build must therefore leave `view.generated.ts` byte-for-byte unchanged. The small duplicated Web Mercator/tile framing kernel in the isolated water-tank module is intentional at this stage: sharing/refactoring the active PNC runtime is deferred until a later integration batch where a View revision is already intentional and can be host-regression-tested.
+
+Batch 2 must remain isolated:
 
 - `ScoutSandboxResult` keeps the existing PNC `map` field only
 - the component server must not call `scout_get_component_sandbox_water_tank_map_v1_internal()` yet
-- the View must not import or render `normalizeScoutSandboxWaterTankMap()` yet
-- no resource URI bump is required for this batch because the View is unchanged
+- `view.ts` must not import the water-tank model/renderer yet
+- the carousel must not receive a water-tank map tile yet
+- the generated View must not contain the water-tank contract/model/renderer
+- no resource URI bump is required because no host-visible View behavior changes
+- no Edge Function deployment occurs in this batch
 
 ## Proven raster-tile renderer
 
@@ -126,7 +146,7 @@ The OSM standard tile service is best-effort and not an SLA-backed production de
 
 - mobile ChatGPT host: **verified working** — Android v15 rendered the hardened PNC premium-exterior raster map successfully in the existing carousel on 2026-09-12.
 - desktop ChatGPT host: still requires explicit visual verification before the PNC pattern is considered verified there.
-- the water-tank contract is not yet exposed to the host and therefore has no host-render verification state.
+- the water-tank contract/renderer is not yet exposed to the host and therefore has no host-render verification state.
 
 The earlier transient v14 `Site map unavailable` state resolved after an app refresh and is not treated as a renderer-architecture failure.
 
