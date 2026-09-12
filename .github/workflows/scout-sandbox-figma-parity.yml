@@ -1,0 +1,121 @@
+name: Scout sandbox Figma parity
+
+on:
+  push:
+    branches: [scout-sandbox-figma-parity-20260911]
+    paths:
+      - .github/workflows/scout-sandbox-figma-parity.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout-sandbox-figma-parity-20260911
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Align canonical resource URI and regression gates
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('supabase/functions')
+          sandbox = root / 'scout-component-sandbox-mcp' / 'index.ts'
+          connect = root / 'scout-connect' / 'index.ts'
+          contract = root / 'scout-mcp-contract' / 'index.ts'
+          test = root / 'scout-component-sandbox-mcp' / 'foundation_test.mjs'
+
+          replacements = [
+              (sandbox, "const RESOURCE_URI = 'ui://scout/component-sandbox/v10'", "const RESOURCE_URI = 'ui://scout/component-sandbox/v11'"),
+              (connect, "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v10'", "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v11'"),
+              (contract, "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v10'", "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v11'"),
+          ]
+          for path, old, new in replacements:
+              text = path.read_text()
+              if old not in text:
+                  raise SystemExit(f'missing canonical v10 marker in {path}')
+              text = text.replace(old, new, 1)
+              path.write_text(text)
+
+          # Add v10 as the newest compatibility resource exactly once.
+          text = sandbox.read_text()
+          marker = "const COMPATIBILITY_RESOURCE_URIS = [\n  'ui://scout/component-sandbox/v9',"
+          replacement = "const COMPATIBILITY_RESOURCE_URIS = [\n  'ui://scout/component-sandbox/v10',\n  'ui://scout/component-sandbox/v9',"
+          if marker not in text:
+              raise SystemExit('missing sandbox compatibility marker')
+          sandbox.write_text(text.replace(marker, replacement, 1))
+
+          for path in (connect, contract):
+              text = path.read_text()
+              marker = "const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v9'"
+              replacement = "const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v10','ui://scout/component-sandbox/v9'"
+              if marker not in text:
+                  raise SystemExit(f'missing gateway compatibility marker in {path}')
+              path.write_text(text.replace(marker, replacement, 1))
+
+          text = test.read_text()
+          text = text.replace(
+              'const [view, server, generated, buildView, connectGateway, contractGateway] = await Promise.all([',
+              'const [view, server, generated, buildView, connectGateway, contractGateway, template, designContract] = await Promise.all(['
+          )
+          text = text.replace(
+              '  readFile(new URL("../scout-mcp-contract/index.ts", directory), "utf8"),\n]);',
+              '  readFile(new URL("../scout-mcp-contract/index.ts", directory), "utf8"),\n  readFile(new URL("view.template.html", directory), "utf8"),\n  readFile(new URL("DESIGN_CONTRACT.md", directory), "utf8"),\n]);'
+          )
+          text = text.replace(
+              'for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"]) {',
+              'for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"]) {'
+          )
+          old_checks = '''assert.ok(generated.includes("Scout by Cadastory"));
+assert.ok(generated.includes("Scout guardrail"));
+assert.ok(generated.includes("Buyer / site route"));
+assert.ok(generated.includes("opportunity"));
+assert.equal(generated.includes("Scout lifecycle"), false);'''
+          new_checks = '''assert.ok(designContract.includes("12:7"));
+assert.ok(designContract.includes("visual source of truth"));
+assert.ok(template.includes('class="scout-header"'));
+assert.ok(template.includes('class="carousel-viewport"'));
+assert.ok(template.includes('Save for later'));
+assert.ok(template.includes('Investigate'));
+assert.ok(template.includes('#ffffff'));
+assert.ok(template.includes('border-radius: 24px'));
+assert.equal(template.includes('light-dark('), false);
+assert.equal(template.includes('class="metrics"'), false);
+assert.equal(template.includes('class="details"'), false);
+assert.equal(template.includes('class="guardrail"'), false);
+assert.equal(template.includes('Scout by Cadastory'), false);
+assert.equal(generated.includes("Scout lifecycle"), false);
+assert.ok(generated.includes("Component preview"));
+assert.ok(generated.includes("Media wiring intentionally deferred"));
+assert.ok(generated.includes("Scout guardrail:"));
+assert.ok(generated.includes("opportunity"));'''
+          if old_checks not in text:
+              raise SystemExit('missing old generated-view assertions')
+          text = text.replace(old_checks, new_checks, 1)
+          test.write_text(text)
+          PY
+      - name: Build and test current MCP Apps View
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: |
+          npm ci
+          npm run build
+          npm test
+      - name: Commit tested parity build
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/scout-component-sandbox-mcp/index.ts \
+                  supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs \
+                  supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
+                  supabase/functions/scout-connect/index.ts \
+                  supabase/functions/scout-mcp-contract/index.ts
+          git diff --cached --check
+          git commit -m "Enforce Scout sandbox Figma parity"
+          git push origin HEAD:scout-sandbox-figma-parity-20260911
