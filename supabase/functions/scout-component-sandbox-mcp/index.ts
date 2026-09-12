@@ -30,8 +30,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v20'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v21'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v20',
   'ui://scout/component-sandbox/v19',
   'ui://scout/component-sandbox/v18',
   'ui://scout/component-sandbox/v17',
@@ -334,7 +335,7 @@ const swpppSiteResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.3' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.4' })
 
   registerAppResource(
     server,
