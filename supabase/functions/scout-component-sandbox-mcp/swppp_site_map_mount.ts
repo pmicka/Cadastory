@@ -7,6 +7,7 @@ export type ScoutSwpppSiteMapMountOptions = ScoutSwpppSiteRasterFrameOptions & {
   timeoutMs?: number
   onReady?: () => void
   onError?: (error: Error) => void
+  embeddedTiles?: Record<string, string>
 }
 
 const DEFAULT_TIMEOUT_MS = 7000
@@ -42,7 +43,7 @@ export function mountScoutSwpppSiteMap(container: HTMLElement, data: ScoutSandbo
       image.decoding = 'async'
       image.loading = 'eager'
       image.referrerPolicy = 'origin'
-      image.src = tile.url
+      image.src = options.embeddedTiles?.[tile.url] ?? tile.url
       image.style.left = `${tile.left}px`
       image.style.top = `${tile.top}px`
       image.addEventListener('load', () => { if (!destroyed && current === generation) { loaded += 1; settled += 1; if (loaded === 1) markReady() } }, { once: true })
