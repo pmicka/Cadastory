@@ -10,6 +10,7 @@ const [server, view, generated, contract, connect, gateway, sharedSchema, mount]
 ])
 
 for (const source of [server, connect, gateway]) {
+  assert.ok(source.includes('ui://scout/component-sandbox/v20'))
   assert.ok(source.includes('ui://scout/component-sandbox/v19'))
   assert.ok(source.includes('ui://scout/component-sandbox/v18'))
   assert.ok(source.includes('ui://scout/component-sandbox/v17'))
@@ -22,6 +23,9 @@ assert.ok(server.includes("z.discriminatedUnion('opportunity_type'"))
 assert.ok(contract.includes('ScoutSandboxSwpppSiteResult'))
 assert.ok(view.includes('normalizeScoutSandboxSwpppSiteOpportunity'))
 assert.ok(view.includes('mountScoutSwpppSiteMap'))
+assert.ok(view.includes("result?._meta?.['scout/rasterTiles']"))
+assert.ok(server.includes("_meta: { 'scout/rasterTiles': await loadEmbeddedSwpppTiles(map) }"))
+assert.ok(mount.includes('options.embeddedTiles?.[tile.url] ?? tile.url'))
 assert.ok(view.includes('documented permit acres'))
 assert.ok(view.includes('Active permit evidence'))
 assert.ok(generated.includes('swppp_site_map_v1'))
