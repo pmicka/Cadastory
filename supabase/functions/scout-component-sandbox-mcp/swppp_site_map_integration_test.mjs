@@ -10,6 +10,7 @@ const [server, view, generated, contract, connect, gateway, sharedSchema, mount]
 ])
 
 for (const source of [server, connect, gateway]) {
+  assert.ok(source.includes('ui://scout/component-sandbox/v18'))
   assert.ok(source.includes('ui://scout/component-sandbox/v17'))
   assert.ok(source.includes('ui://scout/component-sandbox/v16'))
   assert.ok(source.includes('swppp_site'))
@@ -24,6 +25,8 @@ assert.ok(view.includes('documented permit acres'))
 assert.ok(view.includes('Active permit evidence'))
 assert.ok(generated.includes('swppp_site_map_v1'))
 assert.ok(generated.includes('authoritative_permit_location_point'))
+assert.ok(generated.includes('a.tile.openstreetmap.fr/hot'))
+assert.ok(view.includes("timeZone: 'UTC'"))
 assert.ok(sharedSchema.includes("termination_date:{type:'null'}"))
 assert.ok(sharedSchema.includes("buyer_resolvability:{type:'string',enum:['unresolved']}"))
 assert.ok(mount.includes("document.createElement('img')"))
