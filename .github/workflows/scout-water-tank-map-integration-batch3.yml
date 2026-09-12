@@ -23,9 +23,7 @@ jobs:
           node-version: 24
           cache: npm
           cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
-      - name: Align duplicated sandbox gateway schemas
-        run: node scripts/tmp_scout_water_tank_batch3_gateways.mjs
-      - name: Advance foundation regressions to v16
+      - name: Advance PNC hardening assertion to v16
         run: node scripts/tmp_scout_water_tank_batch3_tests.mjs
       - name: Install exact UI dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
@@ -63,17 +61,12 @@ jobs:
             supabase/functions/scout-component-sandbox-mcp/water_tank_map_mount.ts \
             supabase/functions/scout-component-sandbox-mcp/index.ts \
             supabase/functions/scout-component-sandbox-mcp/view.generated.ts
-      - name: Commit generated and aligned source state
+      - name: Commit final aligned regression state
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add \
-            supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs \
-            supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer_test.mjs \
-            supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
-            supabase/functions/scout-connect/index.ts \
-            supabase/functions/scout-mcp-contract/index.ts
+          git add supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer_test.mjs
           if ! git diff --cached --quiet; then
-            git commit -m "Finalize Scout water tank v16 integration [skip ci]"
+            git commit -m "Finalize Scout v16 PNC compatibility regression [skip ci]"
             git push origin HEAD:scout-water-tank-map-integration-batch3-20260912
           fi
