@@ -1,0 +1,89 @@
+name: Scout PNC map hardening
+
+on:
+  push:
+    branches:
+      - scout-pnc-map-hardening-20260912
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout-pnc-map-hardening-20260912
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Align v15 resource and lifecycle regressions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          sandbox = Path('supabase/functions/scout-component-sandbox-mcp/index.ts')
+          text = sandbox.read_text()
+          text = text.replace("const RESOURCE_URI = 'ui://scout/component-sandbox/v14'", "const RESOURCE_URI = 'ui://scout/component-sandbox/v15'")
+          text = text.replace("  'ui://scout/component-sandbox/v13',", "  'ui://scout/component-sandbox/v14',\n  'ui://scout/component-sandbox/v13',")
+          sandbox.write_text(text)
+
+          for path in [Path('supabase/functions/scout-connect/index.ts'), Path('supabase/functions/scout-mcp-contract/index.ts')]:
+              text = path.read_text()
+              text = text.replace("const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v14'", "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v15'")
+              text = text.replace("const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v13'", "const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v14','ui://scout/component-sandbox/v13'")
+              path.write_text(text)
+
+          foundation = Path('supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs')
+          text = foundation.read_text()
+          text = text.replace('for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14"]) {', 'for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"]) {')
+          anchor = 'assert.ok(view.indexOf("app.onerror") < view.indexOf("app.connect("));\n'
+          addition = anchor + 'assert.ok(view.indexOf("app.onhostcontextchanged") < view.indexOf("app.connect("));\nassert.ok(view.includes("new ResizeObserver"));\nassert.ok(view.includes("carouselResizeObserver?.disconnect()"));\n'
+          text = text.replace(anchor, addition)
+          foundation.write_text(text)
+          PY
+      - name: Install exact UI dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Audit production UI dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm audit --omit=dev
+      - name: Rebuild and test hardened View
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: |
+          npm run build
+          npm test
+      - name: Deno check Scout sandbox
+        run: deno check supabase/functions/scout-component-sandbox-mcp/index.ts
+      - name: Deno check Scout connect gateway
+        run: deno check supabase/functions/scout-connect/index.ts
+      - name: Deno check Scout contract gateway
+        run: deno check supabase/functions/scout-mcp-contract/index.ts
+      - name: Assert hardening boundaries
+        run: |
+          grep -q "component-sandbox/v15" supabase/functions/scout-component-sandbox-mcp/index.ts
+          grep -q "component-sandbox/v15" supabase/functions/scout-connect/index.ts
+          grep -q "component-sandbox/v15" supabase/functions/scout-mcp-contract/index.ts
+          grep -q "onhostcontextchanged" supabase/functions/scout-component-sandbox-mcp/view.generated.ts
+          grep -q "ResizeObserver" supabase/functions/scout-component-sandbox-mcp/view.generated.ts
+          ! grep -R "maplibre\|tiles.openfreemap.org\|window.openai\|openai/outputTemplate" supabase/functions/scout-component-sandbox-mcp --exclude-dir=node_modules --exclude=MAP_CONTRACT.md --exclude=single_site_map_renderer_test.mjs
+      - name: Commit generated and aligned source state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            supabase/functions/scout-component-sandbox-mcp/index.ts \
+            supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs \
+            supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
+            supabase/functions/scout-connect/index.ts \
+            supabase/functions/scout-mcp-contract/index.ts
+          if ! git diff --cached --quiet; then
+            git commit -m "Finalize Scout PNC map hardening [skip ci]"
+            git push origin HEAD:scout-pnc-map-hardening-20260912
+          fi
