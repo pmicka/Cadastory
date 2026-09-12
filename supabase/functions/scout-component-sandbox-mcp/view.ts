@@ -54,6 +54,20 @@ function cleanNumber(value: unknown, minimum: number, maximum: number) {
     : null
 }
 
+function normalizeEmbeddedTiles(value: unknown) {
+  if (!Array.isArray(value) || value.length > 12) return undefined
+  const tiles: Record<string, string> = {}
+  for (const item of value) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined
+    const source = item as Record<string, unknown>
+    const url = cleanString(source.url, 1000)
+    const dataUrl = cleanString(source.data_url, 200_000)
+    if (!url?.includes('/scout-component-sandbox-mcp/map-tile/') || !dataUrl?.startsWith('data:image/png;base64,')) return undefined
+    tiles[url] = dataUrl
+  }
+  return Object.keys(tiles).length ? tiles : undefined
+}
+
 function normalizeWaterTankOpportunity(value: unknown): ScoutSandboxWaterTankOpportunity | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const source = value as Record<string, unknown>
@@ -192,7 +206,7 @@ function destroyMap() {
   mapHandle = null
 }
 
-function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown) {
+function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown, embeddedTiles?: Record<string, string>) {
   destroyMap()
   if (!mapContainer || !mapState) return
 
@@ -231,7 +245,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown)
       }
       mapContainer.setAttribute('role', 'img')
       mapContainer.setAttribute('aria-label', `Permit location map for ${mapData.site_name}`)
-      mapHandle = mountScoutSwpppSiteMap(mapContainer, mapData, mapOptions)
+      mapHandle = mountScoutSwpppSiteMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
     } else if (opportunityType === 'water_tank') {
       const mapData = normalizeScoutSandboxWaterTankMap(value)
       if (!mapData) {
@@ -316,10 +330,11 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.5.2' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.5.3' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
+  const embeddedTiles = normalizeEmbeddedTiles(result?._meta?.['scout/rasterTiles'])
   const opportunityType = structured?.opportunity_type
   if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site') {
     renderUnavailableOpportunity()
@@ -327,7 +342,7 @@ app.ontoolresult = (result) => {
     return
   }
   renderOpportunity(opportunityType, structured?.opportunity)
-  renderMap(opportunityType, structured?.map)
+  renderMap(opportunityType, structured?.map, embeddedTiles)
 }
 app.onhostcontextchanged = () => scheduleLayoutRefresh()
 app.onerror = (error) => setState(`Scout SDK error: ${error instanceof Error ? error.message : String(error)}`)
