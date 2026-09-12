@@ -1,0 +1,54 @@
+name: Scout water tank map contract
+
+on:
+  push:
+    branches:
+      - scout-water-tank-map-contract-20260912
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout-water-tank-map-contract-20260912
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Install exact UI dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Audit production UI dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm audit --omit=dev
+      - name: Build and test sandbox
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: |
+          npm run build
+          npm test
+      - name: Deno check Scout sandbox
+        run: deno check supabase/functions/scout-component-sandbox-mcp/index.ts
+      - name: Deno check Scout connect gateway
+        run: deno check supabase/functions/scout-connect/index.ts
+      - name: Deno check Scout contract gateway
+        run: deno check supabase/functions/scout-mcp-contract/index.ts
+      - name: Assert Batch 1 remains data-contract-only
+        run: |
+          grep -q "normalizeScoutSandboxWaterTankMap" supabase/functions/scout-component-sandbox-mcp/contract.ts
+          grep -q "SOUTH PRESSURE ZONE TANK" supabase/functions/scout-component-sandbox-mcp/MAP_CONTRACT.md
+          grep -q "scout_get_component_sandbox_water_tank_map_v1_internal" supabase/migrations/20260912050600_add_component_sandbox_water_tank_map_v1.sql
+          ! grep -q "scout_get_component_sandbox_water_tank_map_v1_internal" supabase/functions/scout-component-sandbox-mcp/index.ts
+          ! grep -q "normalizeScoutSandboxWaterTankMap" supabase/functions/scout-component-sandbox-mcp/view.ts
+          ! grep -q "water_tank_single_site_map_v1" supabase/functions/scout-component-sandbox-mcp/view.ts
+          ! grep -E "window.openai|openai/outputTemplate|openai/widgetAccessible|openai/widgetDescription|openai/widgetCSP" \
+            supabase/functions/scout-component-sandbox-mcp/contract.ts \
+            supabase/functions/scout-component-sandbox-mcp/index.ts \
+            supabase/functions/scout-component-sandbox-mcp/view.ts
