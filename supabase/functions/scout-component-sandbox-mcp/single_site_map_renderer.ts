@@ -1,4 +1,4 @@
-import maplibregl, { type Map as MapLibreMap, type StyleSpecification } from 'maplibre-gl'
+import { Map as MapLibreMap, type StyleSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { ScoutSandboxSingleSiteMap } from './contract.ts'
 import { buildScoutSingleSiteMapRenderModel } from './single_site_map_model.ts'
@@ -31,13 +31,13 @@ export function mountScoutSingleSiteMap(
   const model = buildScoutSingleSiteMapRenderModel(data)
   let destroyed = false
 
-  const map = new maplibregl.Map({
+  const map = new MapLibreMap({
     container,
     style: options.style,
     center: model.center,
     zoom: 17,
     interactive: false,
-    attributionControl: true,
+    attributionControl: {},
     maplibreLogo: false,
     renderWorldCopies: false,
     fadeDuration: 0,
