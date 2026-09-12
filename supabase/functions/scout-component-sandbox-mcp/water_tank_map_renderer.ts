@@ -1,8 +1,4 @@
 import type { ScoutSandboxWaterTankMap } from './contract.ts'
-import type {
-  ScoutRasterFrame,
-  ScoutSingleSiteMapRendererOptions,
-} from './single_site_map_renderer.ts'
 import { buildScoutWaterTankPointMapModel } from './water_tank_map_model.ts'
 
 const TILE_SIZE = 256
@@ -10,10 +6,28 @@ const MAX_MERCATOR_LAT = 85.05112878
 const DEFAULT_MIN_ZOOM = 5
 const DEFAULT_MAX_ZOOM = 18
 
-export type ScoutWaterTankRasterFrameOptions = Pick<
-  ScoutSingleSiteMapRendererOptions,
-  'tileUrlTemplate' | 'minZoom' | 'maxZoom'
->
+export type ScoutWaterTankRasterTile = {
+  z: number
+  x: number
+  y: number
+  left: number
+  top: number
+  url: string
+}
+
+export type ScoutWaterTankRasterFrame = {
+  zoom: number
+  width: number
+  height: number
+  tiles: ScoutWaterTankRasterTile[]
+  marker: { left: number; top: number }
+}
+
+export type ScoutWaterTankRasterFrameOptions = {
+  tileUrlTemplate: string
+  minZoom?: number
+  maxZoom?: number
+}
 
 function clampLat(lat: number) {
   return Math.max(-MAX_MERCATOR_LAT, Math.min(MAX_MERCATOR_LAT, lat))
@@ -40,7 +54,7 @@ export function buildScoutWaterTankRasterFrame(
   width: number,
   height: number,
   options: ScoutWaterTankRasterFrameOptions,
-): ScoutRasterFrame {
+): ScoutWaterTankRasterFrame {
   const model = buildScoutWaterTankPointMapModel(data)
   const frameWidth = Math.max(280, Math.round(width || 0))
   const frameHeight = Math.max(180, Math.round(height || 0))
@@ -57,7 +71,7 @@ export function buildScoutWaterTankRasterFrame(
   const startY = Math.floor(top / TILE_SIZE)
   const endY = Math.floor((top + frameHeight - 1) / TILE_SIZE)
   const tileCount = Math.pow(2, zoom)
-  const tiles = []
+  const tiles: ScoutWaterTankRasterTile[] = []
 
   for (let tx = startX; tx <= endX; tx += 1) {
     for (let ty = startY; ty <= endY; ty += 1) {
