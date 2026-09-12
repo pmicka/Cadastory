@@ -3,11 +3,12 @@ import { build } from 'esbuild'
 import { readFile } from 'node:fs/promises'
 
 const directory = new URL('./', import.meta.url)
-const [contractSource, serverSource, viewSource, mapContract] = await Promise.all([
+const [contractSource, serverSource, viewSource, mapContract, optimizedRpcMigration] = await Promise.all([
   readFile(new URL('contract.ts', directory), 'utf8'),
   readFile(new URL('index.ts', directory), 'utf8'),
   readFile(new URL('view.ts', directory), 'utf8'),
   readFile(new URL('MAP_CONTRACT.md', directory), 'utf8'),
+  readFile(new URL('../../migrations/20260912140603_optimize_component_sandbox_water_tank_v1.sql', directory), 'utf8'),
 ])
 
 const bundled = await build({
@@ -138,6 +139,9 @@ for (const deprecated of [
 
 assert.ok(mapContract.includes('SOUTH PRESSURE ZONE TANK'))
 assert.ok(mapContract.includes('water_tank_single_site_map_v1'))
+assert.ok(optimizedRpcMigration.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
+assert.ok(optimizedRpcMigration.includes('where e.tank_id = t.id'))
+assert.equal(optimizedRpcMigration.includes('join water.v_tank_geometry_profile'), false)
 assert.ok(mapContract.includes('Water-tank Batch 3 integration scope'))
 assert.ok(mapContract.includes('ui://scout/component-sandbox/v16'))
 assert.ok(mapContract.includes('No third opportunity type'))
