@@ -25,6 +25,7 @@ const [
 ])
 
 for (const source of [server, connectGateway, contractGateway]) {
+  assert.ok(source.includes('ui://scout/component-sandbox/v21'))
   assert.ok(source.includes('ui://scout/component-sandbox/v20'))
   assert.ok(source.includes('ui://scout/component-sandbox/v19'))
   assert.ok(source.includes('ui://scout/component-sandbox/v18'))
@@ -52,7 +53,7 @@ assert.equal(contract.includes('SCOUT_SANDBOX_MAX_NAMES'), false)
 assert.ok(view.includes('mountScoutSingleSiteMap'))
 assert.ok(view.includes('mountScoutWaterTankMap'))
 assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))
-assert.ok(view.includes("version: '2.5.3'"))
+assert.ok(view.includes("version: '2.5.4'"))
 assert.ok(view.includes("opportunityType === 'water_tank'"))
 assert.ok(view.includes('Rehab signal'))
 assert.ok(view.includes('morphology confidence'))
