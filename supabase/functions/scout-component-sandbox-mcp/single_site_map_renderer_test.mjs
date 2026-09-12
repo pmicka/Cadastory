@@ -26,7 +26,7 @@ const [
 ])
 
 const packageJson = JSON.parse(packageJsonText)
-assert.equal(packageJson.dependencies['maplibre-gl'], '5.19.0')
+assert.equal(packageJson.dependencies['maplibre-gl'], '6.9.0')
 
 const deprecatedPatterns = [
   'window.openai',
@@ -161,7 +161,9 @@ assert.equal(generated.includes('maplibre'), false)
 assert.equal(generated.includes('scout-single-site-footprint'), false)
 
 assert.ok(mapContract.includes('Batch 2 adds the isolated renderer implementation only'))
-assert.ok(mapContract.includes('maplibre-gl` pinned to `5.19.0'))
+assert.ok(mapContract.includes('maplibre-gl` pinned to `6.9.0'))
+assert.ok(mapContract.includes('never use `maplibre-gl <= 6.4.0`'))
+assert.ok(mapContract.includes('GHSA-jrc7-96c5-q579'))
 assert.ok(mapContract.includes('interactive: false'))
 assert.ok(mapContract.includes('map.remove()'))
 assert.ok(mapContract.includes('does **not**'))
