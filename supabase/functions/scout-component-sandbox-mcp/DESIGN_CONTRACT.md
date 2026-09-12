@@ -45,11 +45,13 @@ Approved 2026-09-12:
 - Scout may resume map work incrementally, one opportunity type at a time.
 - The first map experience is the bounded PNC Tower `premium_exterior` single-site map defined in `MAP_CONTRACT.md`.
 - Map implementation must build on the existing media carousel rather than redesigning the card.
-- After the isolated renderer is verified, a later approved integration batch may replace exactly one existing media placeholder tile with the PNC map while preserving the full-width carousel geometry, count, dots, and swipe behavior.
+- Batch 3 replaces exactly one existing media placeholder tile with the PNC map while preserving the full-width carousel geometry, count, dots, and swipe behavior.
 - The initial map tile is non-interactive so map gestures do not compete with carousel swipe.
 - No portfolio/clustering/territory map semantics are approved by this design decision.
 
 Batch 2 implements the renderer only and intentionally makes no visible View change.
+
+Batch 3 integrates exactly one map tile. It uses OpenFreeMap Positron as a restrained basemap, keeps MapLibre non-interactive, keeps the two remaining placeholders unchanged, and does not add any new map controls or card chrome.
 
 ## Approved real-data substitutions
 
@@ -69,7 +71,7 @@ The existing placeholder copy may be replaced only by fields already present in 
 - buyer/site-route classification
 - Scout guardrail
 
-The approved PNC map may later consume only the bounded `single_site_map_v1` payload defined in `MAP_CONTRACT.md`. Do not fabricate freshness, evidence counts, images, contacts, active procurement status, current need, or action state.
+The approved PNC map consumes only the bounded `single_site_map_v1` payload defined in `MAP_CONTRACT.md`. Do not fabricate freshness, evidence counts, images, contacts, active procurement status, current need, or action state.
 
 ## Forbidden divergence
 
@@ -98,6 +100,8 @@ Keep the current standards-based MCP Apps lifecycle:
 - `_meta.ui.resourceUri`
 - current MCP Apps MIME
 
-The generated View must continue to have exactly one `<!doctype html>`, contain no `window.openai`, and preserve the callback replacement in `build-view.mjs`:
+The generated View must continue to have exactly one `<!doctype html>`, contain no `window.openai`, and preserve callback replacements in `build-view.mjs` for both locally bundled MapLibre CSS and the JavaScript bundle:
+
+`template.replace("/*__SCOUT_VIEW_STYLE__*/", () => css)`
 
 `template.replace("/*__SCOUT_VIEW_BUNDLE__*/", () => bundle)`

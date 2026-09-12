@@ -12,6 +12,7 @@ export type ScoutSingleSiteMapRendererOptions = {
   padding?: number
   maxZoom?: number
   onError?: (error: Error) => void
+  onReady?: () => void
 }
 
 export type ScoutSingleSiteMapRendererHandle = {
@@ -85,6 +86,7 @@ export function mountScoutSingleSiteMap(
       maxZoom: options.maxZoom ?? 19,
       duration: 0,
     })
+    options.onReady?.()
   })
 
   return {

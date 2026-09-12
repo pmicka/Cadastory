@@ -35,7 +35,7 @@ The renderer implementation is `single_site_map_renderer.ts` with pure render-mo
 - Map engine: `maplibre-gl` pinned to `6.9.0` from npm.
 - Security floor: never use `maplibre-gl <= 6.4.0`; those versions are affected by critical attribution-sanitizer XSS advisory `GHSA-jrc7-96c5-q579` / `CVE-2026-85061`. The upstream fix begins at `6.4.1`; Scout currently pins the newer `6.9.0` release.
 - MapLibre JavaScript and `maplibre-gl/dist/maplibre-gl.css` are bundled locally by the application build; no CDN runtime script or stylesheet is allowed.
-- A future integration must pass an approved `style` into the renderer. Provider selection and the corresponding `_meta.ui.csp` origins are an integration concern, not a renderer default.
+- Batch 3 passes the approved OpenFreeMap Positron style (`https://tiles.openfreemap.org/styles/positron`) into the renderer. The renderer itself remains provider-agnostic.
 - The map is created with `interactive: false` so carousel gestures cannot be captured by map pan/zoom in the initial single-site experience.
 - The renderer visualizes the reconciled building footprint only. The Census address geocode remains provenance/context and is deliberately **not** rendered as a competing point marker because Scout records that the geocode is not itself building identity.
 - Framing uses the contract's exact footprint bounds via `fitBounds`, default padding `24`, default `maxZoom` `19`, and animation duration `0` for deterministic embedded rendering.
@@ -116,6 +116,22 @@ The following deprecated/host-specific patterns must not re-enter the current sa
 - `openai/widgetCSP`
 - other OpenAI-specific resource/tool metadata used by the prior map iteration
 
+## Batch 3 integration scope
+
+Batch 3 is the deliberately bounded first live integration of the PNC single-site renderer:
+
+- `single_site_map_v1` is added to the sandbox tool's `structuredContent.map`.
+- The server calls only `public.scout_get_component_sandbox_premium_exterior_map_v1_internal()`; generalized legacy map RPCs remain quarantined.
+- The first of the existing three carousel placeholders becomes the PNC map. The other two placeholders, 100%-width swipe geometry, count, and dots remain unchanged.
+- Basemap provider: OpenFreeMap public instance using the minimal Positron style at `https://tiles.openfreemap.org/styles/positron`.
+- MCP Apps resource CSP declares only `https://tiles.openfreemap.org` in both `connectDomains` and `resourceDomains`. No wildcard domains, CDN runtime library, geolocation permission, or nested frame is introduced.
+- MapLibre JS/CSS remain locally bundled. Provider attribution remains enabled.
+- The View URI advances to `ui://scout/component-sandbox/v13`; `v12` remains a compatibility resource URI.
+- The map remains non-interactive and renders only Scout's reconciled footprint, never the Census geocode as a competing marker.
+- View teardown and rerender paths destroy the MapLibre instance with `map.remove()`.
+
+No second opportunity type, portfolio semantics, clustering, territory layer, contacts, competitors, routing, user-location access, or map-driven discovery is introduced by Batch 3.
+
 ## Next integration boundary
 
-A later batch may expose `single_site_map_v1` through the sandbox result and replace exactly one approved media placeholder with the PNC map. That integration must preserve the full-width carousel contract and must define an approved basemap provider plus modern `_meta.ui.csp` origins before deployment.
+The next boundary is lifecycle verification of this exact PNC map inside ChatGPT on desktop and mobile. Do not broaden map scope until that rendering, carousel gesture behavior, CSP/network behavior, and teardown path are verified in the host.
