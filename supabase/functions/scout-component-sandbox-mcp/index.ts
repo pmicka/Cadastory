@@ -25,8 +25,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v18'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v19'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v18',
   'ui://scout/component-sandbox/v17',
   'ui://scout/component-sandbox/v16',
   'ui://scout/component-sandbox/v15',
@@ -49,7 +50,13 @@ const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
-const MAP_TILE_ORIGIN = 'https://a.tile.openstreetmap.fr'
+const MAP_TILE_ORIGIN = SUPABASE_URL
+const MAP_TILE_UPSTREAM = 'https://a.tile.openstreetmap.fr/hot'
+const SANDBOX_MAP_CENTERS = [
+  { lon: -85.758115986691, lat: 38.256732011411 },
+  { lon: -86.4781456168917, lat: 36.9655317362621 },
+  { lon: -84.521, lat: 39.097 },
+] as const
 
 async function loadScoutSandboxOpportunity() {
   const { data, error } = await admin.rpc('scout_get_component_sandbox_opportunity_v1_internal')
@@ -303,7 +310,7 @@ const swpppSiteResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.1' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.2' })
 
   registerAppResource(
     server,
@@ -426,6 +433,45 @@ function makeServer() {
 
 const mcpHandler = createMcpHandler(() => makeServer())
 
+function tileCenter(z: number, x: number, y: number) {
+  const count = Math.pow(2, z)
+  const lon = (x + 0.5) / count * 360 - 180
+  const mercator = Math.PI * (1 - 2 * (y + 0.5) / count)
+  const lat = Math.atan(Math.sinh(mercator)) * 180 / Math.PI
+  return { lon, lat }
+}
+
+function parseSandboxTile(url: URL) {
+  const match = url.pathname.match(/\/map-tile\/(\d{1,2})\/(\d{1,8})\/(\d{1,8})\.png$/)
+  if (!match) return null
+  const z = Number(match[1]), x = Number(match[2]), y = Number(match[3])
+  const count = Math.pow(2, z)
+  if (!Number.isInteger(z) || z < 12 || z > 18 || x < 0 || y < 0 || x >= count || y >= count) return null
+  const center = tileCenter(z, x, y)
+  if (!SANDBOX_MAP_CENTERS.some((site) => Math.abs(center.lon - site.lon) <= 0.12 && Math.abs(center.lat - site.lat) <= 0.12)) return null
+  return { z, x, y }
+}
+
+async function serveSandboxTile(req: Request, tile: { z: number; x: number; y: number }) {
+  try {
+    const upstream = await fetch(`${MAP_TILE_UPSTREAM}/${tile.z}/${tile.x}/${tile.y}.png`, {
+      headers: { 'user-agent': 'Scout-by-Cadastory-Sandbox/1.0 (+https://github.com/pmicka/Cadastory)' },
+    })
+    if (!upstream.ok || !String(upstream.headers.get('content-type')).startsWith('image/')) {
+      return new Response(null, { status: 502, headers: { 'access-control-allow-origin': '*' } })
+    }
+    const headers = new Headers({
+      'access-control-allow-origin': '*',
+      'cache-control': 'public, max-age=86400, stale-while-revalidate=604800, stale-if-error=604800',
+      'content-type': upstream.headers.get('content-type') || 'image/png',
+      'x-content-type-options': 'nosniff',
+    })
+    return new Response(req.method === 'HEAD' ? null : upstream.body, { status: 200, headers })
+  } catch {
+    return new Response(null, { status: 502, headers: { 'access-control-allow-origin': '*' } })
+  }
+}
+
 function responseHeaders(base?: HeadersInit) {
   const headers = new Headers(base)
   headers.set('access-control-allow-origin', '*')
@@ -440,6 +486,10 @@ function responseHeaders(base?: HeadersInit) {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: responseHeaders() })
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    const tile = parseSandboxTile(new URL(req.url))
+    if (tile) return await serveSandboxTile(req, tile)
+  }
   if (!(await authenticateOwner(req))) {
     return Response.json({ error: 'not found' }, { status: 404, headers: responseHeaders() })
   }
