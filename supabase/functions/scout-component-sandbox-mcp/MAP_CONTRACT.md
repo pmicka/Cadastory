@@ -14,7 +14,7 @@ The first active and host-verified map contract is the bounded **premium exterio
 - exemplar: `PNC Tower`
 - opportunity id: `0edb82cd-7487-4f72-a036-8faa8a40bd54`
 
-The second opportunity type is the bounded **water tank / SOUTH PRESSURE ZONE TANK single-site** contract:
+The second active and host-verified opportunity type is the bounded **water tank / SOUTH PRESSURE ZONE TANK single-site** contract:
 
 - RPC: `public.scout_get_component_sandbox_water_tank_map_v1_internal()`
 - contract version: `water_tank_single_site_map_v1`
@@ -24,7 +24,7 @@ The second opportunity type is the bounded **water tank / SOUTH PRESSURE ZONE TA
 - stable WRIS FID: `00AB7B0C8D56F05717FDFCF0B4000001`
 - PWSID: `KY1140038`
 
-No third opportunity type may be introduced until the water-tank single-site path has been host-verified.
+Both current opportunity paths have been host-verified. A third opportunity type may proceed only as an isolated, bounded contract that preserves the existing verified paths.
 
 ## Premium-exterior allowed payload
 
@@ -119,7 +119,7 @@ For the water-tank path:
 
 The host-visible View resource advances to `ui://scout/component-sandbox/v16`; v15 and earlier remain compatibility resource aliases. This bump is required because the bundled View and tool contract change materially.
 
-The obsolete `names` field is removed from the v16 result. The corresponding `public.scout_get_component_sandbox_names_v1_internal()` RPC is retired once the v16 Edge Functions are live so production never enters a state where the currently deployed View depends on a dropped RPC.
+The obsolete `names` field is removed from the v16 result. After the aligned v16 Edge Functions were deployed from merge commit `5eb15c6d97371a43ae18855c383472e525624454`, migration `20260912113647_retire_component_sandbox_names_v1` retired `public.scout_get_component_sandbox_names_v1_internal()`.
 
 ## Proven raster-tile renderer
 
@@ -161,9 +161,9 @@ The OSM standard tile service is best-effort and not an SLA-backed production de
 
 ## Host verification state
 
-- mobile ChatGPT host / PNC premium exterior: **verified working** — Android rendered the hardened v15 PNC raster map successfully in the existing carousel on 2026-09-12.
-- desktop ChatGPT host / PNC premium exterior: still requires explicit visual verification.
-- water-tank v16 integration: **pending host verification** after deployment. No third opportunity type proceeds until SOUTH PRESSURE ZONE TANK renders correctly in the real ChatGPT host.
+- ChatGPT host / PNC premium exterior: **verified working** — the PNC raster map rendered successfully on Android in the existing carousel on 2026-09-12.
+- ChatGPT host / SOUTH PRESSURE ZONE TANK water tank: **verified working** — the v16 point map rendered successfully in the real ChatGPT host on 2026-09-12.
+- ChatGPT host / PNC v16 regression: **verified working** — PNC was re-tested after the water-tank deployment through the refreshed v16 schema and still rendered correctly on 2026-09-12.
 
 The earlier transient v14 `Site map unavailable` state resolved after an app refresh and is not treated as a renderer-architecture failure.
 
@@ -179,7 +179,7 @@ The following generalized sandbox map RPCs were removed from the database and mu
 
 The temporary local-scene/context RPC created during the workerless-SVG investigation was also removed and is not part of Scout architecture.
 
-The v16 result no longer carries the old names-only handshake. `public.scout_get_component_sandbox_names_v1_internal()` must be dropped after the v16 runtime is deployed and verified to no longer call it.
+The v16 result no longer carries the old names-only handshake. `public.scout_get_component_sandbox_names_v1_internal()` was dropped by deployed migration `20260912113647_retire_component_sandbox_names_v1` after the aligned v16 runtime was live.
 
 Old `component_v*` renderers are Git-history archaeology only. Do not restore those files to the current source tree for reference.
 
