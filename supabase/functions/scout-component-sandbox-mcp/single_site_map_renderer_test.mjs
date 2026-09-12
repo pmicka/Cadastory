@@ -46,6 +46,10 @@ assert.ok(rendererSource.includes("document.createElement('img')"))
 assert.ok(rendererSource.includes("image.referrerPolicy = 'origin'"))
 assert.ok(rendererSource.includes('buildScoutSingleSiteRasterFrame'))
 assert.ok(rendererSource.includes('replaceChildren()'))
+assert.ok(rendererSource.includes('lastFrameWidth'))
+assert.ok(rendererSource.includes('lastFrameHeight'))
+assert.ok(rendererSource.includes('render(true)'))
+assert.ok(rendererSource.includes('render(false)'))
 assert.ok(view.includes("https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
 assert.ok(view.includes('mountScoutSingleSiteMap'))
 assert.equal(view.includes('tiles.openfreemap.org'), false)
@@ -54,13 +58,26 @@ assert.equal(server.includes('tiles.openfreemap.org'), false)
 assert.ok(server.includes("const MAP_TILE_ORIGIN = 'https://tile.openstreetmap.org'"))
 assert.ok(server.includes('csp: { resourceDomains: [MAP_TILE_ORIGIN] }'))
 assert.equal(server.includes('connectDomains: [MAP_TILE_ORIGIN]'), false)
-assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v14'"))
+assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v15'"))
 assert.ok(template.includes('<meta name="referrer" content="origin" />'))
 assert.ok(template.includes('.scout-map img'))
 assert.ok(template.includes('.scout-site-marker'))
 assert.ok(template.includes('.scout-map-attribution'))
+assert.ok(template.includes('pointer-events: none;'))
 assert.equal(template.includes('maplibregl'), false)
 assert.equal(template.includes('__SCOUT_VIEW_STYLE__'), false)
+
+// Current MCP Apps lifecycle hardening: host context and actual layout changes
+// both schedule the same bounded resize path, and teardown removes observers.
+assert.ok(view.includes('app.onhostcontextchanged'))
+assert.ok(view.indexOf('app.onhostcontextchanged') < view.indexOf('app.connect('))
+assert.ok(view.includes('new ResizeObserver'))
+assert.ok(view.includes('carouselResizeObserver.observe(carousel)'))
+assert.ok(view.includes('carouselResizeObserver?.disconnect()'))
+assert.ok(view.includes('requestAnimationFrame(flushLayoutRefresh)'))
+assert.ok(view.includes('cancelAnimationFrame(layoutFrame)'))
+assert.ok(view.includes('activeCarouselIndex'))
+assert.ok(view.includes('carousel.scrollLeft = targetScrollLeft'))
 
 const exemplar = {
   contract_version: 'single_site_map_v1',
@@ -119,16 +136,27 @@ const nodeBuild = await build({
 })
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(nodeBuild.outputFiles[0].text).toString('base64')}`
 const { buildScoutSingleSiteRasterFrame } = await import(moduleUrl)
-const frame = buildScoutSingleSiteRasterFrame(exemplar, 366, 210, {
-  tileUrlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-})
-assert.equal(frame.zoom, 17)
-assert.equal(frame.width, 366)
-assert.equal(frame.height, 210)
-assert.equal(frame.tiles.length, 6)
-assert.ok(frame.tiles.every((tile) => /^https:\/\/tile\.openstreetmap\.org\/17\/\d+\/\d+\.png$/.test(tile.url)))
-assert.ok(frame.marker.left > 0 && frame.marker.left < frame.width)
-assert.ok(frame.marker.top > 0 && frame.marker.top < frame.height)
+
+const viewportCases = [
+  { width: 280, height: 210, zoom: 17, tiles: 4 },
+  { width: 320, height: 210, zoom: 17, tiles: 4 },
+  { width: 366, height: 210, zoom: 17, tiles: 6 },
+  { width: 406, height: 210, zoom: 17, tiles: 6 },
+]
+for (const expected of viewportCases) {
+  const frame = buildScoutSingleSiteRasterFrame(exemplar, expected.width, expected.height, {
+    tileUrlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  })
+  assert.equal(frame.zoom, expected.zoom)
+  assert.equal(frame.width, expected.width)
+  assert.equal(frame.height, expected.height)
+  assert.equal(frame.tiles.length, expected.tiles)
+  assert.ok(frame.tiles.every((tile) => /^https:\/\/tile\.openstreetmap\.org\/17\/\d+\/\d+\.png$/.test(tile.url)))
+  assert.ok(frame.marker.left > 0 && frame.marker.left < frame.width)
+  assert.ok(frame.marker.top > 0 && frame.marker.top < frame.height)
+  assert.ok(Math.abs(frame.marker.left - frame.width / 2) < 0.01)
+  assert.ok(Math.abs(frame.marker.top - frame.height / 2) < 0.01)
+}
 
 const rendererBuild = await build({
   entryPoints: [new URL('single_site_map_renderer.ts', directory).pathname],
@@ -148,11 +176,15 @@ assert.equal(rendererJs.includes('Worker'), false)
 
 assert.ok(generated.includes('tile.openstreetmap.org'))
 assert.ok(generated.includes('scout-site-marker'))
+assert.ok(generated.includes('onhostcontextchanged'))
+assert.ok(generated.includes('ResizeObserver'))
 assert.equal(generated.includes('maplibre'), false)
 assert.ok(mapContract.includes('proven raster-tile renderer'))
 assert.ok(mapContract.includes('tile.openstreetmap.org'))
 assert.ok(mapContract.includes('no Web Worker'))
+assert.ok(mapContract.includes('mobile ChatGPT host: **verified working**'))
+assert.ok(mapContract.includes('desktop ChatGPT host: still requires explicit visual verification'))
 assert.ok(designContract.includes('proven raster-tile technique'))
 assert.equal(designContract.includes('MapLibre non-interactive'), false)
 
-console.log(`Scout single-site raster renderer checks passed. JS ${rendererJs.length} bytes; ${frame.tiles.length} visible tiles at z${frame.zoom}.`)
+console.log(`Scout single-site raster hardening checks passed across ${viewportCases.length} viewport widths. JS ${rendererJs.length} bytes.`)
