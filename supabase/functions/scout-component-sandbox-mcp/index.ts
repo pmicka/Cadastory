@@ -10,6 +10,7 @@ import {
   normalizeScoutSandboxWaterTankMap,
   type ScoutSandboxResult,
 } from './contract.ts'
+import { buildScoutSandboxSwpppSiteOpportunity, normalizeScoutSandboxSwpppSiteMap } from './swppp_site_map_model.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -24,8 +25,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v16'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v17'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v16',
   'ui://scout/component-sandbox/v15',
   'ui://scout/component-sandbox/v14',
   'ui://scout/component-sandbox/v13',
@@ -69,6 +71,14 @@ async function loadScoutSandboxWaterTankMap() {
   if (error) throw new Error('Scout sandbox water-tank map is unavailable')
   const map = normalizeScoutSandboxWaterTankMap(data)
   if (!map) throw new Error('Scout sandbox water-tank map did not satisfy the bounded contract')
+  return map
+}
+
+async function loadScoutSandboxSwpppSiteMap() {
+  const { data, error } = await admin.rpc('scout_get_component_sandbox_swppp_site_map_v1_internal')
+  if (error) throw new Error('Scout sandbox SWPPP-site map is unavailable')
+  const map = normalizeScoutSandboxSwpppSiteMap(data)
+  if (!map) throw new Error('Scout sandbox SWPPP-site map did not satisfy the bounded contract')
   return map
 }
 
@@ -244,8 +254,55 @@ const waterTankResultSchema = z.object({
   map: waterTankMapSchema,
 })
 
+const swpppSiteMapSchema = z.object({
+  contract_version: z.literal('swppp_site_map_v1'),
+  opportunity_type: z.literal('swppp_site'),
+  candidate_key: z.string().min(1).max(160),
+  site_name: z.string().min(1).max(200),
+  location_label: z.string().min(1).max(160),
+  project_reference: z.string().min(1).max(80),
+  site_point: z.object({
+    lon: z.number().min(-180).max(180), lat: z.number().min(-90).max(90),
+    geometry_type: z.literal('Point'), semantics: z.literal('authoritative_permit_location_point'),
+    guardrail: z.string().min(1).max(1000),
+  }),
+  permit: z.object({
+    evidence_status: z.literal('active_documented_state_construction_permit'), status: z.literal('ACTIVE'),
+    type: z.literal('CONSTRUCTION_STORMWATER'), category: z.literal('GENERAL_CONSTRUCTION'),
+    permit_number: z.string().min(1).max(80), registry_id: z.string().min(1).max(80),
+    master_permit_number: z.string().min(1).max(80), issue_date: z.string().min(1).max(40),
+    effective_date: z.string().min(1).max(40), expiration_date: z.string().min(1).max(40),
+    termination_date: z.null(), documented_total_acres: z.number().min(1).max(10_000_000),
+    acreage_semantics: z.string().min(1).max(1000),
+  }),
+  source: z.object({
+    slug: z.literal('ohio-epa-npdes-construction'), name: z.string().min(1).max(240),
+    authority: z.string().min(1).max(240), authority_level: z.literal('state'),
+    source_native_id: z.string().min(1).max(240), source_url: z.string().min(1).max(1000),
+    last_seen_at: z.string().min(1).max(80),
+  }),
+  buyer: z.object({ classification: z.literal('unresolved'), organization_id: z.null(), guardrail: z.string().min(1).max(1000) }),
+  why_investigate: z.string().min(1).max(1000), guardrail: z.string().min(1).max(1000),
+})
+
+const swpppSiteOpportunitySchema = z.object({
+  opportunity_type: z.literal('swppp_site'), name: z.string().min(1).max(200),
+  location_label: z.string().min(1).max(160), evidence_status: z.literal('active_documented_state_construction_permit'),
+  observed_at: z.string().min(1).max(80), permit_number: z.string().min(1).max(80),
+  permit_status: z.literal('ACTIVE'), permit_type: z.literal('CONSTRUCTION_STORMWATER'),
+  permit_effective_date: z.string().min(1).max(40), permit_expiration_date: z.string().min(1).max(40),
+  documented_total_acres: z.number().min(1).max(10_000_000), project_reference: z.string().min(1).max(80),
+  buyer_resolvability: z.literal('unresolved'), why_investigate: z.string().min(1).max(1000),
+  guardrail: z.string().min(1).max(1000),
+})
+
+const swpppSiteResultSchema = z.object({
+  surface: z.literal('scout_component_sandbox'), opportunity_type: z.literal('swppp_site'),
+  opportunity: swpppSiteOpportunitySchema, map: swpppSiteMapSchema,
+})
+
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.1.0' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.0' })
 
   registerAppResource(
     server,
@@ -294,11 +351,11 @@ function makeServer() {
     TOOL_NAME,
     {
       title: 'Preview Scout opportunity card',
-      description: 'Owner-only read-only developer tool that renders one bounded Scout MCP Apps opportunity card and matching single-site map. Use opportunity_type=water_tank for the SOUTH PRESSURE ZONE TANK preview; omit it or use premium_exterior for PNC Tower.',
+      description: 'Owner-only read-only developer tool that renders one bounded Scout MCP Apps opportunity card and matching single-site map. Select premium_exterior, water_tank, or swppp_site; omission preserves the PNC Tower compatibility default.',
       inputSchema: z.object({
-        opportunity_type: z.enum(['premium_exterior', 'water_tank']).optional(),
+        opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site']).optional(),
       }),
-      outputSchema: z.discriminatedUnion('opportunity_type', [premiumResultSchema, waterTankResultSchema]),
+      outputSchema: z.discriminatedUnion('opportunity_type', [premiumResultSchema, waterTankResultSchema, swpppSiteResultSchema]),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -309,6 +366,21 @@ function makeServer() {
     },
     async ({ opportunity_type }) => {
       const selectedType = opportunity_type ?? 'premium_exterior'
+
+      if (selectedType === 'swppp_site') {
+        const map = await loadScoutSandboxSwpppSiteMap()
+        const opportunity = buildScoutSandboxSwpppSiteOpportunity(map)
+        if (map.site_name !== opportunity.name || map.location_label !== opportunity.location_label) {
+          throw new Error('Scout sandbox SWPPP-site opportunity and map identity do not match')
+        }
+        const structuredContent: ScoutSandboxResult = {
+          surface: 'scout_component_sandbox', opportunity_type: 'swppp_site', opportunity, map,
+        }
+        return {
+          content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} SWPPP-site evidence card with its authoritative permit-location point map.` }],
+          structuredContent,
+        }
+      }
 
       if (selectedType === 'water_tank') {
         const map = await loadScoutSandboxWaterTankMap()
