@@ -14,7 +14,7 @@ The first and only active map data contract is the bounded **premium exterior / 
 - exemplar: `PNC Tower`
 - opportunity id: `0edb82cd-7487-4f72-a036-8faa8a40bd54`
 
-No second opportunity type may be introduced until the PNC single-site map is verified in ChatGPT.
+No second opportunity type may be introduced until the PNC single-site map is hardened and verified in ChatGPT.
 
 ## Allowed payload
 
@@ -60,9 +60,11 @@ It must:
 - position those tiles in the existing carousel viewport
 - place only the bounded PNC Scout marker required for this single-site phase
 - remain non-interactive so carousel swipe is not captured by map pan/zoom
-- recalculate framing on host/window resize through the renderer handle
+- recalculate framing on actual host/container size changes through the renderer handle
+- preserve the currently active carousel slide across host/container resize
+- avoid refetching/rebuilding the same raster frame when the rendered width and height have not changed
 - expose visible provider attribution
-- provide deterministic teardown by clearing the renderer DOM and timers
+- provide deterministic teardown by clearing renderer DOM/timers and disconnecting View-side resize observers/listeners
 - use no WebGL
 - use no Web Worker
 - use no custom SVG basemap
@@ -72,7 +74,7 @@ Only the rendering algorithm was recovered from Git history. Deprecated host-spe
 
 ## Raster provider and MCP CSP
 
-For the bounded owner-only v14 sandbox preview, the raster provider is the OpenStreetMap standard tile service:
+For the bounded owner-only sandbox preview, the raster provider is the OpenStreetMap standard tile service:
 
 - tile template: `https://tile.openstreetmap.org/{z}/{x}/{y}.png`
 - MCP Apps CSP: `resourceDomains: ["https://tile.openstreetmap.org"]`
@@ -84,6 +86,28 @@ For the bounded owner-only v14 sandbox preview, the raster provider is the OpenS
 - visible attribution is `© OpenStreetMap contributors`
 
 The OSM standard tile service is best-effort and not an SLA-backed production dependency. If Scout later needs sustained commercial map traffic, provider selection must be revisited without changing the renderer contract unnecessarily.
+
+## Host verification state
+
+- 2026-09-12 mobile ChatGPT host: **verified working** after refreshing the app with v14. The PNC raster map rendered inside the existing carousel.
+- desktop ChatGPT host: still requires explicit visual verification before the PNC pattern is considered fully hardened.
+
+The first failed v14 attempt that displayed `Site map unavailable` resolved after the app refresh and is treated as a transient/stale host-resource state rather than evidence that the raster renderer architecture failed.
+
+## Hardening boundary after mobile verification
+
+The next resource revision is lifecycle hardening only. It may:
+
+- register `app.onhostcontextchanged` before `connect()` so current MCP Apps container-dimension changes are handled
+- use a local `ResizeObserver` as a layout fallback for actual carousel-width changes
+- preserve the active carousel index across width changes
+- deduplicate same-size renderer refreshes
+- add regression coverage for narrow/mobile and max-card/desktop map widths
+- strengthen teardown assertions
+
+It must not change the PNC data contract, add another opportunity type, add map interaction, alter the Figma-derived card hierarchy, add map controls/layers, or reintroduce deprecated host-specific APIs.
+
+Because this hardening changes the generated View JavaScript, the canonical resource URI must advance rather than silently mutating the already-cached v14 resource.
 
 ## Dead-code policy
 
@@ -128,14 +152,3 @@ The following deprecated/host-specific patterns must not re-enter the current sa
 - `openai/widgetDescription`
 - `openai/widgetCSP`
 - other OpenAI-specific resource/tool metadata used by prior map iterations
-
-## Current integration boundary
-
-v14 is a host-fix only:
-
-1. preserve the existing `single_site_map_v1` PNC payload and Figma-derived card;
-2. replace the host-incompatible MapLibre experiment with the proven raster-tile renderer;
-3. remove all MapLibre/OpenFreeMap artifacts made unused by that replacement;
-4. keep the other two carousel tiles as placeholders;
-5. verify the resulting PNC map on mobile and desktop inside ChatGPT;
-6. do not add a second opportunity type until that verification passes.

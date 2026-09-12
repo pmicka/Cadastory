@@ -19,6 +19,9 @@ assert.equal((view.match(/\.connect\(/g) || []).length, 1);
 assert.ok(view.indexOf("app.ontoolinput") < view.indexOf("app.connect("));
 assert.ok(view.indexOf("app.ontoolresult") < view.indexOf("app.connect("));
 assert.ok(view.indexOf("app.onerror") < view.indexOf("app.connect("));
+assert.ok(view.indexOf("app.onhostcontextchanged") < view.indexOf("app.connect("));
+assert.ok(view.includes("new ResizeObserver"));
+assert.ok(view.includes("carouselResizeObserver?.disconnect()"));
 assert.ok(view.indexOf("app.onteardown") < view.indexOf("app.connect("));
 assert.ok(view.includes("new PostMessageTransport()"));
 assert.ok(view.includes("structuredContent?.opportunity"));
@@ -154,7 +157,7 @@ assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { .
 assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { ...mapExemplar.footprint, bounds: { ...mapExemplar.footprint.bounds, east: -86 } } }), null);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
