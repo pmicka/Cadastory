@@ -60,6 +60,61 @@ export type ScoutSandboxSingleSiteMap = {
   }
 }
 
+export type ScoutSandboxWaterTankMap = {
+  contract_version: 'water_tank_single_site_map_v1'
+  opportunity_type: 'water_tank'
+  tank_id: string
+  candidate_key: string
+  name: string
+  system_name: string
+  site_point: {
+    lon: number
+    lat: number
+    source: 'kentucky_wris_water_tank'
+    source_slug: 'ky-kia-water-tanks'
+    source_name: string
+    source_authority: string
+    source_native_id: string
+    wris_fid: string
+    pwsid: string
+    retrieved_at: string
+  }
+  asset: {
+    tank_type: 'ELEVATED'
+    capacity_gallons: number
+    construction_date: string | null
+    last_cleaning_date: string | null
+    last_inspection_date: string | null
+    out_of_service: false
+  }
+  geometry: {
+    morphology_class: string
+    support_geometry: 'single_pedestal'
+    cross_bracing_status: 'none'
+    support_leg_count: number | null
+    operator_assessment: 'favorable'
+    operator_assessment_basis: string
+    evidence_kind: 'engineering_document'
+    confidence: number
+    source_authority: string
+    source_url: string
+    observed_on: string
+    media_retained: false
+    guardrail: string
+  }
+  project_linkage: {
+    project_id: string
+    pnum: string
+    status: 'REHAB'
+    purpose: string | null
+    other_purpose: string | null
+    match_method: string
+    match_distance_m: number
+    source_modified_at: string
+    guardrail: string
+  }
+}
+
 export type ScoutSandboxResult = {
   surface: 'scout_component_sandbox'
   names: string[]
@@ -73,6 +128,10 @@ function boundedString(value: unknown, maxLength: number) {
   return text.length > 0 && text.length <= maxLength ? text : null
 }
 
+function boundedNullableString(value: unknown, maxLength: number) {
+  return value === null ? null : boundedString(value, maxLength)
+}
+
 function boundedNumber(value: unknown, minimum: number, maximum: number) {
   return typeof value === 'number' && Number.isFinite(value) && value >= minimum && value <= maximum
     ? value
@@ -82,6 +141,10 @@ function boundedNumber(value: unknown, minimum: number, maximum: number) {
 function boundedInteger(value: unknown, minimum: number, maximum: number) {
   const number = boundedNumber(value, minimum, maximum)
   return number !== null && Number.isInteger(number) ? number : null
+}
+
+function boundedNullableInteger(value: unknown, minimum: number, maximum: number) {
+  return value === null ? null : boundedInteger(value, minimum, maximum)
 }
 
 function boundedName(value: unknown) {
@@ -250,6 +313,126 @@ export function normalizeScoutSandboxSingleSiteMap(value: unknown): ScoutSandbox
       guardrail,
       target_to_footprint_m: targetToFootprintM,
       stored_match_distance_m: storedMatchDistanceM,
+    },
+  }
+}
+
+export function normalizeScoutSandboxWaterTankMap(value: unknown): ScoutSandboxWaterTankMap | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null
+  const source = value as Record<string, unknown>
+  if (source.contract_version !== 'water_tank_single_site_map_v1' || source.opportunity_type !== 'water_tank') return null
+
+  const sitePointSource = source.site_point
+  const assetSource = source.asset
+  const geometrySource = source.geometry
+  const projectSource = source.project_linkage
+  if (!sitePointSource || typeof sitePointSource !== 'object' || Array.isArray(sitePointSource)) return null
+  if (!assetSource || typeof assetSource !== 'object' || Array.isArray(assetSource)) return null
+  if (!geometrySource || typeof geometrySource !== 'object' || Array.isArray(geometrySource)) return null
+  if (!projectSource || typeof projectSource !== 'object' || Array.isArray(projectSource)) return null
+
+  const sitePoint = sitePointSource as Record<string, unknown>
+  const asset = assetSource as Record<string, unknown>
+  const geometry = geometrySource as Record<string, unknown>
+  const project = projectSource as Record<string, unknown>
+
+  const tankId = boundedUuid(source.tank_id)
+  const candidateKey = boundedString(source.candidate_key, 100)
+  const name = boundedString(source.name, 160)
+  const systemName = boundedString(source.system_name, 200)
+  const lon = boundedLongitude(sitePoint.lon)
+  const lat = boundedLatitude(sitePoint.lat)
+  const sourceName = boundedString(sitePoint.source_name, 240)
+  const sourceAuthority = boundedString(sitePoint.source_authority, 240)
+  const sourceNativeId = boundedString(sitePoint.source_native_id, 240)
+  const wrisFid = boundedString(sitePoint.wris_fid, 80)
+  const pwsid = boundedString(sitePoint.pwsid, 80)
+  const retrievedAt = boundedString(sitePoint.retrieved_at, 80)
+
+  const capacityGallons = boundedNumber(asset.capacity_gallons, 1, 100_000_000)
+  const constructionDate = boundedNullableString(asset.construction_date, 40)
+  const lastCleaningDate = boundedNullableString(asset.last_cleaning_date, 40)
+  const lastInspectionDate = boundedNullableString(asset.last_inspection_date, 40)
+
+  const morphologyClass = boundedString(geometry.morphology_class, 120)
+  const supportLegCount = boundedNullableInteger(geometry.support_leg_count, 0, 64)
+  const operatorAssessmentBasis = boundedString(geometry.operator_assessment_basis, 1000)
+  const geometryConfidence = boundedNumber(geometry.confidence, 0, 1)
+  const geometrySourceAuthority = boundedString(geometry.source_authority, 300)
+  const geometrySourceUrl = boundedString(geometry.source_url, 1000)
+  const geometryObservedOn = boundedString(geometry.observed_on, 40)
+  const geometryGuardrail = boundedString(geometry.guardrail, 1000)
+
+  const projectId = boundedUuid(project.project_id)
+  const pnum = boundedString(project.pnum, 80)
+  const projectPurpose = boundedNullableString(project.purpose, 120)
+  const projectOtherPurpose = boundedNullableString(project.other_purpose, 300)
+  const projectMatchMethod = boundedString(project.match_method, 120)
+  const projectMatchDistanceM = boundedNumber(project.match_distance_m, 0, 10000)
+  const projectSourceModifiedAt = boundedString(project.source_modified_at, 80)
+  const projectGuardrail = boundedString(project.guardrail, 1000)
+
+  if (!tankId || !candidateKey || candidateKey !== `water_tank:${tankId}` || !name || !systemName) return null
+  if (lon === null || lat === null || sitePoint.source !== 'kentucky_wris_water_tank' || sitePoint.source_slug !== 'ky-kia-water-tanks') return null
+  if (!sourceName || !sourceAuthority || !sourceNativeId || !wrisFid || !pwsid || !retrievedAt) return null
+  if (asset.tank_type !== 'ELEVATED' || capacityGallons === null || asset.out_of_service !== false) return null
+  if (!morphologyClass || geometry.support_geometry !== 'single_pedestal' || geometry.cross_bracing_status !== 'none') return null
+  if (geometry.operator_assessment !== 'favorable' || !operatorAssessmentBasis || geometry.evidence_kind !== 'engineering_document') return null
+  if (geometryConfidence === null || !geometrySourceAuthority || !geometrySourceUrl || !geometryObservedOn || geometry.media_retained !== false || !geometryGuardrail) return null
+  if (!projectId || !pnum || project.status !== 'REHAB' || !projectMatchMethod || projectMatchDistanceM === null || !projectSourceModifiedAt || !projectGuardrail) return null
+
+  return {
+    contract_version: 'water_tank_single_site_map_v1',
+    opportunity_type: 'water_tank',
+    tank_id: tankId,
+    candidate_key: candidateKey,
+    name,
+    system_name: systemName,
+    site_point: {
+      lon,
+      lat,
+      source: 'kentucky_wris_water_tank',
+      source_slug: 'ky-kia-water-tanks',
+      source_name: sourceName,
+      source_authority: sourceAuthority,
+      source_native_id: sourceNativeId,
+      wris_fid: wrisFid,
+      pwsid,
+      retrieved_at: retrievedAt,
+    },
+    asset: {
+      tank_type: 'ELEVATED',
+      capacity_gallons: capacityGallons,
+      construction_date: constructionDate,
+      last_cleaning_date: lastCleaningDate,
+      last_inspection_date: lastInspectionDate,
+      out_of_service: false,
+    },
+    geometry: {
+      morphology_class: morphologyClass,
+      support_geometry: 'single_pedestal',
+      cross_bracing_status: 'none',
+      support_leg_count: supportLegCount,
+      operator_assessment: 'favorable',
+      operator_assessment_basis: operatorAssessmentBasis,
+      evidence_kind: 'engineering_document',
+      confidence: geometryConfidence,
+      source_authority: geometrySourceAuthority,
+      source_url: geometrySourceUrl,
+      observed_on: geometryObservedOn,
+      media_retained: false,
+      guardrail: geometryGuardrail,
+    },
+    project_linkage: {
+      project_id: projectId,
+      pnum,
+      status: 'REHAB',
+      purpose: projectPurpose,
+      other_purpose: projectOtherPurpose,
+      match_method: projectMatchMethod,
+      match_distance_m: projectMatchDistanceM,
+      source_modified_at: projectSourceModifiedAt,
+      guardrail: projectGuardrail,
     },
   }
 }
