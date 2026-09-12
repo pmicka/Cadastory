@@ -86,13 +86,13 @@ The water-tank renderer:
 - centers on the exact normalized WRIS asset point
 - places the Scout marker on that same exact WRIS point
 - uses render-only zoom `17` for the initial single-point framing
-- reuses the proven Web Mercator/tile calculation module rather than introducing a second map runtime
+- ports the same proven Web Mercator/tile calculation into an isolated pure point-renderer module rather than introducing a second map runtime
 - loads no tiles by itself during model/frame tests; it only calculates the bounded tile set required for a supplied viewport
 - keeps the model point-only and does not synthesize or persist any domain geometry
 
 The fixed zoom is a presentation choice only. It does not define a service radius, ownership boundary, parcel extent, access envelope, tank diameter, inspection perimeter, or any other real-world spatial claim.
 
-The generic centered-point raster primitive is exported beside the existing PNC implementation, but the existing PNC frame/mount path is not refactored to use it in this batch. The current View therefore continues to use exactly the proven PNC code path.
+The working PNC `single_site_map_renderer.ts` is deliberately restored to the exact `main` blob for Batch 2. A fresh View build must therefore leave `view.generated.ts` byte-for-byte unchanged. The small duplicated Web Mercator/tile framing kernel in the isolated water-tank module is intentional at this stage: sharing/refactoring the active PNC runtime is deferred until a later integration batch where a View revision is already intentional and can be host-regression-tested.
 
 Batch 2 must remain isolated:
 
