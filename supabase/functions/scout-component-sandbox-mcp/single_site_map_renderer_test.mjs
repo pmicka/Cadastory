@@ -152,7 +152,7 @@ assert.equal(generated.includes('maplibre'), false)
 assert.ok(mapContract.includes('proven raster-tile renderer'))
 assert.ok(mapContract.includes('tile.openstreetmap.org'))
 assert.ok(mapContract.includes('no Web Worker'))
-assert.ok(designContract.includes('raster-tile renderer'))
+assert.ok(designContract.includes('proven raster-tile technique'))
 assert.equal(designContract.includes('MapLibre non-interactive'), false)
 
 console.log(`Scout single-site raster renderer checks passed. JS ${rendererJs.length} bytes; ${frame.tiles.length} visible tiles at z${frame.zoom}.`)
