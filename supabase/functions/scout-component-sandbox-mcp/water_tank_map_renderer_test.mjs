@@ -50,7 +50,7 @@ for (const source of [modelSource, rendererSource]) {
 assert.ok(view.includes('mountScoutWaterTankMap'))
 assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))
 assert.ok(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
-assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank']).optional()"))
+assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site']).optional()"))
 assert.ok(generated.includes('water_tank_single_site_map_v1'))
 assert.ok(generated.includes('Rehab signal'))
 
