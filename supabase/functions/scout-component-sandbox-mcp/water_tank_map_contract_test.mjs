@@ -144,6 +144,6 @@ assert.ok(optimizedRpcMigration.includes('where e.tank_id = t.id'))
 assert.equal(optimizedRpcMigration.includes('join water.v_tank_geometry_profile'), false)
 assert.ok(mapContract.includes('Water-tank Batch 3 integration scope'))
 assert.ok(mapContract.includes('ui://scout/component-sandbox/v16'))
-assert.ok(mapContract.includes('No third opportunity type'))
+assert.ok(mapContract.includes('SWPPP-site host-visible integration scope'))
 
 console.log('Scout water-tank single-site map contract checks passed.')

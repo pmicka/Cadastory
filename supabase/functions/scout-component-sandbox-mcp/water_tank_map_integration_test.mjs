@@ -25,6 +25,7 @@ const [
 ])
 
 for (const source of [server, connectGateway, contractGateway]) {
+  assert.ok(source.includes('ui://scout/component-sandbox/v18'))
   assert.ok(source.includes('ui://scout/component-sandbox/v17'))
   assert.ok(source.includes('ui://scout/component-sandbox/v16'))
   assert.ok(source.includes('ui://scout/component-sandbox/v15'))
@@ -49,7 +50,7 @@ assert.equal(contract.includes('SCOUT_SANDBOX_MAX_NAMES'), false)
 assert.ok(view.includes('mountScoutSingleSiteMap'))
 assert.ok(view.includes('mountScoutWaterTankMap'))
 assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))
-assert.ok(view.includes("version: '2.5.0'"))
+assert.ok(view.includes("version: '2.5.1'"))
 assert.ok(view.includes("opportunityType === 'water_tank'"))
 assert.ok(view.includes('Rehab signal'))
 assert.ok(view.includes('morphology confidence'))
@@ -77,7 +78,7 @@ for (const source of [view, server, mount]) {
 
 assert.ok(generated.includes('water_tank_single_site_map_v1'))
 assert.ok(generated.includes('mountScoutWaterTankMap') || generated.includes('Rehab signal'))
-assert.ok(generated.includes('tile.openstreetmap.org'))
+assert.ok(generated.includes('a.tile.openstreetmap.fr/hot'))
 assert.equal(generated.includes('maplibre'), false)
 assert.equal(generated.includes('tiles.openfreemap.org'), false)
 

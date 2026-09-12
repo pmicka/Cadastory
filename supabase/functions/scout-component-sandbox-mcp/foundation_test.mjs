@@ -160,7 +160,7 @@ assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { .
 assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { ...mapExemplar.footprint, bounds: { ...mapExemplar.footprint.bounds, east: -86 } } }), null);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
@@ -190,7 +190,7 @@ assert.equal(template.includes('class="guardrail"'), false);
 assert.equal(template.includes('Scout by Cadastory'), false);
 assert.ok(template.includes('data-scout-map'));
 assert.ok(template.includes('data-scout-map-state'));
-assert.ok(generated.includes("tile.openstreetmap.org"));
+assert.ok(generated.includes("a.tile.openstreetmap.fr/hot"));
 assert.equal(generated.includes("maplibre"), false);
 assert.equal(generated.includes("tiles.openfreemap.org"), false);
 assert.equal(generated.includes("Placeholder image 1"), false);

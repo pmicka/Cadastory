@@ -16,8 +16,8 @@ type ScoutMapHandle = {
   resize: () => void
 }
 
-const SCOUT_RASTER_TILE_TEMPLATE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-const SCOUT_RASTER_ATTRIBUTION_LABEL = '© OpenStreetMap contributors'
+const SCOUT_RASTER_TILE_TEMPLATE = 'https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png'
+const SCOUT_RASTER_ATTRIBUTION_LABEL = '© OpenStreetMap contributors · HOT'
 const SCOUT_RASTER_ATTRIBUTION_URL = 'https://www.openstreetmap.org/copyright'
 
 const title = document.querySelector<HTMLElement>('[data-scout-title]')
@@ -111,6 +111,7 @@ function formatObserved(value: string) {
     year: 'numeric',
     month: 'short',
     day: 'numeric',
+    timeZone: 'UTC',
   }).format(date)
 }
 
@@ -315,7 +316,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.5.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.5.1' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
