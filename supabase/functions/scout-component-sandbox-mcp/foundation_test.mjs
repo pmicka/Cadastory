@@ -37,13 +37,13 @@ assert.ok(server.includes("scout_get_component_sandbox_premium_exterior_map_v1_i
 assert.ok(server.includes("names: z.array"));
 assert.ok(server.includes("opportunity: z.object"));
 assert.ok(server.includes("map: sandboxMapSchema"));
-assert.ok(server.includes("connectDomains: [MAP_RESOURCE_ORIGIN]"));
+assert.ok(server.includes("csp: { resourceDomains: [MAP_TILE_ORIGIN] }"));
 assert.ok(connectGateway.includes("opportunity:{type:'object'"));
 assert.ok(contractGateway.includes("opportunity:{type:'object'"));
 assert.ok(connectGateway.includes("map:sandboxMapSchema()"));
 assert.ok(contractGateway.includes("map:sandboxMapSchema()"));
 assert.equal(server.includes("exemplars:"), false);
-assert.ok(buildView.includes('.replace("/*__SCOUT_VIEW_STYLE__*/", () => css)'));
+assert.equal(buildView.includes("__SCOUT_VIEW_STYLE__"), false);
 assert.ok(buildView.includes('.replace("/*__SCOUT_VIEW_BUNDLE__*/", () => bundle)'));
 
 const deprecatedSandboxPatterns = [
@@ -154,7 +154,7 @@ assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { .
 assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { ...mapExemplar.footprint, bounds: { ...mapExemplar.footprint.bounds, east: -86 } } }), null);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
@@ -162,7 +162,7 @@ assert.ok(designContract.includes("12:7"));
 assert.ok(designContract.includes("visual source of truth"));
 assert.ok(mapContract.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"));
 assert.ok(mapContract.includes("one opportunity type at a time"));
-assert.ok(mapContract.includes("legacy reference only"));
+assert.ok(mapContract.includes("Git history is the reference archive"));
 assert.ok(mapContract.includes("openai/outputTemplate"));
 assert.ok(template.includes('class="scout-header"'));
 assert.ok(template.includes('class="carousel-viewport"'));
@@ -182,8 +182,9 @@ assert.equal(template.includes('class="guardrail"'), false);
 assert.equal(template.includes('Scout by Cadastory'), false);
 assert.ok(template.includes('data-scout-map'));
 assert.ok(template.includes('data-scout-map-state'));
-assert.ok(generated.includes("maplibre"));
-assert.ok(generated.includes("https://tiles.openfreemap.org/styles/positron"));
+assert.ok(generated.includes("tile.openstreetmap.org"));
+assert.equal(generated.includes("maplibre"), false);
+assert.equal(generated.includes("tiles.openfreemap.org"), false);
 assert.equal(generated.includes("Placeholder image 1"), false);
 assert.equal(generated.includes("Scout lifecycle"), false);
 assert.ok(generated.includes("Component preview"));
