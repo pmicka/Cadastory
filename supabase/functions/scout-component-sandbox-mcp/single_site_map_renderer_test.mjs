@@ -138,6 +138,8 @@ const rendererBuild = await build({
   target: 'es2022',
   outdir: 'out',
   write: false,
+  minify: true,
+  legalComments: 'none',
   loader: { '.css': 'css' },
 })
 const rendererJs = rendererBuild.outputFiles.find((file) => file.path.endsWith('.js'))
@@ -166,4 +168,4 @@ assert.ok(mapContract.includes('does **not**'))
 assert.ok(designContract.includes('Owner-approved map direction'))
 assert.ok(designContract.includes('Batch 2 implements the renderer only'))
 
-console.log('Scout Batch 2 single-site MapLibre renderer checks passed.')
+console.log(`Scout Batch 2 single-site MapLibre renderer checks passed. JS ${rendererJs.text.length} bytes; CSS ${rendererCss.text.length} bytes.`)
