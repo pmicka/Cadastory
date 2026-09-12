@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="color-scheme" content="light" />
+    <meta name="referrer" content="origin" />
     <title>Scout opportunity</title>
     <style>
       :root {
@@ -161,12 +162,56 @@
         inset: 0;
         width: 100%;
         height: 100%;
+        overflow: hidden;
+        background: #eef1eb;
+        pointer-events: none;
       }
-      .scout-map .maplibregl-canvas { pointer-events: none; }
+      .scout-map img {
+        position: absolute;
+        width: 256px;
+        height: 256px;
+        max-width: none;
+        user-select: none;
+        pointer-events: none;
+      }
+      .scout-site-marker {
+        position: absolute;
+        z-index: 3;
+        display: grid;
+        place-items: center;
+        width: 24px;
+        height: 24px;
+        transform: translate(-50%, -50%);
+        border: 3px solid #263128;
+        border-radius: 50%;
+        background: rgba(77,107,82,.28);
+        box-shadow: 0 1px 5px rgba(0,0,0,.22);
+        pointer-events: none;
+      }
+      .scout-site-marker-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #4d6b52;
+      }
+      .scout-map-attribution {
+        position: absolute;
+        left: 7px;
+        bottom: 7px;
+        z-index: 3;
+        padding: 2px 5px;
+        border-radius: 5px;
+        background: rgba(255,255,255,.88);
+        color: #394139;
+        font-size: 8px;
+        line-height: 1.25;
+        pointer-events: auto;
+      }
+      .scout-map-attribution a { color: inherit; }
       .scout-map-state {
         position: absolute;
         inset: 0;
-        z-index: 2;
+        z-index: 4;
         display: grid;
         place-items: center;
         padding: 16px;
@@ -319,7 +364,6 @@
         .action-secondary, .action-primary { width: auto; flex: 1 1 0; }
       }
     </style>
-    <style>/*__SCOUT_VIEW_STYLE__*/</style>
   </head>
   <body>
     <main class="scout-card" data-scout-card aria-labelledby="scout-title">
