@@ -8,6 +8,8 @@ import {
 } from './contract.ts'
 import { mountScoutSingleSiteMap } from './single_site_map_renderer.ts'
 import { mountScoutWaterTankMap } from './water_tank_map_mount.ts'
+import { normalizeScoutSandboxSwpppSiteMap, normalizeScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
+import { mountScoutSwpppSiteMap } from './swppp_site_map_mount.ts'
 
 type ScoutMapHandle = {
   destroy: () => void
@@ -127,6 +129,22 @@ function renderUnavailableOpportunity() {
 }
 
 function renderOpportunity(opportunityType: ScoutSandboxOpportunityType, value: unknown) {
+  if (opportunityType === 'swppp_site') {
+    const opportunity = normalizeScoutSandboxSwpppSiteOpportunity(value)
+    if (!opportunity) {
+      renderUnavailableOpportunity()
+      return
+    }
+    if (title) title.textContent = opportunity.name
+    if (tier) tier.textContent = 'Active permit evidence'
+    if (meta) meta.textContent = `Ohio EPA source updated ${formatObserved(opportunity.observed_at)}  •  Permit expires ${formatObserved(opportunity.permit_expiration_date)}`
+    if (address) address.textContent = opportunity.location_label
+    if (summary) summary.textContent = `Construction stormwater  •  ${formatNumber(opportunity.documented_total_acres)} documented permit acres  •  Permit ${opportunity.permit_number}  •  ${opportunity.project_reference}  •  Buyer unresolved  •  ${opportunity.why_investigate}`
+    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
+    setState(`Scout opportunity ready: ${opportunity.name}`)
+    return
+  }
+
   if (opportunityType === 'water_tank') {
     const opportunity = normalizeWaterTankOpportunity(value)
     if (!opportunity) {
@@ -203,7 +221,17 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown)
   }
 
   try {
-    if (opportunityType === 'water_tank') {
+    if (opportunityType === 'swppp_site') {
+      const mapData = normalizeScoutSandboxSwpppSiteMap(value)
+      if (!mapData) {
+        mapState.textContent = 'Site map unavailable'
+        setState('Scout SWPPP-site map result failed validation')
+        return
+      }
+      mapContainer.setAttribute('role', 'img')
+      mapContainer.setAttribute('aria-label', `Permit location map for ${mapData.site_name}`)
+      mapHandle = mountScoutSwpppSiteMap(mapContainer, mapData, mapOptions)
+    } else if (opportunityType === 'water_tank') {
       const mapData = normalizeScoutSandboxWaterTankMap(value)
       if (!mapData) {
         mapState.textContent = 'Site map unavailable'
@@ -287,12 +315,12 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.4.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.5.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
   const opportunityType = structured?.opportunity_type
-  if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank') {
+  if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site') {
     renderUnavailableOpportunity()
     renderMap('premium_exterior', null)
     return
