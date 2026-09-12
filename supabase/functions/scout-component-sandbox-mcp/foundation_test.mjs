@@ -24,27 +24,33 @@ assert.ok(view.includes("new ResizeObserver"));
 assert.ok(view.includes("carouselResizeObserver?.disconnect()"));
 assert.ok(view.indexOf("app.onteardown") < view.indexOf("app.connect("));
 assert.ok(view.includes("new PostMessageTransport()"));
-assert.ok(view.includes("structuredContent?.opportunity"));
-assert.ok(view.includes("structuredContent?.map"));
+assert.ok(view.includes("structured?.opportunity"));
+assert.ok(view.includes("structured?.map"));
 assert.ok(view.includes("mountScoutSingleSiteMap"));
+assert.ok(view.includes("mountScoutWaterTankMap"));
+assert.ok(view.includes("normalizeScoutSandboxWaterTankMap"));
 assert.equal(view.includes("innerHTML"), false);
 assert.equal(generated.includes("https://unpkg.com"), false);
 assert.equal(generated.includes("https://cdn."), false);
 assert.ok(server.includes("_meta: { ui: { resourceUri: RESOURCE_URI } }"));
-assert.ok(server.includes("scout_get_component_sandbox_names_v1_internal"));
+assert.equal(server.includes("scout_get_component_sandbox_names_v1_internal"), false);
 assert.ok(server.includes("scout_get_component_sandbox_opportunity_v1_internal"));
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_internal"), false);
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_v2_internal"), false);
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_v3_internal"), false);
 assert.ok(server.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"));
-assert.ok(server.includes("names: z.array"));
-assert.ok(server.includes("opportunity: z.object"));
-assert.ok(server.includes("map: sandboxMapSchema"));
+assert.ok(server.includes("scout_get_component_sandbox_water_tank_map_v1_internal"));
+assert.equal(server.includes("names: z.array"), false);
+assert.ok(server.includes("premiumOpportunitySchema"));
+assert.ok(server.includes("waterTankOpportunitySchema"));
+assert.ok(server.includes("z.discriminatedUnion(\'opportunity_type\'"));
 assert.ok(server.includes("csp: { resourceDomains: [MAP_TILE_ORIGIN] }"));
-assert.ok(connectGateway.includes("opportunity:{type:'object'"));
-assert.ok(contractGateway.includes("opportunity:{type:'object'"));
-assert.ok(connectGateway.includes("map:sandboxMapSchema()"));
-assert.ok(contractGateway.includes("map:sandboxMapSchema()"));
+assert.ok(connectGateway.includes("sandboxWaterTankOpportunitySchema"));
+assert.ok(contractGateway.includes("sandboxWaterTankOpportunitySchema"));
+assert.ok(connectGateway.includes("sandboxWaterTankMapSchema"));
+assert.ok(contractGateway.includes("sandboxWaterTankMapSchema"));
+assert.ok(connectGateway.includes("outputSchema:sandboxResultSchema()"));
+assert.ok(contractGateway.includes("outputSchema:sandboxResultSchema()"));
 assert.equal(server.includes("exemplars:"), false);
 assert.equal(buildView.includes("__SCOUT_VIEW_STYLE__"), false);
 assert.ok(buildView.includes('.replace("/*__SCOUT_VIEW_BUNDLE__*/", () => bundle)'));
@@ -75,14 +81,11 @@ const contractBuild = await build({
 });
 const contractUrl = `data:text/javascript;base64,${Buffer.from(contractBuild.outputFiles[0].text).toString("base64")}`;
 const {
-  SCOUT_SANDBOX_MAX_NAMES,
-  normalizeScoutSandboxNames,
   normalizeScoutSandboxOpportunity,
   normalizeScoutSandboxSingleSiteMap,
+  normalizeScoutSandboxWaterTankMap,
+  buildScoutSandboxWaterTankOpportunity,
 } = await import(contractUrl);
-assert.deepEqual(normalizeScoutSandboxNames(["  Denton Floyd  ", "PNC Tower"]), ["Denton Floyd", "PNC Tower"]);
-assert.deepEqual(normalizeScoutSandboxNames([null, "", "x".repeat(161), "Valid"]), ["Valid"]);
-assert.equal(normalizeScoutSandboxNames(Array.from({ length: 10 }, (_, i) => `Name ${i}`)).length, SCOUT_SANDBOX_MAX_NAMES);
 
 const exemplar = {
   name: "PNC Tower",
@@ -100,7 +103,7 @@ const exemplar = {
   opportunity_score: 91,
   buyer_resolvability: "public_operator_or_site_route",
 };
-assert.deepEqual(normalizeScoutSandboxOpportunity(exemplar), exemplar);
+assert.deepEqual(normalizeScoutSandboxOpportunity(exemplar), { opportunity_type: "premium_exterior", ...exemplar });
 assert.equal(normalizeScoutSandboxOpportunity({ ...exemplar, confidence: 2 }), null);
 assert.equal(normalizeScoutSandboxOpportunity({ ...exemplar, name: "" }), null);
 
@@ -157,7 +160,7 @@ assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { .
 assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { ...mapExemplar.footprint, bounds: { ...mapExemplar.footprint.bounds, east: -86 } } }), null);
 
 for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15"]) {
+  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16"]) {
     assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
   }
 }
@@ -165,6 +168,8 @@ assert.ok(designContract.includes("12:7"));
 assert.ok(designContract.includes("visual source of truth"));
 assert.ok(mapContract.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"));
 assert.ok(mapContract.includes("one opportunity type at a time"));
+assert.ok(mapContract.includes("Water-tank Batch 3 integration scope"));
+assert.ok(mapContract.includes("ui://scout/component-sandbox/v16"));
 assert.ok(mapContract.includes("Git history is the reference archive"));
 assert.ok(mapContract.includes("openai/outputTemplate"));
 assert.ok(template.includes('class="scout-header"'));
@@ -194,6 +199,8 @@ assert.ok(generated.includes("Component preview"));
 assert.ok(generated.includes("Media wiring intentionally deferred"));
 assert.ok(generated.includes("Site map for"));
 assert.ok(generated.includes("Scout guardrail:"));
+assert.ok(generated.includes("water_tank_single_site_map_v1"));
+assert.ok(generated.includes("Rehab signal"));
 assert.ok(generated.includes("opportunity"));
 assert.equal((generated.match(/<!doctype html>/g) || []).length, 1);
 assert.equal((generated.match(/window\.openai/g) || []).length, 0);
