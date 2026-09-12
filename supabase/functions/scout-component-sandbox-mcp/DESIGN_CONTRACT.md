@@ -44,7 +44,8 @@ Approved incrementally on 2026-09-12:
 
 - Scout map work proceeds one opportunity type at a time.
 - The first host-verified map experience is the bounded PNC Tower `premium_exterior` single-site map defined in `MAP_CONTRACT.md`.
-- The second approved map experience is the bounded SOUTH PRESSURE ZONE TANK `water_tank` single-site map defined in `MAP_CONTRACT.md`.
+- The second host-verified map experience is the bounded SOUTH PRESSURE ZONE TANK `water_tank` single-site map defined in `MAP_CONTRACT.md`; it rendered successfully in the real ChatGPT host on 2026-09-12.
+- After the water-tank v16 deployment, the PNC Tower `premium_exterior` path was re-tested through the refreshed v16 schema and rendered successfully in the real ChatGPT host on 2026-09-12.
 - One sandbox tool result represents exactly one selected opportunity type. The card and map must always describe the same opportunity; never mix a water-tank map into the PNC card or vice versa.
 - The sandbox preview tool may select `premium_exterior` or `water_tank`; omitting the selector preserves the PNC premium-exterior compatibility default.
 - Map implementation builds on the existing media carousel rather than redesigning the card.

@@ -140,6 +140,6 @@ assert.ok(mapContract.includes('SOUTH PRESSURE ZONE TANK'))
 assert.ok(mapContract.includes('water_tank_single_site_map_v1'))
 assert.ok(mapContract.includes('Water-tank Batch 3 integration scope'))
 assert.ok(mapContract.includes('ui://scout/component-sandbox/v16'))
-assert.ok(mapContract.includes('No third opportunity type'))
+assert.ok(mapContract.includes('ChatGPT host / SOUTH PRESSURE ZONE TANK water tank: **verified working**'))
 
 console.log('Scout water-tank single-site map contract checks passed.')

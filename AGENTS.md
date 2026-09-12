@@ -26,7 +26,7 @@ Before changing map data, map rendering, map-resource CSP, map interaction behav
 
 - `supabase/functions/scout-component-sandbox-mcp/MAP_CONTRACT.md`
 
-Map work proceeds one opportunity type at a time. The current active map contract is the bounded PNC Tower premium-exterior single-site contract.
+Map work proceeds one opportunity type at a time. The current host-verified map contracts are the bounded PNC Tower premium-exterior single-site contract and the bounded SOUTH PRESSURE ZONE TANK water-tank single-site contract.
 
 Prior generalized `map_targets*` RPCs were removed from the database. Old `component_v*` renderers are Git-history archaeology only, not current runtime dependencies or source-tree reference files. Recover only a specifically proven algorithm when needed; do not restore retired files, RPCs, compatibility shims, or dependencies merely to keep them available for reference.
 
