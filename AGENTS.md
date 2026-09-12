@@ -26,7 +26,11 @@ Before changing map data, map rendering, map-resource CSP, map interaction behav
 
 - `supabase/functions/scout-component-sandbox-mcp/MAP_CONTRACT.md`
 
-Map work proceeds one opportunity type at a time. The current active map contract is the bounded PNC Tower premium-exterior single-site contract. Prior generalized `map_targets*` RPCs and old `component_v*` renderers are reference-only archaeology, not current runtime dependencies.
+Map work proceeds one opportunity type at a time. The current active map contract is the bounded PNC Tower premium-exterior single-site contract.
+
+Prior generalized `map_targets*` RPCs were removed from the database. Old `component_v*` renderers are Git-history archaeology only, not current runtime dependencies or source-tree reference files. Recover only a specifically proven algorithm when needed; do not restore retired files, RPCs, compatibility shims, or dependencies merely to keep them available for reference.
+
+When a map implementation is superseded, remove the now-unused renderer code, dependency, CSP/provider configuration, generated artifacts, and tests in the same change unless a still-active compatibility contract explicitly requires them. Git history is the reference archive.
 
 Check current MCP Apps behavior through Context7 before each map implementation batch. Do not reintroduce `window.openai`, raw `window.message` lifecycle plumbing, `openai/outputTemplate`, `openai/widgetAccessible`, `openai/widgetDescription`, `openai/widgetCSP`, or other host-specific metadata from the prior map implementation.
 
