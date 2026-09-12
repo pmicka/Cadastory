@@ -46,28 +46,44 @@ Important caveats remain explicit:
 - Scout link guardrail: `Facility geocode is not itself building identity; link selected by corroborating physical evidence.`
 - current target-point-to-footprint distance: approximately `24.2 m`
 
-A renderer may use the polygon as Scout's reconciled mapping geometry, but it must not describe it as a current survey, authoritative parcel boundary, or independently verified facade outline.
+The current renderer uses the reconciled footprint bounds to frame the map and places the Scout marker at the footprint-bounds center. It does **not** render the Census/address geocode as the target marker. The marker is a locator for the reconciled building geometry, not a claim that the footprint is a current survey, authoritative parcel boundary, or independently verified facade outline.
 
-## Renderer direction
+## Proven raster-tile renderer
 
-The MapLibre v13 experiment is a **known host-incompatible experiment**, not the target architecture. It reached the View but stalled at `Loading site map…` inside ChatGPT. Context7 documentation confirms MapLibre uses Web Workers and requires `worker-src`, while the current MCP Apps resource CSP contract does not expose a worker-src control.
+The active renderer is the lightweight raster-tile technique recovered from the previously working Scout map implementation and ported into the current MCP Apps lifecycle.
 
-The approved replacement is the previously proven lightweight raster-tile rendering technique recovered from Git history:
+It must:
 
 - calculate Web Mercator coordinates in ordinary application code
-- choose zoom from the bounded target geometry
-- load 256x256 raster tiles as ordinary `<img>` elements
-- position tiles in the existing carousel viewport
-- render only the bounded Scout overlay needed for the current opportunity
-- keep the map non-interactive so carousel swipe remains host-friendly
-- no WebGL
-- no Web Worker
-- no custom SVG basemap
-- no third-party map runtime library
+- choose zoom from the bounded reconciled footprint geometry
+- load only the raster tiles required for the current viewport as ordinary 256x256 `<img>` elements
+- position those tiles in the existing carousel viewport
+- place only the bounded PNC Scout marker required for this single-site phase
+- remain non-interactive so carousel swipe is not captured by map pan/zoom
+- recalculate framing on host/window resize through the renderer handle
+- expose visible provider attribution
+- provide deterministic teardown by clearing the renderer DOM and timers
+- use no WebGL
+- use no Web Worker
+- use no custom SVG basemap
+- use no third-party map runtime library
 
-Only the rendering algorithm may be recovered from prior iterations. Deprecated host-specific MCP plumbing from those iterations must not return.
+Only the rendering algorithm was recovered from Git history. Deprecated host-specific MCP plumbing from prior iterations must not return.
 
-The external raster tile provider is a separate provider/CSP decision. Do not assume that a prior provider remains approved merely because the rendering algorithm is reused.
+## Raster provider and MCP CSP
+
+For the bounded owner-only v14 sandbox preview, the raster provider is the OpenStreetMap standard tile service:
+
+- tile template: `https://tile.openstreetmap.org/{z}/{x}/{y}.png`
+- MCP Apps CSP: `resourceDomains: ["https://tile.openstreetmap.org"]`
+- no `connectDomains` entry is required because the View loads tiles as image resources rather than fetch/XHR/WebSocket traffic
+- every tile `<img>` sets `referrerPolicy = "origin"`
+- the View declares `<meta name="referrer" content="origin">`
+- the renderer does not prefetch adjacent zoom levels or bulk areas; it requests only tiles intersecting the current viewport
+- browser caching is left enabled; Scout does not add no-cache headers to tile requests
+- visible attribution is `© OpenStreetMap contributors`
+
+The OSM standard tile service is best-effort and not an SLA-backed production dependency. If Scout later needs sustained commercial map traffic, provider selection must be revisited without changing the renderer contract unnecessarily.
 
 ## Dead-code policy
 
@@ -83,12 +99,7 @@ The temporary local-scene/context RPC created during the workerless-SVG investig
 
 Old `component_v*` renderers are Git-history archaeology only. Do not restore those files to the current source tree for reference.
 
-When the raster renderer replaces the live MapLibre experiment, the same change must remove all newly-unused MapLibre artifacts, including:
-
-- `maplibre-gl` package dependency and lockfile entries
-- obsolete MapLibre renderer module/tests
-- OpenFreeMap style constants and map-specific CSP domains if no longer required
-- generated bundle content produced solely by MapLibre
+The superseded MapLibre experiment must leave no active artifacts after the raster host fix: no `maplibre-gl` dependency/lockfile entries, no MapLibre model module, no OpenFreeMap style constant/CSP origin, no MapLibre CSS build path, and no generated MapLibre bundle content.
 
 Negative regression assertions may name retired APIs/RPCs in order to prevent reintroduction; that is not considered vestigial runtime code.
 
@@ -120,11 +131,11 @@ The following deprecated/host-specific patterns must not re-enter the current sa
 
 ## Current integration boundary
 
-The next map change is a host-fix only:
+v14 is a host-fix only:
 
-1. replace the MapLibre renderer with the proven raster-tile technique;
-2. preserve the existing `single_site_map_v1` PNC payload and Figma-derived card;
+1. preserve the existing `single_site_map_v1` PNC payload and Figma-derived card;
+2. replace the host-incompatible MapLibre experiment with the proven raster-tile renderer;
 3. remove all MapLibre/OpenFreeMap artifacts made unused by that replacement;
-4. bump the View URI only because the rendered resource changes;
+4. keep the other two carousel tiles as placeholders;
 5. verify the resulting PNC map on mobile and desktop inside ChatGPT;
 6. do not add a second opportunity type until that verification passes.
