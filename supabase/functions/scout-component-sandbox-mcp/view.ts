@@ -37,6 +37,9 @@ const mapContainer = document.querySelector<HTMLElement>('[data-scout-map]')
 const mapState = document.querySelector<HTMLElement>('[data-scout-map-state]')
 let mapHandle: ScoutSingleSiteMapRendererHandle | null = null
 let mapGeneration = 0
+let activeCarouselIndex = 0
+let layoutFrame: number | null = null
+let carouselResizeObserver: ResizeObserver | null = null
 
 function setState(message: string) {
   if (state) state.textContent = message.slice(0, 200)
@@ -186,6 +189,7 @@ function renderMap(value: unknown) {
         setState(`Scout map error: ${error.message}`)
       },
     })
+    scheduleLayoutRefresh()
   } catch (error) {
     mapState.hidden = false
     mapState.textContent = 'Site map unavailable'
@@ -209,30 +213,61 @@ function updateCarouselState() {
       active = index
     }
   }
+  activeCarouselIndex = active
   carouselCount.textContent = `${active + 1} / ${slides.length}`
   for (let index = 0; index < carouselDots.length; index += 1) {
     carouselDots[index].dataset.active = String(index === active)
   }
 }
 
-function handleResize() {
-  updateCarouselState()
+function alignCarouselToActiveSlide() {
+  if (!carousel || carousel.clientWidth <= 0) return
+  const targetScrollLeft = activeCarouselIndex * carousel.clientWidth
+  if (Math.abs(carousel.scrollLeft - targetScrollLeft) > 1) {
+    carousel.scrollLeft = targetScrollLeft
+  }
+}
+
+function flushLayoutRefresh() {
+  layoutFrame = null
+  alignCarouselToActiveSlide()
   mapHandle?.resize()
+  updateCarouselState()
+}
+
+function scheduleLayoutRefresh() {
+  if (layoutFrame !== null) return
+  layoutFrame = requestAnimationFrame(flushLayoutRefresh)
+}
+
+function handleResize() {
+  scheduleLayoutRefresh()
 }
 
 carousel?.addEventListener('scroll', updateCarouselState, { passive: true })
 window.addEventListener('resize', handleResize, { passive: true })
+if (carousel && typeof ResizeObserver !== 'undefined') {
+  carouselResizeObserver = new ResizeObserver(() => scheduleLayoutRefresh())
+  carouselResizeObserver.observe(carousel)
+}
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.2.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.3.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   renderOpportunity(result?.structuredContent?.opportunity)
   renderMap(result?.structuredContent?.map)
 }
+app.onhostcontextchanged = () => scheduleLayoutRefresh()
 app.onerror = (error) => setState(`Scout SDK error: ${error instanceof Error ? error.message : String(error)}`)
 app.onteardown = async () => {
   window.removeEventListener('resize', handleResize)
+  carouselResizeObserver?.disconnect()
+  carouselResizeObserver = null
+  if (layoutFrame !== null) {
+    cancelAnimationFrame(layoutFrame)
+    layoutFrame = null
+  }
   destroyMap()
   return {}
 }
