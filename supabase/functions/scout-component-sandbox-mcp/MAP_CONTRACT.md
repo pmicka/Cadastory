@@ -1,15 +1,15 @@
 # Scout component sandbox map contract
 
-## SWPPP-site host-visible integration scope (v18)
+## SWPPP-site host-visible integration scope (v19)
 
-- Current resource: `ui://scout/component-sandbox/v18`; v17 through v1 remain compatibility aliases.
+- Current resource: `ui://scout/component-sandbox/v19`; v18 through v1 remain compatibility aliases.
 - Third selector: `opportunity_type: "swppp_site"`, backed only by `scout_get_component_sandbox_swppp_site_map_v1_internal()` and `swppp_site_map_v1`.
 - Exemplar: HAM–Brent Spence Project (PID 116649), Ohio EPA construction-stormwater permit `1GC10896*AG`, active with 135 documented permit acres.
 - Geometry is the authoritative permit-location `Point` at `-84.521, 39.097`. No project polygon, parcel polygon, disturbance boundary, or radius is inferred.
 - The card and map share site name and location identity. The map remains slide 1; slides 2 and 3 remain placeholders.
 - Active permit evidence identifies a potentially relevant site or documentation need; it is not proof of procurement, buyer intent, contract availability, current service need, site access, or ownership.
 - Buyer resolution remains explicitly `unresolved`.
-- The v17 SWPPP card content rendered in the Android ChatGPT host on 2026-09-12, but the OSM standard service blocked its anonymous tile requests. v18 changes only the OSM-derived raster endpoint and UTC date formatting; map host verification remains pending.
+- The v17 SWPPP card content rendered in the Android ChatGPT host on 2026-09-12, but the OSM standard service blocked its anonymous tile requests. v18 confirmed that the ChatGPT host also rejects a replacement external raster origin. v19 keeps the raster renderer but routes only tightly bounded exemplar tiles through Scout's existing Edge Function; map host verification remains pending.
 
 This file is the durable guardrail for incremental map work in `scout-component-sandbox-mcp`.
 
@@ -210,10 +210,11 @@ Only the rendering algorithm was recovered from Git history. Deprecated host-spe
 
 ## Raster provider and MCP CSP
 
-For the bounded owner-only sandbox preview, v18 uses the Humanitarian OpenStreetMap raster service hosted by OpenStreetMap France:
+For the bounded owner-only sandbox preview, v19 uses a same-origin, tightly bounded tile route backed by the Humanitarian OpenStreetMap raster service hosted by OpenStreetMap France:
 
-- tile template: `https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png`
-- MCP Apps CSP: `resourceDomains: ["https://a.tile.openstreetmap.fr"]`
+- View tile template: `https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png`
+- upstream tile template: `https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png`
+- MCP Apps CSP: `resourceDomains: [SUPABASE_URL]`
 - no `connectDomains` entry is required because the View loads tiles as image resources rather than fetch/XHR/WebSocket traffic
 - every tile `<img>` sets `referrerPolicy = "origin"`
 - the View declares `<meta name="referrer" content="origin">`
@@ -221,7 +222,7 @@ For the bounded owner-only sandbox preview, v18 uses the Humanitarian OpenStreet
 - browser caching is left enabled; Scout does not add no-cache headers to tile requests
 - visible attribution is `© OpenStreetMap contributors · HOT`
 
-The OSM standard tile service began returning its explicit access-block tile to the ChatGPT mobile host on 2026-09-12 because the embedded host request could not provide usable application identification. The owner-only v18 sandbox therefore uses the Humanitarian OSM raster endpoint at `https://a.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png`, retains visible `© OpenStreetMap contributors · HOT` attribution, and whitelists only `https://a.tile.openstreetmap.fr` in MCP Apps CSP. This remains best-effort development infrastructure; Scout must select an appropriately contracted provider before sustained commercial traffic.
+The OSM standard service began returning its access-block tile because the embedded host request could not provide usable application identification. The v18 replacement origin was also rejected by the ChatGPT host. The v19 same-origin route accepts only GET/HEAD requests for zooms 12–18 whose tile centers fall within 0.12 degrees of the three approved exemplars; it cannot be used as a general tile proxy. It identifies Scout to the upstream, preserves image content type, enables browser caching, and retains visible `© OpenStreetMap contributors · HOT` attribution. This remains best-effort development infrastructure; Scout must select an appropriately contracted provider before sustained commercial traffic.
 
 ## Host verification state
 
@@ -229,7 +230,7 @@ The OSM standard tile service began returning its explicit access-block tile to 
 - desktop ChatGPT host / PNC premium exterior: still requires explicit visual verification.
 - water-tank v16 integration: **verified working** in the Android ChatGPT host on 2026-09-12.
 - PNC v16 regression after water-tank deployment: **verified working** in the Android ChatGPT host on 2026-09-12.
-- SWPPP v17 card content: **verified**, but standard OSM tiles were blocked; v18 replacement raster endpoint remains pending host verification.
+- SWPPP v17/v18 card content: **verified**, but both direct external raster origins failed in the Android ChatGPT host; v19 bounded same-origin tile routing remains pending host verification.
 
 The earlier transient v14 `Site map unavailable` state resolved after an app refresh and is not treated as a renderer-architecture failure.
 
