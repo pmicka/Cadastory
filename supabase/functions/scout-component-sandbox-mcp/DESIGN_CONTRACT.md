@@ -45,8 +45,9 @@ Approved incrementally on 2026-09-12:
 - Scout map work proceeds one opportunity type at a time.
 - The first host-verified map experience is the bounded PNC Tower `premium_exterior` single-site map defined in `MAP_CONTRACT.md`.
 - The second approved map experience is the bounded SOUTH PRESSURE ZONE TANK `water_tank` single-site map defined in `MAP_CONTRACT.md`.
+- The third approved pre-host-verification experience is the bounded HAM–Brent Spence Project `swppp_site` permit-location point map defined in `MAP_CONTRACT.md`.
 - One sandbox tool result represents exactly one selected opportunity type. The card and map must always describe the same opportunity; never mix a water-tank map into the PNC card or vice versa.
-- The sandbox preview tool may select `premium_exterior` or `water_tank`; omitting the selector preserves the PNC premium-exterior compatibility default.
+- The sandbox preview tool may select `premium_exterior`, `water_tank`, or `swppp_site`; omitting the selector preserves the PNC premium-exterior compatibility default.
 - Map implementation builds on the existing media carousel rather than redesigning the card.
 - Exactly one existing media tile is the selected opportunity's map; the other two remain placeholders.
 - The initial map tile remains non-interactive so map gestures do not compete with carousel swipe.
@@ -89,7 +90,7 @@ For `water_tank`, approved fields are:
 - linked project purpose
 - project guardrail stating that the signal is not proof of active procurement
 
-The approved PNC map consumes only the bounded `single_site_map_v1` payload. The approved water-tank map consumes only the bounded `water_tank_single_site_map_v1` payload. Do not fabricate freshness, evidence counts, images, contacts, active procurement status, current need, access conditions, tank dimensions, ownership boundaries, or action state.
+The approved PNC map consumes only the bounded `single_site_map_v1` payload. The approved water-tank map consumes only the bounded `water_tank_single_site_map_v1` payload. The SWPPP map consumes only `swppp_site_map_v1` and preserves its authoritative point semantics; documented permit acreage is not a displayed boundary. Do not fabricate freshness, evidence counts, images, contacts, active procurement status, buyer intent, current need, access conditions, tank dimensions, ownership or disturbance boundaries, or action state.
 
 ## Forbidden divergence
 
