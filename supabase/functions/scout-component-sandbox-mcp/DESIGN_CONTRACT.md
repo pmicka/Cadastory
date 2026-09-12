@@ -21,7 +21,7 @@ The live MCP Apps View should preserve the card's existing visual hierarchy:
 3. Divider.
 4. Opportunity title.
 5. Status pill plus compact metadata line.
-6. `Media` label and the existing horizontally swipeable placeholder carousel treatment until real media is explicitly wired.
+6. `Media` label and the existing horizontally swipeable placeholder carousel treatment until a specific media/map tile is explicitly approved and wired.
 7. Carousel count/dots.
 8. One compact factual summary region. Approved Scout guardrail copy may extend this region as muted supporting text; it must not become a separate boxed redesign.
 9. Divider.
@@ -37,6 +37,19 @@ Approved 2026-09-11 from the live mobile review:
 - Tile-internal placeholder content remains centered responsively inside the full-width tile.
 
 This refinement intentionally supersedes the narrower 330px tile geometry in the original Figma frame. Do not revert to a fixed 330px tile or reintroduce an adjacent-tile preview unless the owner explicitly changes direction again.
+
+## Owner-approved map direction
+
+Approved 2026-09-12:
+
+- Scout may resume map work incrementally, one opportunity type at a time.
+- The first map experience is the bounded PNC Tower `premium_exterior` single-site map defined in `MAP_CONTRACT.md`.
+- Map implementation must build on the existing media carousel rather than redesigning the card.
+- After the isolated renderer is verified, a later approved integration batch may replace exactly one existing media placeholder tile with the PNC map while preserving the full-width carousel geometry, count, dots, and swipe behavior.
+- The initial map tile is non-interactive so map gestures do not compete with carousel swipe.
+- No portfolio/clustering/territory map semantics are approved by this design decision.
+
+Batch 2 implements the renderer only and intentionally makes no visible View change.
 
 ## Approved real-data substitutions
 
@@ -56,7 +69,7 @@ The existing placeholder copy may be replaced only by fields already present in 
 - buyer/site-route classification
 - Scout guardrail
 
-Do not fabricate freshness, evidence counts, media, contacts, maps, active procurement status, current need, or action state.
+The approved PNC map may later consume only the bounded `single_site_map_v1` payload defined in `MAP_CONTRACT.md`. Do not fabricate freshness, evidence counts, images, contacts, active procurement status, current need, or action state.
 
 ## Forbidden divergence
 
@@ -69,7 +82,8 @@ Unless the owner explicitly changes direction, the sandbox View must not introdu
 - an all-caps `Scout by Cadastory` eyebrow in place of the Figma Scout header
 - standalone-app chrome or dashboard scaffolding
 - lifecycle diagnostics in the visible UI
-- images, maps, contacts, `.vcf`, or persistent Save/Investigate behavior before those are separately approved
+- images, contacts, `.vcf`, or persistent Save/Investigate behavior before those are separately approved
+- maps beyond the bounded PNC single-site direction described above
 - `window.openai`, raw `window.message` lifecycle plumbing, `openai/outputTemplate`, or host-specific lifecycle APIs
 
 ## Lifecycle invariant
