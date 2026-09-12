@@ -40,10 +40,11 @@ for (const source of [rendererSource, modelSource]) {
   for (const pattern of deprecatedPatterns) assert.equal(source.includes(pattern), false)
 }
 
+assert.ok(rendererSource.includes("import { Map as MapLibreMap"))
 assert.ok(rendererSource.includes("from 'maplibre-gl'"))
 assert.ok(rendererSource.includes("maplibre-gl/dist/maplibre-gl.css"))
 assert.ok(rendererSource.includes('interactive: false'))
-assert.ok(rendererSource.includes('attributionControl: true'))
+assert.ok(rendererSource.includes('attributionControl: {}'))
 assert.ok(rendererSource.includes('trackResize: true'))
 assert.ok(rendererSource.includes('renderWorldCopies: false'))
 assert.ok(rendererSource.includes('map.fitBounds(model.bounds'))
