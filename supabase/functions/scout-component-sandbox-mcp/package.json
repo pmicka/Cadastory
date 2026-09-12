@@ -2,7 +2,7 @@
   "private": true,
   "scripts": {
     "build": "node build-view.mjs",
-    "test": "node foundation_test.mjs && node single_site_map_renderer_test.mjs && node water_tank_map_contract_test.mjs && node water_tank_map_renderer_test.mjs && node water_tank_map_integration_test.mjs"
+    "test": "node foundation_test.mjs && node single_site_map_renderer_test.mjs && node water_tank_map_contract_test.mjs && node water_tank_map_renderer_test.mjs && node water_tank_map_integration_test.mjs && node swppp_site_map_contract_test.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/ext-apps": "2.0.0"
