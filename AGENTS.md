@@ -10,6 +10,16 @@ Before changing any Scout MCP tool, public/model-visible capability, routing con
 
 The doctrine is normative. Its `MUST` / `MUST NOT` rules are requirements, not suggestions.
 
+### Scout component sandbox design source
+
+Before changing the presentation, layout, styling, visible controls, or interaction structure of `supabase/functions/scout-component-sandbox-mcp`, read and follow:
+
+- `supabase/functions/scout-component-sandbox-mcp/DESIGN_CONTRACT.md`
+
+The existing Figma sandbox card referenced there is the visual source of truth. Do not redesign that surface from memory, replace it with a new card system, or add visible sections merely because more Scout data is available. Real data should be projected into the existing approved design slots unless the owner explicitly approves a design change.
+
+The MCP Apps lifecycle implementation and the visible design are separate concerns: preserving standards-based lifecycle plumbing does not authorize changing the approved presentation. Conversely, visual parity work must not replace the proven standards-based lifecycle with host-specific or deprecated APIs.
+
 ### Required checks
 
 For relevant database/contract changes, verify both gates before treating the work as release-ready:
