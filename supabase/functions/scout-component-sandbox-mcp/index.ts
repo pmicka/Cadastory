@@ -10,8 +10,13 @@ import {
   normalizeScoutSandboxWaterTankMap,
   type ScoutSandboxResult,
 } from './contract.ts'
-import { buildScoutSandboxSwpppSiteOpportunity, normalizeScoutSandboxSwpppSiteMap } from './swppp_site_map_model.ts'
+import {
+  buildScoutSandboxSwpppSiteOpportunity,
+  normalizeScoutSandboxSwpppSiteMap,
+  type ScoutSandboxSwpppSiteMap,
+} from './swppp_site_map_model.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
+import { buildScoutSwpppSiteRasterFrame } from './swppp_site_map_renderer.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -25,8 +30,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v19'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v20'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v19',
   'ui://scout/component-sandbox/v18',
   'ui://scout/component-sandbox/v17',
   'ui://scout/component-sandbox/v16',
@@ -88,6 +94,24 @@ async function loadScoutSandboxSwpppSiteMap() {
   const map = normalizeScoutSandboxSwpppSiteMap(data)
   if (!map) throw new Error('Scout sandbox SWPPP-site map did not satisfy the bounded contract')
   return map
+}
+
+async function loadEmbeddedSwpppTiles(map: ScoutSandboxSwpppSiteMap) {
+  const frame = buildScoutSwpppSiteRasterFrame(map, 456, 210, {
+    tileUrlTemplate: `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png`,
+  })
+  return await Promise.all(frame.tiles.map(async (tile) => {
+    const response = await fetch(`${MAP_TILE_UPSTREAM}/${tile.z}/${tile.x}/${tile.y}.png`, {
+      headers: { 'user-agent': 'Scout-by-Cadastory-Sandbox/1.0 (+https://github.com/pmicka/Cadastory)' },
+    })
+    if (!response.ok || !String(response.headers.get('content-type')).startsWith('image/png')) {
+      throw new Error('Scout sandbox raster tile is unavailable')
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    let binary = ''
+    for (const byte of bytes) binary += String.fromCharCode(byte)
+    return { url: tile.url, data_url: `data:image/png;base64,${btoa(binary)}` }
+  }))
 }
 
 async function isOwnerConnection(connectionId: string) {
@@ -310,7 +334,7 @@ const swpppSiteResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.2' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.3' })
 
   registerAppResource(
     server,
@@ -387,6 +411,7 @@ function makeServer() {
         return {
           content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} SWPPP-site evidence card with its authoritative permit-location point map.` }],
           structuredContent,
+          _meta: { 'scout/rasterTiles': await loadEmbeddedSwpppTiles(map) },
         }
       }
 
