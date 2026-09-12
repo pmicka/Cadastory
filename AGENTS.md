@@ -20,6 +20,16 @@ The existing Figma sandbox card referenced there is the visual source of truth. 
 
 The MCP Apps lifecycle implementation and the visible design are separate concerns: preserving standards-based lifecycle plumbing does not authorize changing the approved presentation. Conversely, visual parity work must not replace the proven standards-based lifecycle with host-specific or deprecated APIs.
 
+### Scout component sandbox map source
+
+Before changing map data, map rendering, map-resource CSP, map interaction behavior, or map-related tool/result contracts in `supabase/functions/scout-component-sandbox-mcp`, read and follow:
+
+- `supabase/functions/scout-component-sandbox-mcp/MAP_CONTRACT.md`
+
+Map work proceeds one opportunity type at a time. The current active map contract is the bounded PNC Tower premium-exterior single-site contract. Prior generalized `map_targets*` RPCs and old `component_v*` renderers are reference-only archaeology, not current runtime dependencies.
+
+Check current MCP Apps behavior through Context7 before each map implementation batch. Do not reintroduce `window.openai`, raw `window.message` lifecycle plumbing, `openai/outputTemplate`, `openai/widgetAccessible`, `openai/widgetDescription`, `openai/widgetCSP`, or other host-specific metadata from the prior map implementation.
+
 ### Required checks
 
 For relevant database/contract changes, verify both gates before treating the work as release-ready:
