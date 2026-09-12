@@ -1,0 +1,95 @@
+name: Scout carousel full-width build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/scout-carousel-full-width-build.yml
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout-carousel-full-width-20260911
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Align v12 resource and carousel regression gates
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          root = Path('supabase/functions')
+          sandbox = root / 'scout-component-sandbox-mcp' / 'index.ts'
+          connect = root / 'scout-connect' / 'index.ts'
+          contract = root / 'scout-mcp-contract' / 'index.ts'
+          test = root / 'scout-component-sandbox-mcp' / 'foundation_test.mjs'
+
+          for path, old, new in [
+              (sandbox, "const RESOURCE_URI = 'ui://scout/component-sandbox/v11'", "const RESOURCE_URI = 'ui://scout/component-sandbox/v12'"),
+              (connect, "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v11'", "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v12'"),
+              (contract, "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v11'", "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v12'"),
+          ]:
+              text = path.read_text()
+              if old not in text:
+                  raise SystemExit(f'missing canonical v11 marker in {path}')
+              path.write_text(text.replace(old, new, 1))
+
+          text = sandbox.read_text()
+          marker = "const COMPATIBILITY_RESOURCE_URIS = [\n  'ui://scout/component-sandbox/v10',"
+          replacement = "const COMPATIBILITY_RESOURCE_URIS = [\n  'ui://scout/component-sandbox/v11',\n  'ui://scout/component-sandbox/v10',"
+          if marker not in text:
+              raise SystemExit('missing sandbox compatibility marker')
+          sandbox.write_text(text.replace(marker, replacement, 1))
+
+          for path in (connect, contract):
+              text = path.read_text()
+              marker = "const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v10'"
+              replacement = "const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v11','ui://scout/component-sandbox/v10'"
+              if marker not in text:
+                  raise SystemExit(f'missing gateway compatibility marker in {path}')
+              path.write_text(text.replace(marker, replacement, 1))
+
+          text = test.read_text()
+          old_versions = 'for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11"]) {'
+          new_versions = 'for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12"]) {'
+          if old_versions not in text:
+              raise SystemExit('missing v11 version loop')
+          text = text.replace(old_versions, new_versions, 1)
+
+          anchor = "assert.ok(template.includes('class=\"carousel-viewport\"'));\n"
+          additions = """assert.ok(designContract.includes('100% of the visible carousel viewport width'));
+assert.ok(template.includes('flex: 0 0 100%;'));
+assert.ok(template.includes('gap: 0;'));
+assert.equal(template.includes('flex: 0 0 330px;'), false);
+assert.equal(template.includes('width: 330px;'), false);
+"""
+          if anchor not in text:
+              raise SystemExit('missing carousel assertion anchor')
+          test.write_text(text.replace(anchor, anchor + additions, 1))
+          PY
+      - name: Build and test MCP Apps View
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: |
+          npm ci
+          npm run build
+          npm test
+      - name: Commit tested v12 build to implementation branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add supabase/functions/scout-component-sandbox-mcp/index.ts \
+                  supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs \
+                  supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
+                  supabase/functions/scout-connect/index.ts \
+                  supabase/functions/scout-mcp-contract/index.ts
+          git diff --cached --check
+          git commit -m "Build full-width Scout carousel v12"
+          git push origin HEAD:scout-carousel-full-width-20260911
