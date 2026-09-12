@@ -24,7 +24,18 @@ The second opportunity type is the bounded **water tank / SOUTH PRESSURE ZONE TA
 - stable WRIS FID: `00AB7B0C8D56F05717FDFCF0B4000001`
 - PWSID: `KY1140038`
 
-No third opportunity type may be introduced until the water-tank single-site path has been host-verified.
+The water-tank single-site path was host-verified in the Android ChatGPT host on 2026-09-12. The original PNC premium-exterior path was then re-tested successfully through the refreshed v16 schema.
+
+The third bounded contract is the permit-native **SWPPP site / HAM-Brent Spence Project (PID 116649)** contract:
+
+- RPC: `public.scout_get_component_sandbox_swppp_site_map_v1_internal()`
+- contract version: `swppp_site_map_v1`
+- opportunity type: `swppp_site`
+- exemplar: `HAM-Brent Spence Project (PID 116649)`
+- Ohio EPA permit number: `1GC10896*AG`
+- Ohio EPA registry id: `OHGC18548`
+
+This contract is isolated database groundwork only. It is not yet integrated into the sandbox tool, discriminated union, View, or resource version.
 
 ## Premium-exterior allowed payload
 
@@ -93,6 +104,27 @@ The water-tank renderer foundation:
 The fixed zoom is a presentation choice only. It does not define a service radius, ownership boundary, parcel extent, access envelope, tank diameter, inspection perimeter, or any other real-world spatial claim.
 
 The small duplicated Web Mercator/tile framing kernel is intentional. The host-verified PNC renderer remains on its proven code path rather than being refactored merely to deduplicate a small pure-math section.
+
+## SWPPP-site bounded data contract
+
+The initial SWPPP contract is permit-native because Scout currently has no identity-verified construction-project link for the selected permit. Proximity-only project candidates must not be promoted into project attribution.
+
+The allowed payload is limited to:
+
+- one active Ohio EPA construction-stormwater permit record and stable permit identifiers
+- the permit-native facility/project name and embedded PID reference
+- county/state jurisdiction, without inventing a street address
+- documented permit status, type, category, dates, and 135 total permit acres
+- one authoritative Ohio EPA permit-location point and source provenance
+- an explicit unresolved buyer/organization classification
+- one bounded reason the record is worth investigating
+- explicit permit, geometry, buyer, procurement, access, and ownership guardrails
+
+The Ohio EPA `total_acres` value is presented only as documented total permit acreage. It is not substituted with building square footage and is not rendered as a disturbed-area polygon.
+
+All current construction-stormwater evidence geometry is point geometry. The selected point is therefore rendered, when a future isolated renderer is added, as an exact permit-location point. The contract must not fabricate a project polygon, parcel polygon, disturbance boundary, generic radius, ownership boundary, or access envelope.
+
+The permit record identifies a potentially relevant active site or compliance/documentation need. It does not prove active procurement, buyer intent, current service need, site access, ownership, contract availability, or a resolved responsible organization.
 
 ## Water-tank Batch 3 integration scope
 
