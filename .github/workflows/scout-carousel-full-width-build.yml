@@ -65,12 +65,14 @@ jobs:
           text = text.replace(old_versions, new_versions, 1)
 
           anchor = "assert.ok(template.includes('class=\"carousel-viewport\"'));\n"
-          additions = """assert.ok(designContract.includes('100% of the visible carousel viewport width'));
-assert.ok(template.includes('flex: 0 0 100%;'));
-assert.ok(template.includes('gap: 0;'));
-assert.equal(template.includes('flex: 0 0 330px;'), false);
-assert.equal(template.includes('width: 330px;'), false);
-"""
+          additions = "\n".join([
+              "assert.ok(designContract.includes('100% of the visible carousel viewport width'));",
+              "assert.ok(template.includes('flex: 0 0 100%;'));",
+              "assert.ok(template.includes('gap: 0;'));",
+              "assert.equal(template.includes('flex: 0 0 330px;'), false);",
+              "assert.equal(template.includes('width: 330px;'), false);",
+              "",
+          ])
           if anchor not in text:
               raise SystemExit('missing carousel assertion anchor')
           test.write_text(text.replace(anchor, anchor + additions, 1))
