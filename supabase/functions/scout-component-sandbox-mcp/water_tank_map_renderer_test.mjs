@@ -26,8 +26,10 @@ const [
 const packageJson = JSON.parse(packageJsonText)
 assert.ok(packageJson.scripts.test.includes('water_tank_map_renderer_test.mjs'))
 assert.equal(sharedRendererSource.includes('buildScoutCenteredPointRasterFrame'), false)
+assert.equal(rendererSource.includes('single_site_map_renderer'), false)
 assert.ok(rendererSource.includes('MAX_MERCATOR_LAT = 85.05112878'))
 assert.ok(rendererSource.includes('TILE_SIZE = 256'))
+assert.ok(rendererSource.includes('ScoutWaterTankRasterFrame'))
 assert.ok(modelSource.includes('SCOUT_WATER_TANK_POINT_ZOOM = 17'))
 
 for (const source of [modelSource, rendererSource]) {
