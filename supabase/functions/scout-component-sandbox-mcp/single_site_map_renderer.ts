@@ -163,6 +163,8 @@ export function mountScoutSingleSiteMap(
   let destroyed = false
   let renderGeneration = 0
   let timeout: ReturnType<typeof setTimeout> | null = null
+  let lastFrameWidth = -1
+  let lastFrameHeight = -1
 
   const clearTimeoutIfNeeded = () => {
     if (timeout !== null) {
@@ -171,12 +173,8 @@ export function mountScoutSingleSiteMap(
     }
   }
 
-  const render = () => {
+  const render = (force = false) => {
     if (destroyed) return
-    clearTimeoutIfNeeded()
-    renderGeneration += 1
-    const generation = renderGeneration
-    container.replaceChildren()
 
     const frame = buildScoutSingleSiteRasterFrame(
       data,
@@ -184,6 +182,14 @@ export function mountScoutSingleSiteMap(
       container.clientHeight,
       options,
     )
+    if (!force && frame.width === lastFrameWidth && frame.height === lastFrameHeight) return
+    lastFrameWidth = frame.width
+    lastFrameHeight = frame.height
+
+    clearTimeoutIfNeeded()
+    renderGeneration += 1
+    const generation = renderGeneration
+    container.replaceChildren()
     let loadedTiles = 0
     let settledTiles = 0
     let readySent = false
@@ -256,11 +262,11 @@ export function mountScoutSingleSiteMap(
     }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
   }
 
-  render()
+  render(true)
 
   return {
     resize() {
-      render()
+      render(false)
     },
     destroy() {
       if (destroyed) return
