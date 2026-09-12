@@ -124,8 +124,11 @@ The OSM standard tile service is best-effort and not an SLA-backed production de
 
 ## Host verification state
 
-- 2026-09-12 Android/mobile ChatGPT host: **v15 verified working** for the PNC premium-exterior raster map after lifecycle hardening deployment.
+- mobile ChatGPT host: **verified working** — Android v15 rendered the hardened PNC premium-exterior raster map successfully in the existing carousel on 2026-09-12.
+- desktop ChatGPT host: still requires explicit visual verification before the PNC pattern is considered verified there.
 - the water-tank contract is not yet exposed to the host and therefore has no host-render verification state.
+
+The earlier transient v14 `Site map unavailable` state resolved after an app refresh and is not treated as a renderer-architecture failure.
 
 ## Dead-code policy
 
