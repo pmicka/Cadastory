@@ -40,20 +40,25 @@ This refinement intentionally supersedes the narrower 330px tile geometry in the
 
 ## Owner-approved map direction
 
-Approved 2026-09-12:
+Approved incrementally on 2026-09-12:
 
-- Scout map work proceeds incrementally, one opportunity type at a time.
-- The first map experience is the bounded PNC Tower `premium_exterior` single-site map defined in `MAP_CONTRACT.md`.
+- Scout map work proceeds one opportunity type at a time.
+- The first host-verified map experience is the bounded PNC Tower `premium_exterior` single-site map defined in `MAP_CONTRACT.md`.
+- The second approved map experience is the bounded SOUTH PRESSURE ZONE TANK `water_tank` single-site map defined in `MAP_CONTRACT.md`.
+- One sandbox tool result represents exactly one selected opportunity type. The card and map must always describe the same opportunity; never mix a water-tank map into the PNC card or vice versa.
+- The sandbox preview tool may select `premium_exterior` or `water_tank`; omitting the selector preserves the PNC premium-exterior compatibility default.
 - Map implementation builds on the existing media carousel rather than redesigning the card.
-- Exactly one existing media tile is the PNC map; the other two remain placeholders.
-- The initial map tile is non-interactive so map gestures do not compete with carousel swipe.
+- Exactly one existing media tile is the selected opportunity's map; the other two remain placeholders.
+- The initial map tile remains non-interactive so map gestures do not compete with carousel swipe.
 - No portfolio/clustering/territory map semantics are approved by this design decision.
-- The renderer uses the proven raster-tile technique from the prior working map iteration, ported into the current MCP Apps lifecycle.
+- Both approved map types use the proven raster-tile technique from the prior working map iteration, ported into the current MCP Apps lifecycle.
 - The raster basemap is composed from ordinary image tiles; no MapLibre, WebGL, Web Worker, or custom SVG basemap is part of the approved design path.
 
 ## Approved real-data substitutions
 
-The existing placeholder copy may be replaced only by fields already present in the bounded sandbox opportunity contract:
+The existing placeholder/card copy may be replaced only by fields already present in the bounded selected-opportunity contract.
+
+For `premium_exterior`, approved fields are:
 
 - opportunity name
 - opportunity tier
@@ -69,7 +74,22 @@ The existing placeholder copy may be replaced only by fields already present in 
 - buyer/site-route classification
 - Scout guardrail
 
-The approved PNC map consumes only the bounded `single_site_map_v1` payload defined in `MAP_CONTRACT.md`. Do not fabricate freshness, evidence counts, images, contacts, active procurement status, current need, or action state.
+For `water_tank`, approved fields are:
+
+- tank name
+- water-system name in the existing subtitle/address line
+- explicit `REHAB` maintenance signal status
+- engineering-document morphology confidence
+- linked project source-modified date
+- elevated tank type
+- capacity
+- morphology class
+- single-pedestal support geometry
+- favorable operator geometry assessment
+- linked project purpose
+- project guardrail stating that the signal is not proof of active procurement
+
+The approved PNC map consumes only the bounded `single_site_map_v1` payload. The approved water-tank map consumes only the bounded `water_tank_single_site_map_v1` payload. Do not fabricate freshness, evidence counts, images, contacts, active procurement status, current need, access conditions, tank dimensions, ownership boundaries, or action state.
 
 ## Forbidden divergence
 
@@ -83,7 +103,9 @@ Unless the owner explicitly changes direction, the sandbox View must not introdu
 - standalone-app chrome or dashboard scaffolding
 - lifecycle diagnostics in the visible UI
 - images, contacts, `.vcf`, or persistent Save/Investigate behavior before those are separately approved
-- maps beyond the bounded PNC single-site direction described above
+- maps beyond the bounded PNC premium-exterior and SOUTH PRESSURE ZONE TANK water-tank single-site directions described above
+- multiple opportunity maps in one card
+- portfolio, clustering, heatmap, territory, or route-planning map semantics
 - `window.openai`, raw `window.message` lifecycle plumbing, `openai/outputTemplate`, or host-specific lifecycle APIs
 
 ## Lifecycle invariant

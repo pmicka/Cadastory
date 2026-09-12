@@ -1,22 +1,17 @@
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
-import { normalizeScoutSandboxSingleSiteMap } from './contract.ts'
-import { mountScoutSingleSiteMap, type ScoutSingleSiteMapRendererHandle } from './single_site_map_renderer.ts'
+import {
+  normalizeScoutSandboxOpportunity,
+  normalizeScoutSandboxSingleSiteMap,
+  normalizeScoutSandboxWaterTankMap,
+  type ScoutSandboxOpportunityType,
+  type ScoutSandboxWaterTankOpportunity,
+} from './contract.ts'
+import { mountScoutSingleSiteMap } from './single_site_map_renderer.ts'
+import { mountScoutWaterTankMap } from './water_tank_map_mount.ts'
 
-type ScoutOpportunity = {
-  name: string
-  address: string
-  opportunity_tier: string
-  opportunity_score: number
-  confidence: number
-  story_count: number
-  height_m: number
-  footprint_sqft: number
-  glazing_status: string
-  observed_at: string
-  target_class: string
-  target_subclass: string
-  buyer_resolvability: string
-  guardrail: string
+type ScoutMapHandle = {
+  destroy: () => void
+  resize: () => void
 }
 
 const SCOUT_RASTER_TILE_TEMPLATE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
@@ -35,7 +30,7 @@ const carouselCount = document.querySelector<HTMLElement>('[data-scout-carousel-
 const carouselDots = Array.from(document.querySelectorAll<HTMLElement>('[data-scout-carousel-dot]'))
 const mapContainer = document.querySelector<HTMLElement>('[data-scout-map]')
 const mapState = document.querySelector<HTMLElement>('[data-scout-map-state]')
-let mapHandle: ScoutSingleSiteMapRendererHandle | null = null
+let mapHandle: ScoutMapHandle | null = null
 let mapGeneration = 0
 let activeCarouselIndex = 0
 let layoutFrame: number | null = null
@@ -57,41 +52,39 @@ function cleanNumber(value: unknown, minimum: number, maximum: number) {
     : null
 }
 
-function normalizeOpportunity(value: unknown): ScoutOpportunity | null {
+function normalizeWaterTankOpportunity(value: unknown): ScoutSandboxWaterTankOpportunity | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const source = value as Record<string, unknown>
-  const candidate: ScoutOpportunity = {
-    name: cleanString(source.name, 160) ?? '',
-    address: cleanString(source.address, 240) ?? '',
-    opportunity_tier: cleanString(source.opportunity_tier, 64) ?? '',
-    opportunity_score: cleanNumber(source.opportunity_score, 0, 100) ?? -1,
-    confidence: cleanNumber(source.confidence, 0, 1) ?? -1,
-    story_count: cleanNumber(source.story_count, 0, 1000) ?? -1,
-    height_m: cleanNumber(source.height_m, 0, 10000) ?? -1,
-    footprint_sqft: cleanNumber(source.footprint_sqft, 0, 1_000_000_000) ?? -1,
-    glazing_status: cleanString(source.glazing_status, 80) ?? '',
-    observed_at: cleanString(source.observed_at, 80) ?? '',
-    target_class: cleanString(source.target_class, 80) ?? '',
-    target_subclass: cleanString(source.target_subclass, 80) ?? '',
-    buyer_resolvability: cleanString(source.buyer_resolvability, 120) ?? '',
-    guardrail: cleanString(source.guardrail, 1000) ?? '',
+  const name = cleanString(source.name, 160)
+  const systemName = cleanString(source.system_name, 200)
+  const confidence = cleanNumber(source.confidence, 0, 1)
+  const observedAt = cleanString(source.observed_at, 80)
+  const capacityGallons = cleanNumber(source.capacity_gallons, 1, 100_000_000)
+  const morphologyClass = cleanString(source.morphology_class, 120)
+  const projectPurpose = cleanString(source.project_purpose, 300)
+  const opportunityGuardrail = cleanString(source.guardrail, 1000)
+
+  if (source.opportunity_type !== 'water_tank' || source.status !== 'rehab_signal') return null
+  if (!name || !systemName || confidence === null || !observedAt || capacityGallons === null) return null
+  if (source.tank_type !== 'ELEVATED' || !morphologyClass || source.support_geometry !== 'single_pedestal') return null
+  if (source.operator_assessment !== 'favorable' || source.project_status !== 'REHAB' || !projectPurpose || !opportunityGuardrail) return null
+
+  return {
+    opportunity_type: 'water_tank',
+    name,
+    system_name: systemName,
+    status: 'rehab_signal',
+    confidence,
+    observed_at: observedAt,
+    tank_type: 'ELEVATED',
+    capacity_gallons: capacityGallons,
+    morphology_class: morphologyClass,
+    support_geometry: 'single_pedestal',
+    operator_assessment: 'favorable',
+    project_status: 'REHAB',
+    project_purpose: projectPurpose,
+    guardrail: opportunityGuardrail,
   }
-  return candidate.name &&
-      candidate.address &&
-      candidate.opportunity_tier &&
-      candidate.opportunity_score >= 0 &&
-      candidate.confidence >= 0 &&
-      Number.isInteger(candidate.story_count) && candidate.story_count >= 0 &&
-      candidate.height_m >= 0 &&
-      candidate.footprint_sqft >= 0 &&
-      candidate.glazing_status &&
-      candidate.observed_at &&
-      candidate.target_class &&
-      candidate.target_subclass &&
-      candidate.buyer_resolvability &&
-      candidate.guardrail
-    ? candidate
-    : null
 }
 
 function label(value: string) {
@@ -101,6 +94,10 @@ function label(value: string) {
     corporate_office: 'Corporate office',
     confirmed_glazed: 'Confirmed glazed facade',
     public_operator_or_site_route: 'Public operator / site route',
+    rehab_signal: 'Rehab signal',
+    composite_elevated: 'Composite elevated',
+    single_pedestal: 'Single pedestal',
+    favorable: 'Favorable cleaning geometry',
   }
   return known[value] ?? value.replaceAll('_', ' ').replace(/^./, (character) => character.toUpperCase())
 }
@@ -119,16 +116,41 @@ function formatNumber(value: number, maximumFractionDigits = 0) {
   return new Intl.NumberFormat('en-US', { maximumFractionDigits }).format(value)
 }
 
-function renderOpportunity(value: unknown) {
-  const opportunity = normalizeOpportunity(value)
+function renderUnavailableOpportunity() {
+  if (title) title.textContent = 'Opportunity unavailable'
+  if (tier) tier.textContent = 'Unavailable'
+  if (meta) meta.textContent = 'Scout did not receive a valid bounded opportunity result.'
+  if (address) address.textContent = ''
+  if (summary) summary.textContent = ''
+  if (guardrail) guardrail.textContent = ''
+  setState('Scout opportunity result failed validation')
+}
+
+function renderOpportunity(opportunityType: ScoutSandboxOpportunityType, value: unknown) {
+  if (opportunityType === 'water_tank') {
+    const opportunity = normalizeWaterTankOpportunity(value)
+    if (!opportunity) {
+      renderUnavailableOpportunity()
+      return
+    }
+
+    if (title) title.textContent = opportunity.name
+    if (tier) tier.textContent = label(opportunity.status)
+    if (meta) {
+      meta.textContent = `${Math.round(opportunity.confidence * 1000) / 10}% morphology confidence  •  Project source updated ${formatObserved(opportunity.observed_at)}`
+    }
+    if (address) address.textContent = opportunity.system_name
+    if (summary) {
+      summary.textContent = `${label(opportunity.tank_type.toLowerCase())} water tank  •  ${formatNumber(opportunity.capacity_gallons)} gal  •  ${label(opportunity.morphology_class)}  •  ${label(opportunity.support_geometry)}  •  ${label(opportunity.operator_assessment)}  •  ${opportunity.project_status} / ${opportunity.project_purpose}`
+    }
+    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
+    setState(`Scout opportunity ready: ${opportunity.name}`)
+    return
+  }
+
+  const opportunity = normalizeScoutSandboxOpportunity(value)
   if (!opportunity) {
-    if (title) title.textContent = 'Opportunity unavailable'
-    if (tier) tier.textContent = 'Unavailable'
-    if (meta) meta.textContent = 'Scout did not receive a valid bounded opportunity result.'
-    if (address) address.textContent = ''
-    if (summary) summary.textContent = ''
-    if (guardrail) guardrail.textContent = ''
-    setState('Scout opportunity result failed validation')
+    renderUnavailableOpportunity()
     return
   }
 
@@ -151,44 +173,57 @@ function destroyMap() {
   mapHandle = null
 }
 
-function renderMap(value: unknown) {
-  const mapData = normalizeScoutSandboxSingleSiteMap(value)
+function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown) {
   destroyMap()
   if (!mapContainer || !mapState) return
-  if (!mapData) {
-    mapState.hidden = false
-    mapState.textContent = 'Site map unavailable'
-    setState('Scout single-site map result failed validation')
-    return
-  }
 
   const generation = ++mapGeneration
   let ready = false
   mapState.hidden = false
   mapState.textContent = 'Loading site map…'
-  mapContainer.setAttribute('role', 'img')
-  mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
+
+  const mapOptions = {
+    tileUrlTemplate: SCOUT_RASTER_TILE_TEMPLATE,
+    attributionLabel: SCOUT_RASTER_ATTRIBUTION_LABEL,
+    attributionUrl: SCOUT_RASTER_ATTRIBUTION_URL,
+    onReady: () => {
+      if (generation !== mapGeneration) return
+      ready = true
+      mapState.hidden = true
+      setState('Scout site map ready')
+    },
+    onError: (error: Error) => {
+      if (generation !== mapGeneration) return
+      if (!ready) {
+        mapState.hidden = false
+        mapState.textContent = 'Site map unavailable'
+      }
+      setState(`Scout map error: ${error.message}`)
+    },
+  }
 
   try {
-    mapHandle = mountScoutSingleSiteMap(mapContainer, mapData, {
-      tileUrlTemplate: SCOUT_RASTER_TILE_TEMPLATE,
-      attributionLabel: SCOUT_RASTER_ATTRIBUTION_LABEL,
-      attributionUrl: SCOUT_RASTER_ATTRIBUTION_URL,
-      onReady: () => {
-        if (generation !== mapGeneration) return
-        ready = true
-        mapState.hidden = true
-        setState(`Scout site map ready: ${mapData.name}`)
-      },
-      onError: (error) => {
-        if (generation !== mapGeneration) return
-        if (!ready) {
-          mapState.hidden = false
-          mapState.textContent = 'Site map unavailable'
-        }
-        setState(`Scout map error: ${error.message}`)
-      },
-    })
+    if (opportunityType === 'water_tank') {
+      const mapData = normalizeScoutSandboxWaterTankMap(value)
+      if (!mapData) {
+        mapState.textContent = 'Site map unavailable'
+        setState('Scout water-tank map result failed validation')
+        return
+      }
+      mapContainer.setAttribute('role', 'img')
+      mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
+      mapHandle = mountScoutWaterTankMap(mapContainer, mapData, mapOptions)
+    } else {
+      const mapData = normalizeScoutSandboxSingleSiteMap(value)
+      if (!mapData) {
+        mapState.textContent = 'Site map unavailable'
+        setState('Scout single-site map result failed validation')
+        return
+      }
+      mapContainer.setAttribute('role', 'img')
+      mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
+      mapHandle = mountScoutSingleSiteMap(mapContainer, mapData, mapOptions)
+    }
     scheduleLayoutRefresh()
   } catch (error) {
     mapState.hidden = false
@@ -252,11 +287,18 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.3.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.4.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
-  renderOpportunity(result?.structuredContent?.opportunity)
-  renderMap(result?.structuredContent?.map)
+  const structured = result?.structuredContent
+  const opportunityType = structured?.opportunity_type
+  if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank') {
+    renderUnavailableOpportunity()
+    renderMap('premium_exterior', null)
+    return
+  }
+  renderOpportunity(opportunityType, structured?.opportunity)
+  renderMap(opportunityType, structured?.map)
 }
 app.onhostcontextchanged = () => scheduleLayoutRefresh()
 app.onerror = (error) => setState(`Scout SDK error: ${error instanceof Error ? error.message : String(error)}`)

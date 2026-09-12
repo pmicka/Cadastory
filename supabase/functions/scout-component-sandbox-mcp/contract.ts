@@ -1,6 +1,7 @@
-export const SCOUT_SANDBOX_MAX_NAMES = 2
+export type ScoutSandboxOpportunityType = 'premium_exterior' | 'water_tank'
 
-export type ScoutSandboxOpportunity = {
+export type ScoutSandboxPremiumExteriorOpportunity = {
+  opportunity_type: 'premium_exterior'
   name: string
   address: string
   opportunity_tier: string
@@ -14,6 +15,23 @@ export type ScoutSandboxOpportunity = {
   target_class: string
   target_subclass: string
   buyer_resolvability: string
+  guardrail: string
+}
+
+export type ScoutSandboxWaterTankOpportunity = {
+  opportunity_type: 'water_tank'
+  name: string
+  system_name: string
+  status: 'rehab_signal'
+  confidence: number
+  observed_at: string
+  tank_type: 'ELEVATED'
+  capacity_gallons: number
+  morphology_class: string
+  support_geometry: 'single_pedestal'
+  operator_assessment: 'favorable'
+  project_status: 'REHAB'
+  project_purpose: string
   guardrail: string
 }
 
@@ -115,12 +133,21 @@ export type ScoutSandboxWaterTankMap = {
   }
 }
 
-export type ScoutSandboxResult = {
+export type ScoutSandboxPremiumExteriorResult = {
   surface: 'scout_component_sandbox'
-  names: string[]
-  opportunity: ScoutSandboxOpportunity
+  opportunity_type: 'premium_exterior'
+  opportunity: ScoutSandboxPremiumExteriorOpportunity
   map: ScoutSandboxSingleSiteMap
 }
+
+export type ScoutSandboxWaterTankResult = {
+  surface: 'scout_component_sandbox'
+  opportunity_type: 'water_tank'
+  opportunity: ScoutSandboxWaterTankOpportunity
+  map: ScoutSandboxWaterTankMap
+}
+
+export type ScoutSandboxResult = ScoutSandboxPremiumExteriorResult | ScoutSandboxWaterTankResult
 
 function boundedString(value: unknown, maxLength: number) {
   if (typeof value !== 'string') return null
@@ -145,10 +172,6 @@ function boundedInteger(value: unknown, minimum: number, maximum: number) {
 
 function boundedNullableInteger(value: unknown, minimum: number, maximum: number) {
   return value === null ? null : boundedInteger(value, minimum, maximum)
-}
-
-function boundedName(value: unknown) {
-  return boundedString(value, 160)
 }
 
 function boundedUuid(value: unknown) {
@@ -191,15 +214,11 @@ function normalizePolygonGeometry(value: unknown): ScoutSandboxPolygonGeometry |
   return { type: 'Polygon', coordinates: rings }
 }
 
-export function normalizeScoutSandboxNames(value: unknown): string[] {
-  if (!Array.isArray(value)) return []
-  return value.map(boundedName).filter((name): name is string => name !== null).slice(0, SCOUT_SANDBOX_MAX_NAMES)
-}
-
-export function normalizeScoutSandboxOpportunity(value: unknown): ScoutSandboxOpportunity | null {
+export function normalizeScoutSandboxOpportunity(value: unknown): ScoutSandboxPremiumExteriorOpportunity | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const source = value as Record<string, unknown>
-  const opportunity: ScoutSandboxOpportunity = {
+  const opportunity: ScoutSandboxPremiumExteriorOpportunity = {
+    opportunity_type: 'premium_exterior',
     name: boundedString(source.name, 160) ?? '',
     address: boundedString(source.address, 240) ?? '',
     opportunity_tier: boundedString(source.opportunity_tier, 64) ?? '',
@@ -434,5 +453,24 @@ export function normalizeScoutSandboxWaterTankMap(value: unknown): ScoutSandboxW
       source_modified_at: projectSourceModifiedAt,
       guardrail: projectGuardrail,
     },
+  }
+}
+
+export function buildScoutSandboxWaterTankOpportunity(map: ScoutSandboxWaterTankMap): ScoutSandboxWaterTankOpportunity {
+  return {
+    opportunity_type: 'water_tank',
+    name: map.name,
+    system_name: map.system_name,
+    status: 'rehab_signal',
+    confidence: map.geometry.confidence,
+    observed_at: map.project_linkage.source_modified_at,
+    tank_type: map.asset.tank_type,
+    capacity_gallons: map.asset.capacity_gallons,
+    morphology_class: map.geometry.morphology_class,
+    support_geometry: map.geometry.support_geometry,
+    operator_assessment: map.geometry.operator_assessment,
+    project_status: map.project_linkage.status,
+    project_purpose: map.project_linkage.other_purpose ?? map.project_linkage.purpose ?? 'REHAB',
+    guardrail: map.project_linkage.guardrail,
   }
 }

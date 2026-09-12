@@ -4,9 +4,10 @@ import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@modelcontextprotocol/ext-apps@2.0.0/server'
 import * as z from 'npm:zod@4.2.0/v4'
 import {
-  normalizeScoutSandboxNames,
+  buildScoutSandboxWaterTankOpportunity,
   normalizeScoutSandboxOpportunity,
   normalizeScoutSandboxSingleSiteMap,
+  normalizeScoutSandboxWaterTankMap,
   type ScoutSandboxResult,
 } from './contract.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
@@ -23,8 +24,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v15'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v16'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v15',
   'ui://scout/component-sandbox/v14',
   'ui://scout/component-sandbox/v13',
   'ui://scout/component-sandbox/v12',
@@ -46,12 +48,6 @@ const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
 const MAP_TILE_ORIGIN = 'https://tile.openstreetmap.org'
 
-async function loadScoutSandboxNames() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_names_v1_internal')
-  if (error) throw new Error('Scout exemplar names are unavailable')
-  return normalizeScoutSandboxNames(data)
-}
-
 async function loadScoutSandboxOpportunity() {
   const { data, error } = await admin.rpc('scout_get_component_sandbox_opportunity_v1_internal')
   if (error) throw new Error('Scout sandbox opportunity is unavailable')
@@ -65,6 +61,14 @@ async function loadScoutSandboxSingleSiteMap() {
   if (error) throw new Error('Scout sandbox single-site map is unavailable')
   const map = normalizeScoutSandboxSingleSiteMap(data)
   if (!map) throw new Error('Scout sandbox single-site map did not satisfy the bounded contract')
+  return map
+}
+
+async function loadScoutSandboxWaterTankMap() {
+  const { data, error } = await admin.rpc('scout_get_component_sandbox_water_tank_map_v1_internal')
+  if (error) throw new Error('Scout sandbox water-tank map is unavailable')
+  const map = normalizeScoutSandboxWaterTankMap(data)
+  if (!map) throw new Error('Scout sandbox water-tank map did not satisfy the bounded contract')
   return map
 }
 
@@ -94,6 +98,41 @@ async function authenticateOwner(req: Request) {
   if (connectionError || !connection?.connection_id) return null
   return await isOwnerConnection(String(connection.connection_id)) ? connection : null
 }
+
+const premiumOpportunitySchema = z.object({
+  opportunity_type: z.literal('premium_exterior'),
+  name: z.string().min(1).max(160),
+  address: z.string().min(1).max(240),
+  opportunity_tier: z.string().min(1).max(64),
+  opportunity_score: z.number().int().min(0).max(100),
+  confidence: z.number().min(0).max(1),
+  story_count: z.number().int().min(0).max(1000),
+  height_m: z.number().min(0).max(10000),
+  footprint_sqft: z.number().min(0).max(1_000_000_000),
+  glazing_status: z.string().min(1).max(80),
+  observed_at: z.string().min(1).max(80),
+  target_class: z.string().min(1).max(80),
+  target_subclass: z.string().min(1).max(80),
+  buyer_resolvability: z.string().min(1).max(120),
+  guardrail: z.string().min(1).max(1000),
+})
+
+const waterTankOpportunitySchema = z.object({
+  opportunity_type: z.literal('water_tank'),
+  name: z.string().min(1).max(160),
+  system_name: z.string().min(1).max(200),
+  status: z.literal('rehab_signal'),
+  confidence: z.number().min(0).max(1),
+  observed_at: z.string().min(1).max(80),
+  tank_type: z.literal('ELEVATED'),
+  capacity_gallons: z.number().min(1).max(100_000_000),
+  morphology_class: z.string().min(1).max(120),
+  support_geometry: z.literal('single_pedestal'),
+  operator_assessment: z.literal('favorable'),
+  project_status: z.literal('REHAB'),
+  project_purpose: z.string().min(1).max(300),
+  guardrail: z.string().min(1).max(1000),
+})
 
 const sandboxMapSchema = z.object({
   contract_version: z.literal('single_site_map_v1'),
@@ -136,8 +175,77 @@ const sandboxMapSchema = z.object({
   }),
 })
 
+const waterTankMapSchema = z.object({
+  contract_version: z.literal('water_tank_single_site_map_v1'),
+  opportunity_type: z.literal('water_tank'),
+  tank_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
+  candidate_key: z.string().min(1).max(100),
+  name: z.string().min(1).max(160),
+  system_name: z.string().min(1).max(200),
+  site_point: z.object({
+    lon: z.number().min(-180).max(180),
+    lat: z.number().min(-90).max(90),
+    source: z.literal('kentucky_wris_water_tank'),
+    source_slug: z.literal('ky-kia-water-tanks'),
+    source_name: z.string().min(1).max(240),
+    source_authority: z.string().min(1).max(240),
+    source_native_id: z.string().min(1).max(240),
+    wris_fid: z.string().min(1).max(80),
+    pwsid: z.string().min(1).max(80),
+    retrieved_at: z.string().min(1).max(80),
+  }),
+  asset: z.object({
+    tank_type: z.literal('ELEVATED'),
+    capacity_gallons: z.number().min(1).max(100_000_000),
+    construction_date: z.string().min(1).max(40).nullable(),
+    last_cleaning_date: z.string().min(1).max(40).nullable(),
+    last_inspection_date: z.string().min(1).max(40).nullable(),
+    out_of_service: z.literal(false),
+  }),
+  geometry: z.object({
+    morphology_class: z.string().min(1).max(120),
+    support_geometry: z.literal('single_pedestal'),
+    cross_bracing_status: z.literal('none'),
+    support_leg_count: z.number().int().min(0).max(64).nullable(),
+    operator_assessment: z.literal('favorable'),
+    operator_assessment_basis: z.string().min(1).max(1000),
+    evidence_kind: z.literal('engineering_document'),
+    confidence: z.number().min(0).max(1),
+    source_authority: z.string().min(1).max(300),
+    source_url: z.string().min(1).max(1000),
+    observed_on: z.string().min(1).max(40),
+    media_retained: z.literal(false),
+    guardrail: z.string().min(1).max(1000),
+  }),
+  project_linkage: z.object({
+    project_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
+    pnum: z.string().min(1).max(80),
+    status: z.literal('REHAB'),
+    purpose: z.string().min(1).max(120).nullable(),
+    other_purpose: z.string().min(1).max(300).nullable(),
+    match_method: z.string().min(1).max(120),
+    match_distance_m: z.number().min(0).max(10000),
+    source_modified_at: z.string().min(1).max(80),
+    guardrail: z.string().min(1).max(1000),
+  }),
+})
+
+const premiumResultSchema = z.object({
+  surface: z.literal('scout_component_sandbox'),
+  opportunity_type: z.literal('premium_exterior'),
+  opportunity: premiumOpportunitySchema,
+  map: sandboxMapSchema,
+})
+
+const waterTankResultSchema = z.object({
+  surface: z.literal('scout_component_sandbox'),
+  opportunity_type: z.literal('water_tank'),
+  opportunity: waterTankOpportunitySchema,
+  map: waterTankMapSchema,
+})
+
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.0.0' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.1.0' })
 
   registerAppResource(
     server,
@@ -162,7 +270,7 @@ function makeServer() {
   for (const compatibilityUri of COMPATIBILITY_RESOURCE_URIS) {
     registerAppResource(
       server,
-      `scout-ui-foundation-${compatibilityUri.endsWith('/v2') ? 'v2' : 'v1'}-compatibility`,
+      `scout-ui-foundation-${compatibilityUri.split('/').at(-1)}-compatibility`,
       compatibilityUri,
       { mimeType: RESOURCE_MIME_TYPE },
       async () => ({
@@ -186,29 +294,11 @@ function makeServer() {
     TOOL_NAME,
     {
       title: 'Preview Scout opportunity card',
-      description: 'Owner-only read-only developer tool that renders the bounded Scout MCP Apps opportunity card. Call only when the Scout owner explicitly asks to test or preview the Scout sandbox UI foundation.',
-      inputSchema: z.object({}),
-      outputSchema: z.object({
-        surface: z.literal('scout_component_sandbox'),
-        names: z.array(z.string().min(1).max(160)).max(2),
-        opportunity: z.object({
-          name: z.string().min(1).max(160),
-          address: z.string().min(1).max(240),
-          opportunity_tier: z.string().min(1).max(64),
-          opportunity_score: z.number().int().min(0).max(100),
-          confidence: z.number().min(0).max(1),
-          story_count: z.number().int().min(0).max(1000),
-          height_m: z.number().min(0).max(10000),
-          footprint_sqft: z.number().min(0).max(1_000_000_000),
-          glazing_status: z.string().min(1).max(80),
-          observed_at: z.string().min(1).max(80),
-          target_class: z.string().min(1).max(80),
-          target_subclass: z.string().min(1).max(80),
-          buyer_resolvability: z.string().min(1).max(120),
-          guardrail: z.string().min(1).max(1000),
-        }),
-        map: sandboxMapSchema,
+      description: 'Owner-only read-only developer tool that renders one bounded Scout MCP Apps opportunity card and matching single-site map. Use opportunity_type=water_tank for the SOUTH PRESSURE ZONE TANK preview; omit it or use premium_exterior for PNC Tower.',
+      inputSchema: z.object({
+        opportunity_type: z.enum(['premium_exterior', 'water_tank']).optional(),
       }),
+      outputSchema: z.discriminatedUnion('opportunity_type', [premiumResultSchema, waterTankResultSchema]),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -217,23 +307,42 @@ function makeServer() {
       },
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
-    async () => {
-      const [names, opportunity, map] = await Promise.all([
-        loadScoutSandboxNames(),
+    async ({ opportunity_type }) => {
+      const selectedType = opportunity_type ?? 'premium_exterior'
+
+      if (selectedType === 'water_tank') {
+        const map = await loadScoutSandboxWaterTankMap()
+        const opportunity = buildScoutSandboxWaterTankOpportunity(map)
+        if (map.name !== opportunity.name || map.system_name !== opportunity.system_name) {
+          throw new Error('Scout sandbox water-tank opportunity and map identity do not match')
+        }
+        const structuredContent: ScoutSandboxResult = {
+          surface: 'scout_component_sandbox',
+          opportunity_type: 'water_tank',
+          opportunity,
+          map,
+        }
+        return {
+          content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} water-tank opportunity card with its single-site map.` }],
+          structuredContent,
+        }
+      }
+
+      const [opportunity, map] = await Promise.all([
         loadScoutSandboxOpportunity(),
         loadScoutSandboxSingleSiteMap(),
       ])
       if (map.name !== opportunity.name || map.address !== opportunity.address) {
-        throw new Error('Scout sandbox opportunity and map identity do not match')
+        throw new Error('Scout sandbox premium-exterior opportunity and map identity do not match')
       }
       const structuredContent: ScoutSandboxResult = {
         surface: 'scout_component_sandbox',
-        names,
+        opportunity_type: 'premium_exterior',
         opportunity,
         map,
       }
       return {
-        content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} opportunity card with its single-site map.` }],
+        content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} premium-exterior opportunity card with its single-site map.` }],
         structuredContent,
       }
     },

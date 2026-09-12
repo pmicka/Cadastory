@@ -19,7 +19,7 @@ const bundled = await build({
   write: false,
 })
 const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundled.outputFiles[0].text).toString('base64')}`
-const { normalizeScoutSandboxWaterTankMap } = await import(moduleUrl)
+const { normalizeScoutSandboxWaterTankMap, buildScoutSandboxWaterTankOpportunity } = await import(moduleUrl)
 
 const exemplar = {
   contract_version: 'water_tank_single_site_map_v1',
@@ -98,11 +98,33 @@ for (const mutate of [
   assert.equal(normalizeScoutSandboxWaterTankMap(invalid), null)
 }
 
-// Batch 2 adds isolated model/frame code only. The live sandbox result/View must still not expose or render it.
+const opportunity = buildScoutSandboxWaterTankOpportunity(exemplar)
+assert.deepEqual(opportunity, {
+  opportunity_type: 'water_tank',
+  name: 'SOUTH PRESSURE ZONE TANK',
+  system_name: 'BOWLING GREEN MUNICIPAL UTILITIES',
+  status: 'rehab_signal',
+  confidence: 0.995,
+  observed_at: '2026-01-20T14:03:03+00:00',
+  tank_type: 'ELEVATED',
+  capacity_gallons: 1000000,
+  morphology_class: 'composite_elevated',
+  support_geometry: 'single_pedestal',
+  operator_assessment: 'favorable',
+  project_status: 'REHAB',
+  project_purpose: 'TANK IMPROVEMENTS',
+  guardrail: exemplar.project_linkage.guardrail,
+})
+assert.equal('time_sensitive' in opportunity, false)
+
+// Batch 3 is host-visible and type-matched end-to-end.
 assert.ok(contractSource.includes('normalizeScoutSandboxWaterTankMap'))
-assert.equal(serverSource.includes('scout_get_component_sandbox_water_tank_map_v1_internal'), false)
-assert.equal(viewSource.includes('normalizeScoutSandboxWaterTankMap'), false)
-assert.equal(viewSource.includes('water_tank_single_site_map_v1'), false)
+assert.ok(contractSource.includes('buildScoutSandboxWaterTankOpportunity'))
+assert.ok(serverSource.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
+assert.ok(serverSource.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank']).optional()"))
+assert.ok(viewSource.includes('normalizeScoutSandboxWaterTankMap'))
+assert.ok(viewSource.includes('mountScoutWaterTankMap'))
+assert.ok(viewSource.includes("opportunityType === 'water_tank'"))
 
 for (const deprecated of [
   'window.openai',
@@ -116,8 +138,8 @@ for (const deprecated of [
 
 assert.ok(mapContract.includes('SOUTH PRESSURE ZONE TANK'))
 assert.ok(mapContract.includes('water_tank_single_site_map_v1'))
-assert.ok(mapContract.includes('isolated point-renderer batch'))
-assert.ok(mapContract.includes('component server must not call `scout_get_component_sandbox_water_tank_map_v1_internal()` yet'))
-assert.ok(mapContract.includes('view.ts` must not import the water-tank model/renderer yet'))
+assert.ok(mapContract.includes('Water-tank Batch 3 integration scope'))
+assert.ok(mapContract.includes('ui://scout/component-sandbox/v16'))
+assert.ok(mapContract.includes('No third opportunity type'))
 
 console.log('Scout water-tank single-site map contract checks passed.')
