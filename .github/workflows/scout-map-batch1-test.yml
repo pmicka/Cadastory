@@ -1,0 +1,29 @@
+name: Scout map Batch 1 test
+
+on:
+  push:
+    branches:
+      - scout-pnc-map-contract-batch1-20260911
+    paths:
+      - .github/workflows/scout-map-batch1-test.yml
+      - AGENTS.md
+      - supabase/functions/scout-component-sandbox-mcp/**
+      - supabase/migrations/20260912021000_component_sandbox_premium_exterior_map_v1.sql
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install sandbox dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Run sandbox contract and lifecycle tests
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm test
