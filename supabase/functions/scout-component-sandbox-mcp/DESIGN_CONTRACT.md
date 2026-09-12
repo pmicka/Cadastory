@@ -27,6 +27,17 @@ The live MCP Apps View should preserve the card's existing visual hierarchy:
 9. Divider.
 10. `Save for later` and `Investigate` controls in the existing Figma geometry. Until their behaviors are explicitly wired, they remain visually present but inert.
 
+## Owner-approved carousel refinement
+
+Approved 2026-09-11 from the live mobile review:
+
+- Every media tile must occupy exactly 100% of the visible carousel viewport width.
+- Adjacent tiles must not intentionally peek into the viewport.
+- Horizontal swipe, mandatory snap, carousel count, and dots remain intact.
+- Tile-internal placeholder content remains centered responsively inside the full-width tile.
+
+This refinement intentionally supersedes the narrower 330px tile geometry in the original Figma frame. Do not revert to a fixed 330px tile or reintroduce an adjacent-tile preview unless the owner explicitly changes direction again.
+
 ## Approved real-data substitutions
 
 The existing placeholder copy may be replaced only by fields already present in the bounded sandbox opportunity contract:
