@@ -132,6 +132,21 @@ The isolated TypeScript model and strict normalizer consume only `swppp_site_map
 
 The compact opportunity projection carries categorical active permit evidence rather than inventing numeric confidence. It omits `project_type` and `time_sensitive` because neither claim is established by this contract. This model is test-only groundwork until the separate map-frame renderer is complete and the owner approves integration into the live discriminated union and View.
 
+## SWPPP-site isolated point renderer
+
+The isolated SWPPP map model and raster-frame calculation remain disconnected from the live View. They:
+
+- center on the exact normalized Ohio EPA permit-location point
+- place the Scout marker on that same exact point
+- preserve the permit/source identity in the render model
+- use render-only zoom `15` to provide project-vicinity context
+- calculate only the OSM raster tiles intersecting the supplied viewport
+- contain no DOM, host lifecycle, WebGL, worker, MapLibre, or interaction code
+
+The zoom is a presentation choice only and is not calculated from the documented 135 total permit acres. It does not define acreage, project extent, disturbed area, a service radius, parcel or ownership bounds, construction limits, or site access.
+
+The small duplicated Web Mercator/tile framing kernel is intentional. The host-verified PNC and water-tank paths remain untouched rather than being refactored merely to deduplicate pure map math.
+
 ## Water-tank Batch 3 integration scope
 
 Batch 3 is the first host-visible water-tank integration.
