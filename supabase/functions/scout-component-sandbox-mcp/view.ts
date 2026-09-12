@@ -19,18 +19,14 @@ type ScoutOpportunity = {
 
 const title = document.querySelector<HTMLElement>('[data-scout-title]')
 const tier = document.querySelector<HTMLElement>('[data-scout-tier]')
+const meta = document.querySelector<HTMLElement>('[data-scout-meta]')
 const address = document.querySelector<HTMLElement>('[data-scout-address]')
 const summary = document.querySelector<HTMLElement>('[data-scout-summary]')
-const score = document.querySelector<HTMLElement>('[data-scout-score]')
-const confidence = document.querySelector<HTMLElement>('[data-scout-confidence]')
-const stories = document.querySelector<HTMLElement>('[data-scout-stories]')
-const height = document.querySelector<HTMLElement>('[data-scout-height]')
-const footprint = document.querySelector<HTMLElement>('[data-scout-footprint]')
-const facade = document.querySelector<HTMLElement>('[data-scout-facade]')
-const observed = document.querySelector<HTMLElement>('[data-scout-observed]')
-const route = document.querySelector<HTMLElement>('[data-scout-route]')
 const guardrail = document.querySelector<HTMLElement>('[data-scout-guardrail]')
 const state = document.querySelector<HTMLElement>('[data-scout-state]')
+const carousel = document.querySelector<HTMLElement>('[data-scout-carousel]')
+const carouselCount = document.querySelector<HTMLElement>('[data-scout-carousel-count]')
+const carouselDots = Array.from(document.querySelectorAll<HTMLElement>('[data-scout-carousel-dot]'))
 
 function setState(message: string) {
   if (state) state.textContent = message.slice(0, 200)
@@ -106,31 +102,61 @@ function formatObserved(value: string) {
   }).format(date)
 }
 
+function formatNumber(value: number, maximumFractionDigits = 0) {
+  return new Intl.NumberFormat('en-US', { maximumFractionDigits }).format(value)
+}
+
 function renderOpportunity(value: unknown) {
   const opportunity = normalizeOpportunity(value)
   if (!opportunity) {
     if (title) title.textContent = 'Opportunity unavailable'
     if (tier) tier.textContent = 'Unavailable'
-    if (address) address.textContent = 'Scout did not receive a valid bounded opportunity result.'
+    if (meta) meta.textContent = 'Scout did not receive a valid bounded opportunity result.'
+    if (address) address.textContent = ''
+    if (summary) summary.textContent = ''
+    if (guardrail) guardrail.textContent = ''
     setState('Scout opportunity result failed validation')
     return
   }
 
   if (title) title.textContent = opportunity.name
   if (tier) tier.textContent = label(opportunity.opportunity_tier)
+  if (meta) {
+    meta.textContent = `Score ${opportunity.opportunity_score}  •  ${Math.round(opportunity.confidence * 100)}% confidence  •  Observed ${formatObserved(opportunity.observed_at)}`
+  }
   if (address) address.textContent = opportunity.address
-  if (summary) summary.textContent = `${label(opportunity.target_subclass)} · ${label(opportunity.target_class)} · ${label(opportunity.glazing_status)}`
-  if (score) score.textContent = String(opportunity.opportunity_score)
-  if (confidence) confidence.textContent = `${Math.round(opportunity.confidence * 100)}%`
-  if (stories) stories.textContent = String(opportunity.story_count)
-  if (height) height.textContent = `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 1 }).format(opportunity.height_m)} m`
-  if (footprint) footprint.textContent = `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(opportunity.footprint_sqft)} sq ft`
-  if (facade) facade.textContent = label(opportunity.glazing_status)
-  if (observed) observed.textContent = formatObserved(opportunity.observed_at)
-  if (route) route.textContent = label(opportunity.buyer_resolvability)
-  if (guardrail) guardrail.textContent = opportunity.guardrail
+  if (summary) {
+    summary.textContent = `${label(opportunity.target_subclass)}  •  ${label(opportunity.target_class)}  •  ${label(opportunity.glazing_status)}  •  ${opportunity.story_count} stories  •  ${formatNumber(opportunity.height_m, 1)} m  •  ${formatNumber(opportunity.footprint_sqft)} sq ft  •  ${label(opportunity.buyer_resolvability)}`
+  }
+  if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
   setState(`Scout opportunity ready: ${opportunity.name}`)
 }
+
+function updateCarouselState() {
+  if (!carousel || !carouselCount || carouselDots.length === 0) return
+  const slides = Array.from(carousel.querySelectorAll<HTMLElement>('.media-slide'))
+  if (slides.length === 0) return
+  const viewportCenter = carousel.scrollLeft + carousel.clientWidth / 2
+  let active = 0
+  let bestDistance = Number.POSITIVE_INFINITY
+  for (let index = 0; index < slides.length; index += 1) {
+    const slide = slides[index]
+    const center = slide.offsetLeft + slide.offsetWidth / 2
+    const distance = Math.abs(center - viewportCenter)
+    if (distance < bestDistance) {
+      bestDistance = distance
+      active = index
+    }
+  }
+  carouselCount.textContent = `${active + 1} / ${slides.length}`
+  for (let index = 0; index < carouselDots.length; index += 1) {
+    carouselDots[index].dataset.active = String(index === active)
+  }
+}
+
+carousel?.addEventListener('scroll', updateCarouselState, { passive: true })
+window.addEventListener('resize', updateCarouselState, { passive: true })
+updateCarouselState()
 
 const app = new App({ name: 'scout-ui-foundation', version: '2.0.0' })
 app.ontoolinput = () => setState('Scout tool input received')
