@@ -3,79 +3,364 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta name="color-scheme" content="light dark" />
+    <meta name="color-scheme" content="light" />
     <title>Scout opportunity</title>
     <style>
       :root {
-        color-scheme: light dark;
-        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: transparent;
       }
       * { box-sizing: border-box; }
       html, body { margin: 0; padding: 0; background: transparent; }
-      body { padding: 12px; }
-      main {
-        max-width: 560px;
+      body { padding: 8px; }
+      button, input, textarea, select { font: inherit; }
+      .scout-card {
+        width: min(456px, 100%);
         margin: 0 auto;
-        padding: 20px;
-        border: 1px solid light-dark(#dfe4df, #363c37);
-        border-radius: 18px;
-        background: light-dark(#ffffff, #1b1f1c);
-        color: light-dark(#172018, #f1f4f1);
-        box-shadow: 0 8px 26px light-dark(rgba(30, 48, 33, .06), rgba(0, 0, 0, .18));
+        padding: 20px 24px 16px;
+        overflow: hidden;
+        border: 1px solid #dde2da;
+        border-radius: 24px;
+        background: #ffffff;
+        color: #171b17;
+        box-shadow: 0 8px 24px rgba(27, 33, 27, 0.08);
       }
-      .topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-      .eyebrow { margin: 0 0 7px; color: light-dark(#58705c, #9bb7a0); font-size: 11px; font-weight: 750; letter-spacing: .09em; text-transform: uppercase; }
-      h1 { margin: 0; font-size: 24px; line-height: 1.16; letter-spacing: -.02em; }
-      .tier { flex: 0 0 auto; margin-top: 1px; padding: 6px 9px; border-radius: 999px; background: light-dark(#eef5ef, #273128); color: light-dark(#33563a, #b7d5bd); font-size: 12px; font-weight: 750; }
-      .address { margin: 9px 0 0; color: light-dark(#647067, #b7c0b8); font-size: 13px; line-height: 1.45; }
-      .summary { margin: 16px 0 0; font-size: 14px; line-height: 1.5; }
-      .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 18px; }
-      .metric { min-width: 0; padding: 12px; border: 1px solid light-dark(#e5e9e5, #303631); border-radius: 12px; background: light-dark(#fafcf9, #202521); }
-      .metric span { display: block; color: light-dark(#69736b, #aeb7af); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-      .metric strong { display: block; margin-top: 5px; font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
-      .details { margin: 18px 0 0; padding: 0; }
-      .details > div { display: grid; grid-template-columns: 116px 1fr; gap: 12px; padding: 9px 0; border-top: 1px solid light-dark(#e7ebe7, #303631); }
-      dt { color: light-dark(#69736b, #aeb7af); font-size: 12px; }
-      dd { margin: 0; font-size: 12px; font-weight: 650; line-height: 1.4; }
-      .guardrail { margin-top: 17px; padding: 13px 14px; border-radius: 12px; background: light-dark(#f5f7f4, #242925); }
-      .guardrail strong { font-size: 12px; }
-      .guardrail p { margin: 5px 0 0; color: light-dark(#606b62, #b5beb6); font-size: 12px; line-height: 1.48; }
-      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
-      @media (max-width: 430px) {
-        body { padding: 8px; }
-        main { padding: 17px; border-radius: 16px; }
-        .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .details > div { grid-template-columns: 1fr; gap: 3px; }
+      .scout-header {
+        display: grid;
+        grid-template-columns: 10px minmax(0, 1fr) 34px;
+        column-gap: 8px;
+        align-items: start;
+      }
+      .scout-dot {
+        width: 10px;
+        height: 10px;
+        margin-top: 4px;
+        border-radius: 50%;
+        background: #4d6b52;
+      }
+      .scout-brand strong {
+        display: block;
+        color: #263128;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 17px;
+      }
+      .scout-brand span {
+        display: block;
+        margin-top: 2px;
+        color: #798178;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 15px;
+      }
+      .ellipsis {
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        padding: 0 0 8px;
+        border: 1px solid #e1e5de;
+        border-radius: 17px;
+        background: #f5f7f3;
+        color: #596258;
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 17px;
+        opacity: 1;
+      }
+      .ellipsis:disabled,
+      .action:disabled { opacity: 1; cursor: default; }
+      .divider {
+        height: 1px;
+        margin-top: 18px;
+        background: #e6eae4;
+      }
+      h1 {
+        margin: 18px 0 0;
+        color: #171b17;
+        font-size: 21px;
+        font-weight: 600;
+        line-height: 25px;
+        letter-spacing: 0;
+      }
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        margin-top: 11px;
+      }
+      .status-pill {
+        display: inline-flex;
+        min-width: 120px;
+        height: 28px;
+        align-items: center;
+        justify-content: center;
+        padding: 0 12px;
+        border-radius: 14px;
+        background: #eef3ed;
+        color: #3f5d45;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 13px;
+        white-space: nowrap;
+      }
+      .status-meta {
+        min-width: 0;
+        color: #747d73;
+        font-size: 12px;
+        font-weight: 400;
+        line-height: 15px;
+      }
+      .media-label {
+        margin: 17px 0 0;
+        color: #4d564d;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 15px;
+      }
+      .carousel-shell {
+        position: relative;
+        margin-top: 9px;
+      }
+      .carousel-viewport {
+        width: 100%;
+        height: 210px;
+        overflow-x: auto;
+        overflow-y: hidden;
+        border-radius: 16px;
+        background: #e9ece6;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      .carousel-viewport::-webkit-scrollbar { display: none; }
+      .carousel-strip {
+        display: flex;
+        gap: 16px;
+        width: max-content;
+        min-width: 100%;
+        height: 210px;
+      }
+      .media-slide {
+        position: relative;
+        flex: 0 0 330px;
+        width: 330px;
+        height: 210px;
+        overflow: hidden;
+        border-radius: 16px;
+        scroll-snap-align: start;
+      }
+      .media-slide:nth-child(1) { background: #dce4d9; }
+      .media-slide:nth-child(2) { background: #e6e0d4; }
+      .media-slide:nth-child(3) { background: #d9e1e6; }
+      .media-glyph {
+        position: absolute;
+        top: 6px;
+        left: 13px;
+        color: #6f796e;
+        font-size: 24px;
+        font-weight: 500;
+        line-height: 29px;
+      }
+      .media-circle {
+        position: absolute;
+        top: 64px;
+        left: 143px;
+        width: 44px;
+        height: 44px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.74);
+      }
+      .media-placeholder {
+        position: absolute;
+        top: 122px;
+        left: 0;
+        width: 100%;
+        padding: 0 12px;
+        color: #566056;
+        font-size: 13px;
+        font-weight: 500;
+        line-height: 16px;
+        text-align: center;
+      }
+      .media-subtext {
+        position: absolute;
+        top: 146px;
+        left: 0;
+        width: 100%;
+        padding: 0 12px;
+        color: #788078;
+        font-size: 11px;
+        font-weight: 400;
+        line-height: 13px;
+        text-align: center;
+      }
+      .carousel-count {
+        position: absolute;
+        right: 16px;
+        bottom: 16px;
+        display: grid;
+        place-items: center;
+        width: 52px;
+        height: 26px;
+        border-radius: 13px;
+        background: rgba(32, 37, 31, .88);
+        color: #ffffff;
+        font-size: 11px;
+        font-weight: 600;
+        line-height: 13px;
+        pointer-events: none;
+      }
+      .carousel-dots {
+        display: flex;
+        justify-content: center;
+        gap: 7px;
+        margin-top: 12px;
+      }
+      .carousel-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #cdd3cb;
+      }
+      .carousel-dot[data-active="true"] { background: #4d6b52; }
+      .summary {
+        margin: 20px 0 0;
+        color: #4f584f;
+        font-size: 13px;
+        font-weight: 400;
+        line-height: 20px;
+      }
+      .summary-address {
+        display: block;
+        color: #394139;
+        font-weight: 600;
+      }
+      .summary-facts { display: block; margin-top: 4px; }
+      .summary-guardrail {
+        display: block;
+        margin-top: 7px;
+        color: #747d73;
+        font-size: 11px;
+        line-height: 17px;
+      }
+      .actions-divider {
+        height: 1px;
+        margin-top: 30px;
+        background: #e6eae4;
+      }
+      .actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      .action {
+        height: 42px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 15px;
+      }
+      .action-secondary {
+        width: 130px;
+        border: 1px solid #dde2da;
+        background: #f5f7f3;
+        color: #394139;
+      }
+      .action-primary {
+        width: 170px;
+        border: 0;
+        background: #263128;
+        color: #ffffff;
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+      @media (max-width: 380px) {
+        body { padding: 4px; }
+        .scout-card { padding-left: 18px; padding-right: 18px; border-radius: 20px; }
+        .media-slide { flex-basis: calc(100vw - 48px); width: calc(100vw - 48px); }
+        .media-circle { left: calc(50% - 22px); }
+        .actions { gap: 8px; }
+        .action-secondary, .action-primary { width: auto; flex: 1 1 0; }
       }
     </style>
   </head>
   <body>
-    <main data-scout-card aria-labelledby="scout-title">
-      <div class="topline">
-        <div>
-          <p class="eyebrow">Scout by Cadastory</p>
-          <h1 id="scout-title" data-scout-title>Scout opportunity</h1>
+    <main class="scout-card" data-scout-card aria-labelledby="scout-title">
+      <header class="scout-header">
+        <span class="scout-dot" aria-hidden="true"></span>
+        <div class="scout-brand">
+          <strong>Scout</strong>
+          <span>Component preview</span>
         </div>
-        <span class="tier" data-scout-tier>Loading</span>
+        <button class="ellipsis" type="button" aria-label="More Scout actions" title="Actions are not wired in this sandbox" disabled>•••</button>
+      </header>
+
+      <div class="divider" aria-hidden="true"></div>
+
+      <h1 id="scout-title" data-scout-title>Scout opportunity</h1>
+      <div class="status-row">
+        <span class="status-pill" data-scout-tier>Loading</span>
+        <span class="status-meta" data-scout-meta>Loading opportunity…</span>
       </div>
-      <p class="address" data-scout-address>Loading opportunity…</p>
-      <p class="summary" data-scout-summary></p>
-      <section class="metrics" aria-label="Opportunity metrics">
-        <div class="metric"><span>Score</span><strong data-scout-score>—</strong></div>
-        <div class="metric"><span>Confidence</span><strong data-scout-confidence>—</strong></div>
-        <div class="metric"><span>Stories</span><strong data-scout-stories>—</strong></div>
-        <div class="metric"><span>Height</span><strong data-scout-height>—</strong></div>
-        <div class="metric"><span>Footprint</span><strong data-scout-footprint>—</strong></div>
-        <div class="metric"><span>Facade</span><strong data-scout-facade>—</strong></div>
-      </section>
-      <dl class="details">
-        <div><dt>Observed</dt><dd data-scout-observed>—</dd></div>
-        <div><dt>Buyer / site route</dt><dd data-scout-route>—</dd></div>
-      </dl>
-      <aside class="guardrail">
-        <strong>Scout guardrail</strong>
-        <p data-scout-guardrail>—</p>
-      </aside>
+
+      <p class="media-label">Media</p>
+      <div class="carousel-shell">
+        <div class="carousel-viewport" data-scout-carousel aria-label="Scout media placeholders">
+          <div class="carousel-strip">
+            <div class="media-slide">
+              <span class="media-glyph" aria-hidden="true">◇</span>
+              <span class="media-circle" aria-hidden="true"></span>
+              <span class="media-placeholder">Placeholder image 1</span>
+              <span class="media-subtext">Media wiring intentionally deferred</span>
+            </div>
+            <div class="media-slide">
+              <span class="media-glyph" aria-hidden="true">◇</span>
+              <span class="media-circle" aria-hidden="true"></span>
+              <span class="media-placeholder">Placeholder image 2</span>
+              <span class="media-subtext">Media wiring intentionally deferred</span>
+            </div>
+            <div class="media-slide">
+              <span class="media-glyph" aria-hidden="true">◇</span>
+              <span class="media-circle" aria-hidden="true"></span>
+              <span class="media-placeholder">Placeholder image 3</span>
+              <span class="media-subtext">Media wiring intentionally deferred</span>
+            </div>
+          </div>
+        </div>
+        <span class="carousel-count" data-scout-carousel-count>1 / 3</span>
+      </div>
+      <div class="carousel-dots" aria-hidden="true">
+        <span class="carousel-dot" data-scout-carousel-dot="0" data-active="true"></span>
+        <span class="carousel-dot" data-scout-carousel-dot="1" data-active="false"></span>
+        <span class="carousel-dot" data-scout-carousel-dot="2" data-active="false"></span>
+      </div>
+
+      <p class="summary">
+        <span class="summary-address" data-scout-address>Loading opportunity…</span>
+        <span class="summary-facts" data-scout-summary></span>
+        <span class="summary-guardrail" data-scout-guardrail></span>
+      </p>
+
+      <div class="actions-divider" aria-hidden="true"></div>
+      <div class="actions">
+        <button class="action action-secondary" type="button" title="Persistent save behavior is not wired in this sandbox" disabled>Save for later</button>
+        <button class="action action-primary" type="button" title="Investigate behavior is not wired in this sandbox" disabled>Investigate</button>
+      </div>
+
       <p class="sr-only" data-scout-state role="status" aria-live="polite">Scout View loading</p>
     </main>
     <script type="module">/*__SCOUT_VIEW_BUNDLE__*/</script>
