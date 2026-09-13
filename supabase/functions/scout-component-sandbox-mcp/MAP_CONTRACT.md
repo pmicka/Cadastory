@@ -1,15 +1,15 @@
 # Scout component sandbox map contract
 
-## SWPPP-site host-visible integration scope (v21)
+## SWPPP-site host-visible integration scope (v22)
 
-- Current resource: `ui://scout/component-sandbox/v21`; v20 through v1 remain compatibility aliases.
+- Current resource: `ui://scout/component-sandbox/v22`; v21 through v1 remain compatibility aliases.
 - Third selector: `opportunity_type: "swppp_site"`, backed only by `scout_get_component_sandbox_swppp_site_map_v1_internal()` and `swppp_site_map_v1`.
 - Exemplar: HAM–Brent Spence Project (PID 116649), Ohio EPA construction-stormwater permit `1GC10896*AG`, active with 135 documented permit acres.
 - Geometry is the authoritative permit-location `Point` at `-84.521, 39.097`. No project polygon, parcel polygon, disturbance boundary, or radius is inferred.
 - The card and map share site name and location identity. The map remains slide 1; slides 2 and 3 remain placeholders.
 - Active permit evidence identifies a potentially relevant site or documentation need; it is not proof of procurement, buyer intent, contract availability, current service need, site access, or ownership.
 - Buyer resolution remains explicitly `unresolved`.
-- The v17 SWPPP card content rendered in the Android ChatGPT host on 2026-09-12, but the OSM standard service blocked its anonymous tile requests. v18 confirmed that the host also rejects a replacement external raster origin, v19 confirmed that Android rejects runtime image subrequests through Scout's origin, and v20 confirmed that assigning component-only `data:` URLs to image sources is also rejected. v21 decodes the bounded PNG bytes locally and paints them onto a non-interactive 2D canvas; map host verification remains pending.
+- The v17 SWPPP card content rendered in the Android ChatGPT host on 2026-09-12, but the OSM standard service blocked its anonymous tile requests. v18 confirmed that the host also rejects a replacement external raster origin, v19 confirmed that Android rejects runtime image subrequests through Scout's origin, and v20–v21 showed that custom tool-result metadata was not available to this hosted View path. v22 embeds the bounded PNG payload in the View resource itself and paints it onto a non-interactive 2D canvas; map host verification remains pending.
 
 This file is the durable guardrail for incremental map work in `scout-component-sandbox-mcp`.
 
@@ -228,13 +228,15 @@ For v20, the server fetches only the raster tiles intersecting a 456×210 SWPPP 
 
 For v21, the SWPPP mount does not assign those embedded values to an image source. It decodes each validated base64 PNG into a `Blob`, creates an `ImageBitmap`, and draws the original raster tiles onto an ordinary 2D canvas at the same Web Mercator frame positions. This avoids iframe image-source CSP entirely while preserving the raster provider, attribution, exact point marker, bounded frame, and non-interactive semantics. It does not use WebGL or synthesize a basemap.
 
+For v22, the current View resource callback fetches the same bounded SWPPP frame once per warm Edge Function instance and replaces a non-executable JSON placeholder in the HTML resource before delivery. The View validates that resource payload with the same 12-tile and PNG limits before local decoding. The tool result no longer carries raster bytes, so rendering does not depend on host forwarding of custom tool-result metadata. Compatibility resources contain an empty payload and retain their prior behavior.
+
 ## Host verification state
 
 - mobile ChatGPT host / PNC premium exterior: **verified working** — Android rendered the hardened v15 PNC raster map successfully in the existing carousel on 2026-09-12.
 - desktop ChatGPT host / PNC premium exterior: still requires explicit visual verification.
 - water-tank v16 integration: **verified working** in the Android ChatGPT host on 2026-09-12.
 - PNC v16 regression after water-tank deployment: **verified working** in the Android ChatGPT host on 2026-09-12.
-- SWPPP v17–v20 card content: **verified**, but Android rejected both runtime raster requests and embedded image-source delivery; v21 local raster decoding and 2D composition remains pending host verification.
+- SWPPP v17–v21 card content: **verified**, but Android rejected runtime raster requests and did not deliver the custom tile metadata to the View; v22 resource-embedded raster delivery remains pending host verification.
 
 The earlier transient v14 `Site map unavailable` state resolved after an app refresh and is not treated as a renderer-architecture failure.
 
