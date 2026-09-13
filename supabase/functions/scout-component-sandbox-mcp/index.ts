@@ -30,8 +30,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v21'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v22'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v21',
   'ui://scout/component-sandbox/v20',
   'ui://scout/component-sandbox/v19',
   'ui://scout/component-sandbox/v18',
@@ -113,6 +114,22 @@ async function loadEmbeddedSwpppTiles(map: ScoutSandboxSwpppSiteMap) {
     for (const byte of bytes) binary += String.fromCharCode(byte)
     return { url: tile.url, data_url: `data:image/png;base64,${btoa(binary)}` }
   }))
+}
+
+let scoutViewHtmlPromise: Promise<string> | null = null
+
+function loadScoutViewHtml() {
+  if (!scoutViewHtmlPromise) {
+    scoutViewHtmlPromise = (async () => {
+      const map = await loadScoutSandboxSwpppSiteMap()
+      const tiles = await loadEmbeddedSwpppTiles(map)
+      return SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', JSON.stringify(tiles))
+    })().catch((error) => {
+      scoutViewHtmlPromise = null
+      throw error
+    })
+  }
+  return scoutViewHtmlPromise
 }
 
 async function isOwnerConnection(connectionId: string) {
@@ -335,7 +352,7 @@ const swpppSiteResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.4' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.5' })
 
   registerAppResource(
     server,
@@ -346,7 +363,7 @@ function makeServer() {
       contents: [{
         uri: RESOURCE_URI,
         mimeType: RESOURCE_MIME_TYPE,
-        text: SCOUT_VIEW_HTML,
+        text: await loadScoutViewHtml(),
         _meta: {
           ui: {
             prefersBorder: false,
@@ -367,7 +384,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: SCOUT_VIEW_HTML,
+          text: SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'),
           _meta: {
             ui: {
               prefersBorder: false,
@@ -412,7 +429,6 @@ function makeServer() {
         return {
           content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} SWPPP-site evidence card with its authoritative permit-location point map.` }],
           structuredContent,
-          _meta: { 'scout/rasterTiles': await loadEmbeddedSwpppTiles(map) },
         }
       }
 
