@@ -5,6 +5,15 @@ const MAX_MERCATOR_LAT = 85.05112878
 const DEFAULT_MIN_ZOOM = 5
 const DEFAULT_MAX_ZOOM = 18
 const DEFAULT_TIMEOUT_MS = 7000
+const PNG_DATA_URL_PREFIX = 'data:image/png;base64,'
+
+async function decodeEmbeddedRasterTile(dataUrl: string) {
+  if (!dataUrl.startsWith(PNG_DATA_URL_PREFIX)) throw new Error('Scout embedded raster tile is invalid')
+  const binary = atob(dataUrl.slice(PNG_DATA_URL_PREFIX.length))
+  const bytes = new Uint8Array(binary.length)
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index)
+  return await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
+}
 
 export type ScoutSingleSiteMapRendererOptions = {
   tileUrlTemplate: string
@@ -13,6 +22,7 @@ export type ScoutSingleSiteMapRendererOptions = {
   minZoom?: number
   maxZoom?: number
   timeoutMs?: number
+  embeddedTiles?: Record<string, string>
   onError?: (error: Error) => void
   onReady?: () => void
 }
@@ -207,28 +217,57 @@ export function mountScoutSingleSiteMap(
       options.onError?.(new Error('Scout raster tiles did not load'))
     }
 
-    for (const tile of frame.tiles) {
-      const image = document.createElement('img')
-      image.alt = ''
-      image.draggable = false
-      image.decoding = 'async'
-      image.loading = 'eager'
-      image.referrerPolicy = 'origin'
-      image.src = tile.url
-      image.style.left = `${tile.left}px`
-      image.style.top = `${tile.top}px`
-      image.addEventListener('load', () => {
-        if (destroyed || generation !== renderGeneration) return
-        loadedTiles += 1
-        settledTiles += 1
-        if (loadedTiles === 1) finishReady()
-      }, { once: true })
-      image.addEventListener('error', () => {
-        if (destroyed || generation !== renderGeneration) return
-        settledTiles += 1
-        if (settledTiles === frame.tiles.length && loadedTiles === 0) finishError()
-      }, { once: true })
-      container.appendChild(image)
+    const embeddedFrame = frame.tiles.length > 0 && frame.tiles.every((tile) => options.embeddedTiles?.[tile.url])
+    if (embeddedFrame) {
+      const canvas = document.createElement('canvas')
+      canvas.width = frame.width
+      canvas.height = frame.height
+      canvas.style.position = 'absolute'
+      canvas.style.inset = '0'
+      canvas.style.width = `${frame.width}px`
+      canvas.style.height = `${frame.height}px`
+      container.appendChild(canvas)
+      const context = canvas.getContext('2d')
+      if (!context) {
+        finishError()
+        return
+      }
+      void Promise.allSettled(frame.tiles.map(async (tile) => {
+        const bitmap = await decodeEmbeddedRasterTile(options.embeddedTiles![tile.url])
+        if (!destroyed && generation === renderGeneration) {
+          context.drawImage(bitmap, tile.left, tile.top, 256, 256)
+          loadedTiles += 1
+        }
+        bitmap.close()
+      })).then(() => {
+        settledTiles = frame.tiles.length
+        if (loadedTiles > 0) finishReady()
+        else finishError()
+      })
+    } else {
+      for (const tile of frame.tiles) {
+        const image = document.createElement('img')
+        image.alt = ''
+        image.draggable = false
+        image.decoding = 'async'
+        image.loading = 'eager'
+        image.referrerPolicy = 'origin'
+        image.src = tile.url
+        image.style.left = `${tile.left}px`
+        image.style.top = `${tile.top}px`
+        image.addEventListener('load', () => {
+          if (destroyed || generation !== renderGeneration) return
+          loadedTiles += 1
+          settledTiles += 1
+          if (loadedTiles === 1) finishReady()
+        }, { once: true })
+        image.addEventListener('error', () => {
+          if (destroyed || generation !== renderGeneration) return
+          settledTiles += 1
+          if (settledTiles === frame.tiles.length && loadedTiles === 0) finishError()
+        }, { once: true })
+        container.appendChild(image)
+      }
     }
 
     const marker = document.createElement('span')

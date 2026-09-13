@@ -58,7 +58,7 @@ function cleanNumber(value: unknown, minimum: number, maximum: number) {
 }
 
 function normalizeEmbeddedTiles(value: unknown) {
-  if (!Array.isArray(value) || value.length > 12) return undefined
+  if (!Array.isArray(value) || value.length > 20) return undefined
   const tiles: Record<string, string> = {}
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined
@@ -279,7 +279,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
       }
       mapContainer.setAttribute('role', 'img')
       mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
-      mapHandle = mountScoutWaterTankMap(mapContainer, mapData, mapOptions)
+      mapHandle = mountScoutWaterTankMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
     } else {
       const mapData = normalizeScoutSandboxSingleSiteMap(value)
       if (!mapData) {
@@ -289,7 +289,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
       }
       mapContainer.setAttribute('role', 'img')
       mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
-      mapHandle = mountScoutSingleSiteMap(mapContainer, mapData, mapOptions)
+      mapHandle = mountScoutSingleSiteMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
     }
     scheduleLayoutRefresh()
   } catch (error) {
@@ -355,7 +355,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.5.5' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.6.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent

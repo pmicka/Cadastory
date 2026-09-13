@@ -36,6 +36,9 @@ assert.ok(rendererSource.includes('TILE_SIZE = 256'))
 assert.ok(rendererSource.includes('ScoutWaterTankRasterFrame'))
 assert.ok(modelSource.includes('SCOUT_WATER_TANK_POINT_ZOOM = 17'))
 assert.ok(mountSource.includes('buildScoutWaterTankRasterFrame'))
+assert.ok(mountSource.includes("document.createElement('canvas')"))
+assert.ok(mountSource.includes('createImageBitmap'))
+assert.ok(mountSource.includes('embeddedTiles'))
 
 for (const source of [modelSource, rendererSource]) {
   assert.equal(source.includes('time_sensitive'), false)
@@ -48,11 +51,13 @@ for (const source of [modelSource, rendererSource]) {
 
 // Batch 3 wires the isolated point renderer into the selected water-tank View path.
 assert.ok(view.includes('mountScoutWaterTankMap'))
+assert.ok(view.includes('mountScoutWaterTankMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })'))
 assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))
 assert.ok(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
 assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site']).optional()"))
 assert.ok(generated.includes('water_tank_single_site_map_v1'))
 assert.ok(generated.includes('Rehab signal'))
+assert.ok(generated.includes('createImageBitmap'))
 
 // The render model/frame remains point-only. It must not manufacture domain geometry.
 for (const forbidden of ['footprint', 'service_radius', 'property_boundary', 'access_area', 'tank_diameter']) {

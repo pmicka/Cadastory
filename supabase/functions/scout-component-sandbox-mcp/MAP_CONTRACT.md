@@ -1,3 +1,13 @@
+## Cross-opportunity embedded raster transport — owner evidence 2026-09-13
+
+The owner verified in the native Android ChatGPT host that the v25 SWPPP card now renders its map, while a newly rendered SOUTH PRESSURE ZONE TANK card returns the correct opportunity content but displays `Site map unavailable`; the owner also reports the previously functional map types are affected. This is current host evidence, superseding the assumption that the runtime image-subrequest path remains reliable for the earlier map types.
+
+Resource v26 extends the already-proven SWPPP **transport only** to all three bounded exemplars. The server computes the canonical 456×210 raster frames for PNC Tower, SOUTH PRESSURE ZONE TANK, and HAM–Brent Spence, deduplicates their bounded tile URLs, and embeds at most 20 PNG entries in the View resource. The current three canonical frames require 18 unique tiles. Because the approved card is at most 456px wide and the media viewport remains 210px high, narrower host frames consume subsets of those canonical tile sets at the existing contract zooms.
+
+The PNC and water-tank renderers now prefer the same local PNG → `Blob` → `ImageBitmap` → ordinary 2D canvas path that is host-verified for SWPPP. Their existing runtime `<img>` tile path remains only as a fallback. No opportunity data, geometry, zoom semantics, provider, CSP origin, card layout, service/profile gate, authentication, or evidence guardrail changes in this batch. The runtime image-subrequest path is no longer treated as currently verified merely because it worked on 2026-09-12.
+
+Host verification remains required for v26 PNC and water-tank maps after deployment; this transport change is not marked fixed until the owner verifies those cards in the real host.
+
 ## Explicit transport assertions — owner approved 2026-09-13
 
 Resource v25 adds `transport_contract: swppp_site_transport_v1`. The database/domain contract remains `swppp_site_map_v1`. Only after strict source validation (including explicit null termination date and organization ID) does the server add `permit.termination_state: not_recorded` and `buyer.organization_resolution_state: unresolved`. These mean no termination date recorded and no resolved buyer identity; they do not independently prove current activity or procurement.
