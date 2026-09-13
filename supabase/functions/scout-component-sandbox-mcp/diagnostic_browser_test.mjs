@@ -16,6 +16,8 @@ const {buildScoutSwpppSiteRasterFrame} = await import('data:text/javascript;base
 const modelBundle = await build({entryPoints:['swppp_site_map_model.ts'],bundle:true,write:false,format:'esm'})
 const {buildScoutSandboxSwpppSiteOpportunity} = await import('data:text/javascript;base64,'+Buffer.from(modelBundle.outputFiles[0].text).toString('base64'))
 const frame = buildScoutSwpppSiteRasterFrame(exemplar,456,210,{tileUrlTemplate:'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png'})
+const transportBundle = await build({entryPoints:['swppp_site_transport.ts'],bundle:true,write:false,format:'esm'})
+const {buildScoutSwpppSiteTransport} = await import('data:text/javascript;base64,'+Buffer.from(transportBundle.outputFiles[0].text).toString('base64'))
 const template = await readFile('view.template.html','utf8')
 try {
  for (const scenario of ['success','empty','invalid_json','invalid_map','no_bitmap','decode_reject','no_context','draw_reject']) {
@@ -33,7 +35,7 @@ try {
   },scenario)
   await page.addScriptTag({type:'module',content:bundle.outputFiles[0].text})
   await page.waitForFunction(()=>Boolean(globalThis.testApp?.ontoolresult))
-  await page.evaluate(({map,opportunity,scenario})=>globalThis.testApp.ontoolresult({structuredContent:{opportunity_type:'swppp_site',map:scenario==='invalid_map'?{}:map,opportunity}}),{map:exemplar,opportunity:buildScoutSandboxSwpppSiteOpportunity(exemplar),scenario})
+  await page.evaluate(({map,opportunity,scenario})=>globalThis.testApp.ontoolresult({structuredContent:{opportunity_type:'swppp_site',map:scenario==='invalid_map'?{}:map,opportunity}}),{map:buildScoutSwpppSiteTransport(exemplar),opportunity:buildScoutSandboxSwpppSiteOpportunity(exemplar),scenario})
   await page.waitForFunction(()=>document.querySelector('[data-scout-diagnostic-report]').textContent.includes('viewReady: true') || document.querySelector('[data-scout-map-state]').textContent==='Site map unavailable')
   await page.locator('summary').click()
   const report=await page.locator('[data-scout-diagnostic-report]').innerText()

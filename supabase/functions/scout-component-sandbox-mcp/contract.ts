@@ -1,4 +1,5 @@
-import type { ScoutSandboxSwpppSiteMap, ScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
+import type { ScoutSwpppSiteTransport } from './swppp_site_transport.ts'
+import type { ScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
 
 export type ScoutSandboxOpportunityType = 'premium_exterior' | 'water_tank' | 'swppp_site'
 
@@ -153,7 +154,7 @@ export type ScoutSandboxSwpppSiteResult = {
   surface: 'scout_component_sandbox'
   opportunity_type: 'swppp_site'
   opportunity: ScoutSandboxSwpppSiteOpportunity
-  map: ScoutSandboxSwpppSiteMap
+  map: ScoutSwpppSiteTransport
 }
 
 export type ScoutSandboxResult = ScoutSandboxPremiumExteriorResult | ScoutSandboxWaterTankResult | ScoutSandboxSwpppSiteResult

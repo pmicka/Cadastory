@@ -1,3 +1,11 @@
+## Explicit transport assertions — owner approved 2026-09-13
+
+Resource v25 adds `transport_contract: swppp_site_transport_v1`. The database/domain contract remains `swppp_site_map_v1`. Only after strict source validation (including explicit null termination date and organization ID) does the server add `permit.termination_state: not_recorded` and `buyer.organization_resolution_state: unresolved`. These mean no termination date recorded and no resolved buyer identity; they do not independently prove current activity or procurement.
+
+The View requires both assertions and the transport discriminator. It permits null fields to be absent only with those assertions; contradictory non-null fields fail. The adapter then applies all original domain checks. Missing assertions, arbitrary missing data, terminated permits, and resolved buyers remain rejected. Server output retains the original explicit-null fields. Old cached Views may still reject a null-omitted delivery; the new diagnostic build label identifies this update. No renderer, geometry, tile, timeout, credential, or service/profile changes are included.
+
+The observed omission is at the host View boundary. Its origin inside the unobserved wire/host path is not established. Diagnostics remain pending real-host map verification and will be removed in the previously specified follow-up.
+
 ## Normalizer diagnostic extension — 2026-09-13
 
 The owner's host screenshot establishes that the diagnostic build arrived through resource v22, six embedded entries validated, card/map identity matched, and the View map normalizer rejected the payload before entering the renderer. It does not establish which field failed or any tile/decoder failure.

@@ -1,3 +1,4 @@
+import { normalizeScoutSwpppSiteTransport } from './swppp_site_transport.ts'
 import { diagnostic, diagnosticError, diagnosticOverlay } from './map_diagnostics.ts'
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
 import {
@@ -9,7 +10,7 @@ import {
 } from './contract.ts'
 import { mountScoutSingleSiteMap } from './single_site_map_renderer.ts'
 import { mountScoutWaterTankMap } from './water_tank_map_mount.ts'
-import { normalizeScoutSandboxSwpppSiteMap, normalizeScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
+import { normalizeScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
 import { mountScoutSwpppSiteMap } from './swppp_site_map_mount.ts'
 
 type ScoutMapHandle = {
@@ -257,7 +258,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
 
   try {
     if (opportunityType === 'swppp_site') {
-      const mapData = normalizeScoutSandboxSwpppSiteMap(value, (detail) => diagnostic({ rejectedField: detail.field, rejectedCheck: detail.check, receivedType: detail.actualType, receivedStringShape: detail.stringShape }))
+      const mapData = normalizeScoutSwpppSiteTransport(value, (detail) => diagnostic({ rejectedField: detail.field, rejectedCheck: detail.check, receivedType: detail.actualType, receivedStringShape: detail.stringShape }))
       diagnostic({ mapNormalizer: mapData ? 'passed' : 'rejected', viewReady: false, viewError: false, initialization: 'entered' })
       if (!mapData) {
         mapState.textContent = 'Site map unavailable'
