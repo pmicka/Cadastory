@@ -2,14 +2,16 @@ import { readFile } from 'node:fs/promises'
 import assert from 'node:assert/strict'
 
 const directory = new URL('./', import.meta.url)
-const [server, view, generated, contract, connect, gateway, sharedSchema, mount] = await Promise.all([
+const [server, view, generated, contract, connect, gateway, sharedSchema, mount, template] = await Promise.all([
   readFile(new URL('index.ts', directory), 'utf8'), readFile(new URL('view.ts', directory), 'utf8'),
   readFile(new URL('view.generated.ts', directory), 'utf8'), readFile(new URL('contract.ts', directory), 'utf8'),
   readFile(new URL('../scout-connect/index.ts', directory), 'utf8'), readFile(new URL('../scout-mcp-contract/index.ts', directory), 'utf8'),
   readFile(new URL('../_shared/scout_sandbox_swppp_schema.ts', directory), 'utf8'), readFile(new URL('swppp_site_map_mount.ts', directory), 'utf8'),
+  readFile(new URL('view.template.html', directory), 'utf8'),
 ])
 
 for (const source of [server, connect, gateway]) {
+  assert.ok(source.includes('ui://scout/component-sandbox/v22'))
   assert.ok(source.includes('ui://scout/component-sandbox/v21'))
   assert.ok(source.includes('ui://scout/component-sandbox/v20'))
   assert.ok(source.includes('ui://scout/component-sandbox/v19'))
@@ -25,7 +27,11 @@ assert.ok(contract.includes('ScoutSandboxSwpppSiteResult'))
 assert.ok(view.includes('normalizeScoutSandboxSwpppSiteOpportunity'))
 assert.ok(view.includes('mountScoutSwpppSiteMap'))
 assert.ok(view.includes("result?._meta?.['scout/rasterTiles']"))
-assert.ok(server.includes("_meta: { 'scout/rasterTiles': await loadEmbeddedSwpppTiles(map) }"))
+assert.ok(view.includes('resourceEmbeddedTiles'))
+assert.ok(template.includes('scout-embedded-raster-tiles'))
+assert.ok(server.includes("text: await loadScoutViewHtml()"))
+assert.ok(server.includes("SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', JSON.stringify(tiles))"))
+assert.equal(server.includes("_meta: { 'scout/rasterTiles': await loadEmbeddedSwpppTiles(map) }"), false)
 assert.ok(mount.includes("document.createElement('canvas')"))
 assert.ok(mount.includes('createImageBitmap'))
 assert.ok(mount.includes("canvas.getContext('2d')"))
