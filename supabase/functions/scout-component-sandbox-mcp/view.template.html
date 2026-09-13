@@ -428,6 +428,11 @@
 
       <p class="sr-only" data-scout-state role="status" aria-live="polite">Scout View loading</p>
     </main>
+    <details data-scout-diagnostics hidden style="max-width:456px;margin:8px auto;font:12px/1.4 monospace;color:#263128;background:#fff;padding:10px">
+      <summary>Show map diagnostics</summary>
+      <pre data-scout-diagnostic-report style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+    </details>
+    <meta name="scout-diagnostic-resource" content="__SCOUT_DIAGNOSTIC_RESOURCE_URI__" />
     <script id="scout-embedded-raster-tiles" type="application/json">__SCOUT_EMBEDDED_RASTER_TILES__</script>
     <script type="module">/*__SCOUT_VIEW_BUNDLE__*/</script>
   </body>

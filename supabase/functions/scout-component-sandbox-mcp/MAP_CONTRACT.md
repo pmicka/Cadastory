@@ -1,3 +1,15 @@
+## Temporary owner-approved map diagnostics (2026-09-13)
+
+The owner approved implementing and deploying a temporary, opt-in “Show map diagnostics” control for one failing-host reproduction. Current diagnostic resource: `ui://scout/component-sandbox/v23`; build label: `swppp-diagnostic-20260913-1`.
+
+The report is in-memory, SWPPP-only, and retrieved by the owner opening the control and sending screenshots from the actual failing card. It records categorical validation/render stages, bounded counts/error categories, resource/build identity, and overlay state. No network reporting, storage, credential access, chat collection, raster output, or new tool is added. Existing owner authentication and service/profile gates remain unchanged.
+
+Each resource response stamps its own URI. v22 and v23 embed the existing tile payload; v21 and earlier still embed `[]`. This intentionally preserves branch behavior. A missing control/report is not proof of an Android defect or of which resource loaded.
+
+**Evidence correction:** statements below claiming Android CSP rejection, metadata stripping, or decoder restrictions are historical hypotheses, not established causes. Host-rendered failure boundaries remain unobserved. Historical PNC/water-tank success is not current regression verification.
+
+Removal: after the reproduction, remove `map_diagnostics.ts`, View/mount diagnostic hooks, the opt-in control and resource stamp, and its diagnostic test. Rebuild the generated View and publish a separately approved diagnostic-removal deployment. Do not modify rendering based on this instrumentation until host evidence identifies a failing boundary.
+
 # Scout component sandbox map contract
 
 ## SWPPP-site host-visible integration scope (v22)
