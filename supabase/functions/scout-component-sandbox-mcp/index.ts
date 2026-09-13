@@ -1,3 +1,4 @@
+import { buildScoutSwpppSiteTransport } from './swppp_site_transport.ts'
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.0.0'
@@ -30,8 +31,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v24'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v25'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v24',
   'ui://scout/component-sandbox/v23',
   'ui://scout/component-sandbox/v22',
   'ui://scout/component-sandbox/v21',
@@ -308,6 +310,7 @@ const waterTankResultSchema = z.object({
 
 const swpppSiteMapSchema = z.object({
   contract_version: z.literal('swppp_site_map_v1'),
+  transport_contract: z.literal('swppp_site_transport_v1'),
   opportunity_type: z.literal('swppp_site'),
   candidate_key: z.string().min(1).max(160),
   site_name: z.string().min(1).max(200),
@@ -324,7 +327,7 @@ const swpppSiteMapSchema = z.object({
     permit_number: z.string().min(1).max(80), registry_id: z.string().min(1).max(80),
     master_permit_number: z.string().min(1).max(80), issue_date: z.string().min(1).max(40),
     effective_date: z.string().min(1).max(40), expiration_date: z.string().min(1).max(40),
-    termination_date: z.null(), documented_total_acres: z.number().min(1).max(10_000_000),
+    termination_date: z.null(), termination_state: z.literal('not_recorded'), documented_total_acres: z.number().min(1).max(10_000_000),
     acreage_semantics: z.string().min(1).max(1000),
   }),
   source: z.object({
@@ -333,7 +336,7 @@ const swpppSiteMapSchema = z.object({
     source_native_id: z.string().min(1).max(240), source_url: z.string().min(1).max(1000),
     last_seen_at: z.string().min(1).max(80),
   }),
-  buyer: z.object({ classification: z.literal('unresolved'), organization_id: z.null(), guardrail: z.string().min(1).max(1000) }),
+  buyer: z.object({ organization_resolution_state: z.literal('unresolved'), classification: z.literal('unresolved'), organization_id: z.null(), guardrail: z.string().min(1).max(1000) }),
   why_investigate: z.string().min(1).max(1000), guardrail: z.string().min(1).max(1000),
 })
 
@@ -386,7 +389,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23')
+          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24')
             ? await loadScoutViewHtml()
             : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
             .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),
@@ -429,7 +432,7 @@ function makeServer() {
           throw new Error('Scout sandbox SWPPP-site opportunity and map identity do not match')
         }
         const structuredContent: ScoutSandboxResult = {
-          surface: 'scout_component_sandbox', opportunity_type: 'swppp_site', opportunity, map,
+          surface: 'scout_component_sandbox', opportunity_type: 'swppp_site', opportunity, map: buildScoutSwpppSiteTransport(map),
         }
         return {
           content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} SWPPP-site evidence card with its authoritative permit-location point map.` }],
