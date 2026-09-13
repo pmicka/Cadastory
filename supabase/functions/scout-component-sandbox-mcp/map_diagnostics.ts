@@ -1,7 +1,7 @@
 // Temporary owner-approved diagnostics. Remove after the host reproduction.
 export type DiagnosticValue = string | number | boolean
 const report: Record<string, DiagnosticValue> = {
-  build: 'swppp-diagnostic-20260913-1',
+  build: 'swppp-diagnostic-20260913-2',
   resource: (typeof document === 'undefined' ? undefined : document.querySelector<HTMLMetaElement>('meta[name="scout-diagnostic-resource"]')?.content) ?? 'missing',
 }
 export function diagnostic(fields: Record<string, DiagnosticValue>) {

@@ -257,7 +257,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
 
   try {
     if (opportunityType === 'swppp_site') {
-      const mapData = normalizeScoutSandboxSwpppSiteMap(value)
+      const mapData = normalizeScoutSandboxSwpppSiteMap(value, (detail) => diagnostic({ rejectedField: detail.field, rejectedCheck: detail.check, receivedType: detail.actualType, receivedStringShape: detail.stringShape }))
       diagnostic({ mapNormalizer: mapData ? 'passed' : 'rejected', viewReady: false, viewError: false, initialization: 'entered' })
       if (!mapData) {
         mapState.textContent = 'Site map unavailable'
@@ -363,7 +363,7 @@ app.ontoolresult = (result) => {
   const opportunityType = structured?.opportunity_type
   const control = document.querySelector<HTMLElement>('[data-scout-diagnostics]')
   if (control) control.hidden = opportunityType !== 'swppp_site'
-  if (opportunityType === 'swppp_site') diagnostic({ resultCount: ++diagnosticResultCount, branch: 'not_entered', initializationError: 'none', mapNormalizer: 'not_entered', requiredTiles: 0, matchingTiles: 0, generation: 0, loadedTiles: 0, decodedTiles: 0, decodeFailed: 0, drawFailed: 0, imageFailed: 0, rendererReady: false, timeout: false, context2d: 'not_attempted', lastError: 'none', payloadSource: metadataTiles ? 'metadata' : resourceEmbeddedTiles ? 'resource' : 'none', identityMatch: structured?.map?.site_name === structured?.opportunity?.name && structured?.map?.location_label === structured?.opportunity?.location_label })
+  if (opportunityType === 'swppp_site') diagnostic({ rejectedField: 'none', rejectedCheck: 'none', receivedType: 'not_checked', receivedStringShape: 'not_checked', resultCount: ++diagnosticResultCount, branch: 'not_entered', initializationError: 'none', mapNormalizer: 'not_entered', requiredTiles: 0, matchingTiles: 0, generation: 0, loadedTiles: 0, decodedTiles: 0, decodeFailed: 0, drawFailed: 0, imageFailed: 0, rendererReady: false, timeout: false, context2d: 'not_attempted', lastError: 'none', payloadSource: metadataTiles ? 'metadata' : resourceEmbeddedTiles ? 'resource' : 'none', identityMatch: structured?.map?.site_name === structured?.opportunity?.name && structured?.map?.location_label === structured?.opportunity?.location_label })
   if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site') {
     renderUnavailableOpportunity()
     renderMap('premium_exterior', null)

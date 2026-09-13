@@ -1,3 +1,9 @@
+## Normalizer diagnostic extension — 2026-09-13
+
+The owner's host screenshot establishes that the diagnostic build arrived through resource v22, six embedded entries validated, card/map identity matched, and the View map normalizer rejected the payload before entering the renderer. It does not establish which field failed or any tile/decoder failure.
+
+The owner approved proceeding with exact rejection diagnostics. Resource v24 / build `swppp-diagnostic-20260913-2` adds the first rejected contract field, fixed check code, received type, and empty/nonempty string category. No received field values are exposed. Existing predicates and their order remain unchanged; an optional observer cannot change rejection. v22/v23 compatibility aliases retain embedded tiles. Screenshot retrieval and the existing removal plan apply; removal also includes the normalizer observer and rejection parity test.
+
 ## Temporary owner-approved map diagnostics (2026-09-13)
 
 The owner approved implementing and deploying a temporary, opt-in “Show map diagnostics” control for one failing-host reproduction. Current diagnostic resource: `ui://scout/component-sandbox/v23`; build label: `swppp-diagnostic-20260913-1`.

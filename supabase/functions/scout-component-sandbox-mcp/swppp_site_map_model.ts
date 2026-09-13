@@ -89,15 +89,29 @@ function record(value: unknown): Record<string, unknown> | null {
     : null
 }
 
-export function normalizeScoutSandboxSwpppSiteMap(value: unknown): ScoutSandboxSwpppSiteMap | null {
+// Fixed field/check identifiers and categorical types only; no received values.
+export type SwpppMapRejection = { field: string; check: string; actualType: string; stringShape: string }
+
+export function normalizeScoutSandboxSwpppSiteMap(value: unknown, onReject?: (detail: SwpppMapRejection) => void): ScoutSandboxSwpppSiteMap | null {
+  const reject = (field: string, check: string, actual: unknown): null => {
+    // Diagnostics cannot alter validation outcomes, even if the observer fails.
+    try { onReject?.({ field, check, actualType: actual === null ? 'null' : Array.isArray(actual) ? 'array' : typeof actual,
+      stringShape: typeof actual === 'string' ? (actual.trim().length === 0 ? 'empty' : 'nonempty') : 'not_string' }) } catch { /* diagnostic observer only */ }
+    return null
+  }
   const source = record(value)
-  if (!source || source.contract_version !== 'swppp_site_map_v1' || source.opportunity_type !== 'swppp_site') return null
+  if (!source) return reject('map', 'object_required', value)
+  if (source.contract_version !== 'swppp_site_map_v1') return reject('contract_version', 'literal_mismatch', source.contract_version)
+  if (source.opportunity_type !== 'swppp_site') return reject('opportunity_type', 'literal_mismatch', source.opportunity_type)
 
   const sitePoint = record(source.site_point)
   const permit = record(source.permit)
   const sourceInfo = record(source.source)
   const buyer = record(source.buyer)
-  if (!sitePoint || !permit || !sourceInfo || !buyer) return null
+  if (!sitePoint) return reject('site_point', 'object_required', source.site_point)
+  if (!permit) return reject('permit', 'object_required', source.permit)
+  if (!sourceInfo) return reject('source', 'object_required', source.source)
+  if (!buyer) return reject('buyer', 'object_required', source.buyer)
 
   const candidateKey = boundedString(source.candidate_key, 160)
   const siteName = boundedString(source.site_name, 200)
@@ -125,16 +139,41 @@ export function normalizeScoutSandboxSwpppSiteMap(value: unknown): ScoutSandboxS
   const whyInvestigate = boundedString(source.why_investigate, 1000)
   const guardrail = boundedString(source.guardrail, 1000)
 
-  if (!candidateKey || !siteName || !locationLabel || !projectReference) return null
-  if (lon === null || lat === null || sitePoint.geometry_type !== 'Point' || sitePoint.semantics !== 'authoritative_permit_location_point' || !siteGuardrail) return null
-  if (permit.evidence_status !== 'active_documented_state_construction_permit' || permit.status !== 'ACTIVE') return null
-  if (permit.type !== 'CONSTRUCTION_STORMWATER' || permit.category !== 'GENERAL_CONSTRUCTION' || permit.termination_date !== null) return null
-  if (!permitNumber || !registryId || !masterPermitNumber || !issueDate || !effectiveDate || !expirationDate || documentedTotalAcres === null || !acreageSemantics) return null
-  if (sourceInfo.slug !== 'ohio-epa-npdes-construction' || sourceInfo.authority_level !== 'state') return null
-  if (!sourceName || !sourceAuthority || !sourceNativeId || !sourceUrl || !lastSeenAt) return null
-  if (candidateKey !== `swppp_site:${sourceNativeId}`) return null
-  if (buyer.classification !== 'unresolved' || buyer.organization_id !== null || !buyerGuardrail) return null
-  if (!whyInvestigate || !guardrail) return null
+  if (!candidateKey) return reject('candidate_key', 'string_bounds', source.candidate_key)
+  if (!siteName) return reject('site_name', 'string_bounds', source.site_name)
+  if (!locationLabel) return reject('location_label', 'string_bounds', source.location_label)
+  if (!projectReference) return reject('project_reference', 'string_bounds', source.project_reference)
+  if (lon === null) return reject('site_point.lon', 'number_bounds', sitePoint.lon)
+  if (lat === null) return reject('site_point.lat', 'number_bounds', sitePoint.lat)
+  if (sitePoint.geometry_type !== 'Point') return reject('site_point.geometry_type', 'literal_mismatch', sitePoint.geometry_type)
+  if (sitePoint.semantics !== 'authoritative_permit_location_point') return reject('site_point.semantics', 'literal_mismatch', sitePoint.semantics)
+  if (!siteGuardrail) return reject('site_point.guardrail', 'string_bounds', sitePoint.guardrail)
+  if (permit.evidence_status !== 'active_documented_state_construction_permit') return reject('permit.evidence_status', 'literal_mismatch', permit.evidence_status)
+  if (permit.status !== 'ACTIVE') return reject('permit.status', 'literal_mismatch', permit.status)
+  if (permit.type !== 'CONSTRUCTION_STORMWATER') return reject('permit.type', 'literal_mismatch', permit.type)
+  if (permit.category !== 'GENERAL_CONSTRUCTION') return reject('permit.category', 'literal_mismatch', permit.category)
+  if (permit.termination_date !== null) return reject('permit.termination_date', 'null_required', permit.termination_date)
+  if (!permitNumber) return reject('permit.permit_number', 'string_bounds', permit.permit_number)
+  if (!registryId) return reject('permit.registry_id', 'string_bounds', permit.registry_id)
+  if (!masterPermitNumber) return reject('permit.master_permit_number', 'string_bounds', permit.master_permit_number)
+  if (!issueDate) return reject('permit.issue_date', 'string_bounds', permit.issue_date)
+  if (!effectiveDate) return reject('permit.effective_date', 'string_bounds', permit.effective_date)
+  if (!expirationDate) return reject('permit.expiration_date', 'string_bounds', permit.expiration_date)
+  if (documentedTotalAcres === null) return reject('permit.documented_total_acres', 'number_bounds', permit.documented_total_acres)
+  if (!acreageSemantics) return reject('permit.acreage_semantics', 'string_bounds', permit.acreage_semantics)
+  if (sourceInfo.slug !== 'ohio-epa-npdes-construction') return reject('source.slug', 'literal_mismatch', sourceInfo.slug)
+  if (sourceInfo.authority_level !== 'state') return reject('source.authority_level', 'literal_mismatch', sourceInfo.authority_level)
+  if (!sourceName) return reject('source.name', 'string_bounds', sourceInfo.name)
+  if (!sourceAuthority) return reject('source.authority', 'string_bounds', sourceInfo.authority)
+  if (!sourceNativeId) return reject('source.source_native_id', 'string_bounds', sourceInfo.source_native_id)
+  if (!sourceUrl) return reject('source.source_url', 'string_bounds', sourceInfo.source_url)
+  if (!lastSeenAt) return reject('source.last_seen_at', 'string_bounds', sourceInfo.last_seen_at)
+  if (candidateKey !== `swppp_site:${sourceNativeId}`) return reject('candidate_key', 'source_identity_mismatch', source.candidate_key)
+  if (buyer.classification !== 'unresolved') return reject('buyer.classification', 'literal_mismatch', buyer.classification)
+  if (buyer.organization_id !== null) return reject('buyer.organization_id', 'null_required', buyer.organization_id)
+  if (!buyerGuardrail) return reject('buyer.guardrail', 'string_bounds', buyer.guardrail)
+  if (!whyInvestigate) return reject('why_investigate', 'string_bounds', source.why_investigate)
+  if (!guardrail) return reject('guardrail', 'string_bounds', source.guardrail)
 
   return {
     contract_version: 'swppp_site_map_v1',
