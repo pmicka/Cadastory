@@ -68,6 +68,16 @@ function normalizeEmbeddedTiles(value: unknown) {
   return Object.keys(tiles).length ? tiles : undefined
 }
 
+const resourceEmbeddedTiles = (() => {
+  const element = document.getElementById('scout-embedded-raster-tiles')
+  if (!element) return undefined
+  try {
+    return normalizeEmbeddedTiles(JSON.parse(element.textContent ?? ''))
+  } catch {
+    return undefined
+  }
+})()
+
 function normalizeWaterTankOpportunity(value: unknown): ScoutSandboxWaterTankOpportunity | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const source = value as Record<string, unknown>
@@ -330,11 +340,11 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.5.4' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.5.5' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
-  const embeddedTiles = normalizeEmbeddedTiles(result?._meta?.['scout/rasterTiles'])
+  const embeddedTiles = normalizeEmbeddedTiles(result?._meta?.['scout/rasterTiles']) ?? resourceEmbeddedTiles
   const opportunityType = structured?.opportunity_type
   if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site') {
     renderUnavailableOpportunity()
