@@ -1,3 +1,4 @@
+import { diagnosticError, type DiagnosticValue } from './map_diagnostics.ts'
 import type { ScoutSandboxSwpppSiteMap } from './swppp_site_map_model.ts'
 import { buildScoutSwpppSiteRasterFrame, type ScoutSwpppSiteRasterFrameOptions } from './swppp_site_map_renderer.ts'
 
@@ -8,6 +9,7 @@ export type ScoutSwpppSiteMapMountOptions = ScoutSwpppSiteRasterFrameOptions & {
   onReady?: () => void
   onError?: (error: Error) => void
   embeddedTiles?: Record<string, string>
+  onDiagnostic?: (fields: Record<string, DiagnosticValue>) => void
 }
 
 const DEFAULT_TIMEOUT_MS = 7000
@@ -38,14 +40,18 @@ export function mountScoutSwpppSiteMap(container: HTMLElement, data: ScoutSandbo
     clearTimer()
     generation += 1
     const current = generation
+    const report = (fields: Record<string, DiagnosticValue>) => { if (!destroyed && current === generation) options.onDiagnostic?.(fields) }
+    report({ generation: current, width: frame.width, height: frame.height, requiredTiles: frame.tiles.length, loadedTiles: 0, decodedTiles: 0, decodeFailed: 0, drawFailed: 0, imageFailed: 0, timeout: false, rendererReady: false, context2d: 'not_attempted', bitmapAvailable: typeof createImageBitmap === 'function', lastError: 'none' })
+    let decoded = 0, decodeFailed = 0, drawFailed = 0, imageFailed = 0
     container.replaceChildren()
     let loaded = 0
     let settled = 0
     let ready = false
-    const markReady = () => { if (!destroyed && current === generation && !ready) { ready = true; clearTimer(); options.onReady?.() } }
+    const markReady = () => { if (!destroyed && current === generation && !ready) { ready = true; report({ rendererReady: true }); clearTimer(); options.onReady?.() } }
     const markFailed = () => { if (!destroyed && current === generation && !ready) { clearTimer(); options.onError?.(new Error('Scout raster tiles did not load')) } }
 
     const embeddedFrame = frame.tiles.length > 0 && frame.tiles.every((tile) => options.embeddedTiles?.[tile.url])
+    report({ matchingTiles: frame.tiles.filter(tile => options.embeddedTiles?.[tile.url]).length, branch: embeddedFrame ? 'canvas' : 'image' })
     if (embeddedFrame) {
       const canvas = document.createElement('canvas')
       canvas.width = frame.width
@@ -56,12 +62,17 @@ export function mountScoutSwpppSiteMap(container: HTMLElement, data: ScoutSandbo
       canvas.style.height = `${frame.height}px`
       container.appendChild(canvas)
       const context = canvas.getContext('2d')
+      report({ context2d: context ? 'available' : 'unavailable' })
       if (!context) return markFailed()
       void Promise.allSettled(frame.tiles.map(async (tile) => {
-        const bitmap = await decodeRasterTile(options.embeddedTiles![tile.url])
+        let bitmap: ImageBitmap
+        try { bitmap = await decodeRasterTile(options.embeddedTiles![tile.url]); decoded += 1; report({ decodedTiles: decoded }) }
+        catch (error) { decodeFailed += 1; report({ decodeFailed, lastError: diagnosticError(error) }); throw error }
         if (!destroyed && current === generation) {
-          context.drawImage(bitmap, tile.left, tile.top, 256, 256)
+          try { context.drawImage(bitmap, tile.left, tile.top, 256, 256) }
+          catch (error) { drawFailed += 1; report({ drawFailed, lastError: diagnosticError(error) }); throw error }
           loaded += 1
+          report({ loadedTiles: loaded })
         }
         bitmap.close()
       })).then(() => {
@@ -80,8 +91,8 @@ export function mountScoutSwpppSiteMap(container: HTMLElement, data: ScoutSandbo
         image.src = tile.url
         image.style.left = `${tile.left}px`
         image.style.top = `${tile.top}px`
-        image.addEventListener('load', () => { if (!destroyed && current === generation) { loaded += 1; settled += 1; if (loaded === 1) markReady() } }, { once: true })
-        image.addEventListener('error', () => { if (!destroyed && current === generation) { settled += 1; if (settled === frame.tiles.length && loaded === 0) markFailed() } }, { once: true })
+        image.addEventListener('load', () => { if (!destroyed && current === generation) { loaded += 1; settled += 1; report({ loadedTiles: loaded }); if (loaded === 1) markReady() } }, { once: true })
+        image.addEventListener('error', () => { if (!destroyed && current === generation) { settled += 1; imageFailed += 1; report({ imageFailed }); if (settled === frame.tiles.length && loaded === 0) markFailed() } }, { once: true })
         container.appendChild(image)
       }
     }
@@ -108,7 +119,7 @@ export function mountScoutSwpppSiteMap(container: HTMLElement, data: ScoutSandbo
     container.appendChild(attribution)
 
     if (frame.tiles.length === 0) return markFailed()
-    timeout = setTimeout(() => loaded > 0 ? markReady() : markFailed(), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
+    timeout = setTimeout(() => { report({ timeout: true }); loaded > 0 ? markReady() : markFailed() }, options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
   }
 
   render(true)

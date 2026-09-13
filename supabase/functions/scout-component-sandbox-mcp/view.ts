@@ -1,3 +1,4 @@
+import { diagnostic, diagnosticError, diagnosticOverlay } from './map_diagnostics.ts'
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
 import {
   normalizeScoutSandboxOpportunity,
@@ -35,6 +36,7 @@ const mapState = document.querySelector<HTMLElement>('[data-scout-map-state]')
 let mapHandle: ScoutMapHandle | null = null
 let mapGeneration = 0
 let activeCarouselIndex = 0
+let diagnosticResultCount = 0
 let layoutFrame: number | null = null
 let carouselResizeObserver: ResizeObserver | null = null
 
@@ -70,10 +72,15 @@ function normalizeEmbeddedTiles(value: unknown) {
 
 const resourceEmbeddedTiles = (() => {
   const element = document.getElementById('scout-embedded-raster-tiles')
+  diagnostic({ jsonElement: Boolean(element), jsonParse: 'not_attempted', embeddedValidCount: 0 })
   if (!element) return undefined
   try {
-    return normalizeEmbeddedTiles(JSON.parse(element.textContent ?? ''))
+    const parsed = JSON.parse(element.textContent ?? '')
+    const normalized = normalizeEmbeddedTiles(parsed)
+    diagnostic({ jsonParse: 'passed', embeddedValidation: normalized ? 'passed' : 'empty_or_rejected', embeddedValidCount: normalized ? Object.keys(normalized).length : 0 })
+    return normalized
   } catch {
+    diagnostic({ jsonParse: 'failed' })
     return undefined
   }
 })()
@@ -218,6 +225,7 @@ function destroyMap() {
 
 function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown, embeddedTiles?: Record<string, string>) {
   destroyMap()
+  if (opportunityType === 'swppp_site') diagnostic({ mapContainer: Boolean(mapContainer), mapOverlay: Boolean(mapState) })
   if (!mapContainer || !mapState) return
 
   const generation = ++mapGeneration
@@ -233,6 +241,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
       if (generation !== mapGeneration) return
       ready = true
       mapState.hidden = true
+      if (opportunityType === 'swppp_site') { diagnostic({ viewReady: true }); diagnosticOverlay(mapState) }
       setState('Scout site map ready')
     },
     onError: (error: Error) => {
@@ -241,6 +250,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
         mapState.hidden = false
         mapState.textContent = 'Site map unavailable'
       }
+      if (opportunityType === 'swppp_site') { diagnostic({ viewError: true }); diagnosticOverlay(mapState) }
       setState(`Scout map error: ${error.message}`)
     },
   }
@@ -248,14 +258,17 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
   try {
     if (opportunityType === 'swppp_site') {
       const mapData = normalizeScoutSandboxSwpppSiteMap(value)
+      diagnostic({ mapNormalizer: mapData ? 'passed' : 'rejected', viewReady: false, viewError: false, initialization: 'entered' })
       if (!mapData) {
         mapState.textContent = 'Site map unavailable'
+        diagnosticOverlay(mapState)
         setState('Scout SWPPP-site map result failed validation')
         return
       }
       mapContainer.setAttribute('role', 'img')
       mapContainer.setAttribute('aria-label', `Permit location map for ${mapData.site_name}`)
-      mapHandle = mountScoutSwpppSiteMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
+      mapHandle = mountScoutSwpppSiteMap(mapContainer, mapData, { ...mapOptions, embeddedTiles, onDiagnostic: diagnostic })
+      diagnostic({ initialization: 'returned' })
     } else if (opportunityType === 'water_tank') {
       const mapData = normalizeScoutSandboxWaterTankMap(value)
       if (!mapData) {
@@ -281,6 +294,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
   } catch (error) {
     mapState.hidden = false
     mapState.textContent = 'Site map unavailable'
+    if (opportunityType === 'swppp_site') { diagnostic({ initialization: 'failed', initializationError: diagnosticError(error) }); diagnosticOverlay(mapState) }
     setState(`Scout map initialization failed: ${error instanceof Error ? error.message : String(error)}`)
   }
 }
@@ -344,8 +358,12 @@ const app = new App({ name: 'scout-ui-foundation', version: '2.5.5' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
-  const embeddedTiles = normalizeEmbeddedTiles(result?._meta?.['scout/rasterTiles']) ?? resourceEmbeddedTiles
+  const metadataTiles = normalizeEmbeddedTiles(result?._meta?.['scout/rasterTiles'])
+  const embeddedTiles = metadataTiles ?? resourceEmbeddedTiles
   const opportunityType = structured?.opportunity_type
+  const control = document.querySelector<HTMLElement>('[data-scout-diagnostics]')
+  if (control) control.hidden = opportunityType !== 'swppp_site'
+  if (opportunityType === 'swppp_site') diagnostic({ resultCount: ++diagnosticResultCount, branch: 'not_entered', initializationError: 'none', mapNormalizer: 'not_entered', requiredTiles: 0, matchingTiles: 0, generation: 0, loadedTiles: 0, decodedTiles: 0, decodeFailed: 0, drawFailed: 0, imageFailed: 0, rendererReady: false, timeout: false, context2d: 'not_attempted', lastError: 'none', payloadSource: metadataTiles ? 'metadata' : resourceEmbeddedTiles ? 'resource' : 'none', identityMatch: structured?.map?.site_name === structured?.opportunity?.name && structured?.map?.location_label === structured?.opportunity?.location_label })
   if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site') {
     renderUnavailableOpportunity()
     renderMap('premium_exterior', null)
@@ -367,6 +385,11 @@ app.onteardown = async () => {
   destroyMap()
   return {}
 }
+
+// Read computed overlay state at the user's diagnostic inspection, without resizing the map.
+document.querySelector('[data-scout-diagnostics]')?.addEventListener('toggle', () => {
+  if (mapState) diagnosticOverlay(mapState)
+})
 
 const transport = new PostMessageTransport()
 try {

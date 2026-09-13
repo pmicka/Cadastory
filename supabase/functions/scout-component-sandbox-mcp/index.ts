@@ -30,8 +30,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v22'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v23'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v22',
   'ui://scout/component-sandbox/v21',
   'ui://scout/component-sandbox/v20',
   'ui://scout/component-sandbox/v19',
@@ -363,7 +364,7 @@ function makeServer() {
       contents: [{
         uri: RESOURCE_URI,
         mimeType: RESOURCE_MIME_TYPE,
-        text: await loadScoutViewHtml(),
+        text: (await loadScoutViewHtml()).replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', RESOURCE_URI),
         _meta: {
           ui: {
             prefersBorder: false,
@@ -384,7 +385,10 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'),
+          text: (compatibilityUri === 'ui://scout/component-sandbox/v22'
+            ? await loadScoutViewHtml()
+            : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
+            .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),
           _meta: {
             ui: {
               prefersBorder: false,

@@ -1,3 +1,7 @@
+## Temporary owner approval — 2026-09-13
+
+For one SWPPP host reproduction only, the owner approved a collapsed “Show map diagnostics” control below the existing card. It contains categorical, bounded diagnostics and is visible only for SWPPP results. The existing card, map, carousel, and action controls are unchanged. This is an explicit temporary exception to the prohibition on visible lifecycle diagnostics; remove after reproduction as described in MAP_CONTRACT.md.
+
 # Scout component sandbox design contract
 
 This file is the durable UI guardrail for `scout-component-sandbox-mcp`.
