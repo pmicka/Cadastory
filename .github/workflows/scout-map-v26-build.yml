@@ -5,6 +5,9 @@ on:
     branches:
       - fix/scout-all-map-embedded-raster-v26
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -28,9 +31,11 @@ jobs:
         run: |
           git diff --check
           test -n "$(git status --porcelain supabase/functions/scout-component-sandbox-mcp/view.generated.ts)"
-      - name: Upload verified patch
-        uses: actions/upload-artifact@v4
-        with:
-          name: scout-map-v26-verified
-          path: supabase/functions/scout-component-sandbox-mcp
-          if-no-files-found: error
+      - name: Commit verified patch
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/scout-map-v26-build.yml .github/scout_map_v26_patch.py
+          git add supabase/functions/scout-component-sandbox-mcp
+          git commit -m "Use embedded raster transport for all sandbox maps"
+          git push origin HEAD:fix/scout-all-map-embedded-raster-v26
