@@ -128,6 +128,8 @@ assert.equal(frame.markers.filter((marker) => marker.morphology === 'ground_stor
 assert.equal(frame.markers.filter((marker) => marker.morphology === 'standpipe').length, 5)
 assert.equal(frame.markers.filter((marker) => marker.morphology === 'fluted_column').length, 1)
 assert.ok(mountSource.includes('MORPHOLOGY_STYLES'))
+assert.ok(mountSource.includes('Hollow = not in service'))
+assert.equal(mountSource.includes('Slash = not in service'), false)
 assert.ok(mountSource.includes('scout-portfolio-marker'))
 assert.ok(mountSource.includes('scout-portfolio-legend'))
 assert.ok(frame.markers.every((marker) => marker.left >= 0 && marker.left <= frame.width && marker.top >= 0 && marker.top <= frame.height))

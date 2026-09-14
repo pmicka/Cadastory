@@ -4,7 +4,7 @@ This companion contract is subordinate to `MAP_CONTRACT.md` and narrows the firs
 
 ## Warren County Water District exemplar
 
-- Resource: `ui://scout/component-sandbox/v28`
+- Resource: `ui://scout/component-sandbox/v29`
 - Opportunity type: `water_utility_portfolio`
 - Map contract: `water_utility_portfolio_map_v1`
 - RPC: `public.scout_get_component_sandbox_water_portfolio_v1_internal()`
@@ -28,7 +28,7 @@ The portfolio map uses the same workerless embedded-raster strategy already prov
 - chooses a bounded fit-to-bounds Web Mercator frame;
 - renders 24 flat 2D asset markers for the current exemplar;
 - colors markers by documented WRIS tank form only: `ELEVATED` → elevated, `GROUND STORAGE` → ground storage, `STANDPIPE` → standpipe, and `OTHER` + `FLUTED COLUMN` → fluted column; unknown or unsupported source values remain explicitly unclassified;
-- uses marker fill for morphology, a ring for historical rehab evidence, and a slash for documented not-in-service status so evidence dimensions do not compete for the same color channel;
+- uses marker fill for morphology, a ring for historical rehab evidence, and a hollow marker for documented not-in-service status so evidence dimensions do not compete for the same color channel;
 - preserves documented not-in-service and historical-rehab distinctions without inferring current need;
 - uses no WebGL, MapLibre, worker, service-radius polygon, county polygon, property polygon, or ownership polygon;
 - remains non-interactive inside the approved existing card/map slot;

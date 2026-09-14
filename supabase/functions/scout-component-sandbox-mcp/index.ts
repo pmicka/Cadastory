@@ -38,8 +38,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v28'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v29'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v28',
   'ui://scout/component-sandbox/v27',
   'ui://scout/component-sandbox/v26',
   'ui://scout/component-sandbox/v25',
@@ -464,7 +465,7 @@ const waterUtilityPortfolioResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.8' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.9' })
 
   registerAppResource(
     server,
@@ -496,7 +497,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27')
+          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27' || compatibilityUri === 'ui://scout/component-sandbox/v28')
             ? await loadScoutViewHtml()
             : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
             .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),

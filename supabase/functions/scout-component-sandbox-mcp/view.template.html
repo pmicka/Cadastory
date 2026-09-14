@@ -209,18 +209,11 @@
         outline: 1px solid #263128;
         outline-offset: 1px;
       }
-      .scout-portfolio-marker--not-in-service { opacity: .68; }
-      .scout-portfolio-marker--not-in-service::after {
-        content: '';
-        position: absolute;
-        left: 1px;
-        top: 4px;
-        width: 7px;
-        height: 2px;
-        border-radius: 1px;
-        background: rgba(255,255,255,.96);
-        transform: rotate(-45deg);
-        transform-origin: center;
+      .scout-portfolio-marker--not-in-service {
+        width: 13px;
+        height: 13px;
+        border: 3px solid var(--scout-portfolio-marker-color, #747d73);
+        background: #ffffff;
       }
       .scout-portfolio-legend {
         position: absolute;
