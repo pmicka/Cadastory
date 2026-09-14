@@ -22,6 +22,7 @@ import {
   normalizeScoutSandboxDealershipPortfolioOpportunity,
 } from './dealership_portfolio_map_model.ts'
 import { mountScoutDealershipPortfolioMap } from './dealership_portfolio_map_mount.ts'
+import { buildScoutDealershipPortfolioRasterFrame } from './dealership_portfolio_map_renderer.ts'
 
 type ScoutMapHandle = {
   destroy: () => void
@@ -292,6 +293,7 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
       ready = true
       mapState.hidden = true
       if (opportunityType === 'swppp_site') { diagnostic({ viewReady: true }); diagnosticOverlay(mapState) }
+      if (opportunityType === 'dealership_group_portfolio') { diagnostic({ dealershipReady: true, dealershipError: 'none' }); diagnosticOverlay(mapState) }
       setState((opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Scout portfolio map ready' : 'Scout site map ready')
     },
     onError: (error: Error) => {
@@ -301,6 +303,7 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
         mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Portfolio map unavailable' : 'Site map unavailable'
       }
       if (opportunityType === 'swppp_site') { diagnostic({ viewError: true }); diagnosticOverlay(mapState) }
+      if (opportunityType === 'dealership_group_portfolio') { diagnostic({ dealershipReady: false, dealershipError: error.message.slice(0, 180) }); diagnosticOverlay(mapState) }
       setState(`Scout map error: ${error.message}`)
     },
   }
@@ -309,10 +312,14 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
     if (opportunityType === 'dealership_group_portfolio') {
       const mapData = normalizeScoutSandboxDealershipPortfolioMap(value)
       if (!mapData) {
+        diagnostic({ dealershipNormalizer: 'failed' })
         mapState.textContent = 'Portfolio map unavailable'
         setState('Scout dealership portfolio map result failed validation')
         return
       }
+      const diagnosticFrame = buildScoutDealershipPortfolioRasterFrame(mapData, mapContainer.clientWidth, mapContainer.clientHeight, mapOptions)
+      const matchingEmbeddedTiles = embeddedTiles ? diagnosticFrame.tiles.filter((tile) => Boolean(embeddedTiles[tile.url])).length : 0
+      diagnostic({ dealershipNormalizer: 'passed', dealershipContainerWidth: mapContainer.clientWidth, dealershipContainerHeight: mapContainer.clientHeight, dealershipFrameWidth: diagnosticFrame.width, dealershipFrameHeight: diagnosticFrame.height, dealershipZoom: diagnosticFrame.zoom, dealershipRequiredTiles: diagnosticFrame.tiles.length, dealershipMatchingEmbeddedTiles: matchingEmbeddedTiles, dealershipMarkers: diagnosticFrame.markers.length, dealershipTileSource: embeddedTiles ? 'embedded_available' : 'embedded_missing', dealershipReady: false, dealershipError: 'not_yet' })
       mapContainer.setAttribute('role', 'img')
       mapContainer.setAttribute('aria-label', `Documented dealership portfolio map for ${mapData.account_name}`)
       mapHandle = mountScoutDealershipPortfolioMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
@@ -424,7 +431,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.11.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.12.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
@@ -432,8 +439,9 @@ app.ontoolresult = (result) => {
   const embeddedTiles = metadataTiles ?? resourceEmbeddedTiles
   const opportunityType = structured?.opportunity_type
   const control = document.querySelector<HTMLElement>('[data-scout-diagnostics]')
-  if (control) control.hidden = opportunityType !== 'swppp_site'
+  if (control) control.hidden = opportunityType !== 'swppp_site' && opportunityType !== 'dealership_group_portfolio'
   if (opportunityType === 'swppp_site') diagnostic({ rejectedField: 'none', rejectedCheck: 'none', receivedType: 'not_checked', receivedStringShape: 'not_checked', resultCount: ++diagnosticResultCount, branch: 'not_entered', initializationError: 'none', mapNormalizer: 'not_entered', requiredTiles: 0, matchingTiles: 0, generation: 0, loadedTiles: 0, decodedTiles: 0, decodeFailed: 0, drawFailed: 0, imageFailed: 0, rendererReady: false, timeout: false, context2d: 'not_attempted', lastError: 'none', payloadSource: metadataTiles ? 'metadata' : resourceEmbeddedTiles ? 'resource' : 'none', identityMatch: structured?.map?.site_name === structured?.opportunity?.name && structured?.map?.location_label === structured?.opportunity?.location_label })
+  if (opportunityType === 'dealership_group_portfolio') diagnostic({ dealershipResultCount: ++diagnosticResultCount, dealershipPayloadSource: metadataTiles ? 'metadata' : resourceEmbeddedTiles ? 'resource' : 'none', dealershipIdentityMatch: structured?.map?.account_name === structured?.opportunity?.name, dealershipNormalizer: 'not_entered', dealershipReady: false, dealershipError: 'none' })
   if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site' && opportunityType !== 'water_utility_portfolio' && opportunityType !== 'dealership_group_portfolio') {
     renderUnavailableOpportunity()
     renderMap('premium_exterior', null)
