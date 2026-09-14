@@ -1,6 +1,6 @@
 # Water-utility portfolio sandbox map contract
 
-This contract governs the first bounded portfolio-map exemplar in `scout-component-sandbox-mcp`.
+This companion contract is subordinate to `MAP_CONTRACT.md` and narrows the first bounded portfolio-map exemplar without changing the existing single-site contracts.
 
 ## Warren County Water District exemplar
 
