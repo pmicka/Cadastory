@@ -209,7 +209,7 @@ insert into agent_presentation.tool_contracts (
 values (
   'scout_preview_component_sandbox_portfolio', 'status', 1,
   array['portfolio_map', 'member_selector', 'portfolio_context']::text[],
-  'summary', 'one_plus_secondary', 'high', null,
+  'collapsed', 'one_plus_secondary', 'high', null,
   'Render one bounded portfolio card. Preserve exact member locations and explicit documented/unverified states; do not turn historical REHAB evidence into a current-job claim.',
   true, now()
 )
@@ -312,7 +312,7 @@ where tool_name = 'scout_preview_component_sandbox';
 update agent_presentation.tool_contracts
 set max_initial_items = 1,
     section_order = array['opportunity_card', 'single_site_map']::text[],
-    evidence_visibility = 'summary',
+    evidence_visibility = 'collapsed',
     map_priority = 'high',
     agent_instruction = 'Render one bounded owner-only opportunity card and its matching single-site map. Preserve source semantics and explicit guardrails.',
     updated_at = now()
