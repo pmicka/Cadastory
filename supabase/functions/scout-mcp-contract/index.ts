@@ -1,6 +1,12 @@
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { sandboxSwpppSiteMapSchema, sandboxSwpppSiteOpportunitySchema } from '../_shared/scout_sandbox_swppp_schema.ts'
+import {
+  SANDBOX_PORTFOLIO_RESOURCE_URI,
+  SANDBOX_PORTFOLIO_TOOL,
+  sandboxPortfolioResource,
+  sandboxPortfolioTool,
+} from '../_shared/scout_sandbox_portfolio_contract.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -17,8 +23,8 @@ const LEGACY_REVIEW_RESOURCE_URI = 'ui://scout/rapid-review/v1'
 const LENS_RESOURCE_URI = 'ui://scout/lens/v1'
 const TIME_RESOURCE_URI = 'ui://scout/evidence-time-machine/v1'
 const CONSTELLATION_RESOURCE_URI = 'ui://scout/constellations/v1'
-const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v25'
-const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v24','ui://scout/component-sandbox/v23','ui://scout/component-sandbox/v22','ui://scout/component-sandbox/v21','ui://scout/component-sandbox/v20','ui://scout/component-sandbox/v19','ui://scout/component-sandbox/v18','ui://scout/component-sandbox/v17','ui://scout/component-sandbox/v16','ui://scout/component-sandbox/v15','ui://scout/component-sandbox/v14','ui://scout/component-sandbox/v13','ui://scout/component-sandbox/v12','ui://scout/component-sandbox/v11','ui://scout/component-sandbox/v10','ui://scout/component-sandbox/v9','ui://scout/component-sandbox/v8','ui://scout/component-sandbox/v7','ui://scout/component-sandbox/v6','ui://scout/component-sandbox/v5','ui://scout/component-sandbox/v4','ui://scout/component-sandbox/v3','ui://scout/component-sandbox/v2','ui://scout/component-sandbox/v1']
+const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v26'
+const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v25','ui://scout/component-sandbox/v24','ui://scout/component-sandbox/v23','ui://scout/component-sandbox/v22','ui://scout/component-sandbox/v21','ui://scout/component-sandbox/v20','ui://scout/component-sandbox/v19','ui://scout/component-sandbox/v18','ui://scout/component-sandbox/v17','ui://scout/component-sandbox/v16','ui://scout/component-sandbox/v15','ui://scout/component-sandbox/v14','ui://scout/component-sandbox/v13','ui://scout/component-sandbox/v12','ui://scout/component-sandbox/v11','ui://scout/component-sandbox/v10','ui://scout/component-sandbox/v9','ui://scout/component-sandbox/v8','ui://scout/component-sandbox/v7','ui://scout/component-sandbox/v6','ui://scout/component-sandbox/v5','ui://scout/component-sandbox/v4','ui://scout/component-sandbox/v3','ui://scout/component-sandbox/v2','ui://scout/component-sandbox/v1']
 const SANDBOX_TOOL = 'scout_preview_component_sandbox'
 const IMPROVE_TOOLS = new Set(['scout_start_improve_scout','scout_get_improve_scout_state','scout_submit_improvement_answer','scout_review_lead','scout_start_rapid_review','scout_get_rapid_review_state'])
 const EXPLORE_TOOLS = new Set(['scout_get_opportunity_lens_catalog','scout_apply_opportunity_lens','scout_get_opportunity_timeline','scout_get_opportunity_constellation'])
@@ -104,8 +110,8 @@ Deno.serve(async(req:Request)=>{
   if(env?.method==='initialize'){
     try{const upstream=await forwardTo(CORE_URL,req,raw);const parsed=await parseUpstream(upstream);return responseFromUpstream(req,upstream,enrichInitialize(parsed)??undefined)}catch(e){console.error('Scout initialize enrichment error',e);return jsonResponse({error:'Scout MCP contract gateway failed'},500)}
   }
-  if(env?.method==='tools/call'&&env?.params?.name===SANDBOX_TOOL)return await forwardOwnerSandbox(req,env,raw,inboundToken)
-  if(env?.method==='resources/read'&&[SANDBOX_RESOURCE_URI,...SANDBOX_COMPATIBILITY_RESOURCE_URIS].includes(String(env?.params?.uri||'')))return await forwardOwnerSandbox(req,env,raw,inboundToken)
+  if(env?.method==='tools/call'&&[SANDBOX_TOOL,SANDBOX_PORTFOLIO_TOOL].includes(String(env?.params?.name||'')))return await forwardOwnerSandbox(req,env,raw,inboundToken)
+  if(env?.method==='resources/read'&&[SANDBOX_RESOURCE_URI,SANDBOX_PORTFOLIO_RESOURCE_URI,...SANDBOX_COMPATIBILITY_RESOURCE_URIS].includes(String(env?.params?.uri||'')))return await forwardOwnerSandbox(req,env,raw,inboundToken)
   if(env?.method==='tools/call'&&env?.params?.name==='scout_search_knowledge')return await callKnowledge(req,env,raw,inboundToken)
   if(env?.method==='tools/call'&&IMPROVE_TOOLS.has(String(env?.params?.name||''))){try{return responseFromUpstream(req,await forwardTo(IMPROVE_URL,req,raw))}catch{return safeError(req,env.id,-32603,'Improve Scout request failed')}}
   if(env?.method==='tools/call'&&EXPLORE_TOOLS.has(String(env?.params?.name||''))){try{return responseFromUpstream(req,await forwardTo(EXPLORE_URL,req,raw))}catch{return safeError(req,env.id,-32603,'Scout exploration request failed')}}
@@ -119,7 +125,10 @@ Deno.serve(async(req:Request)=>{
       const [coreR,improveR,exploreR]=await Promise.all([fetchRpc(CORE_URL,req,raw,coreToken),fetchRpc(IMPROVE_URL,req,raw,improveToken),fetchRpc(EXPLORE_URL,req,raw,exploreToken)])
       if(coreR.parsed){
         const merged=mergeToolEnvelopes(coreR.parsed,improveR.parsed,exploreR.parsed)
-        if(await isOwnerConnection(fanout.connection.connection_id))merged.result.tools.push(sandboxTool())
+        if(await isOwnerConnection(fanout.connection.connection_id)){
+          if(!merged.result.tools.some((tool:any)=>tool?.name===SANDBOX_TOOL))merged.result.tools.push(sandboxTool())
+          if(!merged.result.tools.some((tool:any)=>tool?.name===SANDBOX_PORTFOLIO_TOOL))merged.result.tools.push(sandboxPortfolioTool())
+        }
         const contracts=await manifest()
         return responseFromUpstream(req,coreR.upstream,enrichToolList(merged,contracts))
       }
@@ -134,7 +143,10 @@ Deno.serve(async(req:Request)=>{
       const [coreR,improveR,exploreR]=await Promise.all([fetchRpc(CORE_URL,req,raw,coreToken),fetchRpc(IMPROVE_URL,req,raw,improveToken),fetchRpc(EXPLORE_URL,req,raw,exploreToken)])
       if(coreR.parsed||improveR.parsed||exploreR.parsed){
         const merged=mergeResourceEnvelopes(coreR.parsed,env.id,improveR.parsed,exploreR.parsed)
-        if(await isOwnerConnection(fanout.connection.connection_id))merged.result.resources.push(sandboxResource())
+        if(await isOwnerConnection(fanout.connection.connection_id)){
+          if(!merged.result.resources.some((resource:any)=>resource?.uri===SANDBOX_RESOURCE_URI))merged.result.resources.push(sandboxResource())
+          if(!merged.result.resources.some((resource:any)=>resource?.uri===SANDBOX_PORTFOLIO_RESOURCE_URI))merged.result.resources.push(sandboxPortfolioResource())
+        }
         return rpcResponse(req,merged)
       }
       return responseFromUpstream(req,coreR.upstream)
