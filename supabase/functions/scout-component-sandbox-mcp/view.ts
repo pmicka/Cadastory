@@ -12,11 +12,18 @@ import { mountScoutSingleSiteMap } from './single_site_map_renderer.ts'
 import { mountScoutWaterTankMap } from './water_tank_map_mount.ts'
 import { normalizeScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
 import { mountScoutSwpppSiteMap } from './swppp_site_map_mount.ts'
+import {
+  normalizeScoutSandboxWaterUtilityPortfolioMap,
+  normalizeScoutSandboxWaterUtilityPortfolioOpportunity,
+} from './water_portfolio_map_model.ts'
+import { mountScoutWaterUtilityPortfolioMap } from './water_portfolio_map_mount.ts'
 
 type ScoutMapHandle = {
   destroy: () => void
   resize: () => void
 }
+
+type ScoutViewOpportunityType = ScoutSandboxOpportunityType | 'water_utility_portfolio'
 
 const SCOUT_RASTER_TILE_TEMPLATE = 'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png'
 const SCOUT_RASTER_ATTRIBUTION_LABEL = '© OpenStreetMap contributors · HOT'
@@ -58,7 +65,7 @@ function cleanNumber(value: unknown, minimum: number, maximum: number) {
 }
 
 function normalizeEmbeddedTiles(value: unknown) {
-  if (!Array.isArray(value) || value.length > 20) return undefined
+  if (!Array.isArray(value) || value.length > 32) return undefined
   const tiles: Record<string, string> = {}
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined
@@ -161,7 +168,23 @@ function renderUnavailableOpportunity() {
   setState('Scout opportunity result failed validation')
 }
 
-function renderOpportunity(opportunityType: ScoutSandboxOpportunityType, value: unknown) {
+function renderOpportunity(opportunityType: ScoutViewOpportunityType, value: unknown) {
+  if (opportunityType === 'water_utility_portfolio') {
+    const opportunity = normalizeScoutSandboxWaterUtilityPortfolioOpportunity(value)
+    if (!opportunity) {
+      renderUnavailableOpportunity()
+      return
+    }
+    if (title) title.textContent = opportunity.name
+    if (tier) tier.textContent = 'Portfolio evidence'
+    if (meta) meta.textContent = `${formatNumber(opportunity.member_count)} documented tank records  •  Kentucky WRIS source modified ${formatObserved(opportunity.source_modified_at)}`
+    if (address) address.textContent = `PWSID ${opportunity.pwsid}`
+    if (summary) summary.textContent = `${formatNumber(opportunity.not_in_service_count)} documented not in service  •  ${formatNumber(opportunity.historical_project_signal_count)} historical rehab-linked records  •  ${opportunity.why_investigate}`
+    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
+    setState(`Scout portfolio ready: ${opportunity.name}`)
+    return
+  }
+
   if (opportunityType === 'swppp_site') {
     const opportunity = normalizeScoutSandboxSwpppSiteOpportunity(value)
     if (!opportunity) {
@@ -224,7 +247,7 @@ function destroyMap() {
   mapHandle = null
 }
 
-function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown, embeddedTiles?: Record<string, string>) {
+function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, embeddedTiles?: Record<string, string>) {
   destroyMap()
   if (opportunityType === 'swppp_site') diagnostic({ mapContainer: Boolean(mapContainer), mapOverlay: Boolean(mapState) })
   if (!mapContainer || !mapState) return
@@ -232,7 +255,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
   const generation = ++mapGeneration
   let ready = false
   mapState.hidden = false
-  mapState.textContent = 'Loading site map…'
+  mapState.textContent = opportunityType === 'water_utility_portfolio' ? 'Loading portfolio map…' : 'Loading site map…'
 
   const mapOptions = {
     tileUrlTemplate: SCOUT_RASTER_TILE_TEMPLATE,
@@ -243,13 +266,13 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
       ready = true
       mapState.hidden = true
       if (opportunityType === 'swppp_site') { diagnostic({ viewReady: true }); diagnosticOverlay(mapState) }
-      setState('Scout site map ready')
+      setState(opportunityType === 'water_utility_portfolio' ? 'Scout portfolio map ready' : 'Scout site map ready')
     },
     onError: (error: Error) => {
       if (generation !== mapGeneration) return
       if (!ready) {
         mapState.hidden = false
-        mapState.textContent = 'Site map unavailable'
+        mapState.textContent = opportunityType === 'water_utility_portfolio' ? 'Portfolio map unavailable' : 'Site map unavailable'
       }
       if (opportunityType === 'swppp_site') { diagnostic({ viewError: true }); diagnosticOverlay(mapState) }
       setState(`Scout map error: ${error.message}`)
@@ -257,7 +280,17 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
   }
 
   try {
-    if (opportunityType === 'swppp_site') {
+    if (opportunityType === 'water_utility_portfolio') {
+      const mapData = normalizeScoutSandboxWaterUtilityPortfolioMap(value)
+      if (!mapData) {
+        mapState.textContent = 'Portfolio map unavailable'
+        setState('Scout water-utility portfolio map result failed validation')
+        return
+      }
+      mapContainer.setAttribute('role', 'img')
+      mapContainer.setAttribute('aria-label', `Documented tank portfolio map for ${mapData.account_name}`)
+      mapHandle = mountScoutWaterUtilityPortfolioMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
+    } else if (opportunityType === 'swppp_site') {
       const mapData = normalizeScoutSwpppSiteTransport(value, (detail) => diagnostic({ rejectedField: detail.field, rejectedCheck: detail.check, receivedType: detail.actualType, receivedStringShape: detail.stringShape }))
       diagnostic({ mapNormalizer: mapData ? 'passed' : 'rejected', viewReady: false, viewError: false, initialization: 'entered' })
       if (!mapData) {
@@ -294,7 +327,7 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
     scheduleLayoutRefresh()
   } catch (error) {
     mapState.hidden = false
-    mapState.textContent = 'Site map unavailable'
+    mapState.textContent = opportunityType === 'water_utility_portfolio' ? 'Portfolio map unavailable' : 'Site map unavailable'
     if (opportunityType === 'swppp_site') { diagnostic({ initialization: 'failed', initializationError: diagnosticError(error) }); diagnosticOverlay(mapState) }
     setState(`Scout map initialization failed: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -355,7 +388,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.6.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.7.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
@@ -365,7 +398,7 @@ app.ontoolresult = (result) => {
   const control = document.querySelector<HTMLElement>('[data-scout-diagnostics]')
   if (control) control.hidden = opportunityType !== 'swppp_site'
   if (opportunityType === 'swppp_site') diagnostic({ rejectedField: 'none', rejectedCheck: 'none', receivedType: 'not_checked', receivedStringShape: 'not_checked', resultCount: ++diagnosticResultCount, branch: 'not_entered', initializationError: 'none', mapNormalizer: 'not_entered', requiredTiles: 0, matchingTiles: 0, generation: 0, loadedTiles: 0, decodedTiles: 0, decodeFailed: 0, drawFailed: 0, imageFailed: 0, rendererReady: false, timeout: false, context2d: 'not_attempted', lastError: 'none', payloadSource: metadataTiles ? 'metadata' : resourceEmbeddedTiles ? 'resource' : 'none', identityMatch: structured?.map?.site_name === structured?.opportunity?.name && structured?.map?.location_label === structured?.opportunity?.location_label })
-  if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site') {
+  if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site' && opportunityType !== 'water_utility_portfolio') {
     renderUnavailableOpportunity()
     renderMap('premium_exterior', null)
     return
