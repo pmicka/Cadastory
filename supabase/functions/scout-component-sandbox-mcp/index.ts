@@ -43,8 +43,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v30'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v31'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v30',
   'ui://scout/component-sandbox/v29',
   'ui://scout/component-sandbox/v28',
   'ui://scout/component-sandbox/v27',
@@ -88,6 +89,7 @@ const SANDBOX_MAP_CENTERS = [
 ] as const
 const WARREN_PORTFOLIO_TILE_BOUNDS = { z: 9, minX: 131, maxX: 134, minY: 198, maxY: 199 } as const
 const DEALERSHIP_PORTFOLIO_TILE_BOUNDS = { z: 8, minX: 66, maxX: 68, minY: 98, maxY: 99 } as const
+const DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS = { z: 7, minX: 33, maxX: 34, minY: 49, maxY: 49 } as const
 
 async function loadScoutSandboxOpportunity() {
   const { data, error } = await admin.rpc('scout_get_component_sandbox_opportunity_v1_internal')
@@ -168,6 +170,7 @@ async function loadEmbeddedSandboxTiles() {
     buildScoutSwpppSiteRasterFrame(swpppMap, 456, 210, { tileUrlTemplate }),
     buildScoutWaterUtilityPortfolioRasterFrame(portfolioMap, 456, 210, { tileUrlTemplate }),
     buildScoutDealershipPortfolioRasterFrame(dealershipMap, 456, 210, { tileUrlTemplate }),
+    buildScoutDealershipPortfolioRasterFrame(dealershipMap, 280, 210, { tileUrlTemplate }),
   ]
   const uniqueTiles = new Map<string, EmbeddedRasterTile>()
   for (const frame of frames) {
@@ -557,7 +560,7 @@ const dealershipPortfolioResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.0' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.1' })
 
   registerAppResource(
     server,
@@ -589,7 +592,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27' || compatibilityUri === 'ui://scout/component-sandbox/v28' || compatibilityUri === 'ui://scout/component-sandbox/v29')
+          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27' || compatibilityUri === 'ui://scout/component-sandbox/v28' || compatibilityUri === 'ui://scout/component-sandbox/v29' || compatibilityUri === 'ui://scout/component-sandbox/v30')
             ? await loadScoutViewHtml()
             : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
             .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),
@@ -730,13 +733,16 @@ function parseSandboxTile(url: URL) {
   if (!match) return null
   const z = Number(match[1]), x = Number(match[2]), y = Number(match[3])
   const count = Math.pow(2, z)
-  if (!Number.isInteger(z) || z < 8 || z > 18 || x < 0 || y < 0 || x >= count || y >= count) return null
+  if (!Number.isInteger(z) || z < 7 || z > 18 || x < 0 || y < 0 || x >= count || y >= count) return null
   if (z === WARREN_PORTFOLIO_TILE_BOUNDS.z
     && x >= WARREN_PORTFOLIO_TILE_BOUNDS.minX && x <= WARREN_PORTFOLIO_TILE_BOUNDS.maxX
     && y >= WARREN_PORTFOLIO_TILE_BOUNDS.minY && y <= WARREN_PORTFOLIO_TILE_BOUNDS.maxY) return { z, x, y }
   if (z === DEALERSHIP_PORTFOLIO_TILE_BOUNDS.z
     && x >= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.minX && x <= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.maxX
     && y >= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.minY && y <= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.maxY) return { z, x, y }
+  if (z === DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.z
+    && x >= DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.minX && x <= DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.maxX
+    && y >= DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.minY && y <= DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.maxY) return { z, x, y }
   if (z < 12) return null
   const center = tileCenter(z, x, y)
   if (!SANDBOX_MAP_CENTERS.some((site) => Math.abs(center.lon - site.lon) <= 0.12 && Math.abs(center.lat - site.lat) <= 0.12)) return null
