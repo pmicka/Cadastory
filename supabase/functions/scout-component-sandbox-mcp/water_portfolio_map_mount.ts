@@ -152,7 +152,8 @@ export function mountScoutWaterUtilityPortfolioMap(
       if (markerData.serviceState === 'documented_not_in_service') marker.classList.add('scout-portfolio-marker--not-in-service')
       marker.style.left = `${markerData.left}px`
       marker.style.top = `${markerData.top}px`
-      marker.style.backgroundColor = morphology.color
+      marker.style.setProperty('--scout-portfolio-marker-color', morphology.color)
+      marker.style.backgroundColor = markerData.serviceState === 'documented_not_in_service' ? '#ffffff' : morphology.color
       marker.title = `${markerData.name} · ${morphology.label}${markerData.serviceState === 'documented_not_in_service' ? ' · documented not in service' : ' · current service state unverified'}${markerData.historicalRehab ? ' · historical rehab record' : ''}`
       marker.setAttribute('aria-hidden', 'true')
       container.appendChild(marker)
@@ -177,7 +178,7 @@ export function mountScoutWaterUtilityPortfolioMap(
     }
     const statusKey = document.createElement('span')
     statusKey.className = 'scout-portfolio-legend-status'
-    statusKey.textContent = 'Ring = historical rehab · Slash = not in service'
+    statusKey.textContent = 'Halo = historical rehab · Hollow = not in service'
     legend.appendChild(statusKey)
     container.appendChild(legend)
 

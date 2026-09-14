@@ -130,4 +130,4 @@ The generated View must continue to have exactly one `<!doctype html>`, contain 
 
 ## Owner-approved Warren portfolio marker refinement — 2026-09-14
 
-Within the existing map media tile, the Warren County portfolio uses flat 2D circular markers with no drop shadow. Fill color encodes documented WRIS tank form; historical rehab and documented not-in-service states use non-color ring/slash cues. A compact in-map legend is approved because the color encoding would otherwise be ambiguous. This does not authorize a new card section or generalized portfolio-map redesign.
+Within the existing map media tile, the Warren County portfolio uses flat 2D circular markers with no drop shadow. Fill color encodes documented WRIS tank form; historical rehab and documented not-in-service states use non-color ring/hollow marker cues. A compact in-map legend is approved because the color encoding would otherwise be ambiguous. This does not authorize a new card section or generalized portfolio-map redesign.
