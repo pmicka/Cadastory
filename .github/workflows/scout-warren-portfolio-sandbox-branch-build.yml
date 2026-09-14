@@ -35,6 +35,7 @@ jobs:
         run: npm test
       - name: Commit generated view when changed
         run: |
+          # Branch-only build artifact; this workflow never deploys Scout.
           if git diff --quiet -- supabase/functions/scout-component-sandbox-mcp/view.generated.ts; then
             echo 'Generated view already current.'
             exit 0
