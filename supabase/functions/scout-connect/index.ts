@@ -1,6 +1,12 @@
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { sandboxSwpppSiteMapSchema, sandboxSwpppSiteOpportunitySchema } from '../_shared/scout_sandbox_swppp_schema.ts'
+import {
+  SANDBOX_PORTFOLIO_RESOURCE_URI,
+  SANDBOX_PORTFOLIO_TOOL,
+  sandboxPortfolioResource,
+  sandboxPortfolioTool,
+} from '../_shared/scout_sandbox_portfolio_contract.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -18,8 +24,8 @@ const CORE_URL = `${SUPABASE_URL}/functions/v1/scout-mcp-contract`
 const OPS_URL = `${SUPABASE_URL}/functions/v1/scout-ops-contract`
 const SANDBOX_URL = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp`
 const SANDBOX_TOOL = 'scout_preview_component_sandbox'
-const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v25'
-const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v24','ui://scout/component-sandbox/v23','ui://scout/component-sandbox/v22','ui://scout/component-sandbox/v21','ui://scout/component-sandbox/v20','ui://scout/component-sandbox/v19','ui://scout/component-sandbox/v18','ui://scout/component-sandbox/v17','ui://scout/component-sandbox/v16','ui://scout/component-sandbox/v15','ui://scout/component-sandbox/v14','ui://scout/component-sandbox/v13','ui://scout/component-sandbox/v12','ui://scout/component-sandbox/v11','ui://scout/component-sandbox/v10','ui://scout/component-sandbox/v9','ui://scout/component-sandbox/v8','ui://scout/component-sandbox/v7','ui://scout/component-sandbox/v6','ui://scout/component-sandbox/v5','ui://scout/component-sandbox/v4','ui://scout/component-sandbox/v3','ui://scout/component-sandbox/v2','ui://scout/component-sandbox/v1']
+const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v26'
+const SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v25','ui://scout/component-sandbox/v24','ui://scout/component-sandbox/v23','ui://scout/component-sandbox/v22','ui://scout/component-sandbox/v21','ui://scout/component-sandbox/v20','ui://scout/component-sandbox/v19','ui://scout/component-sandbox/v18','ui://scout/component-sandbox/v17','ui://scout/component-sandbox/v16','ui://scout/component-sandbox/v15','ui://scout/component-sandbox/v14','ui://scout/component-sandbox/v13','ui://scout/component-sandbox/v12','ui://scout/component-sandbox/v11','ui://scout/component-sandbox/v10','ui://scout/component-sandbox/v9','ui://scout/component-sandbox/v8','ui://scout/component-sandbox/v7','ui://scout/component-sandbox/v6','ui://scout/component-sandbox/v5','ui://scout/component-sandbox/v4','ui://scout/component-sandbox/v3','ui://scout/component-sandbox/v2','ui://scout/component-sandbox/v1']
 const OPS_TOOLS = new Set(['scout_submit_business_signal','scout_get_action_intents','scout_update_action_intent','scout_reject_public_equipment_candidates'])
 
 const publicHeaders = {
@@ -216,7 +222,8 @@ async function mergedToolsList(req:Request,connectionId:string,raw:string,owner:
   if(!core?.result?.tools)return null
   const seen=new Set<string>(); const tools:any[]=[]
   for(const t of [...(core.result.tools||[]),...(ops?.result?.tools||[])]){if(!t?.name||seen.has(t.name))continue;seen.add(t.name);tools.push(t)}
-  if(owner&&!seen.has(SANDBOX_TOOL))tools.push(sandboxTool())
+  if(owner&&!seen.has(SANDBOX_TOOL)){seen.add(SANDBOX_TOOL);tools.push(sandboxTool())}
+  if(owner&&!seen.has(SANDBOX_PORTFOLIO_TOOL)){seen.add(SANDBOX_PORTFOLIO_TOOL);tools.push(sandboxPortfolioTool())}
   return {...core,result:{...core.result,tools}}
 }
 async function mergedResourcesList(req:Request,connectionId:string,raw:string,owner:boolean){
@@ -224,6 +231,7 @@ async function mergedResourcesList(req:Request,connectionId:string,raw:string,ow
   if(!core?.result?.resources)return core
   const resources=[...(core.result.resources||[])]
   if(owner&&!resources.some((r:any)=>String(r?.uri||'')===SANDBOX_RESOURCE_URI))resources.push(sandboxResource())
+  if(owner&&!resources.some((r:any)=>String(r?.uri||'')===SANDBOX_PORTFOLIO_RESOURCE_URI))resources.push(sandboxPortfolioResource())
   return {...core,result:{...core.result,resources}}
 }
 
@@ -257,7 +265,7 @@ function compilePublicInstructions(base:unknown,manifest:RoutingManifest,owner:b
   const groups=new Map<string,Array<Record<string,unknown>>>()
   for(const row of Array.isArray(manifest.tools)?manifest.tools:[]){
     if(!row||typeof row!=='object')continue
-    if(!owner&&routingText(row.tool_name,160)===SANDBOX_TOOL)continue
+    if(!owner&&[SANDBOX_TOOL,SANDBOX_PORTFOLIO_TOOL].includes(routingText(row.tool_name,160)))continue
     const group=routingText(row.instruction_group,80)||'other'
     const rows=groups.get(group)||[];rows.push(row);groups.set(group,rows)
   }
@@ -335,11 +343,11 @@ Deno.serve(async(req:Request)=>{
     if(!Array.isArray(rpcBody)&&rpcBody?.method==='resources/list'){
       try{const merged=await mergedResourcesList(req,connection.connection_id,raw,owner);if(merged)return json(merged)}catch(e){console.error('resources/list merge failed',e)}
     }
-    if(!Array.isArray(rpcBody)&&rpcBody?.method==='tools/call'&&String(rpcBody?.params?.name||'')===SANDBOX_TOOL){
+    if(!Array.isArray(rpcBody)&&rpcBody?.method==='tools/call'&&[SANDBOX_TOOL,SANDBOX_PORTFOLIO_TOOL].includes(String(rpcBody?.params?.name||''))){
       if(!owner)return methodNotFound(rpcBody)
       try{return await forwardTo(SANDBOX_URL,req,token,raw)}catch{return json({error:'server_error',error_description:'Scout component sandbox request could not be prepared.'},500)}
     }
-    if(!Array.isArray(rpcBody)&&rpcBody?.method==='resources/read'&&[SANDBOX_RESOURCE_URI,...SANDBOX_COMPATIBILITY_RESOURCE_URIS].includes(String(rpcBody?.params?.uri||''))){
+    if(!Array.isArray(rpcBody)&&rpcBody?.method==='resources/read'&&[SANDBOX_RESOURCE_URI,SANDBOX_PORTFOLIO_RESOURCE_URI,...SANDBOX_COMPATIBILITY_RESOURCE_URIS].includes(String(rpcBody?.params?.uri||''))){
       if(!owner)return methodNotFound(rpcBody)
       try{return await forwardTo(SANDBOX_URL,req,token,raw)}catch{return json({error:'server_error',error_description:'Scout component sandbox resource could not be prepared.'},500)}
     }

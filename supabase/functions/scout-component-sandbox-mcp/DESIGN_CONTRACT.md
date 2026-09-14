@@ -126,3 +126,9 @@ Keep the current standards-based MCP Apps lifecycle:
 - current MCP Apps MIME
 
 The generated View must continue to have exactly one `<!doctype html>`, contain no `window.openai`, and use `build-view.mjs` only to bundle the standards-based JavaScript into the approved HTML template. The MapLibre-only CSS bundle path is retired and must not be restored unless an explicitly approved future implementation requires a separate generated stylesheet.
+
+## Owner-approved Warren portfolio preparation — 2026-09-14
+
+The subsequent portfolio direction extends the earlier single-site-only scope for Warren County Water District. Retain the same card and three-slide carousel. An explicit water-tank portfolio scope uses one account title, factual roster counts, exact member points in the first slide and a native member selector immediately before the factual summary, outside the swipe area. Show selected-member historical evidence and operational-state caveats without inventing current work or ownership. Other opportunity views hide and clear this control. No new action behavior is approved. This integration is prepared in the draft portfolio work, not exposed by the current tool schema.
+
+The owner's instruction to retain diagnostics until every opportunity map is functional supersedes the earlier remove-after-one-reproduction deadline. Retain the collapsed diagnostic control for SWPPP and the prepared portfolio scope; remove temporary instrumentation only after the broader host-verification condition is met.

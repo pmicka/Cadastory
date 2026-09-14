@@ -1,3 +1,7 @@
+## Portfolio foundation and diagnostic retention — owner direction 2026-09-14
+
+Retain diagnostics until maps are functional for every opportunity type; this supersedes the earlier one-reproduction removal plan. The owner reports earlier single-site regressions tested and addressed. Begin Warren County Water District portfolio groundwork as described in [portfolio/CONTRACT.md](portfolio/CONTRACT.md). This isolated model/frame does not add a live selector, change the existing View, or deploy a portfolio surface.
+
 ## Cross-opportunity embedded raster transport — owner evidence 2026-09-13
 
 The owner verified in the native Android ChatGPT host that the v25 SWPPP card now renders its map, while a newly rendered SOUTH PRESSURE ZONE TANK card returns the correct opportunity content but displays `Site map unavailable`; the owner also reports the previously functional map types are affected. This is current host evidence, superseding the assumption that the runtime image-subrequest path remains reliable for the earlier map types.
