@@ -38,8 +38,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v27'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v28'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v27',
   'ui://scout/component-sandbox/v26',
   'ui://scout/component-sandbox/v25',
   'ui://scout/component-sandbox/v24',
@@ -405,6 +406,7 @@ const portfolioMemberSchema = z.object({
   id: z.string().min(1).max(120),
   name: z.string().min(1).max(200),
   pwsid: z.string().min(1).max(40),
+  morphology: z.enum(['elevated', 'ground_storage', 'standpipe', 'fluted_column', 'unknown']).optional(),
   point: z.union([
     z.object({ type: z.literal('Point'), coordinates: z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]) }),
     z.object({ type: z.literal('unresolved') }),
@@ -462,7 +464,7 @@ const waterUtilityPortfolioResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.7' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.8' })
 
   registerAppResource(
     server,
@@ -494,7 +496,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26')
+          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27')
             ? await loadScoutViewHtml()
             : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
             .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),

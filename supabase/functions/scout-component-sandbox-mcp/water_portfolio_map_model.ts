@@ -8,10 +8,13 @@ export type ScoutWaterUtilityPortfolioPoint =
   | { type: 'Point'; coordinates: [number, number] }
   | { type: 'unresolved' }
 
+export type ScoutWaterUtilityPortfolioMorphology = 'elevated' | 'ground_storage' | 'standpipe' | 'fluted_column' | 'unknown'
+
 export type ScoutWaterUtilityPortfolioMember = {
   id: string
   name: string
   pwsid: string
+  morphology: ScoutWaterUtilityPortfolioMorphology
   point: ScoutWaterUtilityPortfolioPoint
   service_state: 'unverified' | 'documented_not_in_service'
   within_pilot_radius: boolean
@@ -113,12 +116,19 @@ function normalizeSignals(value: unknown): ScoutWaterUtilityPortfolioSignal[] | 
   return signals
 }
 
+function normalizeMorphology(value: unknown): ScoutWaterUtilityPortfolioMorphology {
+  return value === 'elevated' || value === 'ground_storage' || value === 'standpipe' || value === 'fluted_column'
+    ? value
+    : 'unknown'
+}
+
 function normalizeMember(value: unknown): ScoutWaterUtilityPortfolioMember | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const source = value as Record<string, unknown>
   const id = cleanString(source.id, 120)
   const name = cleanString(source.name, 200)
   const pwsid = cleanString(source.pwsid, 40)
+  const morphology = normalizeMorphology(source.morphology)
   const point = normalizePoint(source.point)
   const withinPilotRadius = cleanBoolean(source.within_pilot_radius)
   const sourceModifiedAt = normalizeTimestamp(source.source_modified_at)
@@ -129,6 +139,7 @@ function normalizeMember(value: unknown): ScoutWaterUtilityPortfolioMember | nul
     id,
     name,
     pwsid,
+    morphology,
     point,
     service_state: source.service_state,
     within_pilot_radius: withinPilotRadius,
