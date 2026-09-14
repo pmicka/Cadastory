@@ -71,7 +71,7 @@ assert.ok(server.includes('buildScoutSingleSiteRasterFrame(premiumMap, 456, 210'
 assert.ok(server.includes('buildScoutWaterTankRasterFrame(waterTankMap, 456, 210'))
 assert.ok(server.includes('buildScoutWaterUtilityPortfolioRasterFrame(portfolioMap, 456, 210'))
 assert.equal(server.includes('connectDomains: [MAP_TILE_ORIGIN]'), false)
-assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v30'"))
+assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v31'"))
 assert.ok(server.includes("'ui://scout/component-sandbox/v26'"))
 assert.ok(server.includes("'ui://scout/component-sandbox/v15'"))
 assert.ok(template.includes('<meta name="referrer" content="origin" />'))

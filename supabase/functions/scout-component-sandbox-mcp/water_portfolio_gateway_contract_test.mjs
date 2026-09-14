@@ -16,14 +16,14 @@ assert.ok(sharedSchema.includes('documented_asset_portfolio'))
 assert.ok(sharedSchema.includes('documented_not_in_service'))
 assert.ok(sharedSchema.includes('historical_rehab_record'))
 
-assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v30'"))
+assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v31'"))
 assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site', 'water_utility_portfolio', 'dealership_group_portfolio']).optional()"))
 assert.ok(server.includes('waterUtilityPortfolioResultSchema'))
 assert.ok(server.includes("selectedType === 'water_utility_portfolio'"))
 
 for (const gateway of [connectGateway, contractGateway]) {
   assert.ok(gateway.includes("sandboxWaterUtilityPortfolioMapSchema, sandboxWaterUtilityPortfolioOpportunitySchema"))
-  assert.ok(gateway.includes("const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v30'"))
+  assert.ok(gateway.includes("const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v31'"))
   assert.ok(gateway.includes("'ui://scout/component-sandbox/v26'"))
   assert.ok(gateway.includes("enum:['premium_exterior','water_tank','swppp_site','water_utility_portfolio','dealership_group_portfolio']"))
   assert.ok(gateway.includes("opportunity_type:{type:'string',enum:['water_utility_portfolio']}"))
