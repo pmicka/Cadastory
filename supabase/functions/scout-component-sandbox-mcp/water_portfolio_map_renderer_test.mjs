@@ -96,7 +96,7 @@ assert.equal(opportunity.member_count, 24)
 assert.equal(opportunity.not_in_service_count, 2)
 assert.equal(opportunity.historical_project_signal_count, 2)
 assert.match(opportunity.guardrail, /not proof of current service need/i)
-assert.match(opportunity.why_investigate, /verify current tank service state/i)
+assert.match(opportunity.why_investigate, /current tank service state/i)
 
 const rendererBuild = await build({
   entryPoints: [new URL('water_portfolio_map_renderer.ts', directory).pathname],
