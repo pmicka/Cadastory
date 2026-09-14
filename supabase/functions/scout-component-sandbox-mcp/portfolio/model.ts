@@ -1,4 +1,4 @@
-// Isolated foundation. Not imported by the live View or registered as a tool.
+// Bounded portfolio contract. View integration prepared; no public tool route registered.
 export type Member = {
   id: string; pwsid: string; name: string;
   point: { type: 'Point'; coordinates: [number, number] } | { type: 'unresolved' };

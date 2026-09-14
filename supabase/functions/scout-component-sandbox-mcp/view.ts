@@ -1,3 +1,6 @@
+import { normalizePortfolioResult } from './portfolio/result.ts'
+import { portfolioCounts } from './portfolio/model.ts'
+import { mountPortfolioMap } from './portfolio/mount.ts'
 import { normalizeScoutSwpppSiteTransport } from './swppp_site_transport.ts'
 import { diagnostic, diagnosticError, diagnosticOverlay } from './map_diagnostics.ts'
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
@@ -34,6 +37,7 @@ const carouselCount = document.querySelector<HTMLElement>('[data-scout-carousel-
 const carouselDots = Array.from(document.querySelectorAll<HTMLElement>('[data-scout-carousel-dot]'))
 const mapContainer = document.querySelector<HTMLElement>('[data-scout-map]')
 const mapState = document.querySelector<HTMLElement>('[data-scout-map-state]')
+const portfolioControls = document.querySelector<HTMLElement>('[data-scout-portfolio-controls]')
 let mapHandle: ScoutMapHandle | null = null
 let mapGeneration = 0
 let activeCarouselIndex = 0
@@ -222,6 +226,7 @@ function destroyMap() {
   mapGeneration += 1
   mapHandle?.destroy()
   mapHandle = null
+  if (portfolioControls) { portfolioControls.hidden = true; portfolioControls.replaceChildren() }
 }
 
 function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown, embeddedTiles?: Record<string, string>) {
@@ -300,6 +305,42 @@ function renderMap(opportunityType: ScoutSandboxOpportunityType, value: unknown,
   }
 }
 
+// Prepared portfolio scope; not exposed by the current public tool schema.
+function renderPortfolio(value: unknown, embeddedTiles?: Record<string,string>) {
+  destroyMap()
+  const result = normalizePortfolioResult(value)
+  diagnostic({mapNormalizer:result?'passed':'rejected',identityMatch:Boolean(result),branch:'not_entered',requiredTiles:0,matchingTiles:0,decodedTiles:0,context2d:'not_attempted',rendererReady:false,viewReady:false,viewError:false,lastError:'none'})
+  if (!result || !mapContainer || !mapState || !portfolioControls) {
+    renderUnavailableOpportunity()
+    if (mapState) { mapState.hidden = false; mapState.textContent = 'Portfolio map unavailable' }
+    return
+  }
+  const map = result.map, counts = portfolioCounts(map)
+  if (title) title.textContent = map.account_name
+  if (tier) tier.textContent = 'Documented tank roster'
+  if (meta) meta.textContent = `${counts.total} members • ${counts.mapped} mapped • ${counts.unresolved} locations unresolved • ${counts.omitted} omitted`
+  if (address) address.textContent = `Water system ${map.pwsid}`
+  const sourceDates = [...new Set(map.members.map(member => member.source_modified_at.slice(0,10)))].sort()
+  if (summary) summary.textContent = `${counts.documentedNotInService} documented not in service • ${counts.membersWithHistoricalSignals} members with historical rehabilitation evidence • Roster source updated ${sourceDates[0]}${sourceDates.length>1?' to '+sourceDates.at(-1):''}`
+  if (guardrail) guardrail.textContent = 'Scout guardrail: System membership does not establish ownership, contracting authority, or site access. Historical rehabilitation evidence is not proof of current service need, buyer intent, or available work. Other members have unverified operating state.'
+  mapContainer.setAttribute('role','img')
+  mapContainer.setAttribute('aria-label',`Documented tank locations for ${map.account_name}`)
+  mapState.hidden = false; mapState.textContent = 'Loading portfolio map…'
+  portfolioControls.hidden = false
+  const generation = ++mapGeneration
+  try {
+    mapHandle = mountPortfolioMap(mapContainer,portfolioControls,map,Object.entries(embeddedTiles ?? {}).map(([url,data_url])=>({url,data_url})), {
+      onDiagnostic:diagnostic,
+      onReady:()=>{if(generation!==mapGeneration)return;mapState.hidden=true;diagnostic({viewReady:true,viewError:false});diagnosticOverlay(mapState);setState('Scout portfolio map ready')},
+      onError:()=>{if(generation!==mapGeneration)return;mapState.hidden=false;mapState.textContent='Portfolio map unavailable';diagnostic({viewReady:false,viewError:true});diagnosticOverlay(mapState);setState('Scout portfolio map unavailable')},
+    })
+    scheduleLayoutRefresh()
+  } catch {
+    mapState.hidden=false;mapState.textContent='Portfolio map unavailable'
+    diagnostic({viewError:true,lastError:'portfolio_initialization_rejected'});diagnosticOverlay(mapState)
+  }
+}
+
 function updateCarouselState() {
   if (!carousel || !carouselCount || carouselDots.length === 0) return
   const slides = Array.from(carousel.querySelectorAll<HTMLElement>('.media-slide'))
@@ -363,7 +404,9 @@ app.ontoolresult = (result) => {
   const embeddedTiles = metadataTiles ?? resourceEmbeddedTiles
   const opportunityType = structured?.opportunity_type
   const control = document.querySelector<HTMLElement>('[data-scout-diagnostics]')
-  if (control) control.hidden = opportunityType !== 'swppp_site'
+  const isPortfolio = structured?.view_scope === 'portfolio'
+  if (control) control.hidden = opportunityType !== 'swppp_site' && !isPortfolio
+  if (isPortfolio) { renderPortfolio(structured, embeddedTiles); return }
   if (opportunityType === 'swppp_site') diagnostic({ rejectedField: 'none', rejectedCheck: 'none', receivedType: 'not_checked', receivedStringShape: 'not_checked', resultCount: ++diagnosticResultCount, branch: 'not_entered', initializationError: 'none', mapNormalizer: 'not_entered', requiredTiles: 0, matchingTiles: 0, generation: 0, loadedTiles: 0, decodedTiles: 0, decodeFailed: 0, drawFailed: 0, imageFailed: 0, rendererReady: false, timeout: false, context2d: 'not_attempted', lastError: 'none', payloadSource: metadataTiles ? 'metadata' : resourceEmbeddedTiles ? 'resource' : 'none', identityMatch: structured?.map?.site_name === structured?.opportunity?.name && structured?.map?.location_label === structured?.opportunity?.location_label })
   if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site') {
     renderUnavailableOpportunity()

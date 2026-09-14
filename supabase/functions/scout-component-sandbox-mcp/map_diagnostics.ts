@@ -1,4 +1,4 @@
-// Temporary owner-approved diagnostics. Remove after the host reproduction.
+// Temporary owner-approved diagnostics. Retain until every opportunity map is functional.
 export type DiagnosticValue = string | number | boolean
 const report: Record<string, DiagnosticValue> = {
   build: 'swppp-transport-v1-20260913',
