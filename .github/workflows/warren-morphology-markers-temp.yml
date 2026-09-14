@@ -20,7 +20,9 @@ jobs:
         with:
           node-version: '24'
       - name: Apply source patch
-        run: python .github/scripts/warren_morphology_markers.py
+        run: |
+          python .github/scripts/warren_morphology_markers.py
+          find supabase/functions/scout-component-sandbox-mcp -name '*test.mjs' -type f -exec sed -i "s#const RESOURCE_URI = 'ui://scout/component-sandbox/v27'#const RESOURCE_URI = 'ui://scout/component-sandbox/v28'#g; s#const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v27'#const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v28'#g" {} +
       - name: Build and test Scout sandbox
         run: |
           cd supabase/functions/scout-component-sandbox-mcp
