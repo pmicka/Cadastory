@@ -6,6 +6,9 @@ on:
       - scout/warren-portfolio-sandbox
     paths:
       - 'supabase/functions/scout-component-sandbox-mcp/**'
+      - 'supabase/functions/_shared/scout_sandbox_water_portfolio_schema.ts'
+      - 'supabase/functions/scout-connect/index.ts'
+      - 'supabase/functions/scout-mcp-contract/index.ts'
       - '.github/workflows/scout-warren-portfolio-sandbox-branch-build.yml'
 
 permissions:
@@ -24,6 +27,8 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Align sandbox gateway contracts
+        run: node supabase/functions/scout-component-sandbox-mcp/patch_warren_portfolio_gateways.mjs
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
@@ -33,15 +38,21 @@ jobs:
       - name: Run sandbox tests
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm test
-      - name: Commit generated view when changed
+      - name: Commit branch build outputs when changed
         run: |
-          # Branch-only build artifact; this workflow never deploys Scout.
-          if git diff --quiet -- supabase/functions/scout-component-sandbox-mcp/view.generated.ts; then
-            echo 'Generated view already current.'
+          # Branch-only build artifacts and deterministic gateway mirrors; this workflow never deploys Scout.
+          if git diff --quiet -- \
+            supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
+            supabase/functions/scout-connect/index.ts \
+            supabase/functions/scout-mcp-contract/index.ts; then
+            echo 'Branch build outputs already current.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add supabase/functions/scout-component-sandbox-mcp/view.generated.ts
-          git commit -m 'Build Warren portfolio sandbox view'
+          git add \
+            supabase/functions/scout-component-sandbox-mcp/view.generated.ts \
+            supabase/functions/scout-connect/index.ts \
+            supabase/functions/scout-mcp-contract/index.ts
+          git commit -m 'Build Warren portfolio sandbox v27'
           git push origin HEAD:scout/warren-portfolio-sandbox
