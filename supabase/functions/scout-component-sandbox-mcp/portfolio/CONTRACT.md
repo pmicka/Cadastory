@@ -42,3 +42,13 @@ For this snapshot all tested widths select zoom 9: four tiles at widths 280/330/
 Run from the sandbox package: `node portfolio/test.mjs` (existing esbuild dependency). Tests exercise four viewport widths, fit/padding/tile budget, counts, determinism, duplicate/mismatched IDs, bad geometry, unsupported ownership/operational claims, and partially/fully unresolved geometry.
 
 Next batch: bounded backend projection plus owner-reviewed overlap presentation, followed by View integration and explicit deployment authorization. No browser/host rendering is claimed by this pure foundation.
+
+## Batch 2 — member selection and backend preparation
+
+The owner approved proceeding with the member-selection UI and bounded backend integration. `selector.ts` supplies a native, labeled selector outside the swipeable media area, plus selected-member evidence text and a categorical legend. Every roster member is selectable independently of marker overlap. `member_view.ts` draws the selected marker last at its exact original point, dims other markers, and preserves selection through resize. No panning, position jitter, clustering, persistence, outreach, or action buttons are introduced. The marker layer must be mounted separately above the eventual raster canvas.
+
+`backend.ts` calls one fixed internal RPC with no user-provided organization or query. It validates the full response and the Warren/PWSID identity. `backend.sql` is an unapplied deployment candidate, restricted to service_role with an empty search path and schema-qualified spatial calls. Convert it into a tracked migration with the Supabase CLI during deployment preparation; do not execute it as an untracked database change. The future tool route must retain the existing owner, service, profile, and exposure gates. There is still no public tool or route wired to this loader.
+
+The read-only projection was executed against current data: 24 members, correct source and system membership. Organization attributes explicitly identify ky-kia-water-tanks and wris_operating_system_v1 with the single KY1140487 PWSID; that evidence supports system membership, not legal ownership.
+
+Selection tests cover every member, overview, unknown IDs, unchanged roster, backend errors, and cross-account rejection. Pure framing tests still pass. The DOM control is compiled but browser/host presentation has not been verified. Next work is selected-portfolio raster delivery, the approved card integration, and a tracked backend migration; no production change in this batch.
