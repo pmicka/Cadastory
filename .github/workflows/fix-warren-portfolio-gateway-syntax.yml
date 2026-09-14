@@ -1,0 +1,61 @@
+name: Fix Warren portfolio gateway syntax
+
+on:
+  push:
+    branches:
+      - fix/warren-portfolio-gateway-syntax
+    paths:
+      - '.github/workflows/fix-warren-portfolio-gateway-syntax.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix-test-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/warren-portfolio-gateway-syntax
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Close sandboxTool functions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          paths = [
+              Path('supabase/functions/scout-connect/index.ts'),
+              Path('supabase/functions/scout-mcp-contract/index.ts'),
+          ]
+          needle = "_meta:{ui:{resourceUri:SANDBOX_RESOURCE_URI}}}\nfunction sandboxResource"
+          replacement = "_meta:{ui:{resourceUri:SANDBOX_RESOURCE_URI}}}}\nfunction sandboxResource"
+          for path in paths:
+              text = path.read_text()
+              if text.count(needle) != 1:
+                  raise SystemExit(f'Expected exactly one sandboxTool closure in {path}')
+              path.write_text(text.replace(needle, replacement))
+          PY
+      - name: Install sandbox dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Rebuild sandbox view
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run build
+      - name: Run sandbox and gateway tests
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm test
+      - name: Commit syntax fix and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/fix-warren-portfolio-gateway-syntax.yml
+          git add supabase/functions/scout-connect/index.ts supabase/functions/scout-mcp-contract/index.ts
+          if ! git diff --quiet -- supabase/functions/scout-component-sandbox-mcp/view.generated.ts; then
+            git add supabase/functions/scout-component-sandbox-mcp/view.generated.ts
+          fi
+          git commit -m 'Fix Warren portfolio gateway syntax'
+          git push origin HEAD:fix/warren-portfolio-gateway-syntax
