@@ -20,6 +20,7 @@ import { SCOUT_VIEW_HTML } from './view.generated.ts'
 import { buildScoutSwpppSiteRasterFrame } from './swppp_site_map_renderer.ts'
 import { buildScoutSingleSiteRasterFrame } from './single_site_map_renderer.ts'
 import { buildScoutWaterTankRasterFrame } from './water_tank_map_renderer.ts'
+import { registerPortfolioMcp } from './portfolio/mcp.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -379,7 +380,7 @@ const swpppSiteResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.6' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.7' })
 
   registerAppResource(
     server,
@@ -400,6 +401,8 @@ function makeServer() {
       }],
     }),
   )
+
+  registerPortfolioMcp(server, admin, SCOUT_VIEW_HTML)
 
   for (const compatibilityUri of COMPATIBILITY_RESOURCE_URIS) {
     registerAppResource(
