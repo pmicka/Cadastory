@@ -1,0 +1,408 @@
+{
+  "account_name": "Warren County Water District",
+  "contract_version": "water_utility_portfolio_map_v1",
+  "members": [
+    {
+      "id": "007416C29B5D008677812CC09E00008D",
+      "name": "BLUE LEVEL TANK",
+      "point": {
+        "coordinates": [
+          -86.546103946,
+          36.954153299
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E00008A",
+      "name": "BRIGGS HILL TANK (NOT IN SERVICE)",
+      "point": {
+        "coordinates": [
+          -86.522155028,
+          37.005104154
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "documented_not_in_service",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000084",
+      "name": "GIRKIN TANK",
+      "point": {
+        "coordinates": [
+          -86.369323258,
+          37.064140703
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "00A3931244CFF05717FD09D01A000000",
+      "name": "GLEN LILY RD",
+      "point": {
+        "coordinates": [
+          -86.524860684,
+          37.013775248
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000073",
+      "name": "GREENWOOD TANK",
+      "point": {
+        "coordinates": [
+          -86.418304039,
+          36.924133663
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E00007F",
+      "name": "HADLEY TANK",
+      "point": {
+        "coordinates": [
+          -86.604253186,
+          37.058894396
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E00008B",
+      "name": "HAMMETT HILL TANK",
+      "point": {
+        "coordinates": [
+          -86.5552333,
+          36.995993038
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000075",
+      "name": "HAYS TANK #1",
+      "point": {
+        "coordinates": [
+          -86.172140578,
+          37.034281952
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000076",
+      "name": "HAYS TANK #2",
+      "point": {
+        "coordinates": [
+          -86.172091645,
+          37.034364714
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E00007B",
+      "name": "HIGHWAY 31-W TANK",
+      "point": {
+        "coordinates": [
+          -86.493987952,
+          36.931147012
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E00007D",
+      "name": "HIGHWAY 526",
+      "point": {
+        "coordinates": [
+          -86.424493283,
+          37.062727005
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E00007A",
+      "name": "HIGHWAY 68-W TANK",
+      "point": {
+        "coordinates": [
+          -86.533605907,
+          36.946808995
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000087",
+      "name": "LOVERS LANE TANK",
+      "point": {
+        "coordinates": [
+          -86.396796701,
+          36.971486982
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000082",
+      "name": "MIZPAH",
+      "point": {
+        "coordinates": [
+          -86.307207207,
+          37.038936077
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [
+        {
+          "id": "water_tank:ed18a77d-bcbc-4682-ad69-78b5931ce9f0",
+          "kind": "historical_rehab_record",
+          "observed_at": "2021-12-10T09:40:38+00:00"
+        }
+      ],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000089",
+      "name": "MORGANTOWN ROAD TANK",
+      "point": {
+        "coordinates": [
+          -86.526842646,
+          36.997144233
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000086",
+      "name": "OAKLAND TANK (NOT IN SERVICE)",
+      "point": {
+        "coordinates": [
+          -86.280675283,
+          37.033371224
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "documented_not_in_service",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000081",
+      "name": "PLEASANT HILL TANK",
+      "point": {
+        "coordinates": [
+          -86.339238194,
+          36.926321101
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [
+        {
+          "id": "water_tank:f7e65667-8482-4785-86e7-d018d1cf4b13",
+          "kind": "historical_rehab_record",
+          "observed_at": "2021-12-10T09:40:38+00:00"
+        }
+      ],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000072",
+      "name": "PLUM SPRINGS TANK #2",
+      "point": {
+        "coordinates": [
+          -86.381671094,
+          37.025428462
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000077",
+      "name": "PLUM SPRINGS TANK #3",
+      "point": {
+        "coordinates": [
+          -86.381969791,
+          37.025476744
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000079",
+      "name": "RICHARDSVILLE TANK",
+      "point": {
+        "coordinates": [
+          -86.471351303,
+          37.097877067
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000080",
+      "name": "RIVERSIDE",
+      "point": {
+        "coordinates": [
+          -86.557814332,
+          37.132857983
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000078",
+      "name": "SANDHILL TANK",
+      "point": {
+        "coordinates": [
+          -86.388838529,
+          37.101095041
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E00007C",
+      "name": "SMITHS GROVE TANK",
+      "point": {
+        "coordinates": [
+          -86.207771908,
+          37.050748471
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    },
+    {
+      "id": "007416C29B5D008677812CC09E000083",
+      "name": "THREE SPRINGS",
+      "point": {
+        "coordinates": [
+          -86.437546459,
+          36.908993642
+        ],
+        "type": "Point"
+      },
+      "pwsid": "KY1140487",
+      "service_state": "unverified",
+      "signals": [],
+      "source_modified_at": "2023-06-12T10:17:05+00:00",
+      "within_pilot_radius": true
+    }
+  ],
+  "observed_on": "2026-09-14",
+  "organization_id": "046baf25-53b3-4524-91d0-b115bb62161e",
+  "pwsid": "KY1140487",
+  "scope": "documented_roster",
+  "source_slug": "ky-kia-water-tanks",
+  "relationship": "system_membership"
+}
