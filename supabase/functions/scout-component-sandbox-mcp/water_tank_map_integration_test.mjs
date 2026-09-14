@@ -40,7 +40,7 @@ for (const source of [server, connectGateway, contractGateway]) {
 }
 
 assert.ok(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
-assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site']).optional()"))
+assert.ok(server.includes("opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site', 'water_utility_portfolio']).optional()"))
 assert.ok(server.includes("z.discriminatedUnion('opportunity_type'"))
 assert.ok(server.includes("const selectedType = opportunity_type ?? 'premium_exterior'"))
 assert.ok(server.includes('buildScoutSandboxWaterTankOpportunity'))
