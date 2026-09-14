@@ -1,0 +1,279 @@
+name: Warren morphology marker batch
+
+on:
+  push:
+    branches:
+      - scout/warren-flat-morphology-markers
+
+permissions:
+  contents: write
+
+jobs:
+  patch-build-test:
+    if: ${{ !contains(github.event.head_commit.message, '[warren-morphology-bot]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout/warren-flat-morphology-markers
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Patch morphology contract and 2D marker presentation
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f'pattern not found in {path}: {old[:120]!r}')
+              p.write_text(text.replace(old, new, 1))
+
+          model = 'supabase/functions/scout-component-sandbox-mcp/water_portfolio_map_model.ts'
+          replace_once(model,
+              "export type ScoutWaterUtilityPortfolioMember = {\n",
+              "export type ScoutWaterUtilityPortfolioMorphology = 'elevated' | 'ground_storage' | 'standpipe' | 'fluted_column' | 'unknown'\n\nexport type ScoutWaterUtilityPortfolioMember = {\n")
+          replace_once(model,
+              "  pwsid: string\n  point: ScoutWaterUtilityPortfolioPoint\n",
+              "  pwsid: string\n  morphology: ScoutWaterUtilityPortfolioMorphology\n  point: ScoutWaterUtilityPortfolioPoint\n")
+          replace_once(model,
+              "function normalizeMember(value: unknown): ScoutWaterUtilityPortfolioMember | null {\n",
+              "function normalizeMorphology(value: unknown): ScoutWaterUtilityPortfolioMorphology {\n  return value === 'elevated' || value === 'ground_storage' || value === 'standpipe' || value === 'fluted_column'\n    ? value\n    : 'unknown'\n}\n\nfunction normalizeMember(value: unknown): ScoutWaterUtilityPortfolioMember | null {\n")
+          replace_once(model,
+              "  const pwsid = cleanString(source.pwsid, 40)\n  const point = normalizePoint(source.point)\n",
+              "  const pwsid = cleanString(source.pwsid, 40)\n  const morphology = normalizeMorphology(source.morphology)\n  const point = normalizePoint(source.point)\n")
+          replace_once(model,
+              "    pwsid,\n    point,\n",
+              "    pwsid,\n    morphology,\n    point,\n")
+
+          renderer = 'supabase/functions/scout-component-sandbox-mcp/water_portfolio_map_renderer.ts'
+          replace_once(renderer,
+              "import type { ScoutSandboxWaterUtilityPortfolioMap } from './water_portfolio_map_model.ts'\n",
+              "import type { ScoutSandboxWaterUtilityPortfolioMap, ScoutWaterUtilityPortfolioMorphology } from './water_portfolio_map_model.ts'\n")
+          replace_once(renderer,
+              "  name: string\n  serviceState: 'unverified' | 'documented_not_in_service'\n",
+              "  name: string\n  morphology: ScoutWaterUtilityPortfolioMorphology\n  serviceState: 'unverified' | 'documented_not_in_service'\n")
+          replace_once(renderer,
+              "      name: member.name,\n      serviceState: member.service_state,\n",
+              "      name: member.name,\n      morphology: member.morphology,\n      serviceState: member.service_state,\n")
+
+          mount = 'supabase/functions/scout-component-sandbox-mcp/water_portfolio_map_mount.ts'
+          replace_once(mount,
+              "import type { ScoutSandboxWaterUtilityPortfolioMap } from './water_portfolio_map_model.ts'\n",
+              "import type { ScoutSandboxWaterUtilityPortfolioMap, ScoutWaterUtilityPortfolioMorphology } from './water_portfolio_map_model.ts'\n")
+          replace_once(mount,
+              "const PNG_DATA_URL_PREFIX = 'data:image/png;base64,'\n",
+              "const PNG_DATA_URL_PREFIX = 'data:image/png;base64,'\n\nconst MORPHOLOGY_STYLES: Record<ScoutWaterUtilityPortfolioMorphology, { label: string; color: string }> = {\n  elevated: { label: 'Elevated', color: '#3769b2' },\n  ground_storage: { label: 'Ground storage', color: '#4d7c5d' },\n  standpipe: { label: 'Standpipe', color: '#b96a2d' },\n  fluted_column: { label: 'Fluted column', color: '#7656a8' },\n  unknown: { label: 'Unclassified', color: '#747d73' },\n}\n\nconst MORPHOLOGY_ORDER: ScoutWaterUtilityPortfolioMorphology[] = [\n  'elevated',\n  'ground_storage',\n  'standpipe',\n  'fluted_column',\n  'unknown',\n]\n")
+          old_loop = """    for (const markerData of frame.markers) {\n      const marker = document.createElement('span')\n      marker.className = 'scout-site-marker'\n      marker.style.left = `${markerData.left}px`\n      marker.style.top = `${markerData.top}px`\n      marker.style.width = markerData.serviceState === 'documented_not_in_service' ? '12px' : '10px'\n      marker.style.height = markerData.serviceState === 'documented_not_in_service' ? '12px' : '10px'\n      marker.style.opacity = markerData.serviceState === 'documented_not_in_service' ? '0.55' : '0.92'\n      marker.title = `${markerData.name}${markerData.serviceState === 'documented_not_in_service' ? ' · documented not in service' : ' · current service state unverified'}${markerData.historicalRehab ? ' · historical rehab record' : ''}`\n      marker.setAttribute('aria-hidden', 'true')\n      const markerDot = document.createElement('span')\n      markerDot.className = 'scout-site-marker-dot'\n      marker.appendChild(markerDot)\n      container.appendChild(marker)\n    }\n\n"""
+          new_loop = """    for (const markerData of frame.markers) {\n      const morphology = MORPHOLOGY_STYLES[markerData.morphology]\n      const marker = document.createElement('span')\n      marker.className = 'scout-portfolio-marker'\n      if (markerData.historicalRehab) marker.classList.add('scout-portfolio-marker--historical')\n      if (markerData.serviceState === 'documented_not_in_service') marker.classList.add('scout-portfolio-marker--not-in-service')\n      marker.style.left = `${markerData.left}px`\n      marker.style.top = `${markerData.top}px`\n      marker.style.backgroundColor = morphology.color\n      marker.title = `${markerData.name} · ${morphology.label}${markerData.serviceState === 'documented_not_in_service' ? ' · documented not in service' : ' · current service state unverified'}${markerData.historicalRehab ? ' · historical rehab record' : ''}`\n      marker.setAttribute('aria-hidden', 'true')\n      container.appendChild(marker)\n    }\n\n    const presentMorphologies = new Set(frame.markers.map((marker) => marker.morphology))\n    const legend = document.createElement('span')\n    legend.className = 'scout-portfolio-legend'\n    legend.setAttribute('aria-hidden', 'true')\n    for (const morphologyKey of MORPHOLOGY_ORDER) {\n      if (!presentMorphologies.has(morphologyKey)) continue\n      const style = MORPHOLOGY_STYLES[morphologyKey]\n      const item = document.createElement('span')\n      item.className = 'scout-portfolio-legend-item'\n      const swatch = document.createElement('span')\n      swatch.className = 'scout-portfolio-legend-swatch'\n      swatch.style.backgroundColor = style.color\n      const text = document.createElement('span')\n      text.textContent = style.label\n      item.append(swatch, text)\n      legend.appendChild(item)\n    }\n    const statusKey = document.createElement('span')\n    statusKey.className = 'scout-portfolio-legend-status'\n    statusKey.textContent = 'Ring = historical rehab · Slash = not in service'\n    legend.appendChild(statusKey)\n    container.appendChild(legend)\n\n"""
+          replace_once(mount, old_loop, new_loop)
+
+          template = 'supabase/functions/scout-component-sandbox-mcp/view.template.html'
+          css_anchor = """      .scout-site-marker-dot {\n        width: 7px;\n        height: 7px;\n        border-radius: 50%;\n        background: #4d6b52;\n      }\n"""
+          css_extra = css_anchor + """      .scout-portfolio-marker {\n        position: absolute;\n        z-index: 3;\n        width: 12px;\n        height: 12px;\n        transform: translate(-50%, -50%);\n        border: 2px solid rgba(255,255,255,.96);\n        border-radius: 50%;\n        box-shadow: none;\n        pointer-events: none;\n      }\n      .scout-portfolio-marker--historical {\n        outline: 1px solid #263128;\n        outline-offset: 1px;\n      }\n      .scout-portfolio-marker--not-in-service { opacity: .68; }\n      .scout-portfolio-marker--not-in-service::after {\n        content: '';\n        position: absolute;\n        left: 1px;\n        top: 4px;\n        width: 7px;\n        height: 2px;\n        border-radius: 1px;\n        background: rgba(255,255,255,.96);\n        transform: rotate(-45deg);\n        transform-origin: center;\n      }\n      .scout-portfolio-legend {\n        position: absolute;\n        top: 7px;\n        right: 7px;\n        z-index: 4;\n        display: grid;\n        grid-template-columns: repeat(2, max-content);\n        gap: 3px 8px;\n        max-width: calc(100% - 14px);\n        padding: 5px 7px;\n        border: 1px solid rgba(38,49,40,.14);\n        border-radius: 8px;\n        background: rgba(255,255,255,.9);\n        color: #394139;\n        font-size: 8px;\n        line-height: 10px;\n        pointer-events: none;\n      }\n      .scout-portfolio-legend-item {\n        display: inline-flex;\n        align-items: center;\n        gap: 4px;\n        white-space: nowrap;\n      }\n      .scout-portfolio-legend-swatch {\n        width: 7px;\n        height: 7px;\n        flex: 0 0 7px;\n        border: 1px solid rgba(255,255,255,.96);\n        border-radius: 50%;\n      }\n      .scout-portfolio-legend-status {\n        grid-column: 1 / -1;\n        padding-top: 1px;\n        color: #667066;\n        white-space: nowrap;\n      }\n"""
+          replace_once(template, css_anchor, css_extra)
+
+          shared = 'supabase/functions/_shared/scout_sandbox_water_portfolio_schema.ts'
+          replace_once(shared,
+              "pwsid:{type:'string',minLength:1,maxLength:40},point,service_state",
+              "pwsid:{type:'string',minLength:1,maxLength:40},morphology:{type:'string',enum:['elevated','ground_storage','standpipe','fluted_column','unknown']},point,service_state")
+
+          component = 'supabase/functions/scout-component-sandbox-mcp/index.ts'
+          replace_once(component,
+              "const RESOURCE_URI = 'ui://scout/component-sandbox/v27'\nconst COMPATIBILITY_RESOURCE_URIS = [\n  'ui://scout/component-sandbox/v26',",
+              "const RESOURCE_URI = 'ui://scout/component-sandbox/v28'\nconst COMPATIBILITY_RESOURCE_URIS = [\n  'ui://scout/component-sandbox/v27',\n  'ui://scout/component-sandbox/v26',")
+          replace_once(component,
+              "  pwsid: z.string().min(1).max(40),\n  point: z.union([",
+              "  pwsid: z.string().min(1).max(40),\n  morphology: z.enum(['elevated', 'ground_storage', 'standpipe', 'fluted_column', 'unknown']).optional(),\n  point: z.union([")
+          replace_once(component,
+              "const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.7' })",
+              "const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.8' })")
+          replace_once(component,
+              "compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26')",
+              "compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27')")
+
+          view = 'supabase/functions/scout-component-sandbox-mcp/view.ts'
+          replace_once(view,
+              "const app = new App({ name: 'scout-ui-foundation', version: '2.7.0' })",
+              "const app = new App({ name: 'scout-ui-foundation', version: '2.8.0' })")
+
+          for gateway in ['supabase/functions/scout-connect/index.ts', 'supabase/functions/scout-mcp-contract/index.ts']:
+              replace_once(gateway,
+                  "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v27'\nconst SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v26',",
+                  "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v28'\nconst SANDBOX_COMPATIBILITY_RESOURCE_URIS = ['ui://scout/component-sandbox/v27','ui://scout/component-sandbox/v26',")
+
+          test = 'supabase/functions/scout-component-sandbox-mcp/water_portfolio_map_renderer_test.mjs'
+          replace_once(test,
+              "    pwsid: 'KY1140487',\n    point: {",
+              "    pwsid: 'KY1140487',\n    morphology: index < 12 ? 'elevated' : index < 18 ? 'ground_storage' : index < 23 ? 'standpipe' : 'fluted_column',\n    point: {")
+          replace_once(test,
+              "assert.equal(normalized.evidence_boundary, 'linked water-system tank records only')\n",
+              "assert.equal(normalized.evidence_boundary, 'linked water-system tank records only')\nassert.equal(normalized.members.filter((member) => member.morphology === 'elevated').length, 12)\nassert.equal(normalized.members.filter((member) => member.morphology === 'ground_storage').length, 6)\nassert.equal(normalized.members.filter((member) => member.morphology === 'standpipe').length, 5)\nassert.equal(normalized.members.filter((member) => member.morphology === 'fluted_column').length, 1)\n")
+          replace_once(test,
+              "assert.equal(frame.markers.filter((marker) => marker.historicalRehab).length, 2)\n",
+              "assert.equal(frame.markers.filter((marker) => marker.historicalRehab).length, 2)\nassert.equal(frame.markers.filter((marker) => marker.morphology === 'elevated').length, 12)\nassert.equal(frame.markers.filter((marker) => marker.morphology === 'ground_storage').length, 6)\nassert.equal(frame.markers.filter((marker) => marker.morphology === 'standpipe').length, 5)\nassert.equal(frame.markers.filter((marker) => marker.morphology === 'fluted_column').length, 1)\nassert.ok(mountSource.includes('MORPHOLOGY_STYLES'))\nassert.ok(mountSource.includes('scout-portfolio-marker'))\nassert.ok(mountSource.includes('scout-portfolio-legend'))\n")
+
+          for test_path in [
+              'supabase/functions/scout-component-sandbox-mcp/foundation_test.mjs',
+              'supabase/functions/scout-component-sandbox-mcp/water_portfolio_gateway_contract_test.mjs',
+          ]:
+              p = Path(test_path)
+              text = p.read_text().replace('ui://scout/component-sandbox/v27', 'ui://scout/component-sandbox/v28')
+              text = text.replace("version: '2.7.0'", "version: '2.8.0'")
+              p.write_text(text)
+
+          contract = 'supabase/functions/scout-component-sandbox-mcp/WATER_UTILITY_PORTFOLIO_MAP_CONTRACT.md'
+          p = Path(contract)
+          text = p.read_text().replace('ui://scout/component-sandbox/v27', 'ui://scout/component-sandbox/v28')
+          text = text.replace(
+              '- renders 24 asset markers for the current exemplar;\n',
+              "- renders 24 flat 2D asset markers for the current exemplar;\n- colors markers by documented WRIS tank form only: `ELEVATED` → elevated, `GROUND STORAGE` → ground storage, `STANDPIPE` → standpipe, and `OTHER` + `FLUTED COLUMN` → fluted column; unknown or unsupported source values remain explicitly unclassified;\n- uses marker fill for morphology, a ring for historical rehab evidence, and a slash for documented not-in-service status so evidence dimensions do not compete for the same color channel;\n")
+          text += "\n## Owner-approved marker refinement — 2026-09-14\n\nThe owner approved flat 2D portfolio markers and morphology color-coding for the Warren County exemplar. Morphology is source-derived from Kentucky WRIS `TYPE` / `OTHTYPE`; it is not inferred from map imagery. The compact legend remains inside the existing map media slot and does not add a new card section.\n"
+          p.write_text(text)
+
+          design = 'supabase/functions/scout-component-sandbox-mcp/DESIGN_CONTRACT.md'
+          p = Path(design)
+          text = p.read_text()
+          text = text.replace(
+              "- The third approved pre-host-verification experience is the bounded HAM–Brent Spence Project `swppp_site` permit-location point map defined in `MAP_CONTRACT.md`.\n",
+              "- The third approved pre-host-verification experience is the bounded HAM–Brent Spence Project `swppp_site` permit-location point map defined in `MAP_CONTRACT.md`.\n- The fourth approved experience is the bounded Warren County Water District `water_utility_portfolio` documented tank-roster map defined in `WATER_UTILITY_PORTFOLIO_MAP_CONTRACT.md`.\n")
+          text = text.replace(
+              "- The sandbox preview tool may select `premium_exterior`, `water_tank`, or `swppp_site`; omitting the selector preserves the PNC premium-exterior compatibility default.\n",
+              "- The sandbox preview tool may select `premium_exterior`, `water_tank`, `swppp_site`, or `water_utility_portfolio`; omitting the selector preserves the PNC premium-exterior compatibility default.\n")
+          text = text.replace(
+              "- No portfolio/clustering/territory map semantics are approved by this design decision.\n",
+              "- The Warren County documented asset portfolio is explicitly approved. Generalized clustering, inferred service territory, heatmap, market territory, or route-planning semantics remain unapproved.\n")
+          text = text.replace(
+              "- maps beyond the bounded PNC premium-exterior and SOUTH PRESSURE ZONE TANK water-tank single-site directions described above\n- multiple opportunity maps in one card\n- portfolio, clustering, heatmap, territory, or route-planning map semantics\n",
+              "- maps beyond the bounded approved exemplars described above without separate owner approval\n- multiple opportunity maps in one card\n- portfolio semantics beyond the approved Warren County documented-roster exemplar, or generalized clustering, heatmap, inferred territory, or route-planning semantics\n")
+          text += "\n## Owner-approved Warren portfolio marker refinement — 2026-09-14\n\nWithin the existing map media tile, the Warren County portfolio uses flat 2D circular markers with no drop shadow. Fill color encodes documented WRIS tank form; historical rehab and documented not-in-service states use non-color ring/slash cues. A compact in-map legend is approved because the color encoding would otherwise be ambiguous. This does not authorize a new card section or generalized portfolio-map redesign.\n"
+          p.write_text(text)
+
+          migration = Path('supabase/migrations/20260914202000_add_water_portfolio_morphology_v1.sql')
+          migration.write_text(r'''-- Add source-derived Warren County tank morphology to the bounded owner sandbox projection.
+-- Morphology is taken only from documented Kentucky WRIS TYPE / OTHTYPE values.
+
+create or replace function public.scout_get_component_sandbox_water_portfolio_v1_internal()
+returns jsonb
+language sql
+stable
+security definer
+set search_path = 'pg_catalog'
+as $function$
+with org as (
+  select o.id, o.canonical_name
+  from core.organizations o
+  where o.status = 'active'
+    and o.organization_type = 'water_utility'
+    and o.canonical_name = 'Warren County Water District'
+    and o.attributes->>'source' = 'ky-kia-water-tanks'
+    and o.attributes->>'asset_resolution' = 'wris_operating_system_v1'
+    and o.attributes->'pwsids' = '["KY1140487"]'::jsonb
+), roster as (
+  select
+    o.id as organization_id,
+    o.canonical_name,
+    r.source_native_id,
+    r.location,
+    r.within_pilot_radius,
+    r.raw_payload#>>'{attributes,WRIS_FID}' as wris_fid,
+    r.raw_payload#>>'{attributes,PWSID}' as pwsid,
+    r.raw_payload#>>'{attributes,TYPE}' as tank_type,
+    r.raw_payload#>>'{attributes,OTHTYPE}' as other_type,
+    r.raw_payload#>>'{attributes,MODIFYDATE}' as modify_epoch_ms
+  from org o
+  join ingest.sources s on s.slug = 'ky-kia-water-tanks'
+  join ingest.raw_records r on r.source_id = s.id
+  where r.raw_payload#>>'{attributes,PWSID}' = 'KY1140487'
+), bounded as (
+  select *
+  from roster
+  order by source_native_id, wris_fid
+  limit 100
+)
+select jsonb_build_object(
+  'contract_version', 'water_utility_portfolio_map_v1',
+  'account_name', min(b.canonical_name),
+  'organization_id', min(b.organization_id::text),
+  'pwsid', 'KY1140487',
+  'scope', 'documented_roster',
+  'source_slug', 'ky-kia-water-tanks',
+  'relationship', 'system_membership',
+  'generated_at', statement_timestamp(),
+  'source_modified_at', max(to_timestamp(b.modify_epoch_ms::double precision / 1000)),
+  'members', jsonb_agg(
+    jsonb_build_object(
+      'id', b.wris_fid,
+      'pwsid', b.pwsid,
+      'name', b.source_native_id,
+      'morphology', case
+        when upper(coalesce(b.tank_type, '')) = 'ELEVATED' then 'elevated'
+        when upper(coalesce(b.tank_type, '')) = 'GROUND STORAGE' then 'ground_storage'
+        when upper(coalesce(b.tank_type, '')) = 'STANDPIPE' then 'standpipe'
+        when upper(coalesce(b.tank_type, '')) = 'OTHER' and upper(coalesce(b.other_type, '')) = 'FLUTED COLUMN' then 'fluted_column'
+        else 'unknown'
+      end,
+      'point', case
+        when b.location is null then jsonb_build_object('type', 'unresolved')
+        else extensions.st_asgeojson(b.location::extensions.geometry)::jsonb
+      end,
+      'service_state', case
+        when b.source_native_id ilike '%NOT IN SERVICE%' then 'documented_not_in_service'
+        else 'unverified'
+      end,
+      'within_pilot_radius', b.within_pilot_radius,
+      'source_modified_at', to_timestamp(b.modify_epoch_ms::double precision / 1000),
+      'signals', coalesce((
+        select jsonb_agg(
+          jsonb_build_object(
+            'id', s.candidate_key,
+            'kind', 'historical_rehab_record',
+            'observed_at', s.observed_at
+          ) order by s.observed_at desc, s.candidate_key
+        )
+        from (
+          select v.candidate_key, v.observed_at
+          from scout.v_water_tank_opportunity_candidates v
+          where v.organization_id = b.organization_id
+            and v.subject_key = b.wris_fid
+            and v.details->>'latest_project_status' = 'REHAB'
+          order by v.observed_at desc, v.candidate_key
+          limit 10
+        ) s
+      ), '[]'::jsonb)
+    ) order by b.source_native_id, b.wris_fid
+  )
+)
+from bounded b
+having count(*) between 1 and 100;
+$function$;
+
+comment on function public.scout_get_component_sandbox_water_portfolio_v1_internal() is
+  'Owner sandbox-only Warren County Water District documented tank roster. Morphology is source-derived from WRIS TYPE/OTHTYPE. generated_at is response time; source_modified_at is evidence freshness.';
+
+revoke all on function public.scout_get_component_sandbox_water_portfolio_v1_internal() from public;
+revoke all on function public.scout_get_component_sandbox_water_portfolio_v1_internal() from anon;
+revoke all on function public.scout_get_component_sandbox_water_portfolio_v1_internal() from authenticated;
+grant execute on function public.scout_get_component_sandbox_water_portfolio_v1_internal() to service_role;
+''')
+          PY
+      - name: Build and test Scout sandbox
+        shell: bash
+        run: |
+          cd supabase/functions/scout-component-sandbox-mcp
+          npm ci
+          npm run build
+          npm test
+      - name: Commit generated and source changes
+        shell: bash
+        run: |
+          rm .github/workflows/warren-morphology-markers-temp.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Render flat morphology-coded Warren markers [warren-morphology-bot]"
+          git push origin HEAD:scout/warren-flat-morphology-markers
