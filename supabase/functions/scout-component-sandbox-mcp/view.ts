@@ -17,13 +17,18 @@ import {
   normalizeScoutSandboxWaterUtilityPortfolioOpportunity,
 } from './water_portfolio_map_model.ts'
 import { mountScoutWaterUtilityPortfolioMap } from './water_portfolio_map_mount.ts'
+import {
+  normalizeScoutSandboxDealershipPortfolioMap,
+  normalizeScoutSandboxDealershipPortfolioOpportunity,
+} from './dealership_portfolio_map_model.ts'
+import { mountScoutDealershipPortfolioMap } from './dealership_portfolio_map_mount.ts'
 
 type ScoutMapHandle = {
   destroy: () => void
   resize: () => void
 }
 
-type ScoutViewOpportunityType = ScoutSandboxOpportunityType | 'water_utility_portfolio'
+type ScoutViewOpportunityType = ScoutSandboxOpportunityType | 'water_utility_portfolio' | 'dealership_group_portfolio'
 
 const SCOUT_RASTER_TILE_TEMPLATE = 'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png'
 const SCOUT_RASTER_ATTRIBUTION_LABEL = '© OpenStreetMap contributors · HOT'
@@ -169,6 +174,27 @@ function renderUnavailableOpportunity() {
 }
 
 function renderOpportunity(opportunityType: ScoutViewOpportunityType, value: unknown) {
+  if (opportunityType === 'dealership_group_portfolio') {
+    const opportunity = normalizeScoutSandboxDealershipPortfolioOpportunity(value)
+    if (!opportunity) {
+      renderUnavailableOpportunity()
+      return
+    }
+    if (title) title.textContent = opportunity.name
+    if (tier) tier.textContent = 'Portfolio evidence'
+    if (meta) meta.textContent = `${formatNumber(opportunity.member_count)} documented operating dealership sites  •  First-party roster observed ${formatObserved(opportunity.observed_at)}`
+    if (address) address.textContent = 'Kentucky pilot portfolio'
+    if (summary) {
+      const route = opportunity.operations_route_available || opportunity.procurement_route_available
+        ? 'Operations / procurement route available'
+        : opportunity.contact_route_available ? 'Contact route available; operations / procurement route unresolved' : 'Account route unresolved'
+      summary.textContent = `${formatNumber(opportunity.resolved_member_count)} sites physically crosswalked  •  ${formatNumber(opportunity.resolved_building_count)} resolved buildings  •  ${formatNumber(opportunity.unresolved_member_count)} roster sites not mapped  •  ${route}  •  ${opportunity.why_investigate}`
+    }
+    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
+    setState(`Scout portfolio ready: ${opportunity.name}`)
+    return
+  }
+
   if (opportunityType === 'water_utility_portfolio') {
     const opportunity = normalizeScoutSandboxWaterUtilityPortfolioOpportunity(value)
     if (!opportunity) {
@@ -255,7 +281,7 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
   const generation = ++mapGeneration
   let ready = false
   mapState.hidden = false
-  mapState.textContent = opportunityType === 'water_utility_portfolio' ? 'Loading portfolio map…' : 'Loading site map…'
+  mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Loading portfolio map…' : 'Loading site map…'
 
   const mapOptions = {
     tileUrlTemplate: SCOUT_RASTER_TILE_TEMPLATE,
@@ -266,13 +292,13 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
       ready = true
       mapState.hidden = true
       if (opportunityType === 'swppp_site') { diagnostic({ viewReady: true }); diagnosticOverlay(mapState) }
-      setState(opportunityType === 'water_utility_portfolio' ? 'Scout portfolio map ready' : 'Scout site map ready')
+      setState((opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Scout portfolio map ready' : 'Scout site map ready')
     },
     onError: (error: Error) => {
       if (generation !== mapGeneration) return
       if (!ready) {
         mapState.hidden = false
-        mapState.textContent = opportunityType === 'water_utility_portfolio' ? 'Portfolio map unavailable' : 'Site map unavailable'
+        mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Portfolio map unavailable' : 'Site map unavailable'
       }
       if (opportunityType === 'swppp_site') { diagnostic({ viewError: true }); diagnosticOverlay(mapState) }
       setState(`Scout map error: ${error.message}`)
@@ -280,7 +306,17 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
   }
 
   try {
-    if (opportunityType === 'water_utility_portfolio') {
+    if (opportunityType === 'dealership_group_portfolio') {
+      const mapData = normalizeScoutSandboxDealershipPortfolioMap(value)
+      if (!mapData) {
+        mapState.textContent = 'Portfolio map unavailable'
+        setState('Scout dealership portfolio map result failed validation')
+        return
+      }
+      mapContainer.setAttribute('role', 'img')
+      mapContainer.setAttribute('aria-label', `Documented dealership portfolio map for ${mapData.account_name}`)
+      mapHandle = mountScoutDealershipPortfolioMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
+    } else if (opportunityType === 'water_utility_portfolio') {
       const mapData = normalizeScoutSandboxWaterUtilityPortfolioMap(value)
       if (!mapData) {
         mapState.textContent = 'Portfolio map unavailable'
@@ -327,7 +363,7 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
     scheduleLayoutRefresh()
   } catch (error) {
     mapState.hidden = false
-    mapState.textContent = opportunityType === 'water_utility_portfolio' ? 'Portfolio map unavailable' : 'Site map unavailable'
+    mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Portfolio map unavailable' : 'Site map unavailable'
     if (opportunityType === 'swppp_site') { diagnostic({ initialization: 'failed', initializationError: diagnosticError(error) }); diagnosticOverlay(mapState) }
     setState(`Scout map initialization failed: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -388,7 +424,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.9.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.10.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
@@ -398,7 +434,7 @@ app.ontoolresult = (result) => {
   const control = document.querySelector<HTMLElement>('[data-scout-diagnostics]')
   if (control) control.hidden = opportunityType !== 'swppp_site'
   if (opportunityType === 'swppp_site') diagnostic({ rejectedField: 'none', rejectedCheck: 'none', receivedType: 'not_checked', receivedStringShape: 'not_checked', resultCount: ++diagnosticResultCount, branch: 'not_entered', initializationError: 'none', mapNormalizer: 'not_entered', requiredTiles: 0, matchingTiles: 0, generation: 0, loadedTiles: 0, decodedTiles: 0, decodeFailed: 0, drawFailed: 0, imageFailed: 0, rendererReady: false, timeout: false, context2d: 'not_attempted', lastError: 'none', payloadSource: metadataTiles ? 'metadata' : resourceEmbeddedTiles ? 'resource' : 'none', identityMatch: structured?.map?.site_name === structured?.opportunity?.name && structured?.map?.location_label === structured?.opportunity?.location_label })
-  if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site' && opportunityType !== 'water_utility_portfolio') {
+  if (opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank' && opportunityType !== 'swppp_site' && opportunityType !== 'water_utility_portfolio' && opportunityType !== 'dealership_group_portfolio') {
     renderUnavailableOpportunity()
     renderMap('premium_exterior', null)
     return

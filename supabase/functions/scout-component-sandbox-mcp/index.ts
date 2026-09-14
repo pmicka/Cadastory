@@ -20,11 +20,16 @@ import {
   buildScoutSandboxWaterUtilityPortfolioOpportunity,
   normalizeScoutSandboxWaterUtilityPortfolioMap,
 } from './water_portfolio_map_model.ts'
+import {
+  buildScoutSandboxDealershipPortfolioOpportunity,
+  normalizeScoutSandboxDealershipPortfolioMap,
+} from './dealership_portfolio_map_model.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
 import { buildScoutSwpppSiteRasterFrame } from './swppp_site_map_renderer.ts'
 import { buildScoutSingleSiteRasterFrame } from './single_site_map_renderer.ts'
 import { buildScoutWaterTankRasterFrame } from './water_tank_map_renderer.ts'
 import { buildScoutWaterUtilityPortfolioRasterFrame } from './water_portfolio_map_renderer.ts'
+import { buildScoutDealershipPortfolioRasterFrame } from './dealership_portfolio_map_renderer.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -38,8 +43,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v29'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v30'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v29',
   'ui://scout/component-sandbox/v28',
   'ui://scout/component-sandbox/v27',
   'ui://scout/component-sandbox/v26',
@@ -81,6 +87,7 @@ const SANDBOX_MAP_CENTERS = [
   { lon: -84.521, lat: 39.097 },
 ] as const
 const WARREN_PORTFOLIO_TILE_BOUNDS = { z: 9, minX: 131, maxX: 134, minY: 198, maxY: 199 } as const
+const DEALERSHIP_PORTFOLIO_TILE_BOUNDS = { z: 8, minX: 66, maxX: 68, minY: 98, maxY: 99 } as const
 
 async function loadScoutSandboxOpportunity() {
   const { data, error } = await admin.rpc('scout_get_component_sandbox_opportunity_v1_internal')
@@ -122,6 +129,14 @@ async function loadScoutSandboxWaterUtilityPortfolioMap() {
   return map
 }
 
+async function loadScoutSandboxDealershipPortfolioMap() {
+  const { data, error } = await admin.rpc('scout_get_component_sandbox_dealership_portfolio_v1_internal')
+  if (error) throw new Error('Scout sandbox dealership portfolio map is unavailable')
+  const map = normalizeScoutSandboxDealershipPortfolioMap(data)
+  if (!map) throw new Error('Scout sandbox dealership portfolio map did not satisfy the bounded contract')
+  return map
+}
+
 type EmbeddedRasterTile = { z: number; x: number; y: number; url: string }
 const MAX_EMBEDDED_RASTER_TILES = 32
 
@@ -140,17 +155,19 @@ async function loadEmbeddedRasterTile(tile: EmbeddedRasterTile) {
 
 async function loadEmbeddedSandboxTiles() {
   const tileUrlTemplate = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png`
-  const [premiumMap, waterTankMap, swpppMap, portfolioMap] = await Promise.all([
+  const [premiumMap, waterTankMap, swpppMap, portfolioMap, dealershipMap] = await Promise.all([
     loadScoutSandboxSingleSiteMap(),
     loadScoutSandboxWaterTankMap(),
     loadScoutSandboxSwpppSiteMap(),
     loadScoutSandboxWaterUtilityPortfolioMap(),
+    loadScoutSandboxDealershipPortfolioMap(),
   ])
   const frames = [
     buildScoutSingleSiteRasterFrame(premiumMap, 456, 210, { tileUrlTemplate }),
     buildScoutWaterTankRasterFrame(waterTankMap, 456, 210, { tileUrlTemplate }),
     buildScoutSwpppSiteRasterFrame(swpppMap, 456, 210, { tileUrlTemplate }),
     buildScoutWaterUtilityPortfolioRasterFrame(portfolioMap, 456, 210, { tileUrlTemplate }),
+    buildScoutDealershipPortfolioRasterFrame(dealershipMap, 456, 210, { tileUrlTemplate }),
   ]
   const uniqueTiles = new Map<string, EmbeddedRasterTile>()
   for (const frame of frames) {
@@ -464,8 +481,83 @@ const waterUtilityPortfolioResultSchema = z.object({
   map: waterUtilityPortfolioMapSchema,
 })
 
+
+const dealershipPortfolioMemberSchema = z.object({
+  id: z.string().min(1).max(80),
+  name: z.string().min(1).max(200),
+  address: z.string().min(1).max(240),
+  city: z.string().min(1).max(120),
+  state_code: z.string().min(1).max(8),
+  brands: z.array(z.string().min(1).max(80)).max(16),
+  point: z.union([
+    z.object({ type: z.literal('Point'), coordinates: z.tuple([z.number().min(-180).max(180), z.number().min(-90).max(90)]) }),
+    z.object({ type: z.literal('unresolved') }),
+  ]),
+  resolution_state: z.enum(['single_building_resolved', 'multi_building_resolved', 'unresolved']),
+  resolved_building_count: z.number().int().min(0).max(20),
+  link_confidence: z.number().min(0).max(1).nullable(),
+  within_pilot_radius: z.boolean(),
+  observed_at: z.string().min(1).max(80),
+})
+
+const dealershipPortfolioMapSchema = z.object({
+  contract_version: z.literal('dealership_group_portfolio_map_v1'),
+  opportunity_type: z.literal('dealership_group_portfolio'),
+  group_kind: z.literal('portfolio'),
+  account_name: z.string().min(1).max(200),
+  organization_id: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i),
+  scope: z.literal('documented_operating_roster'),
+  source_slug: z.literal('don-franklin-auto-locations'),
+  relationship: z.literal('operates'),
+  target_kind: z.literal('site_member'),
+  map_semantics: z.literal('documented_operating_site_portfolio'),
+  evidence_boundary: z.literal('first-party dealership roster plus resolved building crosswalks'),
+  generated_at: z.string().min(1).max(80),
+  observed_at: z.string().min(1).max(80),
+  member_count: z.number().int().min(1).max(100),
+  resolved_member_count: z.number().int().min(1).max(100),
+  resolved_building_count: z.number().int().min(1).max(200),
+  contact_route_available: z.boolean(),
+  operations_route_available: z.boolean(),
+  procurement_route_available: z.boolean(),
+  vendor_route_proven: z.boolean(),
+  current_need_scan_complete: z.boolean(),
+  bounds: z.object({
+    west: z.number().min(-180).max(180), south: z.number().min(-90).max(90),
+    east: z.number().min(-180).max(180), north: z.number().min(-90).max(90),
+  }),
+  members: z.array(dealershipPortfolioMemberSchema).min(1).max(100),
+  guardrail: z.string().min(1).max(1600),
+})
+
+const dealershipPortfolioOpportunitySchema = z.object({
+  opportunity_type: z.literal('dealership_group_portfolio'),
+  name: z.string().min(1).max(200),
+  member_count: z.number().int().min(1).max(100),
+  resolved_member_count: z.number().int().min(1).max(100),
+  resolved_building_count: z.number().int().min(1).max(200),
+  unresolved_member_count: z.number().int().min(0).max(100),
+  observed_at: z.string().min(1).max(80),
+  contact_route_available: z.boolean(),
+  operations_route_available: z.boolean(),
+  procurement_route_available: z.boolean(),
+  vendor_route_proven: z.boolean(),
+  current_need_scan_complete: z.boolean(),
+  map_semantics: z.literal('documented_operating_site_portfolio'),
+  evidence_boundary: z.literal('first-party dealership roster plus resolved building crosswalks'),
+  why_investigate: z.string().min(1).max(1000),
+  guardrail: z.string().min(1).max(1600),
+})
+
+const dealershipPortfolioResultSchema = z.object({
+  surface: z.literal('scout_component_sandbox'),
+  opportunity_type: z.literal('dealership_group_portfolio'),
+  opportunity: dealershipPortfolioOpportunitySchema,
+  map: dealershipPortfolioMapSchema,
+})
+
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.2.9' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.0' })
 
   registerAppResource(
     server,
@@ -497,7 +589,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27' || compatibilityUri === 'ui://scout/component-sandbox/v28')
+          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27' || compatibilityUri === 'ui://scout/component-sandbox/v28' || compatibilityUri === 'ui://scout/component-sandbox/v29')
             ? await loadScoutViewHtml()
             : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
             .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),
@@ -517,11 +609,11 @@ function makeServer() {
     TOOL_NAME,
     {
       title: 'Preview Scout opportunity card',
-      description: 'Owner-only read-only developer tool that renders one bounded Scout MCP Apps opportunity card and matching map. Select premium_exterior, water_tank, swppp_site, or the Warren County water_utility_portfolio exemplar; omission preserves the PNC Tower compatibility default.',
+      description: 'Owner-only read-only developer tool that renders one bounded Scout MCP Apps opportunity card and matching map. Select premium_exterior, water_tank, swppp_site, the Warren County water_utility_portfolio exemplar, or the Don Franklin Auto dealership_group_portfolio exemplar; omission preserves the PNC Tower compatibility default.',
       inputSchema: z.object({
-        opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site', 'water_utility_portfolio']).optional(),
+        opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site', 'water_utility_portfolio', 'dealership_group_portfolio']).optional(),
       }),
-      outputSchema: z.discriminatedUnion('opportunity_type', [premiumResultSchema, waterTankResultSchema, swpppSiteResultSchema, waterUtilityPortfolioResultSchema]),
+      outputSchema: z.discriminatedUnion('opportunity_type', [premiumResultSchema, waterTankResultSchema, swpppSiteResultSchema, waterUtilityPortfolioResultSchema, dealershipPortfolioResultSchema]),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -532,6 +624,23 @@ function makeServer() {
     },
     async ({ opportunity_type }) => {
       const selectedType = opportunity_type ?? 'premium_exterior'
+
+      if (selectedType === 'dealership_group_portfolio') {
+        const map = await loadScoutSandboxDealershipPortfolioMap()
+        const opportunity = buildScoutSandboxDealershipPortfolioOpportunity(map)
+        if (map.account_name !== opportunity.name || map.member_count !== opportunity.member_count || map.resolved_member_count !== opportunity.resolved_member_count) {
+          throw new Error('Scout sandbox dealership portfolio opportunity and map identity do not match')
+        }
+        return {
+          content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} dealership-group portfolio card with ${opportunity.resolved_member_count} mapped sites from ${opportunity.member_count} documented operating locations.` }],
+          structuredContent: {
+            surface: 'scout_component_sandbox',
+            opportunity_type: 'dealership_group_portfolio',
+            opportunity,
+            map,
+          },
+        }
+      }
 
       if (selectedType === 'water_utility_portfolio') {
         const map = await loadScoutSandboxWaterUtilityPortfolioMap()
@@ -621,10 +730,13 @@ function parseSandboxTile(url: URL) {
   if (!match) return null
   const z = Number(match[1]), x = Number(match[2]), y = Number(match[3])
   const count = Math.pow(2, z)
-  if (!Number.isInteger(z) || z < 9 || z > 18 || x < 0 || y < 0 || x >= count || y >= count) return null
+  if (!Number.isInteger(z) || z < 8 || z > 18 || x < 0 || y < 0 || x >= count || y >= count) return null
   if (z === WARREN_PORTFOLIO_TILE_BOUNDS.z
     && x >= WARREN_PORTFOLIO_TILE_BOUNDS.minX && x <= WARREN_PORTFOLIO_TILE_BOUNDS.maxX
     && y >= WARREN_PORTFOLIO_TILE_BOUNDS.minY && y <= WARREN_PORTFOLIO_TILE_BOUNDS.maxY) return { z, x, y }
+  if (z === DEALERSHIP_PORTFOLIO_TILE_BOUNDS.z
+    && x >= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.minX && x <= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.maxX
+    && y >= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.minY && y <= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.maxY) return { z, x, y }
   if (z < 12) return null
   const center = tileCenter(z, x, y)
   if (!SANDBOX_MAP_CENTERS.some((site) => Math.abs(center.lon - site.lon) <= 0.12 && Math.abs(center.lat - site.lat) <= 0.12)) return null

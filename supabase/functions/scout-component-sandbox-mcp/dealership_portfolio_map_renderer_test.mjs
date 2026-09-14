@@ -21,7 +21,8 @@ assert.ok(modelSource.includes('first-party dealership roster plus resolved buil
 assert.ok(mountSource.includes('buildScoutDealershipPortfolioRasterFrame'))
 assert.ok(mountSource.includes("document.createElement('canvas')"))
 assert.ok(mountSource.includes('createImageBitmap'))
-assert.ok(mountSource.includes('roster sites unresolved · not mapped'))
+assert.ok(mountSource.includes('unresolvedCount'))
+assert.ok(mountSource.includes('unresolved · not mapped'))
 
 const resolvedSites = [
   ['Don Franklin Bardstown Buick Chevrolet', '120 W John Rowan Blvd', 'Bardstown', ['Buick','Chevrolet'], [-85.465896369,37.828143466], 1, 0.99],
