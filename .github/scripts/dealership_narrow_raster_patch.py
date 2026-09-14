@@ -48,7 +48,6 @@ renderer_test.write_text(text.replace(needle, insert, 1))
 text = gateway_test.read_text()
 needle = "assert.ok(server.includes(\"const RESOURCE_URI = 'ui://scout/component-sandbox/v31'\"))\n"
 if needle not in text:
-    # Existing test may inline the assertion without a local constant update.
     needle = "assert.ok(server.includes(\"const RESOURCE_URI = 'ui://scout/component-sandbox/v30'\"))\n"
     if needle in text:
         text = text.replace(needle, "assert.ok(server.includes(\"const RESOURCE_URI = 'ui://scout/component-sandbox/v31'\"))\n", 1)
@@ -58,10 +57,11 @@ if needle not in text:
 extra = needle + "assert.ok(server.includes(\"const DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS = { z: 7, minX: 33, maxX: 34, minY: 49, maxY: 49 } as const\"))\nassert.ok(server.includes('buildScoutDealershipPortfolioRasterFrame(dealershipMap, 280, 210'))\nassert.ok(server.includes('DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.z'))\n"
 gateway_test.write_text(text.replace(needle, extra, 1))
 
-# Sweep test expectations that intentionally track only the latest resource URI.
+# Sweep test expectations that intentionally track only the latest resource/View version.
 for path in (root / 'supabase/functions/scout-component-sandbox-mcp').glob('*_test.mjs'):
     text = path.read_text()
     text = text.replace("RESOURCE_URI = 'ui://scout/component-sandbox/v30'", "RESOURCE_URI = 'ui://scout/component-sandbox/v31'")
     text = text.replace("const RESOURCE_URI = 'ui://scout/component-sandbox/v30'", "const RESOURCE_URI = 'ui://scout/component-sandbox/v31'")
     text = text.replace("const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v30'", "const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v31'")
+    text = text.replace("version: '2.10.0'", "version: '2.11.0'")
     path.write_text(text)
