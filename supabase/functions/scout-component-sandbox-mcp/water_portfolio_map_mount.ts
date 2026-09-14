@@ -1,4 +1,4 @@
-import type { ScoutSandboxWaterUtilityPortfolioMap } from './water_portfolio_map_model.ts'
+import type { ScoutSandboxWaterUtilityPortfolioMap, ScoutWaterUtilityPortfolioMorphology } from './water_portfolio_map_model.ts'
 import {
   buildScoutWaterUtilityPortfolioRasterFrame,
   type ScoutWaterUtilityPortfolioRasterFrameOptions,
@@ -6,6 +6,22 @@ import {
 
 const DEFAULT_TIMEOUT_MS = 7000
 const PNG_DATA_URL_PREFIX = 'data:image/png;base64,'
+
+const MORPHOLOGY_STYLES: Record<ScoutWaterUtilityPortfolioMorphology, { label: string; color: string }> = {
+  elevated: { label: 'Elevated', color: '#3769b2' },
+  ground_storage: { label: 'Ground storage', color: '#4d7c5d' },
+  standpipe: { label: 'Standpipe', color: '#b96a2d' },
+  fluted_column: { label: 'Fluted column', color: '#7656a8' },
+  unknown: { label: 'Unclassified', color: '#747d73' },
+}
+
+const MORPHOLOGY_ORDER: ScoutWaterUtilityPortfolioMorphology[] = [
+  'elevated',
+  'ground_storage',
+  'standpipe',
+  'fluted_column',
+  'unknown',
+]
 
 async function decodeEmbeddedRasterTile(dataUrl: string) {
   if (!dataUrl.startsWith(PNG_DATA_URL_PREFIX)) throw new Error('Scout embedded raster tile is invalid')
@@ -129,20 +145,41 @@ export function mountScoutWaterUtilityPortfolioMap(
     }
 
     for (const markerData of frame.markers) {
+      const morphology = MORPHOLOGY_STYLES[markerData.morphology]
       const marker = document.createElement('span')
-      marker.className = 'scout-site-marker'
+      marker.className = 'scout-portfolio-marker'
+      if (markerData.historicalRehab) marker.classList.add('scout-portfolio-marker--historical')
+      if (markerData.serviceState === 'documented_not_in_service') marker.classList.add('scout-portfolio-marker--not-in-service')
       marker.style.left = `${markerData.left}px`
       marker.style.top = `${markerData.top}px`
-      marker.style.width = markerData.serviceState === 'documented_not_in_service' ? '12px' : '10px'
-      marker.style.height = markerData.serviceState === 'documented_not_in_service' ? '12px' : '10px'
-      marker.style.opacity = markerData.serviceState === 'documented_not_in_service' ? '0.55' : '0.92'
-      marker.title = `${markerData.name}${markerData.serviceState === 'documented_not_in_service' ? ' · documented not in service' : ' · current service state unverified'}${markerData.historicalRehab ? ' · historical rehab record' : ''}`
+      marker.style.backgroundColor = morphology.color
+      marker.title = `${markerData.name} · ${morphology.label}${markerData.serviceState === 'documented_not_in_service' ? ' · documented not in service' : ' · current service state unverified'}${markerData.historicalRehab ? ' · historical rehab record' : ''}`
       marker.setAttribute('aria-hidden', 'true')
-      const markerDot = document.createElement('span')
-      markerDot.className = 'scout-site-marker-dot'
-      marker.appendChild(markerDot)
       container.appendChild(marker)
     }
+
+    const presentMorphologies = new Set(frame.markers.map((marker) => marker.morphology))
+    const legend = document.createElement('span')
+    legend.className = 'scout-portfolio-legend'
+    legend.setAttribute('aria-hidden', 'true')
+    for (const morphologyKey of MORPHOLOGY_ORDER) {
+      if (!presentMorphologies.has(morphologyKey)) continue
+      const style = MORPHOLOGY_STYLES[morphologyKey]
+      const item = document.createElement('span')
+      item.className = 'scout-portfolio-legend-item'
+      const swatch = document.createElement('span')
+      swatch.className = 'scout-portfolio-legend-swatch'
+      swatch.style.backgroundColor = style.color
+      const text = document.createElement('span')
+      text.textContent = style.label
+      item.append(swatch, text)
+      legend.appendChild(item)
+    }
+    const statusKey = document.createElement('span')
+    statusKey.className = 'scout-portfolio-legend-status'
+    statusKey.textContent = 'Ring = historical rehab · Slash = not in service'
+    legend.appendChild(statusKey)
+    container.appendChild(legend)
 
     const attribution = document.createElement('span')
     attribution.className = 'scout-map-attribution'

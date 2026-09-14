@@ -50,12 +50,13 @@ Approved incrementally on 2026-09-12:
 - The first host-verified map experience is the bounded PNC Tower `premium_exterior` single-site map defined in `MAP_CONTRACT.md`.
 - The second approved map experience is the bounded SOUTH PRESSURE ZONE TANK `water_tank` single-site map defined in `MAP_CONTRACT.md`.
 - The third approved pre-host-verification experience is the bounded HAM–Brent Spence Project `swppp_site` permit-location point map defined in `MAP_CONTRACT.md`.
+- The fourth approved experience is the bounded Warren County Water District `water_utility_portfolio` documented tank-roster map defined in `WATER_UTILITY_PORTFOLIO_MAP_CONTRACT.md`.
 - One sandbox tool result represents exactly one selected opportunity type. The card and map must always describe the same opportunity; never mix a water-tank map into the PNC card or vice versa.
-- The sandbox preview tool may select `premium_exterior`, `water_tank`, or `swppp_site`; omitting the selector preserves the PNC premium-exterior compatibility default.
+- The sandbox preview tool may select `premium_exterior`, `water_tank`, `swppp_site`, or `water_utility_portfolio`; omitting the selector preserves the PNC premium-exterior compatibility default.
 - Map implementation builds on the existing media carousel rather than redesigning the card.
 - Exactly one existing media tile is the selected opportunity's map; the other two remain placeholders.
 - The initial map tile remains non-interactive so map gestures do not compete with carousel swipe.
-- No portfolio/clustering/territory map semantics are approved by this design decision.
+- The Warren County documented asset portfolio is explicitly approved. Generalized clustering, inferred service territory, heatmap, market territory, or route-planning semantics remain unapproved.
 - Both approved map types use the proven raster-tile technique from the prior working map iteration, ported into the current MCP Apps lifecycle.
 - The raster basemap is composed from ordinary image tiles; no MapLibre, WebGL, Web Worker, or custom SVG basemap is part of the approved design path.
 
@@ -108,9 +109,9 @@ Unless the owner explicitly changes direction, the sandbox View must not introdu
 - standalone-app chrome or dashboard scaffolding
 - lifecycle diagnostics in the visible UI
 - images, contacts, `.vcf`, or persistent Save/Investigate behavior before those are separately approved
-- maps beyond the bounded PNC premium-exterior and SOUTH PRESSURE ZONE TANK water-tank single-site directions described above
+- maps beyond the bounded approved exemplars described above without separate owner approval
 - multiple opportunity maps in one card
-- portfolio, clustering, heatmap, territory, or route-planning map semantics
+- portfolio semantics beyond the approved Warren County documented-roster exemplar, or generalized clustering, heatmap, inferred territory, or route-planning semantics
 - `window.openai`, raw `window.message` lifecycle plumbing, `openai/outputTemplate`, or host-specific lifecycle APIs
 
 ## Lifecycle invariant
@@ -126,3 +127,7 @@ Keep the current standards-based MCP Apps lifecycle:
 - current MCP Apps MIME
 
 The generated View must continue to have exactly one `<!doctype html>`, contain no `window.openai`, and use `build-view.mjs` only to bundle the standards-based JavaScript into the approved HTML template. The MapLibre-only CSS bundle path is retired and must not be restored unless an explicitly approved future implementation requires a separate generated stylesheet.
+
+## Owner-approved Warren portfolio marker refinement — 2026-09-14
+
+Within the existing map media tile, the Warren County portfolio uses flat 2D circular markers with no drop shadow. Fill color encodes documented WRIS tank form; historical rehab and documented not-in-service states use non-color ring/slash cues. A compact in-map legend is approved because the color encoding would otherwise be ambiguous. This does not authorize a new card section or generalized portfolio-map redesign.

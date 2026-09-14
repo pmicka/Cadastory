@@ -4,7 +4,7 @@ This companion contract is subordinate to `MAP_CONTRACT.md` and narrows the firs
 
 ## Warren County Water District exemplar
 
-- Resource: `ui://scout/component-sandbox/v27`
+- Resource: `ui://scout/component-sandbox/v28`
 - Opportunity type: `water_utility_portfolio`
 - Map contract: `water_utility_portfolio_map_v1`
 - RPC: `public.scout_get_component_sandbox_water_portfolio_v1_internal()`
@@ -26,7 +26,9 @@ The portfolio map uses the same workerless embedded-raster strategy already prov
 
 - computes bounds from resolved member points only;
 - chooses a bounded fit-to-bounds Web Mercator frame;
-- renders 24 asset markers for the current exemplar;
+- renders 24 flat 2D asset markers for the current exemplar;
+- colors markers by documented WRIS tank form only: `ELEVATED` → elevated, `GROUND STORAGE` → ground storage, `STANDPIPE` → standpipe, and `OTHER` + `FLUTED COLUMN` → fluted column; unknown or unsupported source values remain explicitly unclassified;
+- uses marker fill for morphology, a ring for historical rehab evidence, and a slash for documented not-in-service status so evidence dimensions do not compete for the same color channel;
 - preserves documented not-in-service and historical-rehab distinctions without inferring current need;
 - uses no WebGL, MapLibre, worker, service-radius polygon, county polygon, property polygon, or ownership polygon;
 - remains non-interactive inside the approved existing card/map slot;
@@ -37,3 +39,7 @@ The canonical 456×210 Warren frame uses render zoom 9 and six raster tiles. The
 ## Evidence guardrail
 
 This surface is for account-level investigation. Before outreach or selecting an individual asset, Scout must still verify current tank service state, maintenance ownership, procurement route, current need, access, and applicable operator constraints. Portfolio membership is not proof of an active opportunity.
+
+## Owner-approved marker refinement — 2026-09-14
+
+The owner approved flat 2D portfolio markers and morphology color-coding for the Warren County exemplar. Morphology is source-derived from Kentucky WRIS `TYPE` / `OTHTYPE`; it is not inferred from map imagery. The compact legend remains inside the existing map media slot and does not add a new card section.

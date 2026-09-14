@@ -40,6 +40,7 @@ const members = names.map((name, index) => {
     id: `WRIS-${String(index + 1).padStart(2, '0')}`,
     name,
     pwsid: 'KY1140487',
+    morphology: index < 12 ? 'elevated' : index < 18 ? 'ground_storage' : index < 23 ? 'standpipe' : 'fluted_column',
     point: {
       type: 'Point',
       coordinates: [west + (east - west) * fraction, south + (north - south) * (1 - fraction)],
@@ -88,6 +89,10 @@ assert.equal(normalized.source_modified_at, '2023-06-12T10:17:05.000Z')
 assert.deepEqual(normalized.bounds, { west, south, east, north })
 assert.equal(normalized.map_semantics, 'documented_asset_portfolio')
 assert.equal(normalized.evidence_boundary, 'linked water-system tank records only')
+assert.equal(normalized.members.filter((member) => member.morphology === 'elevated').length, 12)
+assert.equal(normalized.members.filter((member) => member.morphology === 'ground_storage').length, 6)
+assert.equal(normalized.members.filter((member) => member.morphology === 'standpipe').length, 5)
+assert.equal(normalized.members.filter((member) => member.morphology === 'fluted_column').length, 1)
 
 const opportunity = buildScoutSandboxWaterUtilityPortfolioOpportunity(normalized)
 assert.equal(opportunity.name, 'Warren County Water District')
@@ -118,6 +123,13 @@ assert.equal(frame.tiles.length, 6)
 assert.equal(frame.markers.length, 24)
 assert.equal(frame.markers.filter((marker) => marker.serviceState === 'documented_not_in_service').length, 2)
 assert.equal(frame.markers.filter((marker) => marker.historicalRehab).length, 2)
+assert.equal(frame.markers.filter((marker) => marker.morphology === 'elevated').length, 12)
+assert.equal(frame.markers.filter((marker) => marker.morphology === 'ground_storage').length, 6)
+assert.equal(frame.markers.filter((marker) => marker.morphology === 'standpipe').length, 5)
+assert.equal(frame.markers.filter((marker) => marker.morphology === 'fluted_column').length, 1)
+assert.ok(mountSource.includes('MORPHOLOGY_STYLES'))
+assert.ok(mountSource.includes('scout-portfolio-marker'))
+assert.ok(mountSource.includes('scout-portfolio-legend'))
 assert.ok(frame.markers.every((marker) => marker.left >= 0 && marker.left <= frame.width && marker.top >= 0 && marker.top <= frame.height))
 
 const browserBuild = await build({

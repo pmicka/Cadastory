@@ -1,4 +1,4 @@
-import type { ScoutSandboxWaterUtilityPortfolioMap } from './water_portfolio_map_model.ts'
+import type { ScoutSandboxWaterUtilityPortfolioMap, ScoutWaterUtilityPortfolioMorphology } from './water_portfolio_map_model.ts'
 
 const TILE_SIZE = 256
 const MAX_MERCATOR_LAT = 85.05112878
@@ -19,6 +19,7 @@ export type ScoutWaterUtilityPortfolioMarker = {
   left: number
   top: number
   name: string
+  morphology: ScoutWaterUtilityPortfolioMorphology
   serviceState: 'unverified' | 'documented_not_in_service'
   historicalRehab: boolean
 }
@@ -133,6 +134,7 @@ export function buildScoutWaterUtilityPortfolioRasterFrame(
       left: worldX(lon) * world - left,
       top: worldY(lat) * world - top,
       name: member.name,
+      morphology: member.morphology,
       serviceState: member.service_state,
       historicalRehab: member.signals.some((signal) => signal.kind === 'historical_rehab_record'),
     })

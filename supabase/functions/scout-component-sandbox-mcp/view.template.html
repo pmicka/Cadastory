@@ -194,6 +194,71 @@
         border-radius: 50%;
         background: #4d6b52;
       }
+      .scout-portfolio-marker {
+        position: absolute;
+        z-index: 3;
+        width: 12px;
+        height: 12px;
+        transform: translate(-50%, -50%);
+        border: 2px solid rgba(255,255,255,.96);
+        border-radius: 50%;
+        box-shadow: none;
+        pointer-events: none;
+      }
+      .scout-portfolio-marker--historical {
+        outline: 1px solid #263128;
+        outline-offset: 1px;
+      }
+      .scout-portfolio-marker--not-in-service { opacity: .68; }
+      .scout-portfolio-marker--not-in-service::after {
+        content: '';
+        position: absolute;
+        left: 1px;
+        top: 4px;
+        width: 7px;
+        height: 2px;
+        border-radius: 1px;
+        background: rgba(255,255,255,.96);
+        transform: rotate(-45deg);
+        transform-origin: center;
+      }
+      .scout-portfolio-legend {
+        position: absolute;
+        top: 7px;
+        right: 7px;
+        z-index: 4;
+        display: grid;
+        grid-template-columns: repeat(2, max-content);
+        gap: 3px 8px;
+        max-width: calc(100% - 14px);
+        padding: 5px 7px;
+        border: 1px solid rgba(38,49,40,.14);
+        border-radius: 8px;
+        background: rgba(255,255,255,.9);
+        color: #394139;
+        font-size: 8px;
+        line-height: 10px;
+        pointer-events: none;
+      }
+      .scout-portfolio-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+      }
+      .scout-portfolio-legend-swatch {
+        width: 7px;
+        height: 7px;
+        flex: 0 0 7px;
+        border: 1px solid rgba(255,255,255,.96);
+        border-radius: 50%;
+      }
+      .scout-portfolio-legend-status {
+        grid-column: 1 / -1;
+        padding-top: 1px;
+        color: #667066;
+        white-space: nowrap;
+      }
       .scout-map-attribution {
         position: absolute;
         left: 7px;
