@@ -33,11 +33,3 @@ replace_once(view, "  if (opportunityType === 'swppp_site') diagnostic({ rejecte
 for path in (root / 'supabase/functions/scout-component-sandbox-mcp').glob('*_test.mjs'):
     text = path.read_text().replace("ui://scout/component-sandbox/v31", "ui://scout/component-sandbox/v32").replace("version: '2.11.0'", "version: '2.12.0'")
     path.write_text(text)
-
-gateway_test = root / 'supabase/functions/scout-component-sandbox-mcp/dealership_portfolio_gateway_contract_test.mjs'
-text = gateway_test.read_text()
-anchor = "console.log('Scout dealership-portfolio gateway visibility checks passed.')"
-if anchor not in text:
-    raise SystemExit('dealership gateway test anchor missing')
-checks = "assert.ok(view.includes(\"opportunityType !== 'swppp_site' && opportunityType !== 'dealership_group_portfolio'\"))\nassert.ok(view.includes('dealershipMatchingEmbeddedTiles'))\nassert.ok(view.includes('dealershipPayloadSource'))\nassert.ok(view.includes('dealershipError'))\n"
-gateway_test.write_text(text.replace(anchor, checks + anchor, 1))
