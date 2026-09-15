@@ -62,4 +62,35 @@ for test_path in component_dir.glob('*_test.mjs'):
 if selector_replacements < 2:
     raise RuntimeError(f'expected at least two duplicated selector assertions, found {selector_replacements}')
 
-print(f'Tightened bootstrap transforms and replaced {selector_replacements} duplicated selector assertions with registry invariants.')
+# Compatibility aliases are generated from one resource-version policy; integration tests must not recopy historical URI lists.
+integration_path = component_dir / 'water_tank_map_integration_test.mjs'
+integration = integration_path.read_text()
+old_compat_block = """for (const source of [server, connectGateway, contractGateway]) {
+  assert.ok(source.includes('ui://scout/component-sandbox/v22'))
+  assert.ok(source.includes('ui://scout/component-sandbox/v21'))
+  assert.ok(source.includes('ui://scout/component-sandbox/v20'))
+  assert.ok(source.includes('ui://scout/component-sandbox/v19'))
+  assert.ok(source.includes('ui://scout/component-sandbox/v18'))
+  assert.ok(source.includes('ui://scout/component-sandbox/v17'))
+  assert.ok(source.includes('ui://scout/component-sandbox/v16'))
+  assert.ok(source.includes('ui://scout/component-sandbox/v15'))
+  assert.ok(source.includes(\"opportunity_type\"))
+  assert.ok(source.includes(\"premium_exterior\"))
+  assert.ok(source.includes(\"water_tank\"))
+  assert.equal(source.includes('scout_get_component_sandbox_names_v1_internal'), false)
+}
+"""
+new_compat_block = """for (const source of [server, connectGateway, contractGateway]) {
+  assert.ok(source.includes('SCOUT_SANDBOX_RESOURCE_URI'))
+  assert.ok(source.includes('scoutSandboxCompatibilityResourceUris'))
+  assert.ok(source.includes('SCOUT_SANDBOX_OPPORTUNITY_TYPES'))
+  assert.equal(source.includes('scout_get_component_sandbox_names_v1_internal'), false)
+}
+"""
+if integration.count(old_compat_block) != 1:
+    raise RuntimeError('expected one copied compatibility alias block')
+integration = integration.replace(old_compat_block, new_compat_block)
+integration = integration.replace("assert.ok(view.includes(\"version: '2.14.0'\"))", "assert.ok(view.includes('isScoutSandboxOpportunityType'))")
+integration_path.write_text(integration)
+
+print(f'Tightened bootstrap transforms and replaced {selector_replacements} duplicated selector assertions plus compatibility alias copies.')
