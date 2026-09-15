@@ -21,6 +21,8 @@ jobs:
           node-version: '22'
           cache: npm
           cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Tighten bootstrap matchers
+        run: python3 scripts/repair_sandbox_bootstrap.py
       - name: Apply bounded architecture refactor
         run: python3 scripts/bootstrap_sandbox_registry_hardening.py
       - name: Install sandbox dependencies
@@ -35,6 +37,7 @@ jobs:
       - name: Commit verified refactor
         run: |
           rm scripts/bootstrap_sandbox_registry_hardening.py
+          rm scripts/repair_sandbox_bootstrap.py
           rm .github/workflows/sandbox-registry-bootstrap.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
