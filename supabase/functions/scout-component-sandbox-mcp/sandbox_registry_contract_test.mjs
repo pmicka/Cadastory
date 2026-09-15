@@ -9,11 +9,12 @@ async function bundleModule(path) {
 }
 const manifest = await bundleModule('../_shared/scout_sandbox_manifest.ts')
 const schemas = await bundleModule('../_shared/scout_sandbox_contract_schema.ts')
-const [component, contractGateway, connectGateway, view] = await Promise.all([
+const [component, contractGateway, connectGateway, view, viewRegistry] = await Promise.all([
   readFile(new URL('index.ts', directory), 'utf8'),
   readFile(new URL('../scout-mcp-contract/index.ts', directory), 'utf8'),
   readFile(new URL('../scout-connect/index.ts', directory), 'utf8'),
   readFile(new URL('view.ts', directory), 'utf8'),
+  readFile(new URL('portfolio_view_registry.ts', directory), 'utf8'),
 ])
 
 const registered = [...manifest.SCOUT_SANDBOX_OPPORTUNITY_TYPES]
@@ -35,6 +36,8 @@ assert.ok(component.includes('SCOUT_SANDBOX_PORTFOLIO_MANIFEST'))
 assert.ok(component.includes('scoutSandboxPortfolioImplementation'))
 assert.ok(view.includes('isScoutSandboxOpportunityType'))
 assert.ok(view.includes('isScoutSandboxPortfolioType'))
+assert.ok(view.includes('scoutSandboxPortfolioViewImplementation'))
+for (const type of manifest.SCOUT_SANDBOX_PORTFOLIO_TYPES) assert.ok(viewRegistry.includes(`${type}:`), `view registry missing ${type}`)
 assert.equal(view.includes("opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank'"), false)
 
 const compatibility = manifest.scoutSandboxCompatibilityResourceUris()

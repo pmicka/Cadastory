@@ -8,6 +8,7 @@ import {
   type ScoutSandboxOpportunityType as ScoutViewOpportunityType,
 } from '../_shared/scout_sandbox_manifest.ts'
 import { scoutSandboxPortfolioImplementation } from './portfolio_registry.ts'
+import { scoutSandboxPortfolioViewImplementation } from './portfolio_view_registry.ts'
 import {
   normalizeScoutSandboxOpportunity,
   normalizeScoutSandboxSingleSiteMap,
@@ -19,9 +20,6 @@ import { mountScoutSingleSiteMap } from './single_site_map_renderer.ts'
 import { mountScoutWaterTankMap } from './water_tank_map_mount.ts'
 import { normalizeScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
 import { mountScoutSwpppSiteMap } from './swppp_site_map_mount.ts'
-import { mountScoutWaterUtilityPortfolioMap } from './water_portfolio_map_mount.ts'
-import { mountScoutDealershipPortfolioMap } from './dealership_portfolio_map_mount.ts'
-import { mountScoutHotelPortfolioMap } from './hotel_portfolio_map_mount.ts'
 
 type ScoutMapHandle = {
   destroy: () => void
@@ -32,12 +30,6 @@ type ScoutMapHandle = {
 const SCOUT_RASTER_TILE_TEMPLATE = 'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png'
 const SCOUT_RASTER_ATTRIBUTION_LABEL = '© OpenStreetMap contributors · HOT'
 const SCOUT_RASTER_ATTRIBUTION_URL = 'https://www.openstreetmap.org/copyright'
-const SCOUT_SANDBOX_PORTFOLIO_MOUNTS = {
-  water_utility_portfolio: mountScoutWaterUtilityPortfolioMap,
-  dealership_group_portfolio: mountScoutDealershipPortfolioMap,
-  hotel_management_portfolio: mountScoutHotelPortfolioMap,
-} as const
-
 const title = document.querySelector<HTMLElement>('[data-scout-title]')
 const tier = document.querySelector<HTMLElement>('[data-scout-tier]')
 const meta = document.querySelector<HTMLElement>('[data-scout-meta]')
@@ -178,57 +170,18 @@ function renderUnavailableOpportunity() {
 }
 
 function renderOpportunity(opportunityType: ScoutViewOpportunityType, value: unknown) {
-  if (opportunityType === 'hotel_management_portfolio') {
-    const opportunity = scoutSandboxPortfolioImplementation('hotel_management_portfolio').normalizeOpportunity(value)
+  if (isScoutSandboxPortfolioType(opportunityType)) {
+    const implementation = scoutSandboxPortfolioImplementation(opportunityType)
+    const opportunity = implementation.normalizeOpportunity(value)
     if (!opportunity) { renderUnavailableOpportunity(); return }
-    if (title) title.textContent = opportunity.name
-    if (tier) tier.textContent = 'Portfolio evidence'
-    if (meta) meta.textContent = `${formatNumber(opportunity.member_count)} documented operating hotels  •  First-party management roster observed ${formatObserved(opportunity.observed_at)}`
-    if (address) address.textContent = 'Kentucky pilot hotel portfolio'
-    if (summary) {
-      const route = opportunity.operations_route_available && opportunity.procurement_route_available ? 'Operations + procurement routes available' : opportunity.contact_route_available ? 'Contact route available; account purchasing route incomplete' : 'Account route unresolved'
-      const vendor = opportunity.vendor_route_proven ? 'vendor route documented' : 'vendor route not yet proven'
-      summary.textContent = `${formatNumber(opportunity.resolved_member_count)} hotels physically crosswalked  •  ${formatNumber(opportunity.resolved_building_count)} resolved buildings  •  ${formatNumber(opportunity.unresolved_member_count)} roster sites not mapped  •  ${route}; ${vendor}  •  ${opportunity.why_investigate}`
-    }
-    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
-    setState(`Scout portfolio ready: ${opportunity.name}`)
-    return
-  }
-
-  if (opportunityType === 'dealership_group_portfolio') {
-    const opportunity = scoutSandboxPortfolioImplementation('dealership_group_portfolio').normalizeOpportunity(value)
-    if (!opportunity) {
-      renderUnavailableOpportunity()
-      return
-    }
-    if (title) title.textContent = opportunity.name
-    if (tier) tier.textContent = 'Portfolio evidence'
-    if (meta) meta.textContent = `${formatNumber(opportunity.member_count)} documented operating dealership sites  •  First-party roster observed ${formatObserved(opportunity.observed_at)}`
-    if (address) address.textContent = 'Kentucky pilot portfolio'
-    if (summary) {
-      const route = opportunity.operations_route_available || opportunity.procurement_route_available
-        ? 'Operations / procurement route available'
-        : opportunity.contact_route_available ? 'Contact route available; operations / procurement route unresolved' : 'Account route unresolved'
-      summary.textContent = `${formatNumber(opportunity.resolved_member_count)} sites physically crosswalked  •  ${formatNumber(opportunity.resolved_building_count)} resolved buildings  •  ${formatNumber(opportunity.unresolved_member_count)} roster sites not mapped  •  ${route}  •  ${opportunity.why_investigate}`
-    }
-    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
-    setState(`Scout portfolio ready: ${opportunity.name}`)
-    return
-  }
-
-  if (opportunityType === 'water_utility_portfolio') {
-    const opportunity = scoutSandboxPortfolioImplementation('water_utility_portfolio').normalizeOpportunity(value)
-    if (!opportunity) {
-      renderUnavailableOpportunity()
-      return
-    }
-    if (title) title.textContent = opportunity.name
-    if (tier) tier.textContent = 'Portfolio evidence'
-    if (meta) meta.textContent = `${formatNumber(opportunity.member_count)} documented tank records  •  Kentucky WRIS source modified ${formatObserved(opportunity.source_modified_at)}`
-    if (address) address.textContent = `PWSID ${opportunity.pwsid}`
-    if (summary) summary.textContent = `${formatNumber(opportunity.not_in_service_count)} documented not in service  •  ${formatNumber(opportunity.historical_project_signal_count)} historical rehab-linked records  •  ${opportunity.why_investigate}`
-    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
-    setState(`Scout portfolio ready: ${opportunity.name}`)
+    const presentation = scoutSandboxPortfolioViewImplementation(opportunityType).presentation(opportunity)
+    if (title) title.textContent = presentation.title
+    if (tier) tier.textContent = presentation.tier
+    if (meta) meta.textContent = presentation.meta
+    if (address) address.textContent = presentation.address
+    if (summary) summary.textContent = presentation.summary
+    if (guardrail) guardrail.textContent = presentation.guardrail
+    setState(presentation.state)
     return
   }
 
@@ -345,7 +298,7 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
       }
       mapContainer.setAttribute('role', 'img')
       mapContainer.setAttribute('aria-label', implementation.ariaLabel(mapData))
-      const mount = SCOUT_SANDBOX_PORTFOLIO_MOUNTS[opportunityType] as any
+      const mount = scoutSandboxPortfolioViewImplementation(opportunityType).mount as any
       mapHandle = mount(mapContainer, mapData, { ...mapOptions, embeddedTiles })
     } else if (opportunityType === 'swppp_site') {
       const mapData = normalizeScoutSwpppSiteTransport(value, (detail) => diagnostic({ rejectedField: detail.field, rejectedCheck: detail.check, receivedType: detail.actualType, receivedStringShape: detail.stringShape }))
@@ -445,7 +398,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.15.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.16.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent

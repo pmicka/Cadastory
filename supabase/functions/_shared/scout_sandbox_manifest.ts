@@ -1,4 +1,4 @@
-export const SCOUT_SANDBOX_RESOURCE_VERSION = 35 as const
+export const SCOUT_SANDBOX_RESOURCE_VERSION = 36 as const
 export const SCOUT_SANDBOX_RESOURCE_URI = `ui://scout/component-sandbox/v${SCOUT_SANDBOX_RESOURCE_VERSION}` as const
 export const SCOUT_SANDBOX_EMBEDDED_RASTER_COMPATIBILITY_MIN_VERSION = 22 as const
 export const SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES = 40 as const
@@ -13,6 +13,7 @@ export const SCOUT_SANDBOX_PORTFOLIO_TYPES = [
   'water_utility_portfolio',
   'dealership_group_portfolio',
   'hotel_management_portfolio',
+  'school_district_portfolio',
 ] as const
 
 export const SCOUT_SANDBOX_OPPORTUNITY_TYPES = [
@@ -120,6 +121,18 @@ export const SCOUT_SANDBOX_OPPORTUNITY_MANIFEST = {
     tileCenters: [],
     rpc: 'scout_get_component_sandbox_hotel_portfolio_v1_internal',
     contractVersion: 'hotel_management_portfolio_map_v1',
+  },
+  school_district_portfolio: {
+    slug: 'school_district_portfolio',
+    label: 'Scott County School District 2 facilities portfolio',
+    mapKind: 'portfolio',
+    markerSemantics: 'documented NCES school facility points; district-level DLGF capital signals are not attributed to individual campuses',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }, { width: 280, height: 210 }],
+    tileRanges: [{ z: 10, minX: 267, maxX: 269, minY: 392, maxY: 392 }],
+    tileCenters: [],
+    rpc: 'scout_get_component_sandbox_school_district_portfolio_v1_internal',
+    contractVersion: 'school_district_portfolio_map_v1',
   },
 } as const satisfies Record<ScoutSandboxOpportunityType, ScoutSandboxOpportunityManifestEntry | ScoutSandboxPortfolioManifestEntry>
 
