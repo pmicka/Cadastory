@@ -1,0 +1,17 @@
+import type { ScoutSandboxSchoolDistrictPortfolioMap } from './school_district_portfolio_map_model.ts'
+
+const TILE_SIZE = 256
+const MAX_MERCATOR_LAT = 85.05112878
+const DEFAULT_MIN_ZOOM = 5
+const DEFAULT_MAX_ZOOM = 18
+const DEFAULT_PADDING_PX = 24
+export type ScoutSchoolDistrictPortfolioRasterTile = { z: number; x: number; y: number; left: number; top: number; url: string }
+export type ScoutSchoolDistrictPortfolioMarker = { left: number; top: number; name: string; city: string }
+export type ScoutSchoolDistrictPortfolioRasterFrame = { zoom: number; width: number; height: number; tiles: ScoutSchoolDistrictPortfolioRasterTile[]; markers: ScoutSchoolDistrictPortfolioMarker[] }
+export type ScoutSchoolDistrictPortfolioRasterFrameOptions = { tileUrlTemplate: string; minZoom?: number; maxZoom?: number; paddingPx?: number }
+function clampLat(lat:number){return Math.max(-MAX_MERCATOR_LAT,Math.min(MAX_MERCATOR_LAT,lat))}
+function worldX(lon:number){return(lon+180)/360}
+function worldY(lat:number){const radians=clampLat(lat)*Math.PI/180;return(1-Math.log(Math.tan(radians)+1/Math.cos(radians))/Math.PI)/2}
+function tileUrl(template:string,z:number,x:number,y:number){return template.replace('{z}',String(z)).replace('{x}',String(x)).replace('{y}',String(y))}
+function fitZoom(data:ScoutSandboxSchoolDistrictPortfolioMap,width:number,height:number,minZoom:number,maxZoom:number,paddingPx:number){const usableWidth=Math.max(1,width-paddingPx*2),usableHeight=Math.max(1,height-paddingPx*2),west=worldX(data.bounds.west),east=worldX(data.bounds.east),north=worldY(data.bounds.north),south=worldY(data.bounds.south),spanX=Math.max(1e-12,Math.abs(east-west)),spanY=Math.max(1e-12,Math.abs(south-north));for(let zoom=maxZoom;zoom>=minZoom;zoom--){const world=TILE_SIZE*Math.pow(2,zoom);if(spanX*world<=usableWidth&&spanY*world<=usableHeight)return zoom}return minZoom}
+export function buildScoutSchoolDistrictPortfolioRasterFrame(data:ScoutSandboxSchoolDistrictPortfolioMap,width:number,height:number,options:ScoutSchoolDistrictPortfolioRasterFrameOptions):ScoutSchoolDistrictPortfolioRasterFrame{const frameWidth=Math.max(280,Math.round(width||0)),frameHeight=Math.max(180,Math.round(height||0)),minZoom=options.minZoom??DEFAULT_MIN_ZOOM,maxZoom=options.maxZoom??DEFAULT_MAX_ZOOM,paddingPx=options.paddingPx??DEFAULT_PADDING_PX,zoom=fitZoom(data,frameWidth,frameHeight,minZoom,maxZoom,paddingPx),world=TILE_SIZE*Math.pow(2,zoom),westX=worldX(data.bounds.west),eastX=worldX(data.bounds.east),northY=worldY(data.bounds.north),southY=worldY(data.bounds.south),centerPxX=((westX+eastX)/2)*world,centerPxY=((northY+southY)/2)*world,left=centerPxX-frameWidth/2,top=centerPxY-frameHeight/2,startX=Math.floor(left/TILE_SIZE),endX=Math.floor((left+frameWidth-1)/TILE_SIZE),startY=Math.floor(top/TILE_SIZE),endY=Math.floor((top+frameHeight-1)/TILE_SIZE),tileCount=Math.pow(2,zoom),tiles:ScoutSchoolDistrictPortfolioRasterTile[]=[];for(let tx=startX;tx<=endX;tx++){for(let ty=startY;ty<=endY;ty++){if(ty<0||ty>=tileCount)continue;const wrappedX=((tx%tileCount)+tileCount)%tileCount;tiles.push({z:zoom,x:wrappedX,y:ty,left:tx*TILE_SIZE-left,top:ty*TILE_SIZE-top,url:tileUrl(options.tileUrlTemplate,zoom,wrappedX,ty)})}}const markers:ScoutSchoolDistrictPortfolioMarker[]=data.members.map(member=>({left:worldX(member.point.coordinates[0])*world-left,top:worldY(member.point.coordinates[1])*world-top,name:member.name,city:member.city}));return{zoom,width:frameWidth,height:frameHeight,tiles,markers}}

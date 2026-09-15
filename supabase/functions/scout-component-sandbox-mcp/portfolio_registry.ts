@@ -20,6 +20,12 @@ import {
   normalizeScoutSandboxHotelPortfolioOpportunity,
 } from './hotel_portfolio_map_model.ts'
 import { buildScoutHotelPortfolioRasterFrame } from './hotel_portfolio_map_renderer.ts'
+import {
+  buildScoutSandboxSchoolDistrictPortfolioOpportunity,
+  normalizeScoutSandboxSchoolDistrictPortfolioMap,
+  normalizeScoutSandboxSchoolDistrictPortfolioOpportunity,
+} from './school_district_portfolio_map_model.ts'
+import { buildScoutSchoolDistrictPortfolioRasterFrame } from './school_district_portfolio_map_renderer.ts'
 
 export const SCOUT_SANDBOX_PORTFOLIO_IMPLEMENTATIONS = {
   water_utility_portfolio: {
@@ -48,6 +54,15 @@ export const SCOUT_SANDBOX_PORTFOLIO_IMPLEMENTATIONS = {
     identityMatches: (map: any, opportunity: any) => map.account_name === opportunity.name && map.member_count === opportunity.member_count && map.resolved_member_count === opportunity.resolved_member_count,
     responseText: (opportunity: any) => `Scout returned the bounded ${opportunity.name} hotel-management portfolio card with ${opportunity.resolved_member_count} mapped sites from ${opportunity.member_count} documented operating hotels.`,
     ariaLabel: (map: any) => `Documented hotel portfolio map for ${map.account_name}`,
+  },
+  school_district_portfolio: {
+    normalizeMap: normalizeScoutSandboxSchoolDistrictPortfolioMap,
+    normalizeOpportunity: normalizeScoutSandboxSchoolDistrictPortfolioOpportunity,
+    buildOpportunity: buildScoutSandboxSchoolDistrictPortfolioOpportunity,
+    buildRasterFrame: buildScoutSchoolDistrictPortfolioRasterFrame,
+    identityMatches: (map: any, opportunity: any) => map.account_name === opportunity.name && map.district_key === opportunity.district_key && map.member_count === opportunity.member_count,
+    responseText: (opportunity: any) => `Scout returned the bounded ${opportunity.name} school-district portfolio card with ${opportunity.member_count} documented NCES school facilities and a district-level DLGF roof capital-plan signal.`,
+    ariaLabel: (map: any) => `Documented public-school facility portfolio map for ${map.account_name}`,
   },
 } as const
 

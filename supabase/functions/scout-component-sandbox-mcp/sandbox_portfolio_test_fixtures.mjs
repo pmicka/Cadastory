@@ -17,6 +17,21 @@ export function makePortfolioPayload(type) {
     }
   }
 
+  if (type === 'school_district_portfolio') {
+    return {
+      contract_version: 'school_district_portfolio_map_v1', account_name: 'Scott County School District 2', district_key: 'IN-7255', nces_district_id: '1810020', dlgf_unit_id: '1288', dlgf_unit_code: '7255', scope: 'documented_public_school_roster', facility_source_slug: 'nces-edge-public-schools-2425', signal_source_slug: 'indiana-dlgf-school-capital-projects', relationship: 'district_membership', generated_at: '2026-09-15T12:00:00Z', facility_observed_at: '2026-09-06T05:21:27.854428Z', capital_plan_observed_at: '2026-09-06T05:06:41.657508Z',
+      members: [
+        ['181002001609','Johnson Elementary School','4235 E SR 256','Scottsburg','47170',-85.6989,38.7373],
+        ['181002001610','Lexington Elementary School','7980 E Walnut St','Lexington','47138',-85.6264,38.6524],
+        ['181002001608','Scottsburg Elem School','49 N Hyland St','Scottsburg','47170',-85.7757,38.6866],
+        ['181002001611','Scottsburg Middle School','425 S 3rd St','Scottsburg','47170',-85.763562,38.680269],
+        ['181002001612','Scottsburg Senior High School','500 S Gardner','Scottsburg','47170',-85.781081,38.680638],
+        ['181002001614','Vienna-Finley Elementary School','445 Ivan Rogers Dr','Scottsburg','47170',-85.7661,38.6503],
+      ].map(([id,name,address,city,zip,lon,lat]) => ({ id,name,address,city,state_code:'IN',zip,point:{type:'Point',coordinates:[lon,lat]},school_year:'2024-2025',observed_at:'2026-09-06T05:21:27.854428Z' })),
+      capital_signals: [{ id:'dlgf:10695:roof-project',kind:'district_roof_capital_project',project_title:'Roof Project',estimated_cost:500000,start_date_text:'Summer of 2027',end_date_text:'Summer of 2029',plan_year:2027,plan_id:'10695',plan_submitted_at:'2026-08-12T08:28:01Z',extraction_confidence:'high',site_attribution:'district_only_unresolved',observed_at:'2026-09-06T05:06:41.657508Z' }],
+    }
+  }
+
   const hotel = type === 'hotel_management_portfolio'
   if (!hotel && type !== 'dealership_group_portfolio') throw new Error(`No portfolio fixture registered for ${type}`)
 
