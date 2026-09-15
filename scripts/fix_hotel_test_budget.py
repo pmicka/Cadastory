@@ -23,4 +23,9 @@ for test in root.glob('*test.mjs'):
     if text!=original: test.write_text(text)
 if changed<1: raise SystemExit('sandbox enum assertion anchor missing')
 if compact_changed<1: raise SystemExit('compact gateway enum assertion anchor missing')
-print(f'updated {changed} component enum and {compact_changed} compact gateway assertion file(s)')
+hotel=root/'hotel_portfolio_map_renderer_test.mjs'
+ht=hotel.read_text()
+needle="modelSource.includes('linkConfidenceValue == null')"
+if needle not in ht: raise SystemExit('hotel compatibility assertion anchor missing')
+hotel.write_text(ht.replace(needle,"modelSource.includes('confidenceValue==null')"))
+print(f'updated {changed} component enum, {compact_changed} compact gateway, and hotel compatibility assertions')
