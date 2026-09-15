@@ -6,6 +6,7 @@ const MAX_BODY_BYTES = 32 * 1024
 const FETCH_TIMEOUT_MS = 12_000
 const MAX_SOURCE_BYTES = 1_200_000
 const MAX_CONCURRENCY = 4
+const sourceHttpClient = Deno.createHttpClient({ http1: true, http2: false })
 
 function serviceKey(): string {
   try {
@@ -135,6 +136,7 @@ async function fetchText(url: string, accept: string) {
   const parsed = new URL(url)
   if (parsed.protocol !== 'https:') throw new Error('responsible-party lookup requires HTTPS')
   const response = await fetch(parsed.toString(), {
+    client: sourceHttpClient,
     redirect: 'follow',
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: {
