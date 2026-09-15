@@ -145,11 +145,12 @@ function normalizeMember(value: unknown): ScoutDealershipPortfolioMember | null 
   const point = normalizePoint(source.point)
   const resolutionState = normalizeResolutionState(source.resolution_state)
   const resolvedBuildingCount = cleanInteger(source.resolved_building_count, 0, 20)
-  const linkConfidence = source.link_confidence === null ? null : cleanNumber(source.link_confidence, 0, 1)
+  const linkConfidenceValue = source.link_confidence
+  const linkConfidence = linkConfidenceValue == null ? null : cleanNumber(linkConfidenceValue, 0, 1)
   const withinPilotRadius = cleanBoolean(source.within_pilot_radius)
   const observedAt = normalizeTimestamp(source.observed_at)
   if (!id || !name || !address || !city || !stateCode || !brands || !point || !resolutionState || resolvedBuildingCount === null || withinPilotRadius === null || !observedAt) return null
-  if (source.link_confidence !== null && linkConfidence === null) return null
+  if (linkConfidenceValue != null && linkConfidence === null) return null
   if (resolutionState === 'unresolved' && (point.type !== 'unresolved' || resolvedBuildingCount !== 0 || linkConfidence !== null)) return null
   if (resolutionState === 'single_building_resolved' && (point.type !== 'Point' || resolvedBuildingCount !== 1 || linkConfidence === null)) return null
   if (resolutionState === 'multi_building_resolved' && (point.type !== 'Point' || resolvedBuildingCount < 2 || linkConfidence === null)) return null
