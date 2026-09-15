@@ -1,0 +1,2 @@
+alter function public.scout_get_component_sandbox_school_district_portfolio_v1_intern()
+rename to scout_get_component_sandbox_school_portfolio_v1_internal;
