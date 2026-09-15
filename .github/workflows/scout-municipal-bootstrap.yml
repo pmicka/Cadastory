@@ -23,7 +23,9 @@ jobs:
           cache: npm
           cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
       - name: Apply municipal portfolio implementation
-        run: python3 scripts/apply_municipal_sandbox.py
+        run: |
+          python3 scripts/apply_municipal_sandbox.py
+          python3 scripts/patch_municipal_foundation.py
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
