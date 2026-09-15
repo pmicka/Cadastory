@@ -42,3 +42,5 @@ jobs:
         run: npm test
       - name: Run predeploy registry smoke
         run: npm run smoke:contract
+      - name: Syntax-check live backend diagnostic
+        run: node --check sandbox_live_mcp_smoke.mjs
