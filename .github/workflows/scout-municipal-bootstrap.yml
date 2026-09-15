@@ -1,0 +1,49 @@
+name: Scout municipal facilities bootstrap
+
+on:
+  push:
+    branches:
+      - scout/municipal-facilities-portfolio
+    paths:
+      - .github/workflows/scout-municipal-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout/municipal-facilities-portfolio
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Apply municipal portfolio implementation
+        run: python3 scripts/apply_municipal_sandbox.py
+      - name: Install sandbox dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Regenerate MCP Apps View
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run build
+      - name: Run complete sandbox suite
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm test
+      - name: Run predeploy registry smoke
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run smoke:contract
+      - name: Commit generated implementation
+        run: |
+          if git diff --quiet; then
+            echo 'No implementation changes produced.'
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions supabase/migrations
+          git commit -m 'Add Louisville Metro municipal facilities portfolio'
+          git push origin HEAD:scout/municipal-facilities-portfolio
