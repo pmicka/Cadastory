@@ -1,0 +1,44 @@
+name: Scout sandbox registry CI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/scout-sandbox-registry-ci.yml'
+      - 'supabase/functions/_shared/scout_sandbox_*.ts'
+      - 'supabase/functions/scout-component-sandbox-mcp/**'
+      - 'supabase/functions/scout-mcp-contract/**'
+      - 'supabase/functions/scout-connect/**'
+  pull_request:
+    paths:
+      - '.github/workflows/scout-sandbox-registry-ci.yml'
+      - 'supabase/functions/_shared/scout_sandbox_*.ts'
+      - 'supabase/functions/scout-component-sandbox-mcp/**'
+      - 'supabase/functions/scout-mcp-contract/**'
+      - 'supabase/functions/scout-connect/**'
+
+permissions:
+  contents: read
+
+jobs:
+  sandbox-registry:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Install sandbox dependencies
+        run: npm ci
+      - name: Regenerate MCP Apps View
+        run: npm run build
+      - name: Prove generated View parity
+        run: git diff --exit-code -- view.generated.ts
+      - name: Run complete sandbox suite
+        run: npm test
+      - name: Run predeploy registry smoke
+        run: npm run smoke:contract
