@@ -5,6 +5,20 @@ import { createMcpHandler, McpServer } from 'npm:@modelcontextprotocol/server@2.
 import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@modelcontextprotocol/ext-apps@2.0.0/server'
 import * as z from 'npm:zod@4.2.0/v4'
 import {
+  SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES,
+  SCOUT_SANDBOX_OPPORTUNITY_TYPES,
+  SCOUT_SANDBOX_PORTFOLIO_MANIFEST,
+  SCOUT_SANDBOX_PORTFOLIO_TYPES,
+  SCOUT_SANDBOX_RESOURCE_URI,
+  isScoutSandboxPortfolioType,
+  isScoutSandboxRasterTileAllowed,
+  scoutSandboxCompatibilityResourceUris,
+  scoutSandboxCompatibilityUsesEmbeddedRaster,
+  scoutSandboxToolDescription,
+  type ScoutSandboxPortfolioType,
+} from '../_shared/scout_sandbox_manifest.ts'
+import { assertScoutSandboxPortfolioImplementationCoverage, scoutSandboxPortfolioImplementation } from './portfolio_registry.ts'
+import {
   buildScoutSandboxWaterTankOpportunity,
   normalizeScoutSandboxOpportunity,
   normalizeScoutSandboxSingleSiteMap,
@@ -16,25 +30,10 @@ import {
   normalizeScoutSandboxSwpppSiteMap,
   type ScoutSandboxSwpppSiteMap,
 } from './swppp_site_map_model.ts'
-import {
-  buildScoutSandboxWaterUtilityPortfolioOpportunity,
-  normalizeScoutSandboxWaterUtilityPortfolioMap,
-} from './water_portfolio_map_model.ts'
-import {
-  buildScoutSandboxDealershipPortfolioOpportunity,
-  normalizeScoutSandboxDealershipPortfolioMap,
-} from './dealership_portfolio_map_model.ts'
-import {
-  buildScoutSandboxHotelPortfolioOpportunity,
-  normalizeScoutSandboxHotelPortfolioMap,
-} from './hotel_portfolio_map_model.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
 import { buildScoutSwpppSiteRasterFrame } from './swppp_site_map_renderer.ts'
 import { buildScoutSingleSiteRasterFrame } from './single_site_map_renderer.ts'
 import { buildScoutWaterTankRasterFrame } from './water_tank_map_renderer.ts'
-import { buildScoutWaterUtilityPortfolioRasterFrame } from './water_portfolio_map_renderer.ts'
-import { buildScoutDealershipPortfolioRasterFrame } from './dealership_portfolio_map_renderer.ts'
-import { buildScoutHotelPortfolioRasterFrame } from './hotel_portfolio_map_renderer.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -48,57 +47,14 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v34'
-const COMPATIBILITY_RESOURCE_URIS = [
-  'ui://scout/component-sandbox/v33',
-  'ui://scout/component-sandbox/v32',
-  'ui://scout/component-sandbox/v31',
-  'ui://scout/component-sandbox/v30',
-  'ui://scout/component-sandbox/v29',
-  'ui://scout/component-sandbox/v28',
-  'ui://scout/component-sandbox/v27',
-  'ui://scout/component-sandbox/v26',
-  'ui://scout/component-sandbox/v25',
-  'ui://scout/component-sandbox/v24',
-  'ui://scout/component-sandbox/v23',
-  'ui://scout/component-sandbox/v22',
-  'ui://scout/component-sandbox/v21',
-  'ui://scout/component-sandbox/v20',
-  'ui://scout/component-sandbox/v19',
-  'ui://scout/component-sandbox/v18',
-  'ui://scout/component-sandbox/v17',
-  'ui://scout/component-sandbox/v16',
-  'ui://scout/component-sandbox/v15',
-  'ui://scout/component-sandbox/v14',
-  'ui://scout/component-sandbox/v13',
-  'ui://scout/component-sandbox/v12',
-  'ui://scout/component-sandbox/v11',
-  'ui://scout/component-sandbox/v10',
-  'ui://scout/component-sandbox/v9',
-  'ui://scout/component-sandbox/v8',
-  'ui://scout/component-sandbox/v7',
-  'ui://scout/component-sandbox/v6',
-  'ui://scout/component-sandbox/v5',
-  'ui://scout/component-sandbox/v4',
-  'ui://scout/component-sandbox/v3',
-  'ui://scout/component-sandbox/v2',
-  'ui://scout/component-sandbox/v1',
-] as const
+const RESOURCE_URI = SCOUT_SANDBOX_RESOURCE_URI
+const COMPATIBILITY_RESOURCE_URIS = scoutSandboxCompatibilityResourceUris()
 const TOOL_NAME = 'scout_preview_component_sandbox'
 const PRIVACY_CONTRACT = 'privacy-contract-v2'
 const EXPOSURE_CONTRACT = 'scout-exposure-v1'
 const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
 const MAP_TILE_ORIGIN = SUPABASE_URL
 const MAP_TILE_UPSTREAM = 'https://a.tile.openstreetmap.fr/hot'
-const SANDBOX_MAP_CENTERS = [
-  { lon: -85.758115986691, lat: 38.256732011411 },
-  { lon: -86.4781456168917, lat: 36.9655317362621 },
-  { lon: -84.521, lat: 39.097 },
-] as const
-const WARREN_PORTFOLIO_TILE_BOUNDS = { z: 9, minX: 131, maxX: 134, minY: 198, maxY: 199 } as const
-const DEALERSHIP_PORTFOLIO_TILE_BOUNDS = { z: 8, minX: 66, maxX: 68, minY: 98, maxY: 99 } as const
-const DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS = { z: 7, minX: 33, maxX: 34, minY: 49, maxY: 49 } as const
-const HOTEL_PORTFOLIO_TILE_BOUNDS = { z: 7, minX: 32, maxX: 34, minY: 48, maxY: 49 } as const
 
 async function loadScoutSandboxOpportunity() {
   const { data, error } = await admin.rpc('scout_get_component_sandbox_opportunity_v1_internal')
@@ -132,32 +88,18 @@ async function loadScoutSandboxSwpppSiteMap() {
   return map
 }
 
-async function loadScoutSandboxWaterUtilityPortfolioMap() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_water_portfolio_v1_internal')
-  if (error) throw new Error('Scout sandbox water-utility portfolio map is unavailable')
-  const map = normalizeScoutSandboxWaterUtilityPortfolioMap(data)
-  if (!map) throw new Error('Scout sandbox water-utility portfolio map did not satisfy the bounded contract')
-  return map
-}
-
-async function loadScoutSandboxDealershipPortfolioMap() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_dealership_portfolio_v1_internal')
-  if (error) throw new Error('Scout sandbox dealership portfolio map is unavailable')
-  const map = normalizeScoutSandboxDealershipPortfolioMap(data)
-  if (!map) throw new Error('Scout sandbox dealership portfolio map did not satisfy the bounded contract')
-  return map
-}
-
-async function loadScoutSandboxHotelPortfolioMap() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_hotel_portfolio_v1_internal')
-  if (error) throw new Error('Scout sandbox hotel portfolio map is unavailable')
-  const map = normalizeScoutSandboxHotelPortfolioMap(data)
-  if (!map) throw new Error('Scout sandbox hotel portfolio map did not satisfy the bounded contract')
+async function loadScoutSandboxPortfolioMap(type: ScoutSandboxPortfolioType) {
+  const registration = SCOUT_SANDBOX_PORTFOLIO_MANIFEST[type]
+  const implementation = scoutSandboxPortfolioImplementation(type)
+  const { data, error } = await admin.rpc(registration.rpc)
+  if (error) throw new Error(`Scout sandbox ${type} map is unavailable`)
+  const map = implementation.normalizeMap(data)
+  if (!map) throw new Error(`Scout sandbox ${type} map did not satisfy the bounded contract`)
   return map
 }
 
 type EmbeddedRasterTile = { z: number; x: number; y: number; url: string }
-const MAX_EMBEDDED_RASTER_TILES = 40
+const MAX_EMBEDDED_RASTER_TILES = SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES
 
 async function loadEmbeddedRasterTile(tile: EmbeddedRasterTile) {
   const response = await fetch(`${MAP_TILE_UPSTREAM}/${tile.z}/${tile.x}/${tile.y}.png`, {
@@ -173,31 +115,31 @@ async function loadEmbeddedRasterTile(tile: EmbeddedRasterTile) {
 }
 
 async function loadEmbeddedSandboxTiles() {
+  assertScoutSandboxPortfolioImplementationCoverage()
   const tileUrlTemplate = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png`
-  const [premiumMap, waterTankMap, swpppMap, portfolioMap, dealershipMap, hotelMap] = await Promise.all([
+  const [premiumMap, waterTankMap, swpppMap] = await Promise.all([
     loadScoutSandboxSingleSiteMap(),
     loadScoutSandboxWaterTankMap(),
     loadScoutSandboxSwpppSiteMap(),
-    loadScoutSandboxWaterUtilityPortfolioMap(),
-    loadScoutSandboxDealershipPortfolioMap(),
-    loadScoutSandboxHotelPortfolioMap(),
   ])
-  const frames = [
+  const frames: Array<{ tiles: EmbeddedRasterTile[] }> = [
     buildScoutSingleSiteRasterFrame(premiumMap, 456, 210, { tileUrlTemplate }),
     buildScoutWaterTankRasterFrame(waterTankMap, 456, 210, { tileUrlTemplate }),
     buildScoutSwpppSiteRasterFrame(swpppMap, 456, 210, { tileUrlTemplate }),
-    buildScoutWaterUtilityPortfolioRasterFrame(portfolioMap, 456, 210, { tileUrlTemplate }),
-    buildScoutDealershipPortfolioRasterFrame(dealershipMap, 456, 210, { tileUrlTemplate }),
-    buildScoutDealershipPortfolioRasterFrame(dealershipMap, 280, 210, { tileUrlTemplate }),
-    buildScoutHotelPortfolioRasterFrame(hotelMap, 456, 210, { tileUrlTemplate }),
-    buildScoutHotelPortfolioRasterFrame(hotelMap, 280, 210, { tileUrlTemplate }),
   ]
+  for (const type of SCOUT_SANDBOX_PORTFOLIO_TYPES) {
+    const map = await loadScoutSandboxPortfolioMap(type)
+    const implementation = scoutSandboxPortfolioImplementation(type)
+    for (const frameSize of SCOUT_SANDBOX_PORTFOLIO_MANIFEST[type].rasterFrames) {
+      frames.push(implementation.buildRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate }))
+    }
+  }
   const uniqueTiles = new Map<string, EmbeddedRasterTile>()
   for (const frame of frames) {
     for (const tile of frame.tiles) uniqueTiles.set(tile.url, tile)
   }
   if (uniqueTiles.size > MAX_EMBEDDED_RASTER_TILES) {
-    throw new Error('Scout sandbox embedded raster exceeded the bounded tile budget')
+    throw new Error(`Scout sandbox embedded raster requires ${uniqueTiles.size} tiles, exceeding bounded budget ${MAX_EMBEDDED_RASTER_TILES}`)
   }
   return await Promise.all(Array.from(uniqueTiles.values(), loadEmbeddedRasterTile))
 }
@@ -589,8 +531,17 @@ const hotelPortfolioMapSchema=z.object({contract_version:z.literal('hotel_manage
 const hotelPortfolioOpportunitySchema=z.object({opportunity_type:z.literal('hotel_management_portfolio'),name:z.string().min(1).max(200),member_count:z.number().int().min(1).max(100),resolved_member_count:z.number().int().min(1).max(100),resolved_building_count:z.number().int().min(1).max(200),unresolved_member_count:z.number().int().min(0).max(100),observed_at:z.string().min(1).max(80),contact_route_available:z.boolean(),operations_route_available:z.boolean(),procurement_route_available:z.boolean(),vendor_route_proven:z.boolean(),current_need_scan_complete:z.boolean(),map_semantics:z.literal('documented_operating_hotel_portfolio'),evidence_boundary:z.literal('first-party hotel-management roster plus resolved building crosswalks'),why_investigate:z.string().min(1).max(1000),guardrail:z.string().min(1).max(1600)})
 const hotelPortfolioResultSchema=z.object({surface:z.literal('scout_component_sandbox'),opportunity_type:z.literal('hotel_management_portfolio'),opportunity:hotelPortfolioOpportunitySchema,map:hotelPortfolioMapSchema})
 
+const componentResultSchemaByType = {
+  premium_exterior: premiumResultSchema,
+  water_tank: waterTankResultSchema,
+  swppp_site: swpppSiteResultSchema,
+  water_utility_portfolio: waterUtilityPortfolioResultSchema,
+  dealership_group_portfolio: dealershipPortfolioResultSchema,
+  hotel_management_portfolio: hotelPortfolioResultSchema,
+} as const
+
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.4' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.5' })
 
   registerAppResource(
     server,
@@ -622,7 +573,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27' || compatibilityUri === 'ui://scout/component-sandbox/v28' || compatibilityUri === 'ui://scout/component-sandbox/v29' || compatibilityUri === 'ui://scout/component-sandbox/v30' || compatibilityUri === 'ui://scout/component-sandbox/v31' || compatibilityUri === 'ui://scout/component-sandbox/v32')
+          text: (scoutSandboxCompatibilityUsesEmbeddedRaster(compatibilityUri)
             ? await loadScoutViewHtml()
             : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
             .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),
@@ -642,11 +593,11 @@ function makeServer() {
     TOOL_NAME,
     {
       title: 'Preview Scout opportunity card',
-      description: 'Owner-only read-only developer tool that renders one bounded Scout MCP Apps opportunity card and matching map. Select premium_exterior, water_tank, swppp_site, the Warren County water_utility_portfolio exemplar, the Don Franklin Auto dealership_group_portfolio exemplar, or the Commonwealth Hotels hotel_management_portfolio exemplar; omission preserves the PNC Tower compatibility default.',
+      description: scoutSandboxToolDescription(),
       inputSchema: z.object({
-        opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site', 'water_utility_portfolio', 'dealership_group_portfolio', 'hotel_management_portfolio']).optional(),
+        opportunity_type: z.enum(SCOUT_SANDBOX_OPPORTUNITY_TYPES).optional(),
       }),
-      outputSchema: z.discriminatedUnion('opportunity_type', [premiumResultSchema, waterTankResultSchema, swpppSiteResultSchema, waterUtilityPortfolioResultSchema, dealershipPortfolioResultSchema, hotelPortfolioResultSchema]),
+      outputSchema: z.discriminatedUnion('opportunity_type', SCOUT_SANDBOX_OPPORTUNITY_TYPES.map((type) => componentResultSchemaByType[type]) as any),
       annotations: {
         readOnlyHint: true,
         destructiveHint: false,
@@ -658,44 +609,14 @@ function makeServer() {
     async ({ opportunity_type }) => {
       const selectedType = opportunity_type ?? 'premium_exterior'
 
-      if (selectedType === 'hotel_management_portfolio') {
-        const map = await loadScoutSandboxHotelPortfolioMap()
-        const opportunity = buildScoutSandboxHotelPortfolioOpportunity(map)
-        if (map.account_name !== opportunity.name || map.member_count !== opportunity.member_count || map.resolved_member_count !== opportunity.resolved_member_count) throw new Error('Scout sandbox hotel portfolio opportunity and map identity do not match')
-        return { content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} hotel-management portfolio card with ${opportunity.resolved_member_count} mapped sites from ${opportunity.member_count} documented operating hotels.` }], structuredContent: { surface: 'scout_component_sandbox', opportunity_type: 'hotel_management_portfolio', opportunity, map } }
-      }
-
-      if (selectedType === 'dealership_group_portfolio') {
-        const map = await loadScoutSandboxDealershipPortfolioMap()
-        const opportunity = buildScoutSandboxDealershipPortfolioOpportunity(map)
-        if (map.account_name !== opportunity.name || map.member_count !== opportunity.member_count || map.resolved_member_count !== opportunity.resolved_member_count) {
-          throw new Error('Scout sandbox dealership portfolio opportunity and map identity do not match')
-        }
+      if (isScoutSandboxPortfolioType(selectedType)) {
+        const map = await loadScoutSandboxPortfolioMap(selectedType)
+        const implementation = scoutSandboxPortfolioImplementation(selectedType)
+        const opportunity = implementation.buildOpportunity(map)
+        if (!implementation.identityMatches(map, opportunity)) throw new Error(`Scout sandbox ${selectedType} opportunity and map identity do not match`)
         return {
-          content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} dealership-group portfolio card with ${opportunity.resolved_member_count} mapped sites from ${opportunity.member_count} documented operating locations.` }],
-          structuredContent: {
-            surface: 'scout_component_sandbox',
-            opportunity_type: 'dealership_group_portfolio',
-            opportunity,
-            map,
-          },
-        }
-      }
-
-      if (selectedType === 'water_utility_portfolio') {
-        const map = await loadScoutSandboxWaterUtilityPortfolioMap()
-        const opportunity = buildScoutSandboxWaterUtilityPortfolioOpportunity(map)
-        if (map.account_name !== opportunity.name || map.pwsid !== opportunity.pwsid || map.member_count !== opportunity.member_count) {
-          throw new Error('Scout sandbox water-utility portfolio opportunity and map identity do not match')
-        }
-        return {
-          content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} documented water-utility portfolio card with ${opportunity.member_count} mapped tank records.` }],
-          structuredContent: {
-            surface: 'scout_component_sandbox',
-            opportunity_type: 'water_utility_portfolio',
-            opportunity,
-            map,
-          },
+          content: [{ type: 'text', text: implementation.responseText(opportunity) }],
+          structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map },
         }
       }
 
@@ -757,36 +678,13 @@ function makeServer() {
 
 const mcpHandler = createMcpHandler(() => makeServer())
 
-function tileCenter(z: number, x: number, y: number) {
-  const count = Math.pow(2, z)
-  const lon = (x + 0.5) / count * 360 - 180
-  const mercator = Math.PI * (1 - 2 * (y + 0.5) / count)
-  const lat = Math.atan(Math.sinh(mercator)) * 180 / Math.PI
-  return { lon, lat }
-}
-
 function parseSandboxTile(url: URL) {
   const match = url.pathname.match(/\/map-tile\/(\d{1,2})\/(\d{1,8})\/(\d{1,8})\.png$/)
   if (!match) return null
   const z = Number(match[1]), x = Number(match[2]), y = Number(match[3])
   const count = Math.pow(2, z)
   if (!Number.isInteger(z) || z < 7 || z > 18 || x < 0 || y < 0 || x >= count || y >= count) return null
-  if (z === WARREN_PORTFOLIO_TILE_BOUNDS.z
-    && x >= WARREN_PORTFOLIO_TILE_BOUNDS.minX && x <= WARREN_PORTFOLIO_TILE_BOUNDS.maxX
-    && y >= WARREN_PORTFOLIO_TILE_BOUNDS.minY && y <= WARREN_PORTFOLIO_TILE_BOUNDS.maxY) return { z, x, y }
-  if (z === DEALERSHIP_PORTFOLIO_TILE_BOUNDS.z
-    && x >= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.minX && x <= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.maxX
-    && y >= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.minY && y <= DEALERSHIP_PORTFOLIO_TILE_BOUNDS.maxY) return { z, x, y }
-  if (z === DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.z
-    && x >= DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.minX && x <= DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.maxX
-    && y >= DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.minY && y <= DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.maxY) return { z, x, y }
-  if (z === HOTEL_PORTFOLIO_TILE_BOUNDS.z
-    && x >= HOTEL_PORTFOLIO_TILE_BOUNDS.minX && x <= HOTEL_PORTFOLIO_TILE_BOUNDS.maxX
-    && y >= HOTEL_PORTFOLIO_TILE_BOUNDS.minY && y <= HOTEL_PORTFOLIO_TILE_BOUNDS.maxY) return { z, x, y }
-  if (z < 12) return null
-  const center = tileCenter(z, x, y)
-  if (!SANDBOX_MAP_CENTERS.some((site) => Math.abs(center.lon - site.lon) <= 0.12 && Math.abs(center.lat - site.lat) <= 0.12)) return null
-  return { z, x, y }
+  return isScoutSandboxRasterTileAllowed(z, x, y) ? { z, x, y } : null
 }
 
 async function serveSandboxTile(req: Request, tile: { z: number; x: number; y: number }) {

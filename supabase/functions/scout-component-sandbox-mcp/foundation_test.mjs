@@ -45,10 +45,10 @@ assert.ok(server.includes("premiumOpportunitySchema"));
 assert.ok(server.includes("waterTankOpportunitySchema"));
 assert.ok(server.includes("z.discriminatedUnion(\'opportunity_type\'"));
 assert.ok(server.includes("csp: { resourceDomains: [MAP_TILE_ORIGIN] }"));
-assert.ok(connectGateway.includes("sandboxWaterTankOpportunitySchema"));
-assert.ok(contractGateway.includes("sandboxWaterTankOpportunitySchema"));
-assert.ok(connectGateway.includes("sandboxWaterTankMapSchema"));
-assert.ok(contractGateway.includes("sandboxWaterTankMapSchema"));
+assert.ok(connectGateway.includes('SCOUT_SANDBOX_OPPORTUNITY_TYPES'));
+assert.ok(contractGateway.includes('SCOUT_SANDBOX_OPPORTUNITY_TYPES'));
+assert.ok(connectGateway.includes('../_shared/scout_sandbox_contract_schema.ts'));
+assert.ok(contractGateway.includes('../_shared/scout_sandbox_contract_schema.ts'));
 assert.ok(connectGateway.includes("outputSchema:sandboxResultSchema()"));
 assert.ok(contractGateway.includes("outputSchema:sandboxResultSchema()"));
 assert.equal(server.includes("exemplars:"), false);
@@ -159,11 +159,9 @@ assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, linkage: { ...
 assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { ...mapExemplar.footprint, geometry: { type: "Point", coordinates: [-85.75, 38.25] } } }), null);
 assert.equal(normalizeScoutSandboxSingleSiteMap({ ...mapExemplar, footprint: { ...mapExemplar.footprint, bounds: { ...mapExemplar.footprint.bounds, east: -86 } } }), null);
 
-for (const source of [server, connectGateway, contractGateway]) {
-  for (const version of ["v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11", "v12", "v13", "v14", "v15", "v16", "v17", "v18", "v19", "v20", "v21", "v22"]) {
-    assert.ok(source.includes(`ui://scout/component-sandbox/${version}`));
-  }
-}
+assert.ok(server.includes('scoutSandboxCompatibilityResourceUris()'));
+assert.ok(connectGateway.includes('scoutSandboxCompatibilityResourceUris()'));
+assert.ok(contractGateway.includes('scoutSandboxCompatibilityResourceUris()'));
 assert.ok(designContract.includes("12:7"));
 assert.ok(designContract.includes("visual source of truth"));
 assert.ok(mapContract.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"));
