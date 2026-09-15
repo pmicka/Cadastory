@@ -27,6 +27,24 @@ new_dispatch_replacement = r'''"  try {\n    if (isScoutSandboxPortfolioType(opp
 if text.count(old_dispatch_replacement) != 1:
     raise RuntimeError('expected one portfolio View dispatch replacement')
 text = text.replace(old_dispatch_replacement, new_dispatch_replacement)
-
 path.write_text(text)
-print('Tightened sandbox bootstrap import matching, literal replacements, and View dispatch scope.')
+
+# Convert legacy source-string checks to registry invariants instead of restoring duplicated constants.
+test_path = path.parents[1] / 'supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer_test.mjs'
+test = test_path.read_text()
+replacements = {
+    "assert.ok(server.includes('SANDBOX_MAP_CENTERS'))": "assert.ok(server.includes('isScoutSandboxRasterTileAllowed'))",
+    "assert.ok(server.includes('WARREN_PORTFOLIO_TILE_BOUNDS'))": "assert.ok(server.includes('SCOUT_SANDBOX_PORTFOLIO_MANIFEST'))",
+    "assert.ok(server.includes('MAX_EMBEDDED_RASTER_TILES = 40'))": "assert.ok(server.includes('SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES'))",
+    "assert.ok(server.includes('buildScoutWaterUtilityPortfolioRasterFrame(portfolioMap, 456, 210'))": "assert.ok(server.includes('for (const type of SCOUT_SANDBOX_PORTFOLIO_TYPES)'))",
+    "assert.ok(server.includes(\"const RESOURCE_URI = 'ui://scout/component-sandbox/v34'\"))": "assert.ok(server.includes('const RESOURCE_URI = SCOUT_SANDBOX_RESOURCE_URI'))",
+    "assert.ok(server.includes(\"'ui://scout/component-sandbox/v26'\"))": "assert.ok(server.includes('scoutSandboxCompatibilityResourceUris()'))",
+    "assert.ok(server.includes(\"'ui://scout/component-sandbox/v15'\"))": "assert.ok(server.includes('scoutSandboxCompatibilityUsesEmbeddedRaster(compatibilityUri)'))",
+}
+for old, new in replacements.items():
+    if test.count(old) != 1:
+        raise RuntimeError(f'expected one single-site legacy assertion: {old}')
+    test = test.replace(old, new)
+test_path.write_text(test)
+
+print('Tightened bootstrap transforms and aligned single-site regression with shared registry invariants.')
