@@ -1,0 +1,32 @@
+name: Hotel portfolio v34
+on:
+  push:
+    branches: [scout/commonwealth-hotel-portfolio-v34]
+permissions:
+  contents: write
+jobs:
+  patch-build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Apply hotel portfolio patch
+        run: python3 scripts/patch_hotel_portfolio_v34.py
+      - name: Install sandbox dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Build and test Scout sandbox
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run build && npm test
+      - name: Commit verified implementation and remove temporary harness
+        run: |
+          rm scripts/patch_hotel_portfolio_v34.py .github/workflows/hotel-portfolio-v34.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'Add Commonwealth Hotels portfolio sandbox'
+          git push
