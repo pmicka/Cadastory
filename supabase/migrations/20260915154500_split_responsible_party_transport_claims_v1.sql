@@ -156,14 +156,35 @@ revoke all on function public.internal_claim_remote_responsible_party_resolution
 grant execute on function public.internal_claim_remote_responsible_party_resolution_jobs_v1(integer)
   to service_role;
 
+-- Preserve the existing Edge Function RPC contract while making it local-only.
+-- The remote GitHub worker uses internal_claim_remote_responsible_party_resolution_jobs_v1 directly.
+create or replace function public.internal_claim_responsible_party_resolution_jobs_v1(p_limit integer default 8)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+begin
+  if coalesce(auth.role(),'') <> 'service_role' then raise exception 'service_role required'; end if;
+  return public.internal_claim_local_responsible_party_resolution_jobs_v1(p_limit);
+end
+$$;
+
+revoke all on function public.internal_claim_responsible_party_resolution_jobs_v1(integer)
+  from public,anon,authenticated;
+grant execute on function public.internal_claim_responsible_party_resolution_jobs_v1(integer)
+  to service_role;
+
 -- Release guards: each lane must explicitly bind to one provider kind and active profiles.
 do $$
-declare v_local text; v_remote text;
+declare v_local text; v_remote text; v_legacy text;
 begin
   select pg_get_functiondef('public.internal_claim_local_responsible_party_resolution_jobs_v1(integer)'::regprocedure)
     into v_local;
   select pg_get_functiondef('public.internal_claim_remote_responsible_party_resolution_jobs_v1(integer)'::regprocedure)
     into v_remote;
+  select pg_get_functiondef('public.internal_claim_responsible_party_resolution_jobs_v1(integer)'::regprocedure)
+    into v_legacy;
 
   if v_local not like '%p.active and p.provider_kind=''pva_lrsn_html''%'
      or v_local like '%p.provider_kind=''arcgis_point_owner''%' then
@@ -172,6 +193,10 @@ begin
   if v_remote not like '%p.active and p.provider_kind=''arcgis_point_owner''%'
      or v_remote like '%p.provider_kind=''pva_lrsn_html''%' then
     raise exception 'remote responsible-party claim lane regression';
+  end if;
+  if v_legacy not like '%internal_claim_local_responsible_party_resolution_jobs_v1%'
+     or v_legacy like '%internal_claim_remote_responsible_party_resolution_jobs_v1%' then
+    raise exception 'legacy responsible-party claim lane regression';
   end if;
 end
 $$;
