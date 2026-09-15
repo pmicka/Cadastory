@@ -131,7 +131,7 @@ export const SCOUT_SANDBOX_OPPORTUNITY_MANIFEST = {
     rasterFrames: [{ width: 456, height: 210 }, { width: 280, height: 210 }],
     tileRanges: [{ z: 10, minX: 267, maxX: 269, minY: 392, maxY: 392 }],
     tileCenters: [],
-    rpc: 'scout_get_component_sandbox_school_district_portfolio_v1_internal',
+    rpc: 'scout_get_component_sandbox_school_portfolio_v1_internal',
     contractVersion: 'school_district_portfolio_map_v1',
   },
 } as const satisfies Record<ScoutSandboxOpportunityType, ScoutSandboxOpportunityManifestEntry | ScoutSandboxPortfolioManifestEntry>
