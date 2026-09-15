@@ -1,11 +1,6 @@
 name: Scout responsible-party ArcGIS worker
 
 on:
-  # Temporary release-acceptance trigger. Remove after the first successful live run.
-  push:
-    paths:
-      - "scripts/scout_responsible_party_arcgis_worker.py"
-      - ".github/workflows/scout-responsible-party-arcgis.yml"
   schedule:
     - cron: "12,42 * * * *"
   workflow_dispatch:
@@ -42,5 +37,5 @@ jobs:
         env:
           SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
-          SCOUT_RESPONSIBLE_PARTY_BATCH_SIZE: ${{ github.event_name == 'push' && '4' || github.event.inputs.batch_size || '8' }}
+          SCOUT_RESPONSIBLE_PARTY_BATCH_SIZE: ${{ github.event.inputs.batch_size || '8' }}
         run: python scripts/scout_responsible_party_arcgis_worker.py
