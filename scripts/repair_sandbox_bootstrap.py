@@ -30,7 +30,8 @@ text = text.replace(old_dispatch_replacement, new_dispatch_replacement)
 path.write_text(text)
 
 # Convert legacy source-string checks to registry invariants instead of restoring duplicated constants.
-test_path = path.parents[1] / 'supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer_test.mjs'
+root = path.parents[1]
+test_path = root / 'supabase/functions/scout-component-sandbox-mcp/single_site_map_renderer_test.mjs'
 test = test_path.read_text()
 replacements = {
     "assert.ok(server.includes('SANDBOX_MAP_CENTERS'))": "assert.ok(server.includes('isScoutSandboxRasterTileAllowed'))",
@@ -47,4 +48,12 @@ for old, new in replacements.items():
     test = test.replace(old, new)
 test_path.write_text(test)
 
-print('Tightened bootstrap transforms and aligned single-site regression with shared registry invariants.')
+water_contract_path = root / 'supabase/functions/scout-component-sandbox-mcp/water_tank_map_contract_test.mjs'
+water_contract = water_contract_path.read_text()
+old_enum_assertion = "assert.ok(serverSource.includes(\"opportunity_type: z.enum(['premium_exterior', 'water_tank', 'swppp_site', 'water_utility_portfolio', 'dealership_group_portfolio', 'hotel_management_portfolio']).optional()\"))"
+new_enum_assertion = "assert.ok(serverSource.includes('opportunity_type: z.enum(SCOUT_SANDBOX_OPPORTUNITY_TYPES).optional()'))"
+if water_contract.count(old_enum_assertion) != 1:
+    raise RuntimeError('expected one hardcoded water-tank selector enum assertion')
+water_contract_path.write_text(water_contract.replace(old_enum_assertion, new_enum_assertion))
+
+print('Tightened bootstrap transforms and aligned regressions with shared registry invariants.')
