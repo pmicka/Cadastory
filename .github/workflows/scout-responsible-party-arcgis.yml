@@ -1,0 +1,46 @@
+name: Scout responsible-party ArcGIS worker
+
+on:
+  # Temporary release-acceptance trigger. Remove after the first successful live run.
+  push:
+    paths:
+      - "scripts/scout_responsible_party_arcgis_worker.py"
+      - ".github/workflows/scout-responsible-party-arcgis.yml"
+  schedule:
+    - cron: "12,42 * * * *"
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: "Remote responsible-party jobs to claim (1-20)"
+        required: false
+        default: "8"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: scout-responsible-party-arcgis-worker
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install worker dependencies
+        run: python -m pip install --upgrade requests
+
+      - name: Verify worker guards
+        run: python scripts/scout_responsible_party_arcgis_worker.py --self-test
+
+      - name: Probe authoritative ArcGIS sources
+        run: python scripts/scout_responsible_party_arcgis_worker.py --probe
+
+      - name: Process bounded remote responsible-party batch
+        env:
+          SUPABASE_URL: ${{ secrets.SCOUT_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SCOUT_SUPABASE_SERVICE_ROLE_KEY }}
+          SCOUT_RESPONSIBLE_PARTY_BATCH_SIZE: ${{ github.event_name == 'push' && '4' || github.event.inputs.batch_size || '8' }}
+        run: python scripts/scout_responsible_party_arcgis_worker.py
