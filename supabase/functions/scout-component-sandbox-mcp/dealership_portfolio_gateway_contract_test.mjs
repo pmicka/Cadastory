@@ -17,7 +17,7 @@ assert.ok(sharedSchema.includes('single_building_resolved'))
 assert.ok(sharedSchema.includes('multi_building_resolved'))
 assert.ok(sharedSchema.includes('unresolved'))
 
-assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v33'"))
+assert.ok(server.includes("const RESOURCE_URI = 'ui://scout/component-sandbox/v34'"))
 assert.ok(server.includes("const DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS = { z: 7, minX: 33, maxX: 34, minY: 49, maxY: 49 } as const"))
 assert.ok(server.includes('buildScoutDealershipPortfolioRasterFrame(dealershipMap, 280, 210'))
 assert.ok(server.includes('DEALERSHIP_PORTFOLIO_NARROW_TILE_BOUNDS.z'))
@@ -28,7 +28,7 @@ assert.ok(server.includes('DEALERSHIP_PORTFOLIO_TILE_BOUNDS'))
 
 for (const gateway of [connectGateway, contractGateway]) {
   assert.ok(gateway.includes('sandboxDealershipPortfolioMapSchema, sandboxDealershipPortfolioOpportunitySchema'))
-  assert.ok(gateway.includes("const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v33'"))
+  assert.ok(gateway.includes("const SANDBOX_RESOURCE_URI = 'ui://scout/component-sandbox/v34'"))
   assert.ok(gateway.includes("'ui://scout/component-sandbox/v29'"))
   assert.ok(gateway.includes("'dealership_group_portfolio'"))
   assert.ok(gateway.includes("opportunity_type:{type:'string',enum:['dealership_group_portfolio']}"))
