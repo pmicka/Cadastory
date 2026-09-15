@@ -4,7 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 const SLUG = 'collect-responsible-party-resolution'
 const MAX_BODY_BYTES = 32 * 1024
 const FETCH_TIMEOUT_MS = 12_000
-const MAX_HTML_BYTES = 1_200_000
+const MAX_SOURCE_BYTES = 1_200_000
 const MAX_CONCURRENCY = 4
 
 function serviceKey(): string {
@@ -33,6 +33,10 @@ type Job = {
   owner_lookup_url_template?: string | null
   source_authority: string
   source_url: string
+  profile_attributes?: O
+  lookup_latitude?: number | null
+  lookup_longitude?: number | null
+  lookup_address?: string | null
   candidate_keys?: string[]
 }
 
@@ -127,21 +131,30 @@ function parseJeffersonPva(html: string): ParsedProperty {
   }
 }
 
-async function fetchHtml(url: string) {
+async function fetchText(url: string, accept: string) {
   const parsed = new URL(url)
   if (parsed.protocol !== 'https:') throw new Error('responsible-party lookup requires HTTPS')
   const response = await fetch(parsed.toString(), {
     redirect: 'follow',
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: {
-      accept: 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5',
+      accept,
       'user-agent': 'Scout-by-Cadastory/1.0 property-party-evidence',
     },
   })
   if (!response.ok) throw new Error(`property source HTTP ${response.status}`)
   const contentLength = Number(response.headers.get('content-length') || 0)
-  if (contentLength > MAX_HTML_BYTES) throw new Error('property source response too large')
-  return (await response.text()).slice(0, MAX_HTML_BYTES)
+  if (contentLength > MAX_SOURCE_BYTES) throw new Error('property source response too large')
+  return (await response.text()).slice(0, MAX_SOURCE_BYTES)
+}
+
+async function fetchHtml(url: string) {
+  return fetchText(url, 'text/html,application/xhtml+xml;q=0.9,*/*;q=0.5')
+}
+
+async function fetchJson(url: string) {
+  const raw = await fetchText(url, 'application/json,text/plain;q=0.9,*/*;q=0.5')
+  try { return JSON.parse(raw) as O } catch { throw new Error('property source returned invalid JSON') }
 }
 
 async function complete(jobId: string, outcome: string, payload: O = {}) {
@@ -161,10 +174,7 @@ async function complete(jobId: string, outcome: string, payload: O = {}) {
   return result.data
 }
 
-async function processJob(job: Job) {
-  if (job.provider_kind !== 'pva_lrsn_html') {
-    return complete(job.id, 'needs_review', { error: `unsupported provider kind ${job.provider_kind}` })
-  }
+async function processJeffersonPva(job: Job) {
   if (!job.owner_lookup_url_template || !job.lookup_key) {
     return complete(job.id, 'needs_review', { error: 'owner lookup configuration incomplete' })
   }
@@ -205,6 +215,86 @@ async function processJob(job: Job) {
   })
 }
 
+async function processArcgisPointOwner(job: Job) {
+  const latitude = Number(job.lookup_latitude)
+  const longitude = Number(job.lookup_longitude)
+  const base = String(job.owner_lookup_url_template || '')
+  const attrs = job.profile_attributes || {}
+  const ownerField = String(attrs.owner_field || '')
+  const parcelField = String(attrs.parcel_id_field || '')
+  const querySr = Number(attrs.query_sr || 4326)
+
+  if (!base || !Number.isFinite(latitude) || !Number.isFinite(longitude) || !ownerField || !parcelField) {
+    return complete(job.id, 'needs_review', { error: 'ArcGIS owner lookup configuration incomplete' })
+  }
+  if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
+    return complete(job.id, 'needs_review', { error: 'ArcGIS owner lookup coordinates invalid' })
+  }
+
+  const queryUrl = new URL(base)
+  queryUrl.searchParams.set('where', '1=1')
+  queryUrl.searchParams.set('geometry', `${longitude},${latitude}`)
+  queryUrl.searchParams.set('geometryType', 'esriGeometryPoint')
+  queryUrl.searchParams.set('inSR', String(querySr))
+  queryUrl.searchParams.set('spatialRel', 'esriSpatialRelIntersects')
+  queryUrl.searchParams.set('outFields', `${parcelField},${ownerField}`)
+  queryUrl.searchParams.set('returnGeometry', 'false')
+  queryUrl.searchParams.set('f', 'json')
+
+  const payload = await fetchJson(queryUrl.toString())
+  if (payload?.error) {
+    throw new Error(`ArcGIS parcel query error: ${String(payload.error?.message || 'unknown').slice(0, 250)}`)
+  }
+  const features = Array.isArray(payload?.features) ? payload.features : []
+  if (features.length === 0) {
+    return complete(job.id, 'no_evidence', { error: 'public parcel point query returned no parcel' })
+  }
+  if (features.length !== 1) {
+    return complete(job.id, 'needs_review', { error: `public parcel point query returned ${features.length} parcels` })
+  }
+
+  const values = features[0]?.attributes && typeof features[0].attributes === 'object' ? features[0].attributes : {}
+  const owner = String(values?.[ownerField] ?? '').trim()
+  const parcelId = String(values?.[parcelField] ?? '').trim()
+  if (!owner) {
+    return complete(job.id, 'no_evidence', { error: 'public parcel point query returned no owner' })
+  }
+  if (!parcelId) {
+    return complete(job.id, 'needs_review', { error: 'public parcel point query returned no parcel identifier' })
+  }
+
+  return complete(job.id, 'completed', {
+    party_name: owner,
+    site_address: job.lookup_address || null,
+    parcel_id: parcelId,
+    source_url: job.source_url || base,
+    source_authority: job.source_authority,
+    observed_on: null,
+    attributes: {
+      provider_kind: job.provider_kind,
+      lookup_key: job.lookup_key,
+      parcel_match_method: 'authoritative_arcgis_point_intersection',
+      lookup_latitude: latitude,
+      lookup_longitude: longitude,
+      query_sr: querySr,
+      owner_field: ownerField,
+      parcel_id_field: parcelField,
+      public_detail_fields_only: true,
+      bulk_mirror: false,
+      source_media_retained: false,
+      buyer_authority_not_implied: true,
+      property_manager_not_implied: true,
+      operator_not_implied: true,
+    },
+  })
+}
+
+async function processJob(job: Job) {
+  if (job.provider_kind === 'pva_lrsn_html') return processJeffersonPva(job)
+  if (job.provider_kind === 'arcgis_point_owner') return processArcgisPointOwner(job)
+  return complete(job.id, 'needs_review', { error: `unsupported provider kind ${job.provider_kind}` })
+}
+
 async function authorized(req: Request) {
   const key = req.headers.get('x-scout-key') || ''
   if (!key) return false
@@ -238,16 +328,17 @@ async function processBatch(jobs: Job[]) {
     const outcomes = await Promise.all(group.map(async job => {
       try {
         const result = await processJob(job)
-        return { job_id: job.id, lookup_key: job.lookup_key, status: 'succeeded', result }
+        return { job_id: job.id, lookup_key: job.lookup_key, provider_kind: job.provider_kind, status: 'succeeded', result }
       } catch (error) {
         const message = err(error)
         try {
           const result = await complete(job.id, 'failed', { error: message })
-          return { job_id: job.id, lookup_key: job.lookup_key, status: 'succeeded', result, worker_error: message }
+          return { job_id: job.id, lookup_key: job.lookup_key, provider_kind: job.provider_kind, status: 'succeeded', result, worker_error: message }
         } catch (completionError) {
           return {
             job_id: job.id,
             lookup_key: job.lookup_key,
+            provider_kind: job.provider_kind,
             status: 'failed',
             error: `${message}; failure completion also failed: ${err(completionError)}`,
           }
@@ -290,6 +381,7 @@ Deno.serve(async (req: Request) => {
     const summary = {
       outcome,
       counts: { attempted: jobs.length, succeeded, failed: failed.length },
+      providers: [...new Set(jobs.map(x => x.provider_kind))],
       errors: failed.map(x => x.error).slice(0, 10),
     }
     await finishRun(runId, outcome, httpStatus, summary)
