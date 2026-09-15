@@ -19,6 +19,53 @@ export function makePortfolioPayload(type) {
 
   const hotel = type === 'hotel_management_portfolio'
   if (!hotel && type !== 'dealership_group_portfolio') throw new Error(`No portfolio fixture registered for ${type}`)
+
+  const resolvedMembers = hotel
+    ? [
+        {
+          id: '00000000-0000-4000-8000-000000000001',
+          name: 'Residence Inn Louisville Airport',
+          address: '700 Phillips Ln', city: 'Louisville', state_code: 'KY', brands: ['Residence Inn by Marriott'],
+          point: { type: 'Point', coordinates: [-85.744392935, 38.190277203] },
+          resolution_state: 'single_building_resolved', resolved_building_count: 1, link_confidence: 0.99,
+          within_pilot_radius: true, observed_at: '2026-09-15T11:00:00Z',
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000002',
+          name: 'Courtyard Cincinnati Airport',
+          address: '3990 Olympic Blvd', city: 'Erlanger', state_code: 'KY', brands: ['Courtyard by Marriott'],
+          point: { type: 'Point', coordinates: [-84.628490281, 39.052913717] },
+          resolution_state: 'single_building_resolved', resolved_building_count: 1, link_confidence: 0.99,
+          within_pilot_radius: true, observed_at: '2026-09-15T11:00:00Z',
+        },
+      ]
+    : [
+        {
+          id: '00000000-0000-4000-8000-000000000001',
+          name: 'Don Franklin Hardin County Ford',
+          address: '461 S Dixie Blvd', city: 'Radcliff', state_code: 'KY', brands: ['Ford'],
+          point: { type: 'Point', coordinates: [-85.934878659, 37.835096407] },
+          resolution_state: 'single_building_resolved', resolved_building_count: 1, link_confidence: 0.99,
+          within_pilot_radius: true, observed_at: '2026-09-15T11:00:00Z',
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000002',
+          name: 'Don Franklin Campbellsville Chevrolet GMC',
+          address: '200 N Bypass Rd', city: 'Campbellsville', state_code: 'KY', brands: ['Chevrolet', 'GMC'],
+          point: { type: 'Point', coordinates: [-85.361848036, 37.345356171] },
+          resolution_state: 'single_building_resolved', resolved_building_count: 1, link_confidence: 0.99,
+          within_pilot_radius: true, observed_at: '2026-09-15T11:00:00Z',
+        },
+        {
+          id: '00000000-0000-4000-8000-000000000003',
+          name: 'Genesis of Lexington',
+          address: '3390 Richmond Rd', city: 'Lexington', state_code: 'KY', brands: ['Genesis'],
+          point: { type: 'Point', coordinates: [-84.441854524, 37.996077895] },
+          resolution_state: 'single_building_resolved', resolved_building_count: 1, link_confidence: 0.99,
+          within_pilot_radius: true, observed_at: '2026-09-15T11:00:00Z',
+        },
+      ]
+
   return {
     contract_version: hotel ? 'hotel_management_portfolio_map_v1' : 'dealership_group_portfolio_map_v1',
     account_name: hotel ? 'Commonwealth Hotels' : 'Don Franklin Auto',
@@ -37,17 +84,9 @@ export function makePortfolioPayload(type) {
     vendor_route_proven: false,
     current_need_scan_complete: true,
     members: [
+      ...resolvedMembers,
       {
-        id: '00000000-0000-4000-8000-000000000001',
-        name: hotel ? 'Hampton Inn Louisville Airport' : 'Don Franklin Lexington Nissan',
-        address: '1 Resolved Way', city: hotel ? 'Louisville' : 'Lexington', state_code: 'KY',
-        brands: hotel ? ['Hampton by Hilton'] : ['Nissan'],
-        point: { type: 'Point', coordinates: hotel ? [-85.743168701, 38.190898942] : [-84.442756947, 37.996630551] },
-        resolution_state: 'single_building_resolved', resolved_building_count: 1, link_confidence: 0.99,
-        within_pilot_radius: true, observed_at: '2026-09-15T11:00:00Z',
-      },
-      {
-        id: '00000000-0000-4000-8000-000000000002',
+        id: '00000000-0000-4000-8000-000000000099',
         name: hotel ? 'Tru by Hilton Louisville Airport' : 'Don Franklin Lexington Hyundai',
         address: '2 Unresolved Way', city: hotel ? 'Louisville' : 'Lexington', state_code: 'KY',
         brands: hotel ? ['Tru by Hilton'] : ['Hyundai'],
