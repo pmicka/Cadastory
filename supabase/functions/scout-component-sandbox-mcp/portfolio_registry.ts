@@ -26,6 +26,12 @@ import {
   normalizeScoutSandboxSchoolDistrictPortfolioOpportunity,
 } from './school_district_portfolio_map_model.ts'
 import { buildScoutSchoolDistrictPortfolioRasterFrame } from './school_district_portfolio_map_renderer.ts'
+import {
+  buildScoutSandboxMunicipalFacilitiesPortfolioOpportunity,
+  normalizeScoutSandboxMunicipalFacilitiesPortfolioMap,
+  normalizeScoutSandboxMunicipalFacilitiesPortfolioOpportunity,
+} from './municipal_facilities_portfolio_map_model.ts'
+import { buildScoutMunicipalFacilitiesPortfolioRasterFrame } from './municipal_facilities_portfolio_map_renderer.ts'
 
 export const SCOUT_SANDBOX_PORTFOLIO_IMPLEMENTATIONS = {
   water_utility_portfolio: {
@@ -63,6 +69,15 @@ export const SCOUT_SANDBOX_PORTFOLIO_IMPLEMENTATIONS = {
     identityMatches: (map: any, opportunity: any) => map.account_name === opportunity.name && map.district_key === opportunity.district_key && map.member_count === opportunity.member_count,
     responseText: (opportunity: any) => `Scout returned the bounded ${opportunity.name} school-district portfolio card with ${opportunity.member_count} documented NCES school facilities and a district-level DLGF roof capital-plan signal.`,
     ariaLabel: (map: any) => `Documented public-school facility portfolio map for ${map.account_name}`,
+  },
+  municipal_facilities_portfolio: {
+    normalizeMap: normalizeScoutSandboxMunicipalFacilitiesPortfolioMap,
+    normalizeOpportunity: normalizeScoutSandboxMunicipalFacilitiesPortfolioOpportunity,
+    buildOpportunity: buildScoutSandboxMunicipalFacilitiesPortfolioOpportunity,
+    buildRasterFrame: buildScoutMunicipalFacilitiesPortfolioRasterFrame,
+    identityMatches: (map: any, opportunity: any) => map.account_name === opportunity.name && map.member_count === opportunity.member_count && map.signaled_member_count === opportunity.signaled_member_count,
+    responseText: (opportunity: any) => `Scout returned the bounded ${opportunity.name} municipal-facilities portfolio card with ${opportunity.member_count} documented civic locations and ${opportunity.signaled_member_count} member-specific cleaning-need proxy.`,
+    ariaLabel: (map: any) => `Documented municipal civic-facility portfolio map for ${map.account_name}`,
   },
 } as const
 

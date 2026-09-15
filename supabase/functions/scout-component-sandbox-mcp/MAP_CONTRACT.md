@@ -321,3 +321,8 @@ The following deprecated/host-specific patterns must not re-enter the current sa
 - `openai/widgetDescription`
 - `openai/widgetCSP`
 - other OpenAI-specific resource/tool metadata used by prior map iterations
+
+
+## Municipal facilities portfolio contract (owner-approved 2026-09-15)
+
+The `municipal_facilities_portfolio` implementation is governed by `MUNICIPAL_FACILITIES_PORTFOLIO_MAP_CONTRACT.md`. It renders a bounded official Louisville Metro civic-location subset with exact-address structure geometry. Only the Judicial Center member carries the linked cleaning-need proxy; the map must not visually or textually transfer that signal to other members. The registered raster tiles remain a closed allowlist derived from the canonical 456x210 and 280x210 frames.

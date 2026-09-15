@@ -40,7 +40,9 @@ assert.ok(component.includes('registerAppTool('), 'component must register the M
 assert.ok(component.includes('registerAppResource('), 'component must register the MCP Apps resource')
 assert.ok(component.includes('for (const compatibilityUri of COMPATIBILITY_RESOURCE_URIS)'), 'component must register compatibility resources from policy')
 assert.ok(component.includes("_meta: { ui: { resourceUri: RESOURCE_URI } }"), 'tool must advertise the registered UI resource')
-assert.ok(component.includes("outputSchema: z.discriminatedUnion('opportunity_type', SCOUT_SANDBOX_OPPORTUNITY_TYPES.map"), 'component output schema must follow the registry')
+assert.ok(component.includes('inputSchema: componentInputSchema'), 'component input schema must use shared contract schema')
+assert.ok(component.includes('outputSchema: componentOutputSchema'), 'component output schema must use shared contract schema')
+assert.ok(component.includes('fromJsonSchema(sandboxResultSchema())'), 'component output validator must derive from shared JSON schema')
 for (const gateway of [contractGateway, connectGateway]) {
   assert.ok(gateway.includes('sandboxOpportunityTypeInputSchema()'), 'gateway tools/list input schema must use shared contract schema')
   assert.ok(gateway.includes('sandboxResultSchema()'), 'gateway tools/list output schema must use shared contract schema')
@@ -55,6 +57,7 @@ const smokeTestByType = {
   dealership_group_portfolio: 'dealership_portfolio_map_renderer_test.mjs',
   hotel_management_portfolio: 'hotel_portfolio_map_renderer_test.mjs',
   school_district_portfolio: 'school_district_portfolio_map_renderer_test.mjs',
+  municipal_facilities_portfolio: 'municipal_facilities_portfolio_map_renderer_test.mjs',
 }
 assert.deepEqual(Object.keys(smokeTestByType), registered, 'every registered sandbox type must have one canonical smoke fixture')
 

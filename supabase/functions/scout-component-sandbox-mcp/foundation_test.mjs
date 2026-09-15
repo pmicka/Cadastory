@@ -41,9 +41,11 @@ assert.equal(server.includes("scout_get_component_sandbox_map_targets_v3_interna
 assert.ok(server.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"));
 assert.ok(server.includes("scout_get_component_sandbox_water_tank_map_v1_internal"));
 assert.equal(server.includes("names: z.array"), false);
-assert.ok(server.includes("premiumOpportunitySchema"));
-assert.ok(server.includes("waterTankOpportunitySchema"));
-assert.ok(server.includes("z.discriminatedUnion(\'opportunity_type\'"));
+assert.ok(server.includes("fromJsonSchema(sandboxOpportunityTypeInputSchema())"));
+assert.ok(server.includes("fromJsonSchema(sandboxResultSchema())"));
+assert.ok(server.includes("inputSchema: componentInputSchema"));
+assert.ok(server.includes("outputSchema: componentOutputSchema"));
+assert.equal(server.includes("componentResultSchemaByType"), false);
 assert.ok(server.includes("csp: { resourceDomains: [MAP_TILE_ORIGIN] }"));
 assert.ok(connectGateway.includes('SCOUT_SANDBOX_OPPORTUNITY_TYPES'));
 assert.ok(contractGateway.includes('SCOUT_SANDBOX_OPPORTUNITY_TYPES'));
