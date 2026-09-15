@@ -113,6 +113,36 @@ These deferrals suppress only this responsible-party parcel resolver for the aff
 
 This distinction also prevents high-priority no-match parcels from monopolizing every seed window and starving lower-priority resolvable candidates.
 
+## Documented manager and operator lane
+
+Scout may also derive site-responsibility evidence from current first-party portfolio sources that explicitly document management or operation of a site.
+
+A strong current `property_manager` relationship may enter the named-responsibility lane when the opportunity is otherwise unresolved. This does **not** establish that the manager owns the property or has purchasing authority for the relevant service.
+
+A strong current `operator` relationship is evidence-only. Operator evidence must not be auto-promoted into buyer identity or buyer hints.
+
+Address-based matching for this lane requires exact normalized site address plus state, or a stronger canonical property/building link. Ambiguous multi-organization matches fail closed.
+
+## Manager contact-research projection boundary
+
+Documented property managers may be researched for durable public facilities, maintenance, procurement, vendor, or general organizational contact routes. This is still research only; Scout does not send messages, submit forms, place calls, register vendors, or otherwise contact the organization.
+
+Manager-contact research may reuse the bounded `buyer_organization_contact_v1` worker engine only when buyer projection is structurally suppressed.
+
+The generic table:
+
+- `research.document_evidence_job_candidates`
+
+is a buyer-identity projection boundary. Jobs linked through it can participate in downstream buyer restoration and projection. **Manager-only contact research must not use that table.**
+
+Instead, manager-contact jobs use:
+
+- `research.responsible_party_contact_job_candidates`
+
+and keep the opportunity association separate from buyer projection. The job context must record `research_domain=responsible_party_contact`, `responsibility_role=property_manager`, `identity_projection=suppressed`, and `buyer_authority_not_implied=true`.
+
+A successful manager-contact job may add defensible public routes to the known manager organization in `core.organization_contact_points`. It must not change the opportunity's buyer identity, buyer-resolution state, or purchasing-authority semantics merely because a manager contact route was found.
+
 ## Worker contracts
 
 `collect-responsible-party-resolution` is an internal authenticated Edge Function for the local Jefferson lane. It uses Scout's established `x-scout-key` custom authentication and intentionally retains the existing `verify_jwt:false` posture because authentication is enforced in-function.
@@ -142,6 +172,8 @@ Deployment verification should include:
 7. verify the seeder advances across the backlog rather than repeatedly selecting the same no-match candidates;
 8. confirm unauthorized Edge Function access returns `401` for Edge-hosted lanes; and
 9. run the standard Scout architecture assertions.
+
+For manager-contact research, acceptance additionally requires proving that successful contact-route extraction leaves buyer identity and buyer queue state unchanged and that no `research.document_evidence_job_candidates` rows are created for `responsible_party_contact` jobs.
 
 Required assertions:
 
