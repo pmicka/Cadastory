@@ -105,4 +105,13 @@ for test_path in component_dir.glob('*_integration_test.mjs'):
 if removed_uri_assertions < 7:
     raise RuntimeError(f'expected historical compatibility URI copies outside the water integration block, removed only {removed_uri_assertions}')
 
-print(f'Tightened bootstrap transforms; replaced {selector_replacements} selector copies and removed {removed_uri_assertions} historical compatibility URI assertions.')
+# Wrapper-specific integration suites must verify registry exposure, not require each wrapper source to repeat one opportunity slug.
+swppp_integration_path = component_dir / 'swppp_site_map_integration_test.mjs'
+swppp_integration = swppp_integration_path.read_text()
+old_swppp_wrapper_assert = "  assert.ok(source.includes('swppp_site'))"
+new_swppp_wrapper_assert = "  assert.ok(source.includes('SCOUT_SANDBOX_OPPORTUNITY_TYPES'))"
+if swppp_integration.count(old_swppp_wrapper_assert) != 1:
+    raise RuntimeError('expected one SWPPP literal wrapper-slug assertion')
+swppp_integration_path.write_text(swppp_integration.replace(old_swppp_wrapper_assert, new_swppp_wrapper_assert))
+
+print(f'Tightened bootstrap transforms; replaced {selector_replacements} selector copies, removed {removed_uri_assertions} historical compatibility URI assertions, and removed the SWPPP wrapper-slug copy.')
