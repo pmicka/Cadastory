@@ -28,6 +28,7 @@ jobs:
           python3 scripts/patch_municipal_foundation.py
           python3 scripts/patch_municipal_schema_tests.py
           python3 scripts/patch_municipal_all_schema_assertions.py
+          python3 scripts/patch_municipal_discriminated_assertions.py
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
