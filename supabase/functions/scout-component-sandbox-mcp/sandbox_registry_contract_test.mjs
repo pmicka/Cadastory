@@ -33,6 +33,9 @@ for (const source of [contractGateway, connectGateway]) {
   assert.equal(source.includes("enum:['premium_exterior','water_tank','swppp_site','water_utility_portfolio','dealership_group_portfolio','hotel_management_portfolio']"), false)
 }
 assert.ok(component.includes('SCOUT_SANDBOX_PORTFOLIO_MANIFEST'))
+assert.ok(component.includes("fromJsonSchema(sandboxOpportunityTypeInputSchema())"))
+assert.ok(component.includes("fromJsonSchema(sandboxResultSchema())"))
+assert.equal(component.includes('componentResultSchemaByType'), false)
 assert.ok(component.includes('scoutSandboxPortfolioImplementation'))
 assert.ok(view.includes('isScoutSandboxOpportunityType'))
 assert.ok(view.includes('isScoutSandboxPortfolioType'))

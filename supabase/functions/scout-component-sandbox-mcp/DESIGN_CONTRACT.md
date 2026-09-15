@@ -131,3 +131,8 @@ The generated View must continue to have exactly one `<!doctype html>`, contain 
 ## Owner-approved Warren portfolio marker refinement — 2026-09-14
 
 Within the existing map media tile, the Warren County portfolio uses flat 2D circular markers with no drop shadow. Fill color encodes documented WRIS tank form; historical rehab and documented not-in-service states use non-color ring/hollow marker cues. A compact in-map legend is approved because the color encoding would otherwise be ambiguous. This does not authorize a new card section or generalized portfolio-map redesign.
+
+
+## Municipal facilities portfolio extension (owner-approved 2026-09-15)
+
+`municipal_facilities_portfolio` is approved as the next bounded portfolio map. Its first exemplar is Louisville Metro Government. The implementation must preserve the existing card geometry and three-slide carousel; exactly one slide remains the map. Municipal location membership, geometry evidence, ownership/maintenance responsibility, and member-specific opportunity signals are separate claims and must never be collapsed into one another.
