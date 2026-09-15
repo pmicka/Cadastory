@@ -23,13 +23,15 @@ import {
 } from './dealership_portfolio_map_model.ts'
 import { mountScoutDealershipPortfolioMap } from './dealership_portfolio_map_mount.ts'
 import { buildScoutDealershipPortfolioRasterFrame } from './dealership_portfolio_map_renderer.ts'
+import { normalizeScoutSandboxHotelPortfolioMap, normalizeScoutSandboxHotelPortfolioOpportunity } from './hotel_portfolio_map_model.ts'
+import { mountScoutHotelPortfolioMap } from './hotel_portfolio_map_mount.ts'
 
 type ScoutMapHandle = {
   destroy: () => void
   resize: () => void
 }
 
-type ScoutViewOpportunityType = ScoutSandboxOpportunityType | 'water_utility_portfolio' | 'dealership_group_portfolio'
+type ScoutViewOpportunityType = ScoutSandboxOpportunityType | 'water_utility_portfolio' | 'dealership_group_portfolio' | 'hotel_management_portfolio'
 
 const SCOUT_RASTER_TILE_TEMPLATE = 'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png'
 const SCOUT_RASTER_ATTRIBUTION_LABEL = '© OpenStreetMap contributors · HOT'
@@ -71,7 +73,7 @@ function cleanNumber(value: unknown, minimum: number, maximum: number) {
 }
 
 function normalizeEmbeddedTiles(value: unknown) {
-  if (!Array.isArray(value) || value.length > 32) return undefined
+  if (!Array.isArray(value) || value.length > 40) return undefined
   const tiles: Record<string, string> = {}
   for (const item of value) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) return undefined
@@ -175,6 +177,23 @@ function renderUnavailableOpportunity() {
 }
 
 function renderOpportunity(opportunityType: ScoutViewOpportunityType, value: unknown) {
+  if (opportunityType === 'hotel_management_portfolio') {
+    const opportunity = normalizeScoutSandboxHotelPortfolioOpportunity(value)
+    if (!opportunity) { renderUnavailableOpportunity(); return }
+    if (title) title.textContent = opportunity.name
+    if (tier) tier.textContent = 'Portfolio evidence'
+    if (meta) meta.textContent = `${formatNumber(opportunity.member_count)} documented operating hotels  •  First-party management roster observed ${formatObserved(opportunity.observed_at)}`
+    if (address) address.textContent = 'Kentucky pilot hotel portfolio'
+    if (summary) {
+      const route = opportunity.operations_route_available && opportunity.procurement_route_available ? 'Operations + procurement routes available' : opportunity.contact_route_available ? 'Contact route available; account purchasing route incomplete' : 'Account route unresolved'
+      const vendor = opportunity.vendor_route_proven ? 'vendor route documented' : 'vendor route not yet proven'
+      summary.textContent = `${formatNumber(opportunity.resolved_member_count)} hotels physically crosswalked  •  ${formatNumber(opportunity.resolved_building_count)} resolved buildings  •  ${formatNumber(opportunity.unresolved_member_count)} roster sites not mapped  •  ${route}; ${vendor}  •  ${opportunity.why_investigate}`
+    }
+    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
+    setState(`Scout portfolio ready: ${opportunity.name}`)
+    return
+  }
+
   if (opportunityType === 'dealership_group_portfolio') {
     const opportunity = normalizeScoutSandboxDealershipPortfolioOpportunity(value)
     if (!opportunity) {
@@ -282,7 +301,7 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
   const generation = ++mapGeneration
   let ready = false
   mapState.hidden = false
-  mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Loading portfolio map…' : 'Loading site map…'
+  mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio' || opportunityType === 'hotel_management_portfolio') ? 'Loading portfolio map…' : 'Loading site map…'
 
   const mapOptions = {
     tileUrlTemplate: SCOUT_RASTER_TILE_TEMPLATE,
@@ -293,14 +312,20 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
       ready = true
       mapState.hidden = true
       if (opportunityType === 'swppp_site') { diagnostic({ viewReady: true }); diagnosticOverlay(mapState) }
-      if (opportunityType === 'dealership_group_portfolio') { diagnostic({ dealershipReady: true, dealershipError: 'none' }); diagnosticOverlay(mapState) }
-      setState((opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Scout portfolio map ready' : 'Scout site map ready')
+      if (opportunityType === 'hotel_management_portfolio') {
+      const normalized = normalizeScoutSandboxHotelPortfolioMap(value)
+      if (!normalized) { mapState.textContent = 'Portfolio map unavailable'; setState('Scout hotel portfolio map result failed validation'); return }
+      mapContainer.setAttribute('role','img')
+      mapContainer.setAttribute('aria-label', `Documented hotel portfolio map for ${normalized.account_name}`)
+      mapHandle = mountScoutHotelPortfolioMap(mapContainer, normalized, { ...mapOptions, embeddedTiles })
+    } else if (opportunityType === 'dealership_group_portfolio') { diagnostic({ dealershipReady: true, dealershipError: 'none' }); diagnosticOverlay(mapState) }
+      setState((opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio' || opportunityType === 'hotel_management_portfolio') ? 'Scout portfolio map ready' : 'Scout site map ready')
     },
     onError: (error: Error) => {
       if (generation !== mapGeneration) return
       if (!ready) {
         mapState.hidden = false
-        mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Portfolio map unavailable' : 'Site map unavailable'
+        mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio' || opportunityType === 'hotel_management_portfolio') ? 'Portfolio map unavailable' : 'Site map unavailable'
       }
       if (opportunityType === 'swppp_site') { diagnostic({ viewError: true }); diagnosticOverlay(mapState) }
       if (opportunityType === 'dealership_group_portfolio') { diagnostic({ dealershipReady: false, dealershipError: error.message.slice(0, 180) }); diagnosticOverlay(mapState) }
@@ -370,7 +395,7 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
     scheduleLayoutRefresh()
   } catch (error) {
     mapState.hidden = false
-    mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio') ? 'Portfolio map unavailable' : 'Site map unavailable'
+    mapState.textContent = (opportunityType === 'water_utility_portfolio' || opportunityType === 'dealership_group_portfolio' || opportunityType === 'hotel_management_portfolio') ? 'Portfolio map unavailable' : 'Site map unavailable'
     if (opportunityType === 'swppp_site') { diagnostic({ initialization: 'failed', initializationError: diagnosticError(error) }); diagnosticOverlay(mapState) }
     setState(`Scout map initialization failed: ${error instanceof Error ? error.message : String(error)}`)
   }
@@ -431,7 +456,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.13.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.14.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
