@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 path = Path(__file__).with_name('bootstrap_sandbox_registry_hardening.py')
 text = path.read_text()
@@ -62,7 +63,7 @@ for test_path in component_dir.glob('*_test.mjs'):
 if selector_replacements < 2:
     raise RuntimeError(f'expected at least two duplicated selector assertions, found {selector_replacements}')
 
-# Compatibility aliases are generated from one resource-version policy; integration tests must not recopy historical URI lists.
+# Compatibility aliases are generated from one resource-version policy; tests must not recopy historical URI lists.
 integration_path = component_dir / 'water_tank_map_integration_test.mjs'
 integration = integration_path.read_text()
 old_compat_block = """for (const source of [server, connectGateway, contractGateway]) {
@@ -93,4 +94,15 @@ integration = integration.replace(old_compat_block, new_compat_block)
 integration = integration.replace("assert.ok(view.includes(\"version: '2.14.0'\"))", "assert.ok(view.includes('isScoutSandboxOpportunityType'))")
 integration_path.write_text(integration)
 
-print(f'Tightened bootstrap transforms and replaced {selector_replacements} duplicated selector assertions plus compatibility alias copies.')
+uri_assertion = re.compile(r"^\s*assert\.ok\(source\.includes\('ui://scout/component-sandbox/v\d+'\)\)\s*$", re.MULTILINE)
+removed_uri_assertions = 0
+for test_path in component_dir.glob('*_integration_test.mjs'):
+    source = test_path.read_text()
+    source, removed = uri_assertion.subn('', source)
+    if removed:
+        removed_uri_assertions += removed
+        test_path.write_text(source)
+if removed_uri_assertions < 7:
+    raise RuntimeError(f'expected historical compatibility URI copies outside the water integration block, removed only {removed_uri_assertions}')
+
+print(f'Tightened bootstrap transforms; replaced {selector_replacements} selector copies and removed {removed_uri_assertions} historical compatibility URI assertions.')
