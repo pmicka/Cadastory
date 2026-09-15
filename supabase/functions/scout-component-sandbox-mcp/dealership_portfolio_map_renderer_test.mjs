@@ -99,6 +99,17 @@ assert.equal(normalized.procurement_route_available,false)
 assert.equal(normalized.vendor_route_proven,false)
 assert.equal(normalized.current_need_scan_complete,true)
 
+const hostProjectedPayload = structuredClone(rawPayload)
+for (const member of hostProjectedPayload.members) {
+  if (member.resolution_state === 'unresolved') delete member.link_confidence
+}
+const hostProjected = normalizeScoutSandboxDealershipPortfolioMap(hostProjectedPayload)
+assert.ok(hostProjected)
+assert.equal(hostProjected.members.filter((member)=>member.resolution_state==='unresolved').every((member)=>member.link_confidence===null), true)
+const invalidResolvedProjection = structuredClone(rawPayload)
+delete invalidResolvedProjection.members[0].link_confidence
+assert.equal(normalizeScoutSandboxDealershipPortfolioMap(invalidResolvedProjection), null)
+
 const opportunity=buildScoutSandboxDealershipPortfolioOpportunity(normalized)
 assert.equal(opportunity.name,'Don Franklin Auto')
 assert.equal(opportunity.member_count,11)

@@ -43,8 +43,9 @@ const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
-const RESOURCE_URI = 'ui://scout/component-sandbox/v32'
+const RESOURCE_URI = 'ui://scout/component-sandbox/v33'
 const COMPATIBILITY_RESOURCE_URIS = [
+  'ui://scout/component-sandbox/v32',
   'ui://scout/component-sandbox/v31',
   'ui://scout/component-sandbox/v30',
   'ui://scout/component-sandbox/v29',
@@ -561,7 +562,7 @@ const dealershipPortfolioResultSchema = z.object({
 })
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.2' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.3' })
 
   registerAppResource(
     server,
@@ -593,7 +594,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27' || compatibilityUri === 'ui://scout/component-sandbox/v28' || compatibilityUri === 'ui://scout/component-sandbox/v29' || compatibilityUri === 'ui://scout/component-sandbox/v30' || compatibilityUri === 'ui://scout/component-sandbox/v31')
+          text: ((compatibilityUri === 'ui://scout/component-sandbox/v22' || compatibilityUri === 'ui://scout/component-sandbox/v23' || compatibilityUri === 'ui://scout/component-sandbox/v24' || compatibilityUri === 'ui://scout/component-sandbox/v25' || compatibilityUri === 'ui://scout/component-sandbox/v26' || compatibilityUri === 'ui://scout/component-sandbox/v27' || compatibilityUri === 'ui://scout/component-sandbox/v28' || compatibilityUri === 'ui://scout/component-sandbox/v29' || compatibilityUri === 'ui://scout/component-sandbox/v30' || compatibilityUri === 'ui://scout/component-sandbox/v31' || compatibilityUri === 'ui://scout/component-sandbox/v32')
             ? await loadScoutViewHtml()
             : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
             .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),
