@@ -22,7 +22,8 @@ for (const source of [server, connect, gateway]) {
   assert.equal(source.includes('scout_get_component_sandbox_names_v1_internal'), false)
 }
 assert.ok(server.includes('scout_get_component_sandbox_swppp_site_map_v1_internal'))
-assert.ok(server.includes("z.discriminatedUnion('opportunity_type'"))
+assert.ok(server.includes("outputSchema: componentOutputSchema"))
+assert.ok(server.includes("fromJsonSchema(sandboxResultSchema())"))
 assert.ok(contract.includes('ScoutSandboxSwpppSiteResult'))
 assert.ok(view.includes('normalizeScoutSandboxSwpppSiteOpportunity'))
 assert.ok(view.includes('mountScoutSwpppSiteMap'))

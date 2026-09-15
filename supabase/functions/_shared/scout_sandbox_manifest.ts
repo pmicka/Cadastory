@@ -1,4 +1,4 @@
-export const SCOUT_SANDBOX_RESOURCE_VERSION = 36 as const
+export const SCOUT_SANDBOX_RESOURCE_VERSION = 37 as const
 export const SCOUT_SANDBOX_RESOURCE_URI = `ui://scout/component-sandbox/v${SCOUT_SANDBOX_RESOURCE_VERSION}` as const
 export const SCOUT_SANDBOX_EMBEDDED_RASTER_COMPATIBILITY_MIN_VERSION = 22 as const
 export const SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES = 40 as const
@@ -14,6 +14,7 @@ export const SCOUT_SANDBOX_PORTFOLIO_TYPES = [
   'dealership_group_portfolio',
   'hotel_management_portfolio',
   'school_district_portfolio',
+  'municipal_facilities_portfolio',
 ] as const
 
 export const SCOUT_SANDBOX_OPPORTUNITY_TYPES = [
@@ -133,6 +134,18 @@ export const SCOUT_SANDBOX_OPPORTUNITY_MANIFEST = {
     tileCenters: [],
     rpc: 'scout_get_component_sandbox_school_portfolio_v1_internal',
     contractVersion: 'school_district_portfolio_map_v1',
+  },
+  municipal_facilities_portfolio: {
+    slug: 'municipal_facilities_portfolio',
+    label: 'Louisville Metro municipal facilities portfolio',
+    mapKind: 'portfolio',
+    markerSemantics: 'official Louisville Metro civic-location subset with exact-address geometry; the Judicial Center alone carries a linked site-specific cleaning proxy',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }, { width: 280, height: 210 }],
+    tileRanges: [{ z: 12, minX: 1071, maxX: 1073, minY: 1576, maxY: 1576 }],
+    tileCenters: [],
+    rpc: 'scout_get_component_sandbox_municipal_portfolio_v1_internal',
+    contractVersion: 'municipal_facilities_portfolio_map_v1',
   },
 } as const satisfies Record<ScoutSandboxOpportunityType, ScoutSandboxOpportunityManifestEntry | ScoutSandboxPortfolioManifestEntry>
 

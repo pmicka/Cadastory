@@ -32,6 +32,21 @@ export function makePortfolioPayload(type) {
     }
   }
 
+  if (type === 'municipal_facilities_portfolio') {
+    return {
+      contract_version:'municipal_facilities_portfolio_map_v1',account_name:'Louisville Metro Government',organization_id:'1caf010b-5ac3-4fca-bf76-d6eefbb192ae',scope:'documented_civic_location_subset',facility_source_slug:'louisville-metro-government-locations',geometry_source_slug:'fema-usa-structures-current',signal_source_kind:'scout_opportunity_search_spine',relationship:'official_government_location_listing',generated_at:'2026-09-15T21:45:00Z',facility_observed_at:'2026-09-15T21:40:00Z',geometry_observed_at:'2026-09-06T04:27:38.317951Z',signal_observed_at:'2026-09-15T21:27:10.874840Z',
+      members:[
+        ['city-hall','City Hall','601 West Jefferson Street',-85.7608333212202,38.2546422629059,'no_site_signal_linked'],
+        ['metrosafe-building','MetroSafe Building','410 S. 5th Street',-85.7592591792784,38.2529485594949,'no_site_signal_linked'],
+        ['police-headquarters','Police Headquarters','601 W. Chestnut Street',-85.7619630633563,38.2497496557364,'no_site_signal_linked'],
+        ['records-management-archives','Records Management & Archives','635 Industry Road',-85.7740749981969,38.2214560226262,'no_site_signal_linked'],
+        ['health-wellness','Health & Wellness','400 East Gray Street',-85.7465172343292,38.246038944962,'no_site_signal_linked'],
+        ['judicial-center','Judicial Center','700 West Jefferson Street',-85.761753796353,38.253918943988,'site_signal_present'],
+      ].map(([id,name,address,lon,lat,signal_state])=>({id,name,address,city:'Louisville',state_code:'KY',point:{type:'Point',coordinates:[lon,lat]},geometry_source_slug:'fema-usa-structures-current',geometry_match_method:'exact_address',signal_state,observed_at:'2026-09-15T21:40:00Z'})),
+      member_signals:[{id:'exterior_cleaning:7c890eed-6773-48be-b96e-0aecb646719b',kind:'member_cleaning_need_proxy',member_id:'judicial-center',member_name:'Judicial Center',signal_strength:'medium',confidence:0.52,why_now:'Moderate proximity to an operating distillery/ethanol-vapor anchor. Use as prospecting/inspection evidence only until visible staining is verified.',procurement_status:'procurement_route_available',buyer_contact_status:'durable_route_available',site_attribution:'judicial_center_only',observed_at:'2026-09-13T11:20:00.076105Z',refreshed_at:'2026-09-15T21:27:10.874840Z'}],
+    }
+  }
+
   const hotel = type === 'hotel_management_portfolio'
   if (!hotel && type !== 'dealership_group_portfolio') throw new Error(`No portfolio fixture registered for ${type}`)
 
