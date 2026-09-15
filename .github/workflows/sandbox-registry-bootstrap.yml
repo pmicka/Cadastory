@@ -24,7 +24,16 @@ jobs:
       - name: Tighten bootstrap matchers
         run: python3 scripts/repair_sandbox_bootstrap.py
       - name: Apply bounded architecture refactor
-        run: python3 scripts/bootstrap_sandbox_registry_hardening.py
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 scripts/bootstrap_sandbox_registry_hardening.py 2>&1 | tee sandbox-bootstrap.log
+      - name: Upload bootstrap diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sandbox-bootstrap-diagnostics
+          path: sandbox-bootstrap.log
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
