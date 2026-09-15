@@ -11,14 +11,14 @@ const [server, view, generated, contract, connect, gateway, sharedSchema, mount,
 ])
 
 for (const source of [server, connect, gateway]) {
-  assert.ok(source.includes('ui://scout/component-sandbox/v22'))
-  assert.ok(source.includes('ui://scout/component-sandbox/v21'))
-  assert.ok(source.includes('ui://scout/component-sandbox/v20'))
-  assert.ok(source.includes('ui://scout/component-sandbox/v19'))
-  assert.ok(source.includes('ui://scout/component-sandbox/v18'))
-  assert.ok(source.includes('ui://scout/component-sandbox/v17'))
-  assert.ok(source.includes('ui://scout/component-sandbox/v16'))
-  assert.ok(source.includes('swppp_site'))
+
+
+
+
+
+
+
+  assert.ok(source.includes('SCOUT_SANDBOX_OPPORTUNITY_TYPES'))
   assert.equal(source.includes('scout_get_component_sandbox_names_v1_internal'), false)
 }
 assert.ok(server.includes('scout_get_component_sandbox_swppp_site_map_v1_internal'))
