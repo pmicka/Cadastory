@@ -15,7 +15,9 @@ jobs:
         with:
           node-version: '24'
       - name: Apply hotel portfolio patch
-        run: python3 scripts/patch_hotel_portfolio_v34.py
+        run: |
+          python3 scripts/patch_hotel_portfolio_v34.py
+          python3 scripts/fix_hotel_test_budget.py
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
@@ -24,7 +26,7 @@ jobs:
         run: npm run build && npm test
       - name: Commit verified implementation and remove temporary harness
         run: |
-          rm scripts/patch_hotel_portfolio_v34.py .github/workflows/hotel-portfolio-v34.yml
+          rm scripts/patch_hotel_portfolio_v34.py scripts/fix_hotel_test_budget.py .github/workflows/hotel-portfolio-v34.yml
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add -A
