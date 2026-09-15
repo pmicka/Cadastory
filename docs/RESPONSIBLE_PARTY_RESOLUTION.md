@@ -77,6 +77,26 @@ The local seeder operates only on supported locally backed providers. The remote
 
 Both seeders skip candidates already attached to an active responsible-party job. Exhausted jobs may re-enter only when their bounded `requery_after` interval is due.
 
+## Acquisition transport lanes
+
+Acquisition transport is deliberately separate from evidence semantics.
+
+### Local Jefferson transport
+
+`pva_lrsn_html` jobs are claimed through `internal_claim_local_responsible_party_resolution_jobs_v1()` and processed by the private authenticated Supabase Edge Function `collect-responsible-party-resolution`.
+
+The legacy claim RPC delegates to this local-only lane so the scheduled Edge Function cannot consume remote ArcGIS jobs.
+
+### Remote ArcGIS transport
+
+Schneider's public Nelson and Daviess ArcGIS services were verified to reset outbound connections from Supabase Edge before an HTTP response was returned. Forcing HTTP/1.1 did not change that behavior. The services were then successfully exercised from GitHub-hosted Actions runners.
+
+`arcgis_point_owner` jobs therefore use `internal_claim_remote_responsible_party_resolution_jobs_v1()` and `scripts/scout_responsible_party_arcgis_worker.py`, scheduled by `.github/workflows/scout-responsible-party-arcgis.yml`.
+
+This is a private unattended enrichment transport, not an MCP/runtime dependency. It uses the existing GitHub Actions Supabase service-role secrets, performs a live source probe before claiming work, restricts outbound ArcGIS requests to the approved Schneider host, retains no source media, and writes only through Scout's existing responsible-party completion RPC.
+
+Successful remote evidence records `acquisition_transport=github_actions` and preserves the exact reproducible ArcGIS point-query URL.
+
 ## Resolver-specific deferrals
 
 A local parcel lookup that currently has no unique usable parcel match is recorded in:
@@ -93,19 +113,19 @@ These deferrals suppress only this responsible-party parcel resolver for the aff
 
 This distinction also prevents high-priority no-match parcels from monopolizing every seed window and starving lower-priority resolvable candidates.
 
-## Worker contract
+## Worker contracts
 
-`collect-responsible-party-resolution` is an internal authenticated Edge Function. It uses Scout's established `x-scout-key` custom authentication and intentionally retains the existing `verify_jwt:false` posture because authentication is enforced in-function.
+`collect-responsible-party-resolution` is an internal authenticated Edge Function for the local Jefferson lane. It uses Scout's established `x-scout-key` custom authentication and intentionally retains the existing `verify_jwt:false` posture because authentication is enforced in-function.
 
-The worker is bounded by request size, source-response size, network timeout, claim limit, concurrency, retry budget, and lease semantics. Unsupported provider kinds go to review rather than being guessed.
+The remote ArcGIS GitHub worker uses the same database completion contract but a separate claim lane. Both workers are bounded by claim size, source timeout, retry budget, and lease semantics. Unsupported or ambiguous evidence is not guessed into a buyer identity.
 
 No source media is retained.
 
-## Current initial geography
+## Current geography
 
-Jefferson County uses the LOJIC parcel geometry plus public Jefferson PVA detail source.
+Jefferson County uses the LOJIC parcel geometry plus public Jefferson PVA detail source and currently supports construction, exterior-cleaning, and roof-lifecycle responsibility resolution.
 
-Nelson and Daviess Counties are configured for bounded public Schneider/ArcGIS point-owner queries. Their production release is not complete until Scout's actual Supabase Edge runtime has successfully exercised the query path and the returned owner/parcel fields have been audited.
+Nelson and Daviess Counties use bounded public Schneider/ArcGIS point-owner queries for exterior-cleaning candidates. Production acceptance on 2026-09-15 verified both source probes from the GitHub Actions transport and a four-job live batch: all four completed with authoritative owner/parcel evidence, three organization owners entered the named-responsibility lane, and one person/household owner remained evidence-only with no buyer-identity or queue-hint promotion.
 
 ## Production acceptance
 
@@ -114,13 +134,13 @@ A new provider or opportunity type is not considered production-ready solely bec
 Deployment verification should include:
 
 1. seed a bounded set of jobs;
-2. execute a very small live worker batch;
+2. execute a very small live worker batch through the intended production transport;
 3. confirm zero/ambiguous/malformed responses fail closed;
 4. inspect representative owner and parcel evidence;
 5. verify person/household owners are not promoted;
 6. verify organization-owner evidence survives normalized-facts and buyer-route rebuilds;
 7. verify the seeder advances across the backlog rather than repeatedly selecting the same no-match candidates;
-8. confirm unauthorized Edge Function access returns `401`; and
+8. confirm unauthorized Edge Function access returns `401` for Edge-hosted lanes; and
 9. run the standard Scout architecture assertions.
 
 Required assertions:
@@ -129,5 +149,7 @@ Required assertions:
 select agent_contract.assert_tool_registry_integrity_v1();
 select agent_contract.assert_architecture_doctrine_v1();
 ```
+
+The responsible-party internal tables also follow Scout's RLS posture. Privacy assertion failures from unrelated tables should be reported separately rather than masked by weakening this subsystem.
 
 Treat successful assertion execution as completion without assertion failure; do not weaken privacy, authorization, provenance, or evidence controls to make an assertion pass.
