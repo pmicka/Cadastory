@@ -50,4 +50,4 @@ jobs:
           git commit -m 'Add remaining generic single-asset sandbox types'
           git push origin HEAD:scout/all-single-asset-opportunities
 
-# Temporary bootstrap workflow. Remove before PR review.
+# Temporary bootstrap workflow. Remove before PR review after full suite + smoke pass.
