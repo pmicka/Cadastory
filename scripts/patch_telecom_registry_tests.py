@@ -1,6 +1,8 @@
 from pathlib import Path
 
 root=Path('supabase/functions/scout-component-sandbox-mcp')
+
+# Foundation owns broad lifecycle/registry invariants.
 path=root/'foundation_test.mjs'
 text=path.read_text()
 old='''const [view, server, generated, buildView, connectGateway, contractGateway, template, designContract, mapContract] = await Promise.all([
@@ -39,6 +41,47 @@ assert.ok(singleSiteRegistry.includes("scout_get_component_sandbox_water_tank_ma
 assert.ok(singleSiteRegistry.includes("scout_get_component_sandbox_swppp_site_map_v1_internal"));
 assert.ok(singleSiteRegistry.includes("scout_get_component_sandbox_telecom_change_v1_internal"));'''
 if anchor not in text: raise RuntimeError('foundation RPC registry anchor not found')
-text=text.replace(anchor,addition,1)
-path.write_text(text)
-print('Updated foundation invariants for single-site registry and RPC ownership.')
+path.write_text(text.replace(anchor,addition,1))
+
+# Legacy renderer/integration tests should validate registry routing, not direct imports in view/server.
+replacements={
+ 'single_site_map_renderer_test.mjs':[
+  ("assert.ok(view.includes('mountScoutSingleSiteMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
+  ("assert.ok(view.includes('mountScoutSingleSiteMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })'))","assert.ok(view.includes('implementation.mount(mapContainer, mapData, mountOptions)'))"),
+ ],
+ 'water_tank_map_renderer_test.mjs':[
+  ("assert.ok(view.includes('mountScoutWaterTankMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
+  ("assert.ok(view.includes('mountScoutWaterTankMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })'))","assert.ok(view.includes('implementation.mount(mapContainer, mapData, mountOptions)'))"),
+  ("assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
+  ("assert.ok(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))","assert.ok(server.includes('scoutSandboxSingleSiteImplementation'))"),
+ ],
+ 'water_tank_map_contract_test.mjs':[
+  ("assert.ok(serverSource.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))","assert.ok(serverSource.includes('scoutSandboxSingleSiteImplementation'))"),
+  ("assert.ok(viewSource.includes('normalizeScoutSandboxWaterTankMap'))","assert.ok(viewSource.includes('scoutSandboxSingleSiteViewImplementation'))"),
+  ("assert.ok(viewSource.includes('mountScoutWaterTankMap'))","assert.ok(viewSource.includes('scoutSandboxSingleSiteViewImplementation'))"),
+ ],
+ 'water_tank_map_integration_test.mjs':[
+  ("assert.ok(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))","assert.ok(server.includes('scoutSandboxSingleSiteImplementation'))"),
+  ("assert.ok(server.includes('buildScoutSandboxWaterTankOpportunity'))","assert.ok(server.includes('loadScoutSandboxSingleSiteOpportunity'))"),
+  ("assert.ok(view.includes('mountScoutSingleSiteMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
+  ("assert.ok(view.includes('mountScoutWaterTankMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
+  ("assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
+ ],
+ 'swppp_site_map_integration_test.mjs':[
+  ("assert.ok(server.includes('scout_get_component_sandbox_swppp_site_map_v1_internal'))","assert.ok(server.includes('scoutSandboxSingleSiteImplementation'))"),
+  ("assert.ok(view.includes('mountScoutSwpppSiteMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
+  ("assert.ok(server.includes(\"_meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('swppp_site', map) }\"))","assert.ok(server.includes(\"_meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map) }\"))"),
+ ],
+ 'swppp_site_map_renderer_test.mjs':[
+  ("assert.equal(serverSource.includes('buildScoutSwpppSiteRasterFrame'), true)","assert.equal(serverSource.includes('scoutSandboxSingleSiteImplementation'), true)"),
+ ],
+}
+for name,pairs in replacements.items():
+    p=root/name
+    t=p.read_text()
+    for old,new in pairs:
+        if old not in t: raise RuntimeError(f'{name}: missing legacy assertion {old}')
+        t=t.replace(old,new,1)
+    p.write_text(t)
+
+print('Updated legacy single-site wiring tests for registry ownership.')
