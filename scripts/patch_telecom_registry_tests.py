@@ -67,6 +67,9 @@ replacements={
   ("assert.ok(view.includes('mountScoutWaterTankMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
   ("assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
  ],
+ 'swppp_site_map_contract_test.mjs':[
+  ("assert.equal(serverSource.includes('scout_get_component_sandbox_swppp_site_map_v1_internal'), true)","assert.equal(serverSource.includes('scoutSandboxSingleSiteImplementation'), true)"),
+ ],
  'swppp_site_map_integration_test.mjs':[
   ("assert.ok(server.includes('scout_get_component_sandbox_swppp_site_map_v1_internal'))","assert.ok(server.includes('scoutSandboxSingleSiteImplementation'))"),
   ("assert.ok(view.includes('mountScoutSwpppSiteMap'))","assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))"),
