@@ -1,2 +1,100 @@
+import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import { build } from 'esbuild'
 
-import assert from'node:assert/strict';import{build}from'esbuild';const directory=new URL('./',import.meta.url);async function bundle(path){const result=await build({entryPoints:[new URL(path,directory).pathname],bundle:true,format:'esm',platform:'node',target:'node22',write:false});return await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`)}const model=await bundle('telecom_change_map_model.ts'),renderer=await bundle('telecom_change_map_renderer.ts'),manifest=await bundle('../_shared/scout_sandbox_manifest.ts');const payload={contract_version:'telecom_change_single_site_map_v1',opportunity_type:'telecom_change',candidate_key:'telecom_change:89a0e8a7-d84a-453a-a18f-2d8bfc834c0e',event_id:'89a0e8a7-d84a-453a-a18f-2d8bfc834c0e',registration_number:'1333510',event_type:'new_registration',signal_strength:'high',confidence:0.95,observed_at:'2026-09-10T05:00:33Z',site_point:{lon:-86.35352777777777,lat:38.20866666666667,source:'fcc_asr_registration',source_authority:'Federal Communications Commission',canonical_source:'fcc_asr'},asset:{owner_name:'The Towers, LLC',owner_frn:'0033815929',status_code:'C',structure_type_code:'LTOWER',application_purpose_code:'NT',structure_height_m:91.4,overall_height_agl_m:94.5,date_constructed:'09/04/2026',date_entered:'09/09/2026',last_action_date:'09/09/2026',structure_address:'S. Becker Road / IN-5286',city:'Leavenworth',state_code:'IN',zip:'47137',faa_study_number:'2026-AGL-2286-OE'},buyer:{organization_id:'8e59cab5-c220-414a-99d7-f1c6a2cb93a9',canonical_name:'The Towers, LLC',organization_type:'tower_owner',resolution_state:'resolved_scout_organization',resolution_basis:'opportunity_buyer_identity',contact_route_available:true,procurement_route_available:false},guardrail:'This is a bounded FCC Antenna Structure Registration change signal. FCC ASR registration 1333510 and its coordinates and structure attributes identify a registered antenna-structure record; Scout does not infer inspection need, maintenance due, commissioning scope, procurement, buyer intent, vendor eligibility, site access, climb authorization, or work availability. The Towers, LLC buyer resolution is separate Scout organization linkage; a durable contact route is not a documented procurement route.'};const map=model.normalizeScoutSandboxTelecomChangeMap(payload);assert.ok(map);const opp=model.buildScoutSandboxTelecomChangeOpportunity(map);assert.equal(opp.registration_number,'1333510');assert.equal(opp.contact_route_available,true);assert.equal(opp.procurement_route_available,false);const frame=renderer.buildScoutTelecomChangeRasterFrame(map,456,210,{tileUrlTemplate:'https://sandbox.invalid/map-tile/{z}/{x}/{y}.png'});assert.equal(frame.zoom,16);assert.ok(frame.tiles.length>0&&frame.tiles.length<=manifest.SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES);for(const tile of frame.tiles)assert.equal(manifest.isScoutSandboxRasterTileAllowed(tile.z,tile.x,tile.y),true,`telecom tile ${tile.z}/${tile.x}/${tile.y} outside allowlist`);assert.equal(frame.marker.left,228);assert.equal(frame.marker.top,105);console.log(`Scout telecom-change single-site checks passed with ${frame.tiles.length} bounded tiles.`)
+const directory = new URL('./', import.meta.url)
+
+async function bundle(path) {
+  const result = await build({
+    entryPoints: [new URL(path, directory).pathname],
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    target: 'node22',
+    write: false,
+  })
+  return await import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString('base64')}`)
+}
+
+const [model, renderer, manifest, migration] = await Promise.all([
+  bundle('telecom_change_map_model.ts'),
+  bundle('telecom_change_map_renderer.ts'),
+  bundle('../_shared/scout_sandbox_manifest.ts'),
+  readFile(new URL('../../migrations/20260916033000_add_telecom_change_sandbox.sql', directory), 'utf8'),
+])
+
+const payload = {
+  contract_version: 'telecom_change_single_site_map_v1',
+  opportunity_type: 'telecom_change',
+  candidate_key: 'telecom_change:89a0e8a7-d84a-453a-a18f-2d8bfc834c0e',
+  event_id: '89a0e8a7-d84a-453a-a18f-2d8bfc834c0e',
+  registration_number: '1333510',
+  event_type: 'new_registration',
+  signal_strength: 'high',
+  confidence: 0.95,
+  observed_at: '2026-09-10T05:00:33Z',
+  site_point: {
+    lon: -86.35352777777777,
+    lat: 38.20866666666667,
+    source: 'fcc_asr_registration',
+    source_authority: 'Federal Communications Commission',
+    canonical_source: 'fcc_asr',
+  },
+  asset: {
+    owner_name: 'The Towers, LLC',
+    owner_frn: '0033815929',
+    status_code: 'C',
+    structure_type_code: 'LTOWER',
+    application_purpose_code: 'NT',
+    structure_height_m: 91.4,
+    overall_height_agl_m: 94.5,
+    date_constructed: '09/04/2026',
+    date_entered: '09/09/2026',
+    last_action_date: '09/09/2026',
+    structure_address: 'S. Becker Road / IN-5286',
+    city: 'Leavenworth',
+    state_code: 'IN',
+    zip: '47137',
+    faa_study_number: '2026-AGL-2286-OE',
+  },
+  buyer: {
+    organization_id: '8e59cab5-c220-414a-99d7-f1c6a2cb93a9',
+    canonical_name: 'The Towers, LLC',
+    organization_type: 'tower_owner',
+    resolution_state: 'resolved_scout_organization',
+    resolution_basis: 'opportunity_buyer_identity',
+    contact_route_available: true,
+    procurement_route_available: false,
+  },
+  guardrail: 'This is a bounded FCC Antenna Structure Registration change signal. FCC ASR registration 1333510 and its coordinates and structure attributes identify a registered antenna-structure record; Scout does not infer inspection need, maintenance due, commissioning scope, procurement, buyer intent, vendor eligibility, site access, climb authorization, or work availability. The Towers, LLC buyer resolution is separate Scout organization linkage; a durable contact route is not a documented procurement route.',
+}
+
+const map = model.normalizeScoutSandboxTelecomChangeMap(payload)
+assert.ok(map)
+const opportunity = model.buildScoutSandboxTelecomChangeOpportunity(map)
+assert.equal(opportunity.registration_number, '1333510')
+assert.equal(opportunity.contact_route_available, true)
+assert.equal(opportunity.procurement_route_available, false)
+
+const frame = renderer.buildScoutTelecomChangeRasterFrame(map, 456, 210, {
+  tileUrlTemplate: 'https://sandbox.invalid/map-tile/{z}/{x}/{y}.png',
+})
+assert.equal(frame.zoom, 16)
+assert.ok(frame.tiles.length > 0 && frame.tiles.length <= manifest.SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES)
+for (const tile of frame.tiles) {
+  assert.equal(manifest.isScoutSandboxRasterTileAllowed(tile.z, tile.x, tile.y), true, `telecom tile ${tile.z}/${tile.x}/${tile.y} outside allowlist`)
+}
+assert.equal(frame.marker.left, 228)
+assert.equal(frame.marker.top, 105)
+
+// Locked search_path means PostGIS functions/types must be explicitly qualified.
+assert.ok(migration.includes("set search_path to 'pg_catalog'"))
+assert.ok(migration.includes('extensions.st_x(s.location::extensions.geometry)'))
+assert.ok(migration.includes('extensions.st_y(s.location::extensions.geometry)'))
+assert.equal(migration.includes('st_x(s.location::geometry)'), false)
+assert.equal(migration.includes('st_y(s.location::geometry)'), false)
+assert.ok(migration.includes('security definer'))
+assert.ok(migration.includes('revoke all on function public.scout_get_component_sandbox_telecom_change_v1_internal() from public,anon,authenticated'))
+assert.ok(migration.includes('grant execute on function public.scout_get_component_sandbox_telecom_change_v1_internal() to service_role'))
+
+console.log(`Scout telecom-change single-site checks passed with ${frame.tiles.length} bounded tiles and qualified PostGIS RPC contract.`)
