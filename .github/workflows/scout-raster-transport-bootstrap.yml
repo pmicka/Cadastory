@@ -26,6 +26,7 @@ jobs:
         run: |
           python3 scripts/apply_per_result_raster_transport.py
           python3 scripts/patch_per_result_raster_tests.py
+          python3 scripts/patch_per_result_manifest_reference.py
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
