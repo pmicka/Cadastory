@@ -43,6 +43,9 @@ assert.ok(component.includes("_meta: { ui: { resourceUri: RESOURCE_URI } }"), 't
 assert.ok(component.includes('inputSchema: componentInputSchema'), 'component input schema must use shared contract schema')
 assert.ok(component.includes('outputSchema: componentOutputSchema'), 'component output schema must use shared contract schema')
 assert.ok(component.includes('fromJsonSchema(sandboxResultSchema())'), 'component output validator must derive from shared JSON schema')
+assert.equal(component.includes('async function loadEmbeddedSandboxTiles()'), false, 'resource must not globally aggregate raster tiles')
+assert.ok(component.includes(".replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]')"), 'resource must remain a static raster-independent shell')
+assert.ok(component.includes('loadEmbeddedRasterTilesForSelection'), 'tool results must load only selected raster tiles')
 for (const gateway of [contractGateway, connectGateway]) {
   assert.ok(gateway.includes('sandboxOpportunityTypeInputSchema()'), 'gateway tools/list input schema must use shared contract schema')
   assert.ok(gateway.includes('sandboxResultSchema()'), 'gateway tools/list output schema must use shared contract schema')

@@ -1,4 +1,4 @@
-export const SCOUT_SANDBOX_RESOURCE_VERSION = 37 as const
+export const SCOUT_SANDBOX_RESOURCE_VERSION = 38 as const
 export const SCOUT_SANDBOX_RESOURCE_URI = `ui://scout/component-sandbox/v${SCOUT_SANDBOX_RESOURCE_VERSION}` as const
 export const SCOUT_SANDBOX_EMBEDDED_RASTER_COMPATIBILITY_MIN_VERSION = 22 as const
 export const SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES = 40 as const

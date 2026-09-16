@@ -6,14 +6,14 @@ import { registerAppResource, registerAppTool, RESOURCE_MIME_TYPE } from 'npm:@m
 import {
   SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES,
   SCOUT_SANDBOX_OPPORTUNITY_TYPES,
+  SCOUT_SANDBOX_OPPORTUNITY_MANIFEST,
   SCOUT_SANDBOX_PORTFOLIO_MANIFEST,
-  SCOUT_SANDBOX_PORTFOLIO_TYPES,
   SCOUT_SANDBOX_RESOURCE_URI,
   isScoutSandboxPortfolioType,
   isScoutSandboxRasterTileAllowed,
   scoutSandboxCompatibilityResourceUris,
-  scoutSandboxCompatibilityUsesEmbeddedRaster,
   scoutSandboxToolDescription,
+  type ScoutSandboxOpportunityType,
   type ScoutSandboxPortfolioType,
 } from '../_shared/scout_sandbox_manifest.ts'
 import { sandboxOpportunityTypeInputSchema, sandboxResultSchema } from '../_shared/scout_sandbox_contract_schema.ts'
@@ -99,64 +99,63 @@ async function loadScoutSandboxPortfolioMap(type: ScoutSandboxPortfolioType) {
 }
 
 type EmbeddedRasterTile = { z: number; x: number; y: number; url: string }
+type EmbeddedRasterPayload = { url: string; data_url: string }
 const MAX_EMBEDDED_RASTER_TILES = SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES
+const EMBEDDED_RASTER_FETCH_TIMEOUT_MS = 3500
+const TILE_URL_TEMPLATE = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png`
 
-async function loadEmbeddedRasterTile(tile: EmbeddedRasterTile) {
-  const response = await fetch(`${MAP_TILE_UPSTREAM}/${tile.z}/${tile.x}/${tile.y}.png`, {
-    headers: { 'user-agent': 'Scout-by-Cadastory-Sandbox/1.0 (+https://github.com/pmicka/Cadastory)' },
-  })
-  if (!response.ok || !String(response.headers.get('content-type')).startsWith('image/png')) {
-    throw new Error('Scout sandbox raster tile is unavailable')
+async function loadEmbeddedRasterTile(tile: EmbeddedRasterTile): Promise<EmbeddedRasterPayload | null> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), EMBEDDED_RASTER_FETCH_TIMEOUT_MS)
+  try {
+    const response = await fetch(`${MAP_TILE_UPSTREAM}/${tile.z}/${tile.x}/${tile.y}.png`, {
+      headers: { 'user-agent': 'Scout-by-Cadastory-Sandbox/1.0 (+https://github.com/pmicka/Cadastory)' },
+      signal: controller.signal,
+    })
+    if (!response.ok || !String(response.headers.get('content-type')).startsWith('image/png')) return null
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    let binary = ''
+    for (const byte of bytes) binary += String.fromCharCode(byte)
+    return { url: tile.url, data_url: `data:image/png;base64,${btoa(binary)}` }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
   }
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return { url: tile.url, data_url: `data:image/png;base64,${btoa(binary)}` }
 }
 
-async function loadEmbeddedSandboxTiles() {
-  assertScoutSandboxPortfolioImplementationCoverage()
-  const tileUrlTemplate = `${SUPABASE_URL}/functions/v1/scout-component-sandbox-mcp/map-tile/{z}/{x}/{y}.png`
-  const [premiumMap, waterTankMap, swpppMap] = await Promise.all([
-    loadScoutSandboxSingleSiteMap(),
-    loadScoutSandboxWaterTankMap(),
-    loadScoutSandboxSwpppSiteMap(),
-  ])
-  const frames: Array<{ tiles: EmbeddedRasterTile[] }> = [
-    buildScoutSingleSiteRasterFrame(premiumMap, 456, 210, { tileUrlTemplate }),
-    buildScoutWaterTankRasterFrame(waterTankMap, 456, 210, { tileUrlTemplate }),
-    buildScoutSwpppSiteRasterFrame(swpppMap, 456, 210, { tileUrlTemplate }),
-  ]
-  for (const type of SCOUT_SANDBOX_PORTFOLIO_TYPES) {
-    const map = await loadScoutSandboxPortfolioMap(type)
-    const implementation = scoutSandboxPortfolioImplementation(type)
-    for (const frameSize of SCOUT_SANDBOX_PORTFOLIO_MANIFEST[type].rasterFrames) {
-      frames.push(implementation.buildRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate }))
-    }
+function selectedRasterFrames(selectedType: ScoutSandboxOpportunityType, map: any) {
+  const registration = SCOUT_SANDBOX_OPPORTUNITY_MANIFEST[selectedType]
+  if (isScoutSandboxPortfolioType(selectedType)) {
+    const implementation = scoutSandboxPortfolioImplementation(selectedType)
+    return registration.rasterFrames.map((frameSize) =>
+      implementation.buildRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
+    )
   }
+  return registration.rasterFrames.map((frameSize) => {
+    if (selectedType === 'swppp_site') return buildScoutSwpppSiteRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
+    if (selectedType === 'water_tank') return buildScoutWaterTankRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
+    return buildScoutSingleSiteRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
+  })
+}
+
+async function loadEmbeddedRasterTilesForSelection(selectedType: ScoutSandboxOpportunityType, map: any) {
+  if (isScoutSandboxPortfolioType(selectedType)) assertScoutSandboxPortfolioImplementationCoverage()
   const uniqueTiles = new Map<string, EmbeddedRasterTile>()
-  for (const frame of frames) {
+  for (const frame of selectedRasterFrames(selectedType, map)) {
     for (const tile of frame.tiles) uniqueTiles.set(tile.url, tile)
   }
   if (uniqueTiles.size > MAX_EMBEDDED_RASTER_TILES) {
-    throw new Error(`Scout sandbox embedded raster requires ${uniqueTiles.size} tiles, exceeding bounded budget ${MAX_EMBEDDED_RASTER_TILES}`)
+    throw new Error(`Scout sandbox ${selectedType} raster requires ${uniqueTiles.size} tiles, exceeding bounded per-result budget ${MAX_EMBEDDED_RASTER_TILES}`)
   }
-  return await Promise.all(Array.from(uniqueTiles.values(), loadEmbeddedRasterTile))
+  const payloads = await Promise.all(Array.from(uniqueTiles.values(), loadEmbeddedRasterTile))
+  return payloads.filter((payload): payload is EmbeddedRasterPayload => payload !== null)
 }
 
-let scoutViewHtmlPromise: Promise<string> | null = null
-
-function loadScoutViewHtml() {
-  if (!scoutViewHtmlPromise) {
-    scoutViewHtmlPromise = (async () => {
-      const tiles = await loadEmbeddedSandboxTiles()
-      return SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', JSON.stringify(tiles))
-    })().catch((error) => {
-      scoutViewHtmlPromise = null
-      throw error
-    })
-  }
-  return scoutViewHtmlPromise
+function staticScoutViewHtml(resourceUri: string) {
+  return SCOUT_VIEW_HTML
+    .replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]')
+    .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', resourceUri)
 }
 
 async function isOwnerConnection(connectionId: string) {
@@ -190,7 +189,7 @@ const componentInputSchema = fromJsonSchema(sandboxOpportunityTypeInputSchema())
 const componentOutputSchema = fromJsonSchema(sandboxResultSchema())
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.7' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.8' })
 
   registerAppResource(
     server,
@@ -201,7 +200,7 @@ function makeServer() {
       contents: [{
         uri: RESOURCE_URI,
         mimeType: RESOURCE_MIME_TYPE,
-        text: (await loadScoutViewHtml()).replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', RESOURCE_URI),
+        text: staticScoutViewHtml(RESOURCE_URI),
         _meta: {
           ui: {
             prefersBorder: false,
@@ -222,10 +221,7 @@ function makeServer() {
         contents: [{
           uri: compatibilityUri,
           mimeType: RESOURCE_MIME_TYPE,
-          text: (scoutSandboxCompatibilityUsesEmbeddedRaster(compatibilityUri)
-            ? await loadScoutViewHtml()
-            : SCOUT_VIEW_HTML.replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]'))
-            .replace('__SCOUT_DIAGNOSTIC_RESOURCE_URI__', compatibilityUri),
+          text: staticScoutViewHtml(compatibilityUri),
           _meta: {
             ui: {
               prefersBorder: false,
@@ -264,6 +260,7 @@ function makeServer() {
         return {
           content: [{ type: 'text', text: implementation.responseText(opportunity) }],
           structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map },
+          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map) },
         }
       }
 
@@ -279,6 +276,7 @@ function makeServer() {
         return {
           content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} SWPPP-site evidence card with its authoritative permit-location point map.` }],
           structuredContent,
+          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('swppp_site', map) },
         }
       }
 
@@ -297,6 +295,7 @@ function makeServer() {
         return {
           content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} water-tank opportunity card with its single-site map.` }],
           structuredContent,
+          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('water_tank', map) },
         }
       }
 
@@ -316,6 +315,7 @@ function makeServer() {
       return {
         content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} premium-exterior opportunity card with its single-site map.` }],
         structuredContent,
+        _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('premium_exterior', map) },
       }
     },
   )
