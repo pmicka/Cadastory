@@ -122,6 +122,16 @@ export const SCOUT_SANDBOX_OPPORTUNITY_MANIFEST = {
     tileRanges: [],
     tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.construction_site.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.construction_site.center.lat),
   },
+  event_detailing: {
+    slug: 'event_detailing',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.event_detailing.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded target-building point; event venue is timing context only and no event footprint, service radius, or access area is implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.event_detailing.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.event_detailing.center.lat),
+  },
   dam: {
     slug: 'dam',
     label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.dam.label,

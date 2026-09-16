@@ -59,6 +59,7 @@ const smokeTestByType = {
   telecom_change: 'telecom_change_map_renderer_test.mjs',
   bridge: 'spine_single_asset_map_renderer_test.mjs',
   construction_site: 'spine_single_asset_map_renderer_test.mjs',
+  event_detailing: 'spine_single_asset_map_renderer_test.mjs',
   dam: 'spine_single_asset_map_renderer_test.mjs',
   mine_quarry: 'spine_single_asset_map_renderer_test.mjs',
   landfill: 'spine_single_asset_map_renderer_test.mjs',

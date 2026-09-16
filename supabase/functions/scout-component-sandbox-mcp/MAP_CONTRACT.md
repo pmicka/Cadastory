@@ -341,3 +341,8 @@ The `telecom_change` implementation is governed by `TELECOM_CHANGE_MAP_CONTRACT.
 ## Owner-approved remaining single-asset batch — 2026-09-16
 
 The owner approved completing the remaining non-special-domain single-asset opportunity families before moving to multi-asset/network opportunities. Each card/result still represents exactly one opportunity type and one bounded evidence contract; batching authorizes a combined implementation/release cadence, not mixed maps or cross-type inference. The first batch covers bridge, construction site, dam, mine/quarry, landfill, rail crossing, roof lifecycle, and solar lifecycle through the shared single-site registry. Agriculture and forest-health/ecology remain outside this batch. Event-detailing remains in the single-asset phase but is held until its current event-source evidence is cleaned rather than freezing malformed venue text into a durable contract.
+
+
+### Event-detailing single-asset resolution — 2026-09-16
+
+`event_detailing` is included in the remaining single-asset batch only when a separate independent need signal exists for the exact target asset. The exemplar is 2600 S Floyd Street: its exterior-cleaning proxy exists independently of the Louisville vs. #16 SMU event. The event may amplify timing but cannot create cleaning need. Attendance is rendered only as a venue-capacity proxy, never as a forecast. The target-building point is mapped; the event venue does not create a service radius, site boundary, access area, or work authorization.
