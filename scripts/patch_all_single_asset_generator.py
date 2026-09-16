@@ -23,5 +23,11 @@ for typ in ['bridge','construction_site','dam','mine_quarry','landfill','rail_cr
 '''
 if old not in text:
     raise RuntimeError('manifest generator block not found')
-path.write_text(text.replace(old, new, 1))
-print('Patched single-asset generator manifest loop.')
+text = text.replace(old, new, 1)
+old_smoke = "if anchor not in text:raise RuntimeError('predeploy smoke anchor missing');path.write_text(text.replace(anchor,addition,1))"
+new_smoke = "if anchor not in text:raise RuntimeError('predeploy smoke anchor missing')\npath.write_text(text.replace(anchor,addition,1))"
+if old_smoke not in text:
+    raise RuntimeError('predeploy smoke write block not found')
+text = text.replace(old_smoke, new_smoke, 1)
+path.write_text(text)
+print('Patched single-asset generator bootstrap issues.')
