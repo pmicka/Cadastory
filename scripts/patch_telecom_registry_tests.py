@@ -92,4 +92,12 @@ for name,pairs in replacements.items():
         t=t.replace(old,new,1)
     p.write_text(t)
 
-print('Updated legacy single-site wiring tests for registry ownership.')
+# Every registered type must be invoked by predeploy smoke.
+p=root/'sandbox_predeploy_smoke_test.mjs'
+t=p.read_text()
+old="  swppp_site: 'swppp_site_map_integration_test.mjs',\n"
+new="  swppp_site: 'swppp_site_map_integration_test.mjs',\n  telecom_change: 'telecom_change_map_renderer_test.mjs',\n"
+if old not in t: raise RuntimeError('predeploy smoke fixture anchor missing')
+p.write_text(t.replace(old,new,1))
+
+print('Updated legacy single-site wiring tests and telecom predeploy fixture.')
