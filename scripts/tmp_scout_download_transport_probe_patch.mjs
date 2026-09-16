@@ -9,12 +9,6 @@ function replaceOne(path, before, after, label){
   if(source.indexOf(before, first + before.length) >= 0) throw new Error(`Anchor is not unique for ${label}`)
   write(path, source.replace(before, after))
 }
-function replaceCount(path, before, after, expected, label){
-  const source = read(path)
-  const count = source.split(before).length - 1
-  if(count !== expected) throw new Error(`Expected ${expected} anchors for ${label}, found ${count}`)
-  write(path, source.split(before).join(after))
-}
 
 const schemaPath = 'supabase/functions/_shared/scout_sandbox_contract_schema.ts'
 replaceOne(
@@ -39,12 +33,17 @@ replaceOne(
   "      const selectedType = opportunity_type ?? 'premium_exterior'\n      const includeDownloadProbe = download_probe === true\n",
   'probe request flag',
 )
-replaceCount(
+replaceOne(
   indexPath,
-  "          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map) },",
-  "          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map), ...(includeDownloadProbe ? { 'scout/downloadProbe': true } : {}) },",
-  2,
-  'probe result metadata',
+  "          structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map },\n          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map) },",
+  "          structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map },\n          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map), ...(includeDownloadProbe ? { 'scout/downloadProbe': true } : {}) },",
+  'portfolio probe result metadata',
+)
+replaceOne(
+  indexPath,
+  "        structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map: implementation.toResultMap(map) },\n        _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map) },",
+  "        structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map: implementation.toResultMap(map) },\n        _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map), ...(includeDownloadProbe ? { 'scout/downloadProbe': true } : {}) },",
+  'single-site probe result metadata',
 )
 
 const viewPath = 'supabase/functions/scout-component-sandbox-mcp/view.ts'
