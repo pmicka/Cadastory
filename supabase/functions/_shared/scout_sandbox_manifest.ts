@@ -1,4 +1,4 @@
-export const SCOUT_SANDBOX_RESOURCE_VERSION = 38 as const
+export const SCOUT_SANDBOX_RESOURCE_VERSION = 39 as const
 export const SCOUT_SANDBOX_RESOURCE_URI = `ui://scout/component-sandbox/v${SCOUT_SANDBOX_RESOURCE_VERSION}` as const
 export const SCOUT_SANDBOX_EMBEDDED_RASTER_COMPATIBILITY_MIN_VERSION = 22 as const
 export const SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES = 40 as const
@@ -7,6 +7,7 @@ export const SCOUT_SANDBOX_BASE_OPPORTUNITY_TYPES = [
   'premium_exterior',
   'water_tank',
   'swppp_site',
+  'telecom_change',
 ] as const
 
 export const SCOUT_SANDBOX_PORTFOLIO_TYPES = [
@@ -22,7 +23,10 @@ export const SCOUT_SANDBOX_OPPORTUNITY_TYPES = [
   ...SCOUT_SANDBOX_PORTFOLIO_TYPES,
 ] as const
 
+export const SCOUT_SANDBOX_SINGLE_SITE_TYPES = SCOUT_SANDBOX_BASE_OPPORTUNITY_TYPES
+
 export type ScoutSandboxOpportunityType = typeof SCOUT_SANDBOX_OPPORTUNITY_TYPES[number]
+export type ScoutSandboxSingleSiteType = typeof SCOUT_SANDBOX_SINGLE_SITE_TYPES[number]
 export type ScoutSandboxPortfolioType = typeof SCOUT_SANDBOX_PORTFOLIO_TYPES[number]
 export type ScoutSandboxMapKind = 'single_site' | 'portfolio'
 export type ScoutSandboxHostNormalizationRule = 'strict' | 'unresolved_link_confidence_null_elision'
@@ -83,6 +87,16 @@ export const SCOUT_SANDBOX_OPPORTUNITY_MANIFEST = {
     rasterFrames: [{ width: 456, height: 210 }],
     tileRanges: [],
     tileCenters: singleSiteCenter(-84.521, 39.097),
+  },
+  telecom_change: {
+    slug: 'telecom_change',
+    label: 'FCC ASR telecom change',
+    mapKind: 'single_site',
+    markerSemantics: 'exact FCC ASR registration coordinate; no service radius, access envelope, or ownership boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(-86.35352777777777, 38.20866666666667),
   },
   water_utility_portfolio: {
     slug: 'water_utility_portfolio',
@@ -155,6 +169,10 @@ export const SCOUT_SANDBOX_PORTFOLIO_MANIFEST = Object.fromEntries(
 
 export function isScoutSandboxOpportunityType(value: unknown): value is ScoutSandboxOpportunityType {
   return typeof value === 'string' && (SCOUT_SANDBOX_OPPORTUNITY_TYPES as readonly string[]).includes(value)
+}
+
+export function isScoutSandboxSingleSiteType(value: unknown): value is ScoutSandboxSingleSiteType {
+  return typeof value === 'string' && (SCOUT_SANDBOX_SINGLE_SITE_TYPES as readonly string[]).includes(value)
 }
 
 export function isScoutSandboxPortfolioType(value: unknown): value is ScoutSandboxPortfolioType {

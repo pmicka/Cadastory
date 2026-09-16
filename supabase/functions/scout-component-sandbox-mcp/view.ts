@@ -1,25 +1,22 @@
-import { normalizeScoutSwpppSiteTransport } from './swppp_site_transport.ts'
 import { diagnostic, diagnosticError, diagnosticOverlay } from './map_diagnostics.ts'
 import { App, PostMessageTransport } from '@modelcontextprotocol/ext-apps'
 import {
   SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES,
   isScoutSandboxOpportunityType,
+  isScoutSandboxSingleSiteType,
   isScoutSandboxPortfolioType,
   type ScoutSandboxOpportunityType as ScoutViewOpportunityType,
 } from '../_shared/scout_sandbox_manifest.ts'
 import { scoutSandboxPortfolioImplementation } from './portfolio_registry.ts'
 import { scoutSandboxPortfolioViewImplementation } from './portfolio_view_registry.ts'
+import { scoutSandboxSingleSiteViewImplementation } from './single_site_view_registry.ts'
 import {
   normalizeScoutSandboxOpportunity,
-  normalizeScoutSandboxSingleSiteMap,
-  normalizeScoutSandboxWaterTankMap,
   type ScoutSandboxOpportunityType,
   type ScoutSandboxWaterTankOpportunity,
 } from './contract.ts'
-import { mountScoutSingleSiteMap } from './single_site_map_renderer.ts'
-import { mountScoutWaterTankMap } from './water_tank_map_mount.ts'
+import { normalizeScoutSandboxTelecomChangeOpportunity } from './telecom_change_map_model.ts'
 import { normalizeScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
-import { mountScoutSwpppSiteMap } from './swppp_site_map_mount.ts'
 
 type ScoutMapHandle = {
   destroy: () => void
@@ -222,6 +219,19 @@ function renderOpportunity(opportunityType: ScoutViewOpportunityType, value: unk
     return
   }
 
+  if (opportunityType === 'telecom_change') {
+    const opportunity = normalizeScoutSandboxTelecomChangeOpportunity(value)
+    if (!opportunity) { renderUnavailableOpportunity(); return }
+    if (title) title.textContent = `${opportunity.name} · ASR ${opportunity.registration_number}`
+    if (tier) tier.textContent = 'FCC change signal'
+    if (meta) meta.textContent = `${Math.round(opportunity.signal_confidence * 100)}% Scout signal confidence  •  Observed ${formatObserved(opportunity.observed_at)}`
+    if (address) address.textContent = opportunity.location_label
+    if (summary) summary.textContent = `FCC structure type ${opportunity.structure_type_code}  •  ${formatNumber(opportunity.overall_height_agl_m, 1)} m overall AGL  •  FCC record reports constructed ${opportunity.date_constructed}  •  Durable contact route available; procurement route not established  •  ${opportunity.why_investigate}`
+    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
+    setState(`Scout opportunity ready: FCC ASR ${opportunity.registration_number}`)
+    return
+  }
+
   const opportunity = normalizeScoutSandboxOpportunity(value)
   if (!opportunity) {
     renderUnavailableOpportunity()
@@ -300,39 +310,29 @@ function renderMap(opportunityType: ScoutViewOpportunityType, value: unknown, em
       mapContainer.setAttribute('aria-label', implementation.ariaLabel(mapData))
       const mount = scoutSandboxPortfolioViewImplementation(opportunityType).mount as any
       mapHandle = mount(mapContainer, mapData, { ...mapOptions, embeddedTiles })
-    } else if (opportunityType === 'swppp_site') {
-      const mapData = normalizeScoutSwpppSiteTransport(value, (detail) => diagnostic({ rejectedField: detail.field, rejectedCheck: detail.check, receivedType: detail.actualType, receivedStringShape: detail.stringShape }))
-      diagnostic({ mapNormalizer: mapData ? 'passed' : 'rejected', viewReady: false, viewError: false, initialization: 'entered' })
-      if (!mapData) {
-        mapState.textContent = 'Site map unavailable'
-        diagnosticOverlay(mapState)
-        setState('Scout SWPPP-site map result failed validation')
-        return
-      }
-      mapContainer.setAttribute('role', 'img')
-      mapContainer.setAttribute('aria-label', `Permit location map for ${mapData.site_name}`)
-      mapHandle = mountScoutSwpppSiteMap(mapContainer, mapData, { ...mapOptions, embeddedTiles, onDiagnostic: diagnostic })
-      diagnostic({ initialization: 'returned' })
-    } else if (opportunityType === 'water_tank') {
-      const mapData = normalizeScoutSandboxWaterTankMap(value)
-      if (!mapData) {
-        mapState.textContent = 'Site map unavailable'
-        setState('Scout water-tank map result failed validation')
-        return
-      }
-      mapContainer.setAttribute('role', 'img')
-      mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
-      mapHandle = mountScoutWaterTankMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
     } else {
-      const mapData = normalizeScoutSandboxSingleSiteMap(value)
+      if (!isScoutSandboxSingleSiteType(opportunityType)) {
+        mapState.textContent = 'Site map unavailable'
+        setState(`Scout ${opportunityType} has no registered single-site map implementation`)
+        return
+      }
+      const implementation = scoutSandboxSingleSiteViewImplementation(opportunityType)
+      const rejectObserver = opportunityType === 'swppp_site'
+        ? (detail: any) => diagnostic({ rejectedField: detail.field, rejectedCheck: detail.check, receivedType: detail.actualType, receivedStringShape: detail.stringShape })
+        : undefined
+      const mapData = implementation.normalizeMap(value, rejectObserver)
+      if (opportunityType === 'swppp_site') diagnostic({ mapNormalizer: mapData ? 'passed' : 'rejected', viewReady: false, viewError: false, initialization: 'entered' })
       if (!mapData) {
         mapState.textContent = 'Site map unavailable'
-        setState('Scout single-site map result failed validation')
+        if (opportunityType === 'swppp_site') diagnosticOverlay(mapState)
+        setState(`Scout ${opportunityType} map result failed validation`)
         return
       }
       mapContainer.setAttribute('role', 'img')
-      mapContainer.setAttribute('aria-label', `Site map for ${mapData.name}`)
-      mapHandle = mountScoutSingleSiteMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })
+      mapContainer.setAttribute('aria-label', implementation.ariaLabel(mapData))
+      const mountOptions = opportunityType === 'swppp_site' ? { ...mapOptions, embeddedTiles, onDiagnostic: diagnostic } : { ...mapOptions, embeddedTiles }
+      mapHandle = implementation.mount(mapContainer, mapData, mountOptions)
+      if (opportunityType === 'swppp_site') diagnostic({ initialization: 'returned' })
     }
     scheduleLayoutRefresh()
   } catch (error) {
@@ -398,7 +398,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.18.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.19.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent

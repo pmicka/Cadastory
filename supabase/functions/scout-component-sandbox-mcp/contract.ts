@@ -1,7 +1,8 @@
 import type { ScoutSwpppSiteTransport } from './swppp_site_transport.ts'
 import type { ScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
+import type { ScoutSandboxTelecomChangeMap, ScoutSandboxTelecomChangeOpportunity } from './telecom_change_map_model.ts'
 
-export type ScoutSandboxOpportunityType = 'premium_exterior' | 'water_tank' | 'swppp_site'
+export type ScoutSandboxOpportunityType = 'premium_exterior' | 'water_tank' | 'swppp_site' | 'telecom_change'
 
 export type ScoutSandboxPremiumExteriorOpportunity = {
   opportunity_type: 'premium_exterior'
@@ -157,7 +158,14 @@ export type ScoutSandboxSwpppSiteResult = {
   map: ScoutSwpppSiteTransport
 }
 
-export type ScoutSandboxResult = ScoutSandboxPremiumExteriorResult | ScoutSandboxWaterTankResult | ScoutSandboxSwpppSiteResult
+export type ScoutSandboxTelecomChangeResult = {
+  surface: 'scout_component_sandbox'
+  opportunity_type: 'telecom_change'
+  opportunity: ScoutSandboxTelecomChangeOpportunity
+  map: ScoutSandboxTelecomChangeMap
+}
+
+export type ScoutSandboxResult = ScoutSandboxPremiumExteriorResult | ScoutSandboxWaterTankResult | ScoutSandboxSwpppSiteResult | ScoutSandboxTelecomChangeResult
 
 function boundedString(value: unknown, maxLength: number) {
   if (typeof value !== 'string') return null

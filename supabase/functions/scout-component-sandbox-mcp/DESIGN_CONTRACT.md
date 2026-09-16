@@ -136,3 +136,7 @@ Within the existing map media tile, the Warren County portfolio uses flat 2D cir
 ## Municipal facilities portfolio extension (owner-approved 2026-09-15)
 
 `municipal_facilities_portfolio` is approved as the next bounded portfolio map. Its first exemplar is Louisville Metro Government. The implementation must preserve the existing card geometry and three-slide carousel; exactly one slide remains the map. Municipal location membership, geometry evidence, ownership/maintenance responsibility, and member-specific opportunity signals are separate claims and must never be collapsed into one another.
+
+## Telecom-change single-site extension (owner-approved 2026-09-16)
+
+`telecom_change` is approved as the next bounded single-site opportunity family. Its first exemplar is FCC ASR registration 1333510 / The Towers, LLC near Leavenworth, Indiana. The existing card geometry and three-slide carousel remain unchanged; exactly one slide is the non-interactive FCC registration-point map. Raw FCC codes may be displayed as codes but must not be silently decoded without authoritative support.

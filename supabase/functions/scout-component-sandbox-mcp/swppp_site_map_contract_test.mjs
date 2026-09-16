@@ -34,7 +34,7 @@ assert.ok(mapContract.includes('isolated database groundwork only'))
 assert.ok(mapContract.includes('must not fabricate a project polygon'))
 
 // The isolated contract is now consumed by the v17 host-visible path.
-assert.equal(serverSource.includes('scout_get_component_sandbox_swppp_site_map_v1_internal'), true)
+assert.equal(serverSource.includes('scoutSandboxSingleSiteImplementation'), true)
 assert.equal(viewSource.includes("opportunityType === 'swppp_site'"), true)
 
 console.log('Scout SWPPP-site isolated database contract checks passed.')

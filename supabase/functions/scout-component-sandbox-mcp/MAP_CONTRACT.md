@@ -333,3 +333,6 @@ Raster PNG payloads must not be aggregated across every registered sandbox oppor
 
 This invariant prevents portfolio growth from increasing every resource read and specifically guards the v37 failure where 24 portfolio tiles plus three six-tile single-site maps required 42 global embedded tiles against a 40-tile ceiling.
 
+## Telecom-change single-site contract (owner-approved 2026-09-16)
+
+The `telecom_change` implementation is governed by `TELECOM_CHANGE_MAP_CONTRACT.md`. The first exemplar uses the exact FCC ASR registration coordinate for registration 1333510. No parcel, compound, service radius, access envelope, guy-wire footprint, ownership boundary, inspection perimeter, or climb area may be inferred. New registration/recent construction are qualification signals only; they do not prove inspection need, procurement, buyer intent, access, or work availability.

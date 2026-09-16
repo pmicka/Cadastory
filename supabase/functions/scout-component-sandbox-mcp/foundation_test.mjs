@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { build, transform } from "esbuild";
 
 const directory = new URL("./", import.meta.url);
-const [view, server, generated, buildView, connectGateway, contractGateway, template, designContract, mapContract] = await Promise.all([
+const [view, server, generated, buildView, connectGateway, contractGateway, template, designContract, mapContract, singleSiteRegistry] = await Promise.all([
   readFile(new URL("view.ts", directory), "utf8"),
   readFile(new URL("index.ts", directory), "utf8"),
   readFile(new URL("view.generated.ts", directory), "utf8"),
@@ -13,6 +13,7 @@ const [view, server, generated, buildView, connectGateway, contractGateway, temp
   readFile(new URL("view.template.html", directory), "utf8"),
   readFile(new URL("DESIGN_CONTRACT.md", directory), "utf8"),
   readFile(new URL("MAP_CONTRACT.md", directory), "utf8"),
+  readFile(new URL("single_site_registry.ts", directory), "utf8"),
 ]);
 
 assert.equal((view.match(/\.connect\(/g) || []).length, 1);
@@ -26,20 +27,25 @@ assert.ok(view.indexOf("app.onteardown") < view.indexOf("app.connect("));
 assert.ok(view.includes("new PostMessageTransport()"));
 assert.ok(view.includes("structured?.opportunity"));
 assert.ok(view.includes("structured?.map"));
-assert.ok(view.includes("mountScoutSingleSiteMap"));
-assert.ok(view.includes("mountScoutWaterTankMap"));
-assert.ok(view.includes("normalizeScoutSandboxWaterTankMap"));
+assert.ok(view.includes("scoutSandboxSingleSiteViewImplementation"));
+assert.ok(server.includes("scoutSandboxSingleSiteImplementation"));
+assert.ok(server.includes("assertScoutSandboxSingleSiteImplementationCoverage"));
 assert.equal(view.includes("innerHTML"), false);
 assert.equal(generated.includes("https://unpkg.com"), false);
 assert.equal(generated.includes("https://cdn."), false);
 assert.ok(server.includes("_meta: { ui: { resourceUri: RESOURCE_URI } }"));
 assert.equal(server.includes("scout_get_component_sandbox_names_v1_internal"), false);
-assert.ok(server.includes("scout_get_component_sandbox_opportunity_v1_internal"));
+
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_internal"), false);
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_v2_internal"), false);
 assert.equal(server.includes("scout_get_component_sandbox_map_targets_v3_internal"), false);
-assert.ok(server.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"));
-assert.ok(server.includes("scout_get_component_sandbox_water_tank_map_v1_internal"));
+assert.ok(singleSiteRegistry.includes("scout_get_component_sandbox_opportunity_v1_internal"));
+assert.ok(singleSiteRegistry.includes("scout_get_component_sandbox_premium_exterior_map_v1_internal"));
+assert.ok(singleSiteRegistry.includes("scout_get_component_sandbox_water_tank_map_v1_internal"));
+assert.ok(singleSiteRegistry.includes("scout_get_component_sandbox_swppp_site_map_v1_internal"));
+assert.ok(singleSiteRegistry.includes("scout_get_component_sandbox_telecom_change_v1_internal"));
+
+
 assert.equal(server.includes("names: z.array"), false);
 assert.ok(server.includes("fromJsonSchema(sandboxOpportunityTypeInputSchema())"));
 assert.ok(server.includes("fromJsonSchema(sandboxResultSchema())"));

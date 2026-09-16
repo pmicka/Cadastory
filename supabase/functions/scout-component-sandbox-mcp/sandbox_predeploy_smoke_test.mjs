@@ -56,6 +56,7 @@ const smokeTestByType = {
   premium_exterior: 'single_site_map_renderer_test.mjs',
   water_tank: 'water_tank_map_integration_test.mjs',
   swppp_site: 'swppp_site_map_integration_test.mjs',
+  telecom_change: 'telecom_change_map_renderer_test.mjs',
   water_utility_portfolio: 'water_portfolio_map_renderer_test.mjs',
   dealership_group_portfolio: 'dealership_portfolio_map_renderer_test.mjs',
   hotel_management_portfolio: 'hotel_portfolio_map_renderer_test.mjs',

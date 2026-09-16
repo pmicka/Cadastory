@@ -1,4 +1,3 @@
-import { buildScoutSwpppSiteTransport } from './swppp_site_transport.ts'
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import { createMcpHandler, fromJsonSchema, McpServer } from 'npm:@modelcontextprotocol/server@2.0.0'
@@ -9,31 +8,19 @@ import {
   SCOUT_SANDBOX_OPPORTUNITY_MANIFEST,
   SCOUT_SANDBOX_PORTFOLIO_MANIFEST,
   SCOUT_SANDBOX_RESOURCE_URI,
+  isScoutSandboxSingleSiteType,
   isScoutSandboxPortfolioType,
   isScoutSandboxRasterTileAllowed,
   scoutSandboxCompatibilityResourceUris,
   scoutSandboxToolDescription,
   type ScoutSandboxOpportunityType,
+  type ScoutSandboxSingleSiteType,
   type ScoutSandboxPortfolioType,
 } from '../_shared/scout_sandbox_manifest.ts'
 import { sandboxOpportunityTypeInputSchema, sandboxResultSchema } from '../_shared/scout_sandbox_contract_schema.ts'
 import { assertScoutSandboxPortfolioImplementationCoverage, scoutSandboxPortfolioImplementation } from './portfolio_registry.ts'
-import {
-  buildScoutSandboxWaterTankOpportunity,
-  normalizeScoutSandboxOpportunity,
-  normalizeScoutSandboxSingleSiteMap,
-  normalizeScoutSandboxWaterTankMap,
-  type ScoutSandboxResult,
-} from './contract.ts'
-import {
-  buildScoutSandboxSwpppSiteOpportunity,
-  normalizeScoutSandboxSwpppSiteMap,
-  type ScoutSandboxSwpppSiteMap,
-} from './swppp_site_map_model.ts'
+import { assertScoutSandboxSingleSiteImplementationCoverage, scoutSandboxSingleSiteImplementation } from './single_site_registry.ts'
 import { SCOUT_VIEW_HTML } from './view.generated.ts'
-import { buildScoutSwpppSiteRasterFrame } from './swppp_site_map_renderer.ts'
-import { buildScoutSingleSiteRasterFrame } from './single_site_map_renderer.ts'
-import { buildScoutWaterTankRasterFrame } from './water_tank_map_renderer.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -56,36 +43,27 @@ const ENUMERATION_CONTRACT = 'scout-enumeration-v1'
 const MAP_TILE_ORIGIN = SUPABASE_URL
 const MAP_TILE_UPSTREAM = 'https://a.tile.openstreetmap.fr/hot'
 
-async function loadScoutSandboxOpportunity() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_opportunity_v1_internal')
-  if (error) throw new Error('Scout sandbox opportunity is unavailable')
-  const opportunity = normalizeScoutSandboxOpportunity(data)
-  if (!opportunity) throw new Error('Scout sandbox opportunity did not satisfy the bounded contract')
+async function loadScoutSandboxSingleSiteMap(type: ScoutSandboxSingleSiteType) {
+  const implementation = scoutSandboxSingleSiteImplementation(type)
+  const { data, error } = await admin.rpc(implementation.mapRpc)
+  if (error) throw new Error(`Scout sandbox ${type} map is unavailable`)
+  const map = implementation.normalizeMap(data)
+  if (!map) throw new Error(`Scout sandbox ${type} map did not satisfy the bounded contract`)
+  return map
+}
+
+async function loadScoutSandboxSingleSiteOpportunity(type: ScoutSandboxSingleSiteType, map: any) {
+  const implementation = scoutSandboxSingleSiteImplementation(type)
+  if (implementation.opportunityRpc) {
+    const { data, error } = await admin.rpc(implementation.opportunityRpc)
+    if (error) throw new Error(`Scout sandbox ${type} opportunity is unavailable`)
+    const opportunity = implementation.normalizeOpportunity?.(data)
+    if (!opportunity) throw new Error(`Scout sandbox ${type} opportunity did not satisfy the bounded contract`)
+    return opportunity
+  }
+  const opportunity = implementation.buildOpportunity?.(map)
+  if (!opportunity) throw new Error(`Scout sandbox ${type} opportunity could not be built from the bounded map contract`)
   return opportunity
-}
-
-async function loadScoutSandboxSingleSiteMap() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_premium_exterior_map_v1_internal')
-  if (error) throw new Error('Scout sandbox single-site map is unavailable')
-  const map = normalizeScoutSandboxSingleSiteMap(data)
-  if (!map) throw new Error('Scout sandbox single-site map did not satisfy the bounded contract')
-  return map
-}
-
-async function loadScoutSandboxWaterTankMap() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_water_tank_map_v1_internal')
-  if (error) throw new Error('Scout sandbox water-tank map is unavailable')
-  const map = normalizeScoutSandboxWaterTankMap(data)
-  if (!map) throw new Error('Scout sandbox water-tank map did not satisfy the bounded contract')
-  return map
-}
-
-async function loadScoutSandboxSwpppSiteMap() {
-  const { data, error } = await admin.rpc('scout_get_component_sandbox_swppp_site_map_v1_internal')
-  if (error) throw new Error('Scout sandbox SWPPP-site map is unavailable')
-  const map = normalizeScoutSandboxSwpppSiteMap(data)
-  if (!map) throw new Error('Scout sandbox SWPPP-site map did not satisfy the bounded contract')
-  return map
 }
 
 async function loadScoutSandboxPortfolioMap(type: ScoutSandboxPortfolioType) {
@@ -132,15 +110,16 @@ function selectedRasterFrames(selectedType: ScoutSandboxOpportunityType, map: an
       implementation.buildRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
     )
   }
-  return registration.rasterFrames.map((frameSize) => {
-    if (selectedType === 'swppp_site') return buildScoutSwpppSiteRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
-    if (selectedType === 'water_tank') return buildScoutWaterTankRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
-    return buildScoutSingleSiteRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
-  })
+  if (!isScoutSandboxSingleSiteType(selectedType)) throw new Error(`Scout sandbox ${selectedType} has no single-site raster implementation`)
+  const implementation = scoutSandboxSingleSiteImplementation(selectedType)
+  return registration.rasterFrames.map((frameSize) =>
+    implementation.buildRasterFrame(map, frameSize.width, frameSize.height, { tileUrlTemplate: TILE_URL_TEMPLATE })
+  )
 }
 
 async function loadEmbeddedRasterTilesForSelection(selectedType: ScoutSandboxOpportunityType, map: any) {
   if (isScoutSandboxPortfolioType(selectedType)) assertScoutSandboxPortfolioImplementationCoverage()
+  if (isScoutSandboxSingleSiteType(selectedType)) assertScoutSandboxSingleSiteImplementationCoverage()
   const uniqueTiles = new Map<string, EmbeddedRasterTile>()
   for (const frame of selectedRasterFrames(selectedType, map)) {
     for (const tile of frame.tiles) uniqueTiles.set(tile.url, tile)
@@ -189,7 +168,7 @@ const componentInputSchema = fromJsonSchema(sandboxOpportunityTypeInputSchema())
 const componentOutputSchema = fromJsonSchema(sandboxResultSchema())
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.8' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.9' })
 
   registerAppResource(
     server,
@@ -264,58 +243,15 @@ function makeServer() {
         }
       }
 
-      if (selectedType === 'swppp_site') {
-        const map = await loadScoutSandboxSwpppSiteMap()
-        const opportunity = buildScoutSandboxSwpppSiteOpportunity(map)
-        if (map.site_name !== opportunity.name || map.location_label !== opportunity.location_label) {
-          throw new Error('Scout sandbox SWPPP-site opportunity and map identity do not match')
-        }
-        const structuredContent: ScoutSandboxResult = {
-          surface: 'scout_component_sandbox', opportunity_type: 'swppp_site', opportunity, map: buildScoutSwpppSiteTransport(map),
-        }
-        return {
-          content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} SWPPP-site evidence card with its authoritative permit-location point map.` }],
-          structuredContent,
-          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('swppp_site', map) },
-        }
-      }
-
-      if (selectedType === 'water_tank') {
-        const map = await loadScoutSandboxWaterTankMap()
-        const opportunity = buildScoutSandboxWaterTankOpportunity(map)
-        if (map.name !== opportunity.name || map.system_name !== opportunity.system_name) {
-          throw new Error('Scout sandbox water-tank opportunity and map identity do not match')
-        }
-        const structuredContent: ScoutSandboxResult = {
-          surface: 'scout_component_sandbox',
-          opportunity_type: 'water_tank',
-          opportunity,
-          map,
-        }
-        return {
-          content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} water-tank opportunity card with its single-site map.` }],
-          structuredContent,
-          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('water_tank', map) },
-        }
-      }
-
-      const [opportunity, map] = await Promise.all([
-        loadScoutSandboxOpportunity(),
-        loadScoutSandboxSingleSiteMap(),
-      ])
-      if (map.name !== opportunity.name || map.address !== opportunity.address) {
-        throw new Error('Scout sandbox premium-exterior opportunity and map identity do not match')
-      }
-      const structuredContent: ScoutSandboxResult = {
-        surface: 'scout_component_sandbox',
-        opportunity_type: 'premium_exterior',
-        opportunity,
-        map,
-      }
+      if (!isScoutSandboxSingleSiteType(selectedType)) throw new Error(`Scout sandbox opportunity type ${selectedType} is not registered`)
+      const implementation = scoutSandboxSingleSiteImplementation(selectedType)
+      const map = await loadScoutSandboxSingleSiteMap(selectedType)
+      const opportunity = await loadScoutSandboxSingleSiteOpportunity(selectedType, map)
+      if (!implementation.identityMatches(map, opportunity)) throw new Error(`Scout sandbox ${selectedType} opportunity and map identity do not match`)
       return {
-        content: [{ type: 'text', text: `Scout returned the bounded ${opportunity.name} premium-exterior opportunity card with its single-site map.` }],
-        structuredContent,
-        _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('premium_exterior', map) },
+        content: [{ type: 'text', text: implementation.responseText(opportunity) }],
+        structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map: implementation.toResultMap(map) },
+        _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map) },
       }
     },
   )
