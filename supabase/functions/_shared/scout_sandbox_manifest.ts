@@ -1,13 +1,16 @@
-export const SCOUT_SANDBOX_RESOURCE_VERSION = 39 as const
+import{SCOUT_SPINE_SINGLE_ASSET_CONFIG,SCOUT_SPINE_SINGLE_ASSET_TYPES,type ScoutSpineSingleAssetType,isScoutSpineSingleAssetType}from'./scout_sandbox_spine_single_asset_config.ts'
+export const SCOUT_SANDBOX_RESOURCE_VERSION = 40 as const
 export const SCOUT_SANDBOX_RESOURCE_URI = `ui://scout/component-sandbox/v${SCOUT_SANDBOX_RESOURCE_VERSION}` as const
 export const SCOUT_SANDBOX_EMBEDDED_RASTER_COMPATIBILITY_MIN_VERSION = 22 as const
 export const SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES = 40 as const
 
+export const SCOUT_SANDBOX_SPINE_SINGLE_ASSET_TYPES = SCOUT_SPINE_SINGLE_ASSET_TYPES
 export const SCOUT_SANDBOX_BASE_OPPORTUNITY_TYPES = [
   'premium_exterior',
   'water_tank',
   'swppp_site',
   'telecom_change',
+  ...SCOUT_SANDBOX_SPINE_SINGLE_ASSET_TYPES,
 ] as const
 
 export const SCOUT_SANDBOX_PORTFOLIO_TYPES = [
@@ -27,6 +30,7 @@ export const SCOUT_SANDBOX_SINGLE_SITE_TYPES = SCOUT_SANDBOX_BASE_OPPORTUNITY_TY
 
 export type ScoutSandboxOpportunityType = typeof SCOUT_SANDBOX_OPPORTUNITY_TYPES[number]
 export type ScoutSandboxSingleSiteType = typeof SCOUT_SANDBOX_SINGLE_SITE_TYPES[number]
+export type ScoutSandboxSpineSingleAssetType = ScoutSpineSingleAssetType
 export type ScoutSandboxPortfolioType = typeof SCOUT_SANDBOX_PORTFOLIO_TYPES[number]
 export type ScoutSandboxMapKind = 'single_site' | 'portfolio'
 export type ScoutSandboxHostNormalizationRule = 'strict' | 'unresolved_link_confidence_null_elision'
@@ -97,6 +101,96 @@ export const SCOUT_SANDBOX_OPPORTUNITY_MANIFEST = {
     rasterFrames: [{ width: 456, height: 210 }],
     tileRanges: [],
     tileCenters: singleSiteCenter(-86.35352777777777, 38.20866666666667),
+  },
+  bridge: {
+    slug: 'bridge',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.bridge.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded source opportunity point; no parcel, access, service-radius, or operating boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.bridge.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.bridge.center.lat),
+  },
+  construction_site: {
+    slug: 'construction_site',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.construction_site.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded source opportunity point; no parcel, access, service-radius, or operating boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.construction_site.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.construction_site.center.lat),
+  },
+  event_detailing: {
+    slug: 'event_detailing',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.event_detailing.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded target-building point; event venue is timing context only and no event footprint, service radius, or access area is implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.event_detailing.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.event_detailing.center.lat),
+  },
+  dam: {
+    slug: 'dam',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.dam.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded source opportunity point; no parcel, access, service-radius, or operating boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.dam.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.dam.center.lat),
+  },
+  mine_quarry: {
+    slug: 'mine_quarry',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.mine_quarry.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded source opportunity point; no parcel, access, service-radius, or operating boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.mine_quarry.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.mine_quarry.center.lat),
+  },
+  landfill: {
+    slug: 'landfill',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.landfill.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded source opportunity point; no parcel, access, service-radius, or operating boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.landfill.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.landfill.center.lat),
+  },
+  rail_crossing: {
+    slug: 'rail_crossing',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.rail_crossing.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded source opportunity point; no parcel, access, service-radius, or operating boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.rail_crossing.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.rail_crossing.center.lat),
+  },
+  roof_lifecycle: {
+    slug: 'roof_lifecycle',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.roof_lifecycle.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded source opportunity point; no parcel, access, service-radius, or operating boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.roof_lifecycle.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.roof_lifecycle.center.lat),
+  },
+  solar_lifecycle: {
+    slug: 'solar_lifecycle',
+    label: SCOUT_SPINE_SINGLE_ASSET_CONFIG.solar_lifecycle.label,
+    mapKind: 'single_site',
+    markerSemantics: 'bounded source opportunity point; no parcel, access, service-radius, or operating boundary implied',
+    hostNormalization: 'strict',
+    rasterFrames: [{ width: 456, height: 210 }],
+    tileRanges: [],
+    tileCenters: singleSiteCenter(SCOUT_SPINE_SINGLE_ASSET_CONFIG.solar_lifecycle.center.lon, SCOUT_SPINE_SINGLE_ASSET_CONFIG.solar_lifecycle.center.lat),
   },
   water_utility_portfolio: {
     slug: 'water_utility_portfolio',
@@ -173,6 +267,10 @@ export function isScoutSandboxOpportunityType(value: unknown): value is ScoutSan
 
 export function isScoutSandboxSingleSiteType(value: unknown): value is ScoutSandboxSingleSiteType {
   return typeof value === 'string' && (SCOUT_SANDBOX_SINGLE_SITE_TYPES as readonly string[]).includes(value)
+}
+
+export function isScoutSandboxSpineSingleAssetType(value: unknown): value is ScoutSandboxSpineSingleAssetType {
+  return isScoutSpineSingleAssetType(value)
 }
 
 export function isScoutSandboxPortfolioType(value: unknown): value is ScoutSandboxPortfolioType {

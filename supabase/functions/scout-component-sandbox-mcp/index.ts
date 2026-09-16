@@ -45,7 +45,8 @@ const MAP_TILE_UPSTREAM = 'https://a.tile.openstreetmap.fr/hot'
 
 async function loadScoutSandboxSingleSiteMap(type: ScoutSandboxSingleSiteType) {
   const implementation = scoutSandboxSingleSiteImplementation(type)
-  const { data, error } = await admin.rpc(implementation.mapRpc)
+  const rpcArgs = implementation.mapRpcArgs?.()
+  const { data, error } = rpcArgs ? await admin.rpc(implementation.mapRpc, rpcArgs) : await admin.rpc(implementation.mapRpc)
   if (error) throw new Error(`Scout sandbox ${type} map is unavailable`)
   const map = implementation.normalizeMap(data)
   if (!map) throw new Error(`Scout sandbox ${type} map did not satisfy the bounded contract`)
@@ -168,7 +169,7 @@ const componentInputSchema = fromJsonSchema(sandboxOpportunityTypeInputSchema())
 const componentOutputSchema = fromJsonSchema(sandboxResultSchema())
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.9' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.10' })
 
   registerAppResource(
     server,
