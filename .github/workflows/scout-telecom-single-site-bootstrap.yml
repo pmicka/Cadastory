@@ -50,4 +50,4 @@ jobs:
           git commit -m 'Add FCC ASR telecom change sandbox type'
           git push origin HEAD:scout/telecom-change-single-site
 
-# Temporary bootstrap; permanent registry CI validates the cleaned branch before release.
+# Temporary bootstrap; permanent registry CI validates the final product-only branch.
