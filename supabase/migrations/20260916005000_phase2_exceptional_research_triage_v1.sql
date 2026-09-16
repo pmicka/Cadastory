@@ -51,12 +51,12 @@ begin
 end
 $$;
 
--- Redact the single legacy credential-like query string retained in evidence provenance.
+-- Remove credential-like query values from legacy provenance while retaining the URL path.
 update research.document_evidence_findings
 set source_url=regexp_replace(
       source_url,
       '([?&](api_key|key|token|access_token|auth|authorization)=)[^&]+',
-      E'\\1[REDACTED]',
+      '\1[REDACTED]',
       'gi'
     ),
     extracted_values=coalesce(extracted_values,'{}'::jsonb)||jsonb_build_object(
@@ -85,8 +85,8 @@ set extracted_values=(
     auto_applied=false
 where f.extracted_values::text like '%5554567890%';
 
--- Person-name construction evidence from the retired broad web-research pass is not
--- organization identity evidence. Preserve the rows but quarantine their decision value.
+-- A named individual is not organization identity evidence. Preserve the historical
+-- rows but remove them from decision-grade identity evidence.
 update research.document_evidence_findings f
 set decision_state='unknown',
     identity_confidence=least(identity_confidence,.45),
@@ -99,8 +99,8 @@ where j.id=f.job_id
   and j.rule_pack='buyer_organization_contact_v1'
   and j.subject_key='named-party:daniel gregory';
 
--- The Smith Farms legacy pass matched unrelated similarly named businesses. Retain the
--- research trail, but remove those pages from decision-grade identity evidence.
+-- The Smith Farms legacy pass matched unrelated similarly named businesses. Use stable
+-- farm name/address semantics instead of the generated farm candidate identifier.
 update research.document_evidence_findings f
 set decision_state='unknown',
     identity_confidence=least(identity_confidence,.45),
@@ -110,13 +110,15 @@ set decision_state='unknown',
     )
 from research.document_evidence_jobs j
 where j.id=f.job_id
-  and j.subject_key='agriculture:farm-source:b1ea4f90-ec18-4fa6-ae8e-2f5918c40e70'
-  and f.source_url !~* '(^|\\.)kyagr\\.com/'
-  and f.source_url !~* 'smithberrywinery\\.com';
+  and j.rule_pack='buyer_organization_contact_v1'
+  and j.context->>'research_domain'='agriculture'
+  and public.scout_normalize_business_name(j.organization_name)=public.scout_normalize_business_name('Smith Farms')
+  and coalesce(j.context->'addresses','[]'::jsonb) @> '["Box 44, New Castle, KY 40050"]'::jsonb
+  and lower(f.source_url) not like '%kyagr.com/%'
+  and lower(f.source_url) not like '%smithberrywinery.com%';
 
 -- Construction person names require upstream company/project-party resolution, not
--- another person-oriented web search. Leave the global buyer queue pending so other
--- upstream resolvers can continue working these opportunities.
+-- another person-oriented web search. The buyer queue remains pending for other resolvers.
 update research.document_evidence_jobs
 set state='needs_review',
     completed_at=now(),
@@ -141,9 +143,8 @@ set context=coalesce(context,'{}'::jsonb)||jsonb_build_object(
 where rule_pack='buyer_organization_contact_v1'
   and subject_key='named-party:bill wilkinson';
 
--- Agricultural directory evidence identifies a farm business/contact surface, but the
--- current operator/customer/purchasing role is not independently corroborated. Park
--- these jobs for operator-resolution evidence rather than repeating generic web search.
+-- These seven current farm exceptions have authoritative farm-directory identity/contact
+-- evidence but no independently corroborated current operator/customer/purchasing role.
 update research.document_evidence_jobs
 set state='needs_review',
     completed_at=now(),
@@ -158,7 +159,16 @@ set state='needs_review',
     updated_at=now()
 where rule_pack='buyer_organization_contact_v1'
   and context->>'research_domain'='agriculture'
-  and state='failed';
+  and state='failed'
+  and public.scout_normalize_business_name(organization_name)=any(array[
+    public.scout_normalize_business_name('Anderson Conrad Farms'),
+    public.scout_normalize_business_name('Howe Valley Farms'),
+    public.scout_normalize_business_name('Maxey Valley Farms'),
+    public.scout_normalize_business_name('May Haven Farm'),
+    public.scout_normalize_business_name('Sharp Farms'),
+    public.scout_normalize_business_name('Smith Farms'),
+    public.scout_normalize_business_name('Victoria Farms')
+  ]);
 
 -- Water-tank morphology remains genuinely ambiguous: system-level engineering documents
 -- contain morphology terms that cannot safely be assigned to the exact tank.
@@ -185,6 +195,7 @@ declare
   v_org_id uuid;
   v_count integer;
   v_job_id uuid;
+  v_job_count integer;
   v_candidates text[];
 begin
   select count(*),(array_agg(id order by id))[1]
@@ -216,11 +227,15 @@ begin
       and cp.contact_value='https://www.daviessky.org/transparency/'
   );
 
-  select id into v_job_id
+  select count(*),(array_agg(id order by id))[1]
+    into v_job_count,v_job_id
   from research.document_evidence_jobs
   where rule_pack='buyer_organization_contact_v1'
-    and subject_key='organization:e6b3a1b2-34cd-4c12-8d5d-b984ccf53d7e';
-  if v_job_id is null then raise exception 'Daviess buyer research job not found'; end if;
+    and context->>'organization_id'=v_org_id::text
+    and public.scout_normalize_business_name(organization_name)=public.scout_normalize_business_name('Daviess County Public Works');
+  if v_job_count<>1 then
+    raise exception 'expected exactly one Daviess buyer research job, found %',v_job_count;
+  end if;
 
   update research.document_evidence_jobs
   set state='completed',completed_at=now(),claimed_at=null,lease_until=null,last_error=null,
@@ -240,12 +255,13 @@ end
 $$;
 
 -- Louisville & Indiana Railroad: Anacostia Rail Holdings' current first-party LIRC pages
--- establish the railroad identity and publish a stable general contact route.
+-- establish the railroad identity and publish stable organization/access routes.
 do $$
 declare
   v_org_id uuid;
   v_count integer;
   v_job_id uuid;
+  v_job_count integer;
   v_candidates text[];
 begin
   select count(*),(array_agg(id order by id))[1]
@@ -303,11 +319,14 @@ begin
       and cp.channel_type='url' and cp.contact_value='https://omegarail.com/permitting'
   );
 
-  select id into v_job_id
+  select count(*),(array_agg(id order by id))[1]
+    into v_job_count,v_job_id
   from research.document_evidence_jobs
   where rule_pack='buyer_organization_contact_v1'
     and subject_key='named-party:louisville and indiana railroad';
-  if v_job_id is null then raise exception 'LIRC buyer research job not found'; end if;
+  if v_job_count<>1 then
+    raise exception 'expected exactly one LIRC buyer research job, found %',v_job_count;
+  end if;
 
   update research.document_evidence_jobs
   set organization_name='Louisville & Indiana Railroad Company',
@@ -347,7 +366,7 @@ begin
 end
 $$;
 
--- Fail closed if the targeted exceptional set or unsafe legacy artifacts remain unexplained.
+-- Fail closed if the bounded exceptional set or unsafe legacy artifacts remain unexplained.
 do $$
 declare
   v_failed integer;
@@ -357,14 +376,18 @@ begin
   select count(*) into v_failed
   from research.document_evidence_jobs
   where state='failed'
-    and (
-      subject_key in (
-        'named-party:daniel gregory',
-        'named-party:louisville and indiana railroad',
-        'organization:e6b3a1b2-34cd-4c12-8d5d-b984ccf53d7e'
-      )
-      or context->>'research_domain'='agriculture'
-    );
+    and public.scout_normalize_business_name(organization_name)=any(array[
+      public.scout_normalize_business_name('Daniel Gregory'),
+      public.scout_normalize_business_name('Louisville & Indiana Railroad Company'),
+      public.scout_normalize_business_name('Daviess County Public Works'),
+      public.scout_normalize_business_name('Anderson Conrad Farms'),
+      public.scout_normalize_business_name('Howe Valley Farms'),
+      public.scout_normalize_business_name('Maxey Valley Farms'),
+      public.scout_normalize_business_name('May Haven Farm'),
+      public.scout_normalize_business_name('Sharp Farms'),
+      public.scout_normalize_business_name('Smith Farms'),
+      public.scout_normalize_business_name('Victoria Farms')
+    ]);
   if v_failed<>0 then raise exception 'phase2 targeted failed jobs remain: %',v_failed; end if;
 
   select count(*) into v_placeholder
