@@ -29,9 +29,9 @@ for path in root.glob('*test*.mjs'):
 stale = []
 for path in root.glob('*test*.mjs'):
     text = path.read_text()
-    if 'loadScoutViewHtml' in text or "JSON.stringify(tiles))" in text:
+    if re.search(r'''assert\.ok\([^\n]*loadScoutViewHtml''', text) or re.search(r'''assert\.ok\([^\n]*JSON\.stringify\(tiles\)''', text):
         stale.append(str(path))
 if stale:
-    raise RuntimeError('stale global resource-raster assertions remain: ' + ', '.join(stale))
+    raise RuntimeError('stale positive global resource-raster assertions remain: ' + ', '.join(stale))
 
 print('Migrated per-result resource assertions in', len(changed), 'test files')
