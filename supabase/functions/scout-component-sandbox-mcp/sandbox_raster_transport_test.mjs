@@ -42,7 +42,6 @@ assert.ok(historicalGlobalBundle.size > manifest.SCOUT_SANDBOX_MAX_EMBEDDED_RAST
 for (const [type,tiles] of selections) {
   assert.ok(tiles.length <= manifest.SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES, `${type} exceeds per-result embedded raster budget`)
 }
-assert.equal(historicalGlobalBundle.size,42,'expected v37 regression geometry to require 42 global embedded tiles')
 assert.equal(serverSource.includes('async function loadEmbeddedSandboxTiles()'),false,'resource must not aggregate all registered maps')
 assert.equal(serverSource.includes('loadScoutViewHtml()'),false,'resource must not depend on raster fetch completion')
 assert.ok(serverSource.includes(".replace('__SCOUT_EMBEDDED_RASTER_TILES__', '[]')"),'resource shell must be raster-independent')

@@ -1,5 +1,6 @@
 import{SCOUT_SPINE_SINGLE_ASSET_CONFIG,SCOUT_SPINE_SINGLE_ASSET_TYPES,type ScoutSpineSingleAssetType,isScoutSpineSingleAssetType}from'./scout_sandbox_spine_single_asset_config.ts'
-export const SCOUT_SANDBOX_RESOURCE_VERSION = 40 as const
+import{SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG,SCOUT_SPINE_GROUPED_PORTFOLIO_TYPES,type ScoutSpineGroupedPortfolioType,isScoutSpineGroupedPortfolioType}from'./scout_sandbox_spine_grouped_portfolio_config.ts'
+export const SCOUT_SANDBOX_RESOURCE_VERSION = 41 as const
 export const SCOUT_SANDBOX_RESOURCE_URI = `ui://scout/component-sandbox/v${SCOUT_SANDBOX_RESOURCE_VERSION}` as const
 export const SCOUT_SANDBOX_EMBEDDED_RASTER_COMPATIBILITY_MIN_VERSION = 22 as const
 export const SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES = 40 as const
@@ -13,12 +14,14 @@ export const SCOUT_SANDBOX_BASE_OPPORTUNITY_TYPES = [
   ...SCOUT_SANDBOX_SPINE_SINGLE_ASSET_TYPES,
 ] as const
 
+export const SCOUT_SANDBOX_SPINE_GROUPED_PORTFOLIO_TYPES = SCOUT_SPINE_GROUPED_PORTFOLIO_TYPES
 export const SCOUT_SANDBOX_PORTFOLIO_TYPES = [
   'water_utility_portfolio',
   'dealership_group_portfolio',
   'hotel_management_portfolio',
   'school_district_portfolio',
   'municipal_facilities_portfolio',
+  ...SCOUT_SANDBOX_SPINE_GROUPED_PORTFOLIO_TYPES,
 ] as const
 
 export const SCOUT_SANDBOX_OPPORTUNITY_TYPES = [
@@ -31,6 +34,7 @@ export const SCOUT_SANDBOX_SINGLE_SITE_TYPES = SCOUT_SANDBOX_BASE_OPPORTUNITY_TY
 export type ScoutSandboxOpportunityType = typeof SCOUT_SANDBOX_OPPORTUNITY_TYPES[number]
 export type ScoutSandboxSingleSiteType = typeof SCOUT_SANDBOX_SINGLE_SITE_TYPES[number]
 export type ScoutSandboxSpineSingleAssetType = ScoutSpineSingleAssetType
+export type ScoutSandboxSpineGroupedPortfolioType = ScoutSpineGroupedPortfolioType
 export type ScoutSandboxPortfolioType = typeof SCOUT_SANDBOX_PORTFOLIO_TYPES[number]
 export type ScoutSandboxMapKind = 'single_site' | 'portfolio'
 export type ScoutSandboxHostNormalizationRule = 'strict' | 'unresolved_link_confidence_null_elision'
@@ -255,6 +259,18 @@ export const SCOUT_SANDBOX_OPPORTUNITY_MANIFEST = {
     rpc: 'scout_get_component_sandbox_municipal_portfolio_v1_internal',
     contractVersion: 'municipal_facilities_portfolio_map_v1',
   },
+  bridge_agency_portfolio: {
+    slug: 'bridge_agency_portfolio', label: SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.bridge_agency_portfolio.label, mapKind: 'portfolio', markerSemantics: SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.bridge_agency_portfolio.markerSemantics, hostNormalization: 'strict', rasterFrames: [{ width: 456, height: 210 }, { width: 280, height: 210 }], tileRanges: [SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.bridge_agency_portfolio.tileRange], tileCenters: [], rpc: 'scout_get_component_sandbox_grouped_portfolio_v1_internal', contractVersion: 'spine_grouped_portfolio_map_v1',
+  },
+  railroad_crossing_network: {
+    slug: 'railroad_crossing_network', label: SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.railroad_crossing_network.label, mapKind: 'portfolio', markerSemantics: SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.railroad_crossing_network.markerSemantics, hostNormalization: 'strict', rasterFrames: [{ width: 456, height: 210 }, { width: 280, height: 210 }], tileRanges: [SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.railroad_crossing_network.tileRange], tileCenters: [], rpc: 'scout_get_component_sandbox_grouped_portfolio_v1_internal', contractVersion: 'spine_grouped_portfolio_map_v1',
+  },
+  construction_contractor_portfolio: {
+    slug: 'construction_contractor_portfolio', label: SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.construction_contractor_portfolio.label, mapKind: 'portfolio', markerSemantics: SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.construction_contractor_portfolio.markerSemantics, hostNormalization: 'strict', rasterFrames: [{ width: 456, height: 210 }, { width: 280, height: 210 }], tileRanges: [SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.construction_contractor_portfolio.tileRange], tileCenters: [], rpc: 'scout_get_component_sandbox_grouped_portfolio_v1_internal', contractVersion: 'spine_grouped_portfolio_map_v1',
+  },
+  telecom_registration_portfolio: {
+    slug: 'telecom_registration_portfolio', label: SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.telecom_registration_portfolio.label, mapKind: 'portfolio', markerSemantics: SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.telecom_registration_portfolio.markerSemantics, hostNormalization: 'strict', rasterFrames: [{ width: 456, height: 210 }, { width: 280, height: 210 }], tileRanges: [SCOUT_SPINE_GROUPED_PORTFOLIO_CONFIG.telecom_registration_portfolio.tileRange], tileCenters: [], rpc: 'scout_get_component_sandbox_grouped_portfolio_v1_internal', contractVersion: 'spine_grouped_portfolio_map_v1',
+  },
 } as const satisfies Record<ScoutSandboxOpportunityType, ScoutSandboxOpportunityManifestEntry | ScoutSandboxPortfolioManifestEntry>
 
 export const SCOUT_SANDBOX_PORTFOLIO_MANIFEST = Object.fromEntries(
@@ -275,6 +291,10 @@ export function isScoutSandboxSpineSingleAssetType(value: unknown): value is Sco
 
 export function isScoutSandboxPortfolioType(value: unknown): value is ScoutSandboxPortfolioType {
   return typeof value === 'string' && (SCOUT_SANDBOX_PORTFOLIO_TYPES as readonly string[]).includes(value)
+}
+
+export function isScoutSandboxSpineGroupedPortfolioType(value: unknown): value is ScoutSandboxSpineGroupedPortfolioType {
+  return isScoutSpineGroupedPortfolioType(value)
 }
 
 export function scoutSandboxCompatibilityResourceUris() {

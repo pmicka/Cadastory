@@ -70,7 +70,8 @@ async function loadScoutSandboxSingleSiteOpportunity(type: ScoutSandboxSingleSit
 async function loadScoutSandboxPortfolioMap(type: ScoutSandboxPortfolioType) {
   const registration = SCOUT_SANDBOX_PORTFOLIO_MANIFEST[type]
   const implementation = scoutSandboxPortfolioImplementation(type)
-  const { data, error } = await admin.rpc(registration.rpc)
+  const rpcArgs = implementation.mapRpcArgs?.()
+  const { data, error } = rpcArgs ? await admin.rpc(registration.rpc, rpcArgs) : await admin.rpc(registration.rpc)
   if (error) throw new Error(`Scout sandbox ${type} map is unavailable`)
   const map = implementation.normalizeMap(data)
   if (!map) throw new Error(`Scout sandbox ${type} map did not satisfy the bounded contract`)
@@ -169,7 +170,7 @@ const componentInputSchema = fromJsonSchema(sandboxOpportunityTypeInputSchema())
 const componentOutputSchema = fromJsonSchema(sandboxResultSchema())
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.10' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.11' })
 
   registerAppResource(
     server,

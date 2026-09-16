@@ -9,7 +9,7 @@ async function bundleModule(path) {
 }
 const manifest = await bundleModule('../_shared/scout_sandbox_manifest.ts')
 const schemas = await bundleModule('../_shared/scout_sandbox_contract_schema.ts')
-const [component, contractGateway, connectGateway, view, viewRegistry, singleSiteRegistry, singleSiteViewRegistry] = await Promise.all([
+const [component, contractGateway, connectGateway, view, viewRegistrySource, singleSiteRegistry, singleSiteViewRegistry] = await Promise.all([
   readFile(new URL('index.ts', directory), 'utf8'),
   readFile(new URL('../scout-mcp-contract/index.ts', directory), 'utf8'),
   readFile(new URL('../scout-connect/index.ts', directory), 'utf8'),
@@ -48,7 +48,9 @@ for (const type of manifest.SCOUT_SANDBOX_SINGLE_SITE_TYPES) {
 assert.ok(view.includes('isScoutSandboxOpportunityType'))
 assert.ok(view.includes('isScoutSandboxPortfolioType'))
 assert.ok(view.includes('scoutSandboxPortfolioViewImplementation'))
-for (const type of manifest.SCOUT_SANDBOX_PORTFOLIO_TYPES) assert.ok(viewRegistry.includes(`${type}:`), `view registry missing ${type}`)
+assert.ok(viewRegistrySource.includes('groupedViewImplementations'))
+const viewRegistryModule = await bundleModule('portfolio_view_registry.ts')
+assert.deepEqual(Object.keys(viewRegistryModule.SCOUT_SANDBOX_PORTFOLIO_VIEW_IMPLEMENTATIONS).sort(),[...manifest.SCOUT_SANDBOX_PORTFOLIO_TYPES].sort(),'portfolio view runtime registry must cover the shared manifest')
 assert.equal(view.includes("opportunityType !== 'premium_exterior' && opportunityType !== 'water_tank'"), false)
 
 const compatibility = manifest.scoutSandboxCompatibilityResourceUris()
