@@ -60,7 +60,7 @@ The LOJIC address-point query is bounded and paginated because a common house nu
 
 The assessor's primary situs address is allowed to differ from the operational/site address. Multi-building or multi-address parcels make that a normal condition. Parcel identity, not fuzzy situs-address equality, is the cross-source join after the exact LOJIC address-point match.
 
-The recovery profile is `ky_jefferson_pva_address_lrsn`. It keeps `eligible_source_kinds=[]` so it cannot enter the ordinary spatial seeder. Its dedicated recovery seeder reads `recovery_source_kinds`, and `automated_dispatch` is the explicit switch controlling whether the normal local claim lane may consume recovery jobs.
+The recovery profile is `ky_jefferson_pva_address_lrsn`. It keeps `eligible_source_kinds=[]` so it cannot enter the ordinary spatial seeder. Its dedicated recovery seeder reads `recovery_source_kinds`. The profile deliberately keeps `automated_dispatch=false`; recovery work is consumed only through the dedicated `address_recovery` claim scope, not through the ordinary local claim RPC.
 
 ### `arcgis_point_owner`
 
@@ -102,13 +102,15 @@ Acquisition transport is deliberately separate from evidence semantics.
 
 ### Local Jefferson transport
 
-`pva_lrsn_html` jobs are claimed through `internal_claim_local_responsible_party_resolution_jobs_v1()` and processed by the private authenticated Supabase Edge Function `collect-responsible-party-resolution`.
+`pva_lrsn_html` jobs are processed by the private authenticated Supabase Edge Function `collect-responsible-party-resolution`.
 
-The legacy claim RPC delegates to this local-only lane so the scheduled Edge Function cannot consume remote ArcGIS jobs.
+Ordinary Jefferson jobs are claimed through `internal_claim_local_responsible_party_resolution_jobs_v1()`. The legacy claim RPC delegates to this local-only lane so the scheduled Edge Function cannot consume remote ArcGIS jobs or address-recovery jobs.
 
-The same worker handles both Jefferson `pva_lrsn_html` modes. Ordinary primary jobs use the parcel/LRSN already selected by the local spatial seeder. Recovery jobs first resolve an exact LOJIC address point to LRSN/PARCELID, then fetch the same public PVA detail source. Recovery jobs participate in the ordinary local claim lane only when their profile has `automated_dispatch=true`.
+Recovery jobs use the separate `internal_claim_responsible_party_address_recovery_jobs_v1()` claim RPC and invoke the same Edge Function with `claim_scope=address_recovery`. Recovery first resolves an exact LOJIC address point to LRSN/PARCELID, then fetches the same public PVA detail source used by primary Jefferson jobs.
 
-The release cadence remains the existing responsible-party cadence: seed at minute `21`, then local worker at minutes `22` and `52`. Recovery activation extends the existing seed wrapper and local claim lane; it must not add a parallel recovery cron.
+The release cadence remains the existing responsible-party cadence: seed at minute `21`, then the existing worker cron at minutes `22` and `52`. The worker cron does not gain another schedule. Instead, its command invokes a scheduler wrapper that spends the same eight-job budget as a fixed **4 primary + 4 recovery** split per run. This prevents a large recovery backlog from starving ordinary parcel work while guaranteeing bounded recovery progress.
+
+The split is intentionally enforced outside priority ordering. During pre-release fairness analysis, 308 active recovery candidates outranked the primary Jefferson queue's then-current maximum priority, so a single merged priority queue would have allowed fallback work to monopolize the worker.
 
 ### Remote ArcGIS transport
 
@@ -215,6 +217,8 @@ The unauthorized Edge Function boundary returned `401` during acceptance.
 
 A full `scout.refresh_opportunity_buyer_routes()` rebuild was then run against the accepted evidence. All five organization-owner rows retained their durable organization IDs and named-responsibility projection, while both person/household rows remained `role_only` with no organization ID, buyer organization, buyer hint, or buyer name. That rebuild is the persistence acceptance for the fallback lane.
 
+Pre-release fairness analysis then evaluated the full active Jefferson deferral population. Of 1,014 then-current eligible deferred candidates, 308 had priority above the primary local queue's maximum. Recovery therefore uses a fixed 4/4 lane split rather than merging fallback jobs into the primary priority ordering.
+
 ## Production acceptance
 
 A new provider or opportunity type is not considered production-ready solely because its schema or public service metadata looks correct.
@@ -231,7 +235,7 @@ Deployment verification should include:
 8. confirm unauthorized Edge Function access returns `401` for Edge-hosted lanes; and
 9. run the standard Scout architecture assertions.
 
-For Jefferson address recovery, acceptance additionally requires exact LOJIC address-point matching, LOJIC/PVA parcel-ID agreement, bounded pagination behavior, and confirmation that the ordinary spatial deferral remains resolver-specific rather than blocking the global buyer queue.
+For Jefferson address recovery, acceptance additionally requires exact LOJIC address-point matching, LOJIC/PVA parcel-ID agreement, bounded pagination behavior, confirmation that the ordinary spatial deferral remains resolver-specific rather than blocking the global buyer queue, and a bounded dispatch strategy that cannot starve primary Jefferson work.
 
 For manager-contact research, acceptance additionally requires proving that successful contact-route extraction leaves buyer identity and buyer queue state unchanged and that no `research.document_evidence_job_candidates` rows are created for `responsible_party_contact` jobs.
 
