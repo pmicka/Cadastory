@@ -1,5 +1,6 @@
 name: Scout per-result raster transport bootstrap
 
+# Temporary branch-only bootstrap; removed before merge.
 on:
   push:
     branches:
