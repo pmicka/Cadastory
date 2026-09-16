@@ -5,6 +5,9 @@
 -- eligible_source_kinds is empty. The dedicated recovery seeder reads
 -- recovery_source_kinds instead and only considers candidates already deferred by
 -- the canonical Jefferson spatial profile.
+--
+-- automated_dispatch starts false so bounded production acceptance can use the
+-- dedicated recovery claim lane without racing the ordinary Jefferson worker.
 
 insert into ingest.sources(
   slug,name,authority,source_class,geographic_scope,acquisition_method,
@@ -58,6 +61,7 @@ values(
   jsonb_build_object(
     'resolution_mode','address_point_lrsn_recovery',
     'recovery_from_profile','ky_jefferson_pva_lrsn',
+    'automated_dispatch',false,
     'eligible_source_kinds',jsonb_build_array(),
     'recovery_source_kinds',jsonb_build_array('construction_window','exterior_cleaning','roof_lifecycle'),
     'address_lookup_url','https://gis.lojic.org/maps/rest/services/LojicSolutions/OpenDataAddresses/MapServer/0/query',
@@ -175,7 +179,6 @@ begin
       max(lookup_address) lookup_address,
       max(priority) priority,
       array_agg(candidate_key order by priority desc,candidate_key) candidate_keys,
-      array_agg(distinct source_kind order by source_kind) source_kinds,
       md5(concat_ws('|',profile_key,address_key,
         string_agg(candidate_key,',' order by candidate_key))) input_fingerprint
     from eligible
@@ -308,6 +311,7 @@ begin
     from research.responsible_party_resolution_jobs j
     join research.responsible_party_source_profiles p on p.profile_key=j.profile_key
     where p.active and p.provider_kind='pva_lrsn_html'
+      and coalesce((p.attributes->>'automated_dispatch')::boolean,true)=true
       and j.state in ('queued','failed')
       and j.attempt_count<j.max_attempts
       and j.next_attempt_at<=now()
@@ -346,6 +350,74 @@ revoke all on function public.internal_claim_local_responsible_party_resolution_
 grant execute on function public.internal_claim_local_responsible_party_resolution_jobs_v1(integer)
   to service_role;
 
+create or replace function public.internal_claim_responsible_party_address_recovery_jobs_v1(
+  p_limit integer default 4
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare v_result jsonb;
+begin
+  if coalesce(auth.role(),'') <> 'service_role' then raise exception 'service_role required'; end if;
+  if p_limit < 1 or p_limit > 8 then raise exception 'p_limit must be between 1 and 8'; end if;
+
+  update research.responsible_party_resolution_jobs j
+  set state='queued',claimed_at=null,lease_until=null,
+      last_error=concat_ws(E'\n',nullif(j.last_error,''),'claim lease expired'),updated_at=now()
+  where j.state='claimed' and j.lease_until<now()
+    and exists (
+      select 1 from research.responsible_party_source_profiles p
+      where p.profile_key=j.profile_key and p.active
+        and p.attributes->>'resolution_mode'='address_point_lrsn_recovery'
+    );
+
+  with picked as (
+    select j.id
+    from research.responsible_party_resolution_jobs j
+    join research.responsible_party_source_profiles p on p.profile_key=j.profile_key
+    where p.active
+      and p.provider_kind='pva_lrsn_html'
+      and p.attributes->>'resolution_mode'='address_point_lrsn_recovery'
+      and j.state in ('queued','failed')
+      and j.attempt_count<j.max_attempts
+      and j.next_attempt_at<=now()
+    order by j.priority desc,j.next_attempt_at,j.created_at
+    for update of j skip locked
+    limit p_limit
+  ), claimed as (
+    update research.responsible_party_resolution_jobs j
+    set state='claimed',attempt_count=j.attempt_count+1,claimed_at=now(),
+        lease_until=now()+interval '30 minutes',last_error=null,updated_at=now()
+    from picked where j.id=picked.id returning j.*
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id',c.id,'profile_key',c.profile_key,'lookup_key',c.lookup_key,
+    'parcel_source_record_id',c.parcel_source_record_id,
+    'parcel_source_native_id',c.parcel_source_native_id,'parcel_id',c.parcel_id,
+    'priority',c.priority,'attempt_count',c.attempt_count,'max_attempts',c.max_attempts,
+    'provider_kind',p.provider_kind,'owner_lookup_url_template',p.owner_lookup_url_template,
+    'source_authority',p.source_authority,'source_url',p.source_url,
+    'profile_attributes',p.attributes,
+    'lookup_address',(select max(nullif(btrim(l.address_hint),''))
+      from research.responsible_party_resolution_job_candidates l where l.job_id=c.id),
+    'candidate_keys',(select coalesce(jsonb_agg(l.candidate_key order by l.candidate_key),'[]'::jsonb)
+      from research.responsible_party_resolution_job_candidates l where l.job_id=c.id)
+  ) order by c.priority desc,c.created_at),'[]'::jsonb)
+  into v_result
+  from claimed c
+  join research.responsible_party_source_profiles p on p.profile_key=c.profile_key;
+
+  return v_result;
+end
+$$;
+
+revoke all on function public.internal_claim_responsible_party_address_recovery_jobs_v1(integer)
+  from public,anon,authenticated;
+grant execute on function public.internal_claim_responsible_party_address_recovery_jobs_v1(integer)
+  to service_role;
+
 -- Recovery jobs are an alternate authoritative resolver and must not mutate the
 -- original spatial deferral record merely by being seeded.
 do $$
@@ -354,7 +426,10 @@ begin
   select count(*) into v_bad
   from research.responsible_party_source_profiles p
   where p.profile_key='ky_jefferson_pva_address_lrsn'
-    and pg_catalog.jsonb_array_length(coalesce(p.attributes->'eligible_source_kinds','[]'::jsonb))<>0;
-  if v_bad<>0 then raise exception 'address recovery profile entered ordinary spatial seeding'; end if;
+    and (
+      pg_catalog.jsonb_array_length(coalesce(p.attributes->'eligible_source_kinds','[]'::jsonb))<>0
+      or coalesce((p.attributes->>'automated_dispatch')::boolean,true)<>false
+    );
+  if v_bad<>0 then raise exception 'address recovery profile entered ordinary production dispatch'; end if;
 end
 $$;
