@@ -50,10 +50,10 @@ for (const source of [modelSource, rendererSource]) {
 }
 
 // Batch 3 wires the isolated point renderer into the selected water-tank View path.
-assert.ok(view.includes('mountScoutWaterTankMap'))
-assert.ok(view.includes('mountScoutWaterTankMap(mapContainer, mapData, { ...mapOptions, embeddedTiles })'))
-assert.ok(view.includes('normalizeScoutSandboxWaterTankMap'))
-assert.ok(server.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
+assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))
+assert.ok(view.includes('implementation.mount(mapContainer, mapData, mountOptions)'))
+assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))
+assert.ok(server.includes('scoutSandboxSingleSiteImplementation'))
 assert.ok(server.includes("inputSchema: componentInputSchema"))
 assert.ok(server.includes("outputSchema: componentOutputSchema"))
 assert.ok(server.includes("fromJsonSchema(sandboxResultSchema())"))

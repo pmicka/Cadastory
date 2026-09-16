@@ -152,7 +152,7 @@ assert.equal(rendererJs.includes('document.createElement'), false)
 
 // The live server uses the same pure frame projection to preload only the
 // bounded tiles required by the selected SWPPP card.
-assert.equal(serverSource.includes('buildScoutSwpppSiteRasterFrame'), true)
+assert.equal(serverSource.includes('scoutSandboxSingleSiteImplementation'), true)
 assert.equal(viewSource.includes('buildScoutSwpppSiteRasterFrame'), false)
 assert.equal(generatedView.includes('swppp_site_map_v1'), true)
 assert.ok(mapContract.includes('SWPPP-site isolated point renderer'))

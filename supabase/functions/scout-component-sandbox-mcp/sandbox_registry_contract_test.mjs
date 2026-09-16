@@ -9,12 +9,14 @@ async function bundleModule(path) {
 }
 const manifest = await bundleModule('../_shared/scout_sandbox_manifest.ts')
 const schemas = await bundleModule('../_shared/scout_sandbox_contract_schema.ts')
-const [component, contractGateway, connectGateway, view, viewRegistry] = await Promise.all([
+const [component, contractGateway, connectGateway, view, viewRegistry, singleSiteRegistry, singleSiteViewRegistry] = await Promise.all([
   readFile(new URL('index.ts', directory), 'utf8'),
   readFile(new URL('../scout-mcp-contract/index.ts', directory), 'utf8'),
   readFile(new URL('../scout-connect/index.ts', directory), 'utf8'),
   readFile(new URL('view.ts', directory), 'utf8'),
   readFile(new URL('portfolio_view_registry.ts', directory), 'utf8'),
+  readFile(new URL('single_site_registry.ts', directory), 'utf8'),
+  readFile(new URL('single_site_view_registry.ts', directory), 'utf8'),
 ])
 
 const registered = [...manifest.SCOUT_SANDBOX_OPPORTUNITY_TYPES]
@@ -37,6 +39,12 @@ assert.ok(component.includes("fromJsonSchema(sandboxOpportunityTypeInputSchema()
 assert.ok(component.includes("fromJsonSchema(sandboxResultSchema())"))
 assert.equal(component.includes('componentResultSchemaByType'), false)
 assert.ok(component.includes('scoutSandboxPortfolioImplementation'))
+assert.ok(component.includes('scoutSandboxSingleSiteImplementation'))
+assert.ok(view.includes('scoutSandboxSingleSiteViewImplementation'))
+for (const type of manifest.SCOUT_SANDBOX_SINGLE_SITE_TYPES) {
+  assert.ok(singleSiteRegistry.includes(`${type}:`), `single-site runtime registry missing ${type}`)
+  assert.ok(singleSiteViewRegistry.includes(`${type}:`), `single-site view registry missing ${type}`)
+}
 assert.ok(view.includes('isScoutSandboxOpportunityType'))
 assert.ok(view.includes('isScoutSandboxPortfolioType'))
 assert.ok(view.includes('scoutSandboxPortfolioViewImplementation'))

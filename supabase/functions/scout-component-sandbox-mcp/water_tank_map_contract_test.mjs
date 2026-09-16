@@ -121,12 +121,12 @@ assert.equal('time_sensitive' in opportunity, false)
 // Batch 3 is host-visible and type-matched end-to-end.
 assert.ok(contractSource.includes('normalizeScoutSandboxWaterTankMap'))
 assert.ok(contractSource.includes('buildScoutSandboxWaterTankOpportunity'))
-assert.ok(serverSource.includes('scout_get_component_sandbox_water_tank_map_v1_internal'))
+assert.ok(serverSource.includes('scoutSandboxSingleSiteImplementation'))
 assert.ok(serverSource.includes("inputSchema: componentInputSchema"))
 assert.ok(serverSource.includes("outputSchema: componentOutputSchema"))
 assert.ok(serverSource.includes("fromJsonSchema(sandboxResultSchema())"))
-assert.ok(viewSource.includes('normalizeScoutSandboxWaterTankMap'))
-assert.ok(viewSource.includes('mountScoutWaterTankMap'))
+assert.ok(viewSource.includes('scoutSandboxSingleSiteViewImplementation'))
+assert.ok(viewSource.includes('scoutSandboxSingleSiteViewImplementation'))
 assert.ok(viewSource.includes("opportunityType === 'water_tank'"))
 
 for (const deprecated of [
