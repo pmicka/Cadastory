@@ -1,0 +1,49 @@
+name: Scout telecom single-site bootstrap
+
+on:
+  push:
+    branches:
+      - scout/telecom-change-single-site
+    paths:
+      - .github/workflows/scout-telecom-single-site-bootstrap.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: scout/telecom-change-single-site
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Apply telecom single-site implementation
+        run: python3 scripts/apply_telecom_single_site.py
+      - name: Install sandbox dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Regenerate MCP Apps View
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run build
+      - name: Run complete sandbox suite
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm test
+      - name: Run predeploy registry smoke
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run smoke:contract
+      - name: Commit generated implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add supabase/functions supabase/migrations
+          if git diff --cached --quiet; then
+            echo 'No durable changes produced.'
+            exit 1
+          fi
+          git commit -m 'Add FCC ASR telecom change sandbox type'
+          git push origin HEAD:scout/telecom-change-single-site
