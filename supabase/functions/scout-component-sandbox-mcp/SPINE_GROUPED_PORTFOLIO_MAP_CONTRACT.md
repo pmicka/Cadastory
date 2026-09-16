@@ -1,5 +1,7 @@
 # Scout grouped spine portfolio map contract
 
+**Owner-approved Stage 2 scope — 2026-09-16.** The initial multi-asset/network rollout is approved for `bridge_agency_portfolio`, `railroad_crossing_network`, `construction_contractor_portfolio`, and `telecom_registration_portfolio`. This approval preserves the existing Scout card geometry and one-map-per-result behavior; it does not authorize generalized clustering, inferred territory, route planning, network topology, or synthetic asset boundaries.
+
 `spine_grouped_portfolio_map_v1` is the bounded Stage-2 adapter for multi-member opportunities that already share a resolved organization relationship in `scout.opportunity_search_spine`.
 
 The adapter is point-only. Membership means current spine evidence resolved the member to the same buyer organization under the type-specific relationship semantics. It does **not** create parcels, ownership polygons, rights-of-way, track topology, service radii, access envelopes, project-control areas, guy-wire footprints, inspection perimeters, or operating boundaries.
