@@ -50,4 +50,4 @@ jobs:
           git commit -m 'Add FCC ASR telecom change sandbox type'
           git push origin HEAD:scout/telecom-change-single-site
 
-# Bootstrap workflow is temporary and will be removed before PR review.
+# Temporary bootstrap. Durable output is validated again by permanent registry CI.
