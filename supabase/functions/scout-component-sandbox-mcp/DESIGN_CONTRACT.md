@@ -140,3 +140,8 @@ Within the existing map media tile, the Warren County portfolio uses flat 2D cir
 ## Telecom-change single-site extension (owner-approved 2026-09-16)
 
 `telecom_change` is approved as the next bounded single-site opportunity family. Its first exemplar is FCC ASR registration 1333510 / The Towers, LLC near Leavenworth, Indiana. The existing card geometry and three-slide carousel remain unchanged; exactly one slide is the non-interactive FCC registration-point map. Raw FCC codes may be displayed as codes but must not be silently decoded without authoritative support.
+
+
+## Owner-approved remaining single-asset batch — 2026-09-16
+
+The owner approved completing the remaining non-special-domain single-asset opportunity families before moving to multi-asset/network opportunities. Each card/result still represents exactly one opportunity type and one bounded evidence contract; batching authorizes a combined implementation/release cadence, not mixed maps or cross-type inference. The first batch covers bridge, construction site, dam, mine/quarry, landfill, rail crossing, roof lifecycle, and solar lifecycle through the shared single-site registry. Agriculture and forest-health/ecology remain outside this batch. Event-detailing remains in the single-asset phase but is held until its current event-source evidence is cleaned rather than freezing malformed venue text into a durable contract.

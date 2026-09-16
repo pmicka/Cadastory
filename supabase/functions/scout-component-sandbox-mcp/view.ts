@@ -4,6 +4,7 @@ import {
   SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES,
   isScoutSandboxOpportunityType,
   isScoutSandboxSingleSiteType,
+  isScoutSandboxSpineSingleAssetType,
   isScoutSandboxPortfolioType,
   type ScoutSandboxOpportunityType as ScoutViewOpportunityType,
 } from '../_shared/scout_sandbox_manifest.ts'
@@ -17,6 +18,7 @@ import {
 } from './contract.ts'
 import { normalizeScoutSandboxTelecomChangeOpportunity } from './telecom_change_map_model.ts'
 import { normalizeScoutSandboxSwpppSiteOpportunity } from './swppp_site_map_model.ts'
+import { normalizeScoutSandboxSpineSingleAssetOpportunity } from './spine_single_asset_model.ts'
 
 type ScoutMapHandle = {
   destroy: () => void
@@ -179,6 +181,19 @@ function renderOpportunity(opportunityType: ScoutViewOpportunityType, value: unk
     if (summary) summary.textContent = presentation.summary
     if (guardrail) guardrail.textContent = presentation.guardrail
     setState(presentation.state)
+    return
+  }
+
+  if (isScoutSandboxSpineSingleAssetType(opportunityType)) {
+    const opportunity = normalizeScoutSandboxSpineSingleAssetOpportunity(opportunityType, value)
+    if (!opportunity) { renderUnavailableOpportunity(); return }
+    if (title) title.textContent = opportunity.name
+    if (tier) tier.textContent = opportunity.status_label
+    if (meta) meta.textContent = `${Math.round(opportunity.confidence * 100)}% Scout signal confidence  •  Observed ${formatObserved(opportunity.observed_at)}`
+    if (address) address.textContent = opportunity.location_label
+    if (summary) summary.textContent = `${opportunity.facts.map((fact) => `${fact.label}: ${fact.value}`).join('  •  ')}  •  ${opportunity.why_investigate}`
+    if (guardrail) guardrail.textContent = `Scout guardrail: ${opportunity.guardrail}`
+    setState(`Scout opportunity ready: ${opportunity.name}`)
     return
   }
 
@@ -398,7 +413,7 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.19.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.20.0' })
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent

@@ -336,3 +336,8 @@ This invariant prevents portfolio growth from increasing every resource read and
 ## Telecom-change single-site contract (owner-approved 2026-09-16)
 
 The `telecom_change` implementation is governed by `TELECOM_CHANGE_MAP_CONTRACT.md`. The first exemplar uses the exact FCC ASR registration coordinate for registration 1333510. No parcel, compound, service radius, access envelope, guy-wire footprint, ownership boundary, inspection perimeter, or climb area may be inferred. New registration/recent construction are qualification signals only; they do not prove inspection need, procurement, buyer intent, access, or work availability.
+
+
+## Owner-approved remaining single-asset batch — 2026-09-16
+
+The owner approved completing the remaining non-special-domain single-asset opportunity families before moving to multi-asset/network opportunities. Each card/result still represents exactly one opportunity type and one bounded evidence contract; batching authorizes a combined implementation/release cadence, not mixed maps or cross-type inference. The first batch covers bridge, construction site, dam, mine/quarry, landfill, rail crossing, roof lifecycle, and solar lifecycle through the shared single-site registry. Agriculture and forest-health/ecology remain outside this batch. Event-detailing remains in the single-asset phase but is held until its current event-source evidence is cleaned rather than freezing malformed venue text into a durable contract.
