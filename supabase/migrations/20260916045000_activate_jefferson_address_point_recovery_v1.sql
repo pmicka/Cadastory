@@ -1,5 +1,11 @@
 -- Phase 4 release activation: add the proven Jefferson address-point recovery
--- lane to the existing responsible-party cadence. No new cron is introduced.
+-- lane to the existing responsible-party cadence without adding another cron.
+--
+-- Recovery stays structurally isolated from the ordinary local claim RPC. The
+-- existing worker cron invokes the same Edge Function twice per run with a fixed
+-- 4/4 split: four primary Jefferson jobs and four address-recovery jobs. This
+-- preserves the existing total limit of eight jobs per run while preventing the
+-- ~1,000-case recovery backlog from starving primary parcel work.
 --
 -- The recovery provider remains property-owner evidence only. Household owners
 -- remain evidence-only; property ownership does not imply management, operation,
@@ -9,7 +15,7 @@ update research.responsible_party_source_profiles
 set attributes=jsonb_set(
       coalesce(attributes,'{}'::jsonb),
       '{automated_dispatch}',
-      'true'::jsonb,
+      'false'::jsonb,
       true
     ),
     updated_at=now()
@@ -52,17 +58,82 @@ $$;
 revoke all on function research.seed_responsible_party_resolution_jobs_cron_v1(integer)
   from public,anon,authenticated;
 
--- Fail closed if the release activation did not land exactly on the intended
--- profile/dispatch contract. The normal local claim lane already filters on
--- automated_dispatch=true, so this is the only dispatch switch required.
+create or replace function research.invoke_responsible_party_resolution_workers_cron_v1(
+  p_primary_limit integer default 4,
+  p_recovery_limit integer default 4
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path=''
+as $$
+declare
+  v_primary jsonb;
+  v_recovery jsonb;
+begin
+  if current_user <> 'postgres' and session_user <> 'postgres' then
+    raise exception 'postgres scheduler only';
+  end if;
+
+  if p_primary_limit<1 or p_primary_limit>8 or p_recovery_limit<1 or p_recovery_limit>8 then
+    raise exception 'responsible-party worker lane limits must be between 1 and 8';
+  end if;
+
+  if p_primary_limit+p_recovery_limit>8 then
+    raise exception 'combined responsible-party worker limit must not exceed 8';
+  end if;
+
+  v_primary:=ingest.invoke_edge_collector(
+    'collect-responsible-party-resolution',
+    jsonb_build_object('limit',p_primary_limit)
+  );
+
+  v_recovery:=ingest.invoke_edge_collector(
+    'collect-responsible-party-resolution',
+    jsonb_build_object('limit',p_recovery_limit,'claim_scope','address_recovery')
+  );
+
+  return jsonb_build_object(
+    'primary',v_primary,
+    'address_recovery',v_recovery
+  );
+end
+$$;
+
+revoke all on function research.invoke_responsible_party_resolution_workers_cron_v1(integer,integer)
+  from public,anon,authenticated;
+
+do $$
+declare
+  v_jobid bigint;
+begin
+  select jobid into v_jobid
+  from cron.job
+  where jobname='scout-responsible-party-worker';
+
+  if v_jobid is null then
+    raise exception 'scout-responsible-party-worker cron missing';
+  end if;
+
+  perform cron.alter_job(
+    v_jobid,
+    command := 'select research.invoke_responsible_party_resolution_workers_cron_v1(4,4);',
+    active := true
+  );
+end
+$$;
+
+-- Fail closed if release activation did not land exactly on the intended
+-- isolated/fair-dispatch contract.
 do $$
 declare
   v_profile_count integer;
   v_dispatch_enabled boolean;
   v_eligible_count integer;
+  v_cron_count integer;
 begin
   select count(*),
-         bool_and(coalesce((attributes->>'automated_dispatch')::boolean,false)),
+         bool_and(coalesce((attributes->>'automated_dispatch')::boolean,true)),
          max(jsonb_array_length(coalesce(attributes->'eligible_source_kinds','[]'::jsonb)))
     into v_profile_count,v_dispatch_enabled,v_eligible_count
   from research.responsible_party_source_profiles
@@ -71,8 +142,8 @@ begin
     and provider_kind='pva_lrsn_html'
     and attributes->>'resolution_mode'='address_point_lrsn_recovery';
 
-  if v_profile_count<>1 or coalesce(v_dispatch_enabled,false)<>true then
-    raise exception 'Jefferson address recovery profile not activated';
+  if v_profile_count<>1 or coalesce(v_dispatch_enabled,true)<>false then
+    raise exception 'Jefferson address recovery profile lost isolated dispatch';
   end if;
 
   if coalesce(v_eligible_count,0)<>0 then
@@ -87,6 +158,27 @@ begin
       and p.proname='internal_seed_responsible_party_address_recovery_jobs_v1'
   ) then
     raise exception 'Jefferson address recovery seeder missing';
+  end if;
+
+  if not exists (
+    select 1
+    from pg_proc p
+    join pg_namespace n on n.oid=p.pronamespace
+    where n.nspname='public'
+      and p.proname='internal_claim_responsible_party_address_recovery_jobs_v1'
+  ) then
+    raise exception 'Jefferson address recovery claim lane missing';
+  end if;
+
+  select count(*) into v_cron_count
+  from cron.job
+  where jobname='scout-responsible-party-worker'
+    and active
+    and schedule='22,52 * * * *'
+    and command='select research.invoke_responsible_party_resolution_workers_cron_v1(4,4);';
+
+  if v_cron_count<>1 then
+    raise exception 'responsible-party fair worker dispatch not installed';
   end if;
 end
 $$;
