@@ -78,6 +78,11 @@ replacements={
  'swppp_site_map_renderer_test.mjs':[
   ("assert.equal(serverSource.includes('buildScoutSwpppSiteRasterFrame'), true)","assert.equal(serverSource.includes('scoutSandboxSingleSiteImplementation'), true)"),
  ],
+ 'sandbox_raster_transport_test.mjs':[
+  ("assert.ok(serverSource.includes(\"'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('swppp_site', map)\"))","assert.ok(serverSource.includes('isScoutSandboxSingleSiteType(selectedType)'))"),
+  ("assert.ok(serverSource.includes(\"'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('water_tank', map)\"))","assert.ok(serverSource.includes('scoutSandboxSingleSiteImplementation(selectedType)'))"),
+  ("assert.ok(serverSource.includes(\"'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection('premium_exterior', map)\"))","assert.ok(serverSource.includes(\"'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map)\"))"),
+ ],
 }
 for name,pairs in replacements.items():
     p=root/name
