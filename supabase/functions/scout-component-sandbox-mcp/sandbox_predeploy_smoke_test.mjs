@@ -71,6 +71,10 @@ const smokeTestByType = {
   hotel_management_portfolio: 'hotel_portfolio_map_renderer_test.mjs',
   school_district_portfolio: 'school_district_portfolio_map_renderer_test.mjs',
   municipal_facilities_portfolio: 'municipal_facilities_portfolio_map_renderer_test.mjs',
+  bridge_agency_portfolio: 'spine_grouped_portfolio_map_renderer_test.mjs',
+  railroad_crossing_network: 'spine_grouped_portfolio_map_renderer_test.mjs',
+  construction_contractor_portfolio: 'spine_grouped_portfolio_map_renderer_test.mjs',
+  telecom_registration_portfolio: 'spine_grouped_portfolio_map_renderer_test.mjs',
 }
 assert.deepEqual(Object.keys(smokeTestByType), registered, 'every registered sandbox type must have one canonical smoke fixture')
 

@@ -32,6 +32,11 @@ import {
   normalizeScoutSandboxMunicipalFacilitiesPortfolioOpportunity,
 } from './municipal_facilities_portfolio_map_model.ts'
 import { buildScoutMunicipalFacilitiesPortfolioRasterFrame } from './municipal_facilities_portfolio_map_renderer.ts'
+import { SCOUT_SPINE_GROUPED_PORTFOLIO_TYPES, type ScoutSpineGroupedPortfolioType } from '../_shared/scout_sandbox_spine_grouped_portfolio_config.ts'
+import { buildScoutSandboxSpineGroupedPortfolioOpportunity, normalizeScoutSandboxSpineGroupedPortfolioMap, normalizeScoutSandboxSpineGroupedPortfolioOpportunity, scoutSpineGroupedPortfolioAriaLabel, scoutSpineGroupedPortfolioIdentityMatches, scoutSpineGroupedPortfolioResponseText } from './spine_grouped_portfolio_model.ts'
+import { buildScoutSpineGroupedPortfolioRasterFrame } from './spine_grouped_portfolio_map_renderer.ts'
+
+const groupedPortfolioImplementations=Object.fromEntries(SCOUT_SPINE_GROUPED_PORTFOLIO_TYPES.map((type)=>[type,{mapRpcArgs:()=>({p_opportunity_type:type}),normalizeMap:(value:any)=>normalizeScoutSandboxSpineGroupedPortfolioMap(type,value),normalizeOpportunity:(value:any)=>normalizeScoutSandboxSpineGroupedPortfolioOpportunity(type,value),buildOpportunity:buildScoutSandboxSpineGroupedPortfolioOpportunity,buildRasterFrame:buildScoutSpineGroupedPortfolioRasterFrame,identityMatches:scoutSpineGroupedPortfolioIdentityMatches,responseText:scoutSpineGroupedPortfolioResponseText,ariaLabel:scoutSpineGroupedPortfolioAriaLabel}])) as Record<ScoutSpineGroupedPortfolioType,any>
 
 export const SCOUT_SANDBOX_PORTFOLIO_IMPLEMENTATIONS = {
   water_utility_portfolio: {
@@ -79,6 +84,7 @@ export const SCOUT_SANDBOX_PORTFOLIO_IMPLEMENTATIONS = {
     responseText: (opportunity: any) => `Scout returned the bounded ${opportunity.name} municipal-facilities portfolio card with ${opportunity.member_count} documented civic locations and ${opportunity.signaled_member_count} member-specific cleaning-need proxy.`,
     ariaLabel: (map: any) => `Documented municipal civic-facility portfolio map for ${map.account_name}`,
   },
+  ...groupedPortfolioImplementations,
 } as const
 
 export function scoutSandboxPortfolioImplementation(type: ScoutSandboxPortfolioType) {
