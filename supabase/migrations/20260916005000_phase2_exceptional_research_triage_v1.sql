@@ -81,9 +81,13 @@ set extracted_values=(
           )
         else coalesce(f.extracted_values,'{}'::jsonb)
       end
-    )||jsonb_build_object('triage_contact_route_cleanup','removed_placeholder_phone_5554567890'),
+    )||jsonb_build_object('triage_contact_route_cleanup','removed_known_placeholder_phone'),
     auto_applied=false
-where f.extracted_values::text like '%5554567890%';
+where exists (
+  select 1
+  from jsonb_array_elements(coalesce(f.extracted_values->'contact_routes','[]'::jsonb)) r(value)
+  where regexp_replace(coalesce(r.value->>'contact_value',''),'\D','','g')='5554567890'
+);
 
 -- A named individual is not organization identity evidence. Preserve the historical
 -- rows but remove them from decision-grade identity evidence.
@@ -391,9 +395,12 @@ begin
   if v_failed<>0 then raise exception 'phase2 targeted failed jobs remain: %',v_failed; end if;
 
   select count(*) into v_placeholder
-  from research.document_evidence_findings
-  where extracted_values::text like '%5554567890%';
-  if v_placeholder<>0 then raise exception 'placeholder phone remains in evidence findings: %',v_placeholder; end if;
+  from research.document_evidence_findings f
+  where exists (
+    select 1 from jsonb_array_elements(coalesce(f.extracted_values->'contact_routes','[]'::jsonb)) r(value)
+    where regexp_replace(coalesce(r.value->>'contact_value',''),'\D','','g')='5554567890'
+  );
+  if v_placeholder<>0 then raise exception 'placeholder phone remains in evidence contact routes: %',v_placeholder; end if;
 
   select count(*) into v_secretish
   from research.document_evidence_findings
