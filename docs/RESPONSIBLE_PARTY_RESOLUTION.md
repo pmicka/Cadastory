@@ -43,7 +43,24 @@ Current provider kinds are:
 
 Used for Jefferson County, Kentucky.
 
-Scout spatially intersects an opportunity point with the locally ingested LOJIC parcel layer, requires exactly one parcel, reads its LRSN, then fetches the public Jefferson PVA detail page. The public detail page supplies owner identity and parcel/assessment context.
+The primary Jefferson mode spatially intersects an opportunity point with the locally ingested LOJIC parcel layer, requires exactly one parcel, reads its LRSN, then fetches the public Jefferson PVA detail page. The public detail page supplies owner identity and parcel/assessment context.
+
+Jefferson also has an alternate `address_point_lrsn_recovery` mode for opportunities already deferred by the primary spatial profile. This is a fallback for cases where the opportunity point does not intersect a unique usable parcel; it is **not** a nearest-parcel heuristic.
+
+The recovery chain is:
+
+1. take the opportunity's documented site address;
+2. issue a bounded query to the authoritative LOJIC current-address point service;
+3. require an exact normalized address match;
+4. require the matching LOJIC address point to expose one distinct usable `PARCELID` + `LRSN` pair;
+5. fetch the Jefferson PVA detail page for that LRSN; and
+6. require the PVA parcel ID to equal the LOJIC address-point parcel ID before accepting owner evidence.
+
+The LOJIC address-point query is bounded and paginated because a common house number can exceed one ArcGIS page. The worker currently reads at most five pages of 200 rows each and fails closed if the bounded result set still cannot be proven complete.
+
+The assessor's primary situs address is allowed to differ from the operational/site address. Multi-building or multi-address parcels make that a normal condition. Parcel identity, not fuzzy situs-address equality, is the cross-source join after the exact LOJIC address-point match.
+
+The recovery profile is `ky_jefferson_pva_address_lrsn`. It keeps `eligible_source_kinds=[]` so it cannot enter the ordinary spatial seeder. Its dedicated recovery seeder reads `recovery_source_kinds`, and `automated_dispatch` is the explicit switch controlling whether the normal local claim lane may consume recovery jobs.
 
 ### `arcgis_point_owner`
 
@@ -75,7 +92,9 @@ Local and remote providers are seeded separately.
 
 The local seeder operates only on supported locally backed providers. The remote seeder operates only on `arcgis_point_owner` profiles. This prevents remote-provider candidates from being repeatedly scanned by a local spatial join that cannot resolve them.
 
-Both seeders skip candidates already attached to an active responsible-party job. Exhausted jobs may re-enter only when their bounded `requery_after` interval is due.
+Jefferson address recovery is a third seed stage inside the same responsible-party scheduler. It considers only candidates with an active deferral from the canonical Jefferson spatial profile and clusters them by normalized site address. It does not replace the primary spatial seeder and does not create a separate cron.
+
+All seeders skip candidates already attached to an active responsible-party job. Exhausted jobs may re-enter only when their bounded `requery_after` interval is due.
 
 ## Acquisition transport lanes
 
@@ -86,6 +105,10 @@ Acquisition transport is deliberately separate from evidence semantics.
 `pva_lrsn_html` jobs are claimed through `internal_claim_local_responsible_party_resolution_jobs_v1()` and processed by the private authenticated Supabase Edge Function `collect-responsible-party-resolution`.
 
 The legacy claim RPC delegates to this local-only lane so the scheduled Edge Function cannot consume remote ArcGIS jobs.
+
+The same worker handles both Jefferson `pva_lrsn_html` modes. Ordinary primary jobs use the parcel/LRSN already selected by the local spatial seeder. Recovery jobs first resolve an exact LOJIC address point to LRSN/PARCELID, then fetch the same public PVA detail source. Recovery jobs participate in the ordinary local claim lane only when their profile has `automated_dispatch=true`.
+
+The release cadence remains the existing responsible-party cadence: seed at minute `21`, then local worker at minutes `22` and `52`. Recovery activation extends the existing seed wrapper and local claim lane; it must not add a parallel recovery cron.
 
 ### Remote ArcGIS transport
 
@@ -112,6 +135,8 @@ Deferral reasons are bounded to:
 These deferrals suppress only this responsible-party parcel resolver for the affected provider until requery is due. They **must not** delay or block the global buyer queue, because another upstream strategy may still resolve the opportunity.
 
 This distinction also prevents high-priority no-match parcels from monopolizing every seed window and starving lower-priority resolvable candidates.
+
+Jefferson address recovery deliberately leaves the original spatial deferral intact. The deferral documents that the primary point-to-parcel method failed; the alternate recovery job records whether the authoritative address-point route succeeded. The two states are not contradictory and should not be collapsed into one generic "parcel resolved" flag.
 
 ## Documented manager and operator lane
 
@@ -149,13 +174,46 @@ A successful manager-contact job may add defensible public routes to the known m
 
 The remote ArcGIS GitHub worker uses the same database completion contract but a separate claim lane. Both workers are bounded by claim size, source timeout, retry budget, and lease semantics. Unsupported or ambiguous evidence is not guessed into a buyer identity.
 
+Jefferson address recovery inherits the same completion contract and therefore the same role boundary: a successful recovery writes `property_owner` evidence. Organization owners may enter the named-responsibility lane and later be materialized as organizations for contact research; person/household owners remain evidence-only and must not be used as personal-name research targets.
+
 No source media is retained.
 
 ## Current geography
 
-Jefferson County uses the LOJIC parcel geometry plus public Jefferson PVA detail source and currently supports construction, exterior-cleaning, and roof-lifecycle responsibility resolution.
+Jefferson County uses the LOJIC parcel geometry plus public Jefferson PVA detail source and currently supports construction, exterior-cleaning, and roof-lifecycle responsibility resolution. For primary spatial deferrals, the Jefferson-only fallback uses the LOJIC current-address point service to bridge an exact site address to LRSN/PARCELID before the same PVA owner lookup.
+
+This fallback is intentionally county-specific. The architecture is reusable, but another county must have its own authoritative address/parcel identity source and provider profile; Scout must not assume Jefferson field names or resolution semantics elsewhere.
 
 Nelson and Daviess Counties use bounded public Schneider/ArcGIS point-owner queries for exterior-cleaning candidates. Production acceptance on 2026-09-15 verified both source probes from the GitHub Actions transport and a four-job live batch: all four completed with authoritative owner/parcel evidence, three organization owners entered the named-responsibility lane, and one person/household owner remained evidence-only with no buyer-identity or queue-hint promotion.
+
+## Jefferson address-recovery acceptance
+
+Bounded production acceptance on 2026-09-16 exercised the recovery lane before autonomous dispatch was enabled.
+
+The accepted chain was:
+
+- exact site address -> LOJIC address point;
+- one distinct LOJIC `PARCELID` + `LRSN`;
+- public Jefferson PVA detail page;
+- exact LOJIC/PVA parcel-ID agreement;
+- property-owner evidence only.
+
+The first accepted set contained seven opportunity evidence rows across six recovery jobs:
+
+- five organization-owner rows;
+- two person/household-owner rows;
+- zero household promotions;
+- five organization owners materialized to durable `core.organizations` through the existing buyer-document pipeline; and
+- zero outbound contact.
+
+Acceptance also caught and corrected two worker defects before release:
+
+1. the PVA page has a branded masthead `<h1>` before the property-address `<h1>`, so the parser now selects the plain property heading; and
+2. common house numbers can exceed a single 200-row ArcGIS page, so LOJIC address lookup now uses bounded pagination up to five pages / 1,000 rows and fails closed if the bounded set is still incomplete.
+
+The unauthorized Edge Function boundary returned `401` during acceptance.
+
+A full `scout.refresh_opportunity_buyer_routes()` rebuild was then run against the accepted evidence. All five organization-owner rows retained their durable organization IDs and named-responsibility projection, while both person/household rows remained `role_only` with no organization ID, buyer organization, buyer hint, or buyer name. That rebuild is the persistence acceptance for the fallback lane.
 
 ## Production acceptance
 
@@ -172,6 +230,8 @@ Deployment verification should include:
 7. verify the seeder advances across the backlog rather than repeatedly selecting the same no-match candidates;
 8. confirm unauthorized Edge Function access returns `401` for Edge-hosted lanes; and
 9. run the standard Scout architecture assertions.
+
+For Jefferson address recovery, acceptance additionally requires exact LOJIC address-point matching, LOJIC/PVA parcel-ID agreement, bounded pagination behavior, and confirmation that the ordinary spatial deferral remains resolver-specific rather than blocking the global buyer queue.
 
 For manager-contact research, acceptance additionally requires proving that successful contact-route extraction leaves buyer identity and buyer queue state unchanged and that no `research.document_evidence_job_candidates` rows are created for `responsible_party_contact` jobs.
 
