@@ -23,7 +23,9 @@ jobs:
           cache: npm
           cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
       - name: Apply telecom single-site implementation
-        run: python3 scripts/apply_telecom_single_site.py
+        run: |
+          python3 scripts/apply_telecom_single_site.py
+          python3 scripts/patch_telecom_registry_tests.py
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
