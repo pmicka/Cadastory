@@ -3,7 +3,7 @@ returns jsonb language sql stable security definer set search_path to 'pg_catalo
 with chosen as(
  select o.* from scout.opportunity_search_spine o
  where (p_opportunity_type='bridge' and o.source_kind='bridge' and o.signal_kind='bridge_condition_or_inspection' and o.details->>'structure_number'='037B00052R')
- or (p_opportunity_type='construction_site' and o.source_kind='construction_window' and o.signal_kind='construction_lifecycle' and o.details->>'address'='700 CENTRAL AVE' and o.details->>'project_type'='Commercial Alteration')
+ or (p_opportunity_type='construction_site' and o.source_kind='construction_window' and o.signal_kind='construction_lifecycle' and o.details->>'address'='700 CENTRAL AVE' and o.details->>'project_type'='Commercial Alteration' and o.details->>'contractor_name'='CALHOUN CONSTRUCTION SERV INC' and o.details->>'project_value'='3000000' and o.details->>'square_feet'='6800')
  or (p_opportunity_type='dam' and o.source_kind='dam_condition_cadence' and o.signal_kind='dam_condition' and o.display_name='Hurricane Lake Dam' and o.details->>'county'='Nelson' and o.state_code='KY')
  or (p_opportunity_type='mine_quarry' and o.source_kind='active_mine' and o.signal_kind='mine_material_activity' and o.candidate_key='mine:1200013')
  or (p_opportunity_type='landfill' and o.source_kind='landfill' and o.signal_kind='landfill_capacity_gas' and o.display_name='Nelson County SWDF' and o.details->>'county'='Nelson' and o.state_code='KY')
