@@ -23,7 +23,9 @@ jobs:
           cache: npm
           cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
       - name: Apply single-asset batch
-        run: python3 scripts/apply_all_single_asset_sandbox.py
+        run: |
+          python3 scripts/patch_all_single_asset_generator.py
+          python3 scripts/apply_all_single_asset_sandbox.py
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
