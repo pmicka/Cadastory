@@ -326,3 +326,10 @@ The following deprecated/host-specific patterns must not re-enter the current sa
 ## Municipal facilities portfolio contract (owner-approved 2026-09-15)
 
 The `municipal_facilities_portfolio` implementation is governed by `MUNICIPAL_FACILITIES_PORTFOLIO_MAP_CONTRACT.md`. It renders a bounded official Louisville Metro civic-location subset with exact-address structure geometry. Only the Judicial Center member carries the linked cleaning-need proxy; the map must not visually or textually transfer that signal to other members. The registered raster tiles remain a closed allowlist derived from the canonical 456x210 and 280x210 frames.
+
+## Per-result raster transport hardening (owner-approved 2026-09-16)
+
+Raster PNG payloads must not be aggregated across every registered sandbox opportunity inside the MCP Apps resource HTML. The resource is a static shell. Each tool result may carry only the bounded raster tiles required for that selected opportunity via result `_meta['scout/rasterTiles']`; the existing allowlisted Scout tile proxy remains the fallback when an embedded tile is unavailable. The per-result tile set must remain at or below `SCOUT_SANDBOX_MAX_EMBEDDED_RASTER_TILES`.
+
+This invariant prevents portfolio growth from increasing every resource read and specifically guards the v37 failure where 24 portfolio tiles plus three six-tile single-site maps required 42 global embedded tiles against a 40-tile ceiling.
+
