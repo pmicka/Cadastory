@@ -1,0 +1,62 @@
+name: Stage 2 grouped portfolio bootstrap
+
+on:
+  push:
+    branches:
+      - scout/stage2-grouped-opportunities
+    paths:
+      - '.github/workflows/stage2-grouped-bootstrap.yml'
+      - 'scripts/stage2_integrate.py'
+
+permissions:
+  contents: write
+
+jobs:
+  integrate-and-verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: scout/stage2-grouped-opportunities
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
+      - name: Apply Stage 2 integration patch
+        run: |
+          python3 scripts/stage2_integrate.py
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('supabase/functions/scout-component-sandbox-mcp/view.ts')
+          t=p.read_text()
+          if "version: '2.20.0'" not in t:
+              raise SystemExit('expected View version anchor 2.20.0 not found')
+          p.write_text(t.replace("version: '2.20.0'", "version: '2.21.0'", 1))
+          PY
+      - name: Install sandbox dependencies
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm ci
+      - name: Regenerate MCP Apps View
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run build
+      - name: Run complete sandbox suite
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm test
+      - name: Run predeploy registry smoke
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: npm run smoke:contract
+      - name: Syntax-check live backend diagnostic
+        working-directory: supabase/functions/scout-component-sandbox-mcp
+        run: node --check sandbox_live_mcp_smoke.mjs
+      - name: Check patch hygiene
+        run: git diff --check
+      - name: Commit verified Stage 2 integration
+        run: |
+          rm .github/workflows/stage2-grouped-bootstrap.yml scripts/stage2_integrate.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Integrate Stage 2 grouped opportunity portfolios"
+          git push origin HEAD:scout/stage2-grouped-opportunities
