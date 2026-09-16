@@ -23,7 +23,9 @@ jobs:
           cache: npm
           cache-dependency-path: supabase/functions/scout-component-sandbox-mcp/package-lock.json
       - name: Apply raster transport hardening
-        run: python3 scripts/apply_per_result_raster_transport.py
+        run: |
+          python3 scripts/apply_per_result_raster_transport.py
+          python3 scripts/patch_per_result_raster_tests.py
       - name: Install sandbox dependencies
         working-directory: supabase/functions/scout-component-sandbox-mcp
         run: npm ci
@@ -39,7 +41,7 @@ jobs:
       - name: Commit generated implementation
         run: |
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.email '41898282+github-actions-bot@users.noreply.github.com'
           git add supabase/functions
           if git diff --cached --quiet; then
             echo 'No durable changes produced.'
