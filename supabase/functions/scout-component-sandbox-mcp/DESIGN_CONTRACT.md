@@ -2,6 +2,10 @@
 
 For one SWPPP host reproduction only, the owner approved a collapsed “Show map diagnostics” control below the existing card. It contains categorical, bounded diagnostics and is visible only for SWPPP results. The existing card, map, carousel, and action controls are unchanged. This is an explicit temporary exception to the prohibition on visible lifecycle diagnostics; remove after reproduction as described in MAP_CONTRACT.md.
 
+## Temporary owner approval — 2026-09-17 download transport canary
+
+For the owner-requested MCP Apps file-download transport diagnostic only, the existing disabled `Investigate` action may become a synthetic download-probe control when and only when `scout_preview_component_sandbox` is explicitly invoked with `download_probe=true`. The probe MUST use the already-connected root `App` instance and `App.downloadFile()`, MUST first require the host-advertised `downloadFile` capability, and MUST send only the fixed synthetic `scout-download-probe.txt` payload. It MUST NOT contain Scout contact data, create a second `App`, use `window.openai`, browser Blob/object-URL download, `navigator.share`, an app-only tool, a new RPC, an external download URL, persistent storage, or new CSP domains. Normal sandbox results remain visually and behaviorally unchanged. Remove this temporary diagnostic after the text-file and synthetic-vCard host canaries are resolved.
+
 # Scout component sandbox design contract
 
 This file is the durable UI guardrail for `scout-component-sandbox-mcp`.

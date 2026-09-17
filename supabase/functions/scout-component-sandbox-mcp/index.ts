@@ -170,7 +170,7 @@ const componentInputSchema = fromJsonSchema(sandboxOpportunityTypeInputSchema())
 const componentOutputSchema = fromJsonSchema(sandboxResultSchema())
 
 function makeServer() {
-  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.11' })
+  const server = new McpServer({ name: 'Scout UI Foundation', version: '2.3.12' })
 
   registerAppResource(
     server,
@@ -219,7 +219,7 @@ function makeServer() {
     TOOL_NAME,
     {
       title: 'Preview Scout opportunity card',
-      description: scoutSandboxToolDescription(),
+      description: `${scoutSandboxToolDescription()} Temporary owner-only diagnostic: set download_probe=true only when the owner explicitly requests the MCP Apps file-download transport canary.`,
       inputSchema: componentInputSchema,
       outputSchema: componentOutputSchema,
       annotations: {
@@ -230,8 +230,9 @@ function makeServer() {
       },
       _meta: { ui: { resourceUri: RESOURCE_URI } },
     },
-    async ({ opportunity_type }) => {
+    async ({ opportunity_type, download_probe }) => {
       const selectedType = opportunity_type ?? 'premium_exterior'
+      const includeDownloadProbe = download_probe === true
 
       if (isScoutSandboxPortfolioType(selectedType)) {
         const map = await loadScoutSandboxPortfolioMap(selectedType)
@@ -241,7 +242,7 @@ function makeServer() {
         return {
           content: [{ type: 'text', text: implementation.responseText(opportunity) }],
           structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map },
-          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map) },
+          _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map), ...(includeDownloadProbe ? { 'scout/downloadProbe': true } : {}) },
         }
       }
 
@@ -253,7 +254,7 @@ function makeServer() {
       return {
         content: [{ type: 'text', text: implementation.responseText(opportunity) }],
         structuredContent: { surface: 'scout_component_sandbox', opportunity_type: selectedType, opportunity, map: implementation.toResultMap(map) },
-        _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map) },
+        _meta: { 'scout/rasterTiles': await loadEmbeddedRasterTilesForSelection(selectedType, map), ...(includeDownloadProbe ? { 'scout/downloadProbe': true } : {}) },
       }
     },
   )

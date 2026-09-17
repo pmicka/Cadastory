@@ -41,12 +41,15 @@ const carouselCount = document.querySelector<HTMLElement>('[data-scout-carousel-
 const carouselDots = Array.from(document.querySelectorAll<HTMLElement>('[data-scout-carousel-dot]'))
 const mapContainer = document.querySelector<HTMLElement>('[data-scout-map]')
 const mapState = document.querySelector<HTMLElement>('[data-scout-map-state]')
+const primaryAction = document.querySelector<HTMLButtonElement>('.action-primary')
 let mapHandle: ScoutMapHandle | null = null
 let mapGeneration = 0
 let activeCarouselIndex = 0
 let diagnosticResultCount = 0
 let layoutFrame: number | null = null
 let carouselResizeObserver: ResizeObserver | null = null
+let downloadProbeRequested = false
+let downloadProbeRunning = false
 
 function setState(message: string) {
   if (state) state.textContent = message.slice(0, 200)
@@ -413,10 +416,74 @@ if (carousel && typeof ResizeObserver !== 'undefined') {
 }
 updateCarouselState()
 
-const app = new App({ name: 'scout-ui-foundation', version: '2.21.0' })
+const app = new App({ name: 'scout-ui-foundation', version: '2.22.0' })
+
+function downloadProbeSupported() {
+  return Boolean(app.getHostCapabilities?.()?.downloadFile)
+}
+
+function configureDownloadProbeControl() {
+  if (!primaryAction) return
+  primaryAction.onclick = null
+  primaryAction.disabled = true
+  primaryAction.textContent = 'Investigate'
+  primaryAction.title = 'Investigate behavior is not wired in this sandbox'
+  if (!downloadProbeRequested) return
+
+  const supported = downloadProbeSupported()
+  primaryAction.textContent = supported ? 'Test file download' : 'Host lacks download'
+  primaryAction.title = supported
+    ? 'Run the synthetic MCP Apps file-download transport probe'
+    : 'This host did not advertise the MCP Apps downloadFile capability'
+  primaryAction.disabled = !supported
+  primaryAction.onclick = supported ? () => { void runDownloadProbe() } : null
+  setState(supported
+    ? 'Scout download probe ready; host advertises downloadFile'
+    : 'Scout download probe unavailable; host does not advertise downloadFile')
+}
+
+async function runDownloadProbe() {
+  if (!downloadProbeRequested || downloadProbeRunning || !primaryAction) return
+  if (!downloadProbeSupported()) {
+    configureDownloadProbeControl()
+    return
+  }
+
+  downloadProbeRunning = true
+  primaryAction.disabled = true
+  primaryAction.textContent = 'Requesting download…'
+  setState('Scout download probe request started')
+  try {
+    const result = await app.downloadFile({
+      contents: [{
+        type: 'resource',
+        resource: {
+          uri: 'file:///scout-download-probe.txt',
+          mimeType: 'text/plain',
+          text: 'Scout MCP Apps download transport probe.\r\n',
+        },
+      }],
+    })
+    if (result?.isError) {
+      primaryAction.textContent = 'Download cancelled'
+      setState('Scout download probe was cancelled, denied, or rejected by the host')
+      return
+    }
+    primaryAction.textContent = 'Repeat download probe'
+    setState('Scout download probe handed the synthetic file to the host')
+  } catch (error) {
+    primaryAction.textContent = 'Download probe failed'
+    setState(`Scout download probe failed: ${error instanceof Error ? error.message : String(error)}`)
+  } finally {
+    downloadProbeRunning = false
+    primaryAction.disabled = !downloadProbeSupported()
+  }
+}
 app.ontoolinput = () => setState('Scout tool input received')
 app.ontoolresult = (result) => {
   const structured = result?.structuredContent
+  downloadProbeRequested = result?._meta?.['scout/downloadProbe'] === true
+  configureDownloadProbeControl()
   const metadataTiles = normalizeEmbeddedTiles(result?._meta?.['scout/rasterTiles'])
   const embeddedTiles = metadataTiles ?? resourceEmbeddedTiles
   const opportunityType = structured?.opportunity_type
