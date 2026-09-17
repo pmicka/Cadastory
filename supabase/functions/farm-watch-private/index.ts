@@ -22,6 +22,36 @@ const ALLOWED_ORIGINS = new Set([
 
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
+const HYDRO_BUFFER_M = 1000
+const HYDRO_AVAILABLE_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const HYDRO_PARTIAL_TTL_MS = 60 * 60 * 1000
+
+const HYDRO_SOURCES = [
+  {
+    key: 'flowline',
+    sourceSlug: 'usgs-3dhp',
+    featureKind: 'flowline',
+    url: 'https://3dhp.nationalmap.gov/arcgis/rest/services/usgs_3dhp_all/MapServer/50',
+    outFields: 'OBJECTID,id3dhp,gnisidlabel,featuretypelabel,lengthkm,flowdirectionlabel,streamorder,onsurfacelabel',
+    timeoutMs: 9000,
+  },
+  {
+    key: 'waterbody',
+    sourceSlug: 'usgs-3dhp',
+    featureKind: 'waterbody',
+    url: 'https://3dhp.nationalmap.gov/arcgis/rest/services/usgs_3dhp_all/MapServer/60',
+    outFields: 'OBJECTID,id3dhp,gnisidlabel,featuretypelabel,areasqkm',
+    timeoutMs: 9000,
+  },
+  {
+    key: 'wetland',
+    sourceSlug: 'usfws-nwi',
+    featureKind: 'wetland',
+    url: 'https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/rest/services/Wetlands/MapServer/0',
+    outFields: '*',
+    timeoutMs: 15000,
+  },
+] as const
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -57,6 +87,9 @@ function boundedSlug(value: string | null): string | null {
 }
 
 type Center = { lat: number; lon: number; basis: string; matched_address?: string }
+type Envelope = { west: number; south: number; east: number; north: number }
+
+type HydroSource = typeof HYDRO_SOURCES[number]
 
 async function censusCenter(address: string): Promise<Center | null> {
   const controller = new AbortController()
@@ -99,6 +132,155 @@ function storedCenter(property: any): Center | null {
   const lat = Number(coords[1])
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null
   return { lat, lon, basis: 'stored property center' }
+}
+
+function collectCoordinatePairs(value: unknown, out: number[][]) {
+  if (!Array.isArray(value)) return
+  if (value.length >= 2 && Number.isFinite(Number(value[0])) && Number.isFinite(Number(value[1]))) {
+    out.push([Number(value[0]), Number(value[1])])
+    return
+  }
+  for (const child of value) collectCoordinatePairs(child, out)
+}
+
+function expandedEnvelope(boundary: any, bufferM: number): Envelope | null {
+  const pairs: number[][] = []
+  collectCoordinatePairs(boundary?.coordinates, pairs)
+  if (!pairs.length) return null
+  const lons = pairs.map((pair) => pair[0])
+  const lats = pairs.map((pair) => pair[1])
+  const west = Math.min(...lons)
+  const east = Math.max(...lons)
+  const south = Math.min(...lats)
+  const north = Math.max(...lats)
+  const centerLat = (south + north) / 2
+  const latPad = bufferM / 111320
+  const lonMetersPerDegree = 111320 * Math.max(0.2, Math.cos(centerLat * Math.PI / 180))
+  const lonPad = bufferM / lonMetersPerDegree
+  return { west: west - lonPad, east: east + lonPad, south: south - latPad, north: north + latPad }
+}
+
+function pickProperty(properties: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = properties?.[key]
+    if (value !== undefined && value !== null && value !== '') return value
+  }
+  return null
+}
+
+function normalizeHydroProperties(source: HydroSource, properties: Record<string, unknown>) {
+  if (source.featureKind === 'flowline') {
+    return {
+      name: pickProperty(properties, 'gnisidlabel'),
+      feature_type: pickProperty(properties, 'featuretypelabel'),
+      length_km: pickProperty(properties, 'lengthkm'),
+      stream_order: pickProperty(properties, 'streamorder'),
+      flow_direction: pickProperty(properties, 'flowdirectionlabel'),
+      on_surface: pickProperty(properties, 'onsurfacelabel'),
+    }
+  }
+  if (source.featureKind === 'waterbody') {
+    return {
+      name: pickProperty(properties, 'gnisidlabel'),
+      feature_type: pickProperty(properties, 'featuretypelabel'),
+      area_sq_km: pickProperty(properties, 'areasqkm'),
+    }
+  }
+  return {
+    attribute_code: pickProperty(properties, 'ATTRIBUTE', 'Wetlands.ATTRIBUTE'),
+    wetland_type: pickProperty(properties, 'WETLAND_TYPE', 'Wetlands.WETLAND_TYPE'),
+    source_acres: pickProperty(properties, 'ACRES', 'Wetlands.ACRES'),
+    system_name: pickProperty(properties, 'SYSTEM_NAME', 'NWI_Wetland_Codes.SYSTEM_NAME'),
+    class_name: pickProperty(properties, 'CLASS_NAME', 'NWI_Wetland_Codes.CLASS_NAME'),
+    water_regime_name: pickProperty(properties, 'WATER_REGIME_NAME', 'NWI_Wetland_Codes.WATER_REGIME_NAME'),
+  }
+}
+
+function sourceFeatureId(source: HydroSource, feature: any, index: number) {
+  const properties = feature?.properties || {}
+  const candidate = source.featureKind === 'wetland'
+    ? pickProperty(properties, 'GLOBALID', 'Wetlands.GLOBALID', 'OBJECTID', 'Wetlands.OBJECTID')
+    : pickProperty(properties, 'id3dhp', 'OBJECTID')
+  return String(candidate ?? feature?.id ?? `${source.featureKind}-${index}`)
+}
+
+async function fetchHydroSource(source: HydroSource, envelope: Envelope) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), source.timeoutMs)
+  try {
+    const url = new URL(`${source.url}/query`)
+    url.searchParams.set('where', '1=1')
+    url.searchParams.set('geometry', `${envelope.west},${envelope.south},${envelope.east},${envelope.north}`)
+    url.searchParams.set('geometryType', 'esriGeometryEnvelope')
+    url.searchParams.set('inSR', '4326')
+    url.searchParams.set('outSR', '4326')
+    url.searchParams.set('spatialRel', 'esriSpatialRelIntersects')
+    url.searchParams.set('outFields', source.outFields)
+    url.searchParams.set('returnGeometry', 'true')
+    url.searchParams.set('geometryPrecision', '6')
+    url.searchParams.set('f', 'geojson')
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        accept: 'application/geo+json, application/json',
+        'user-agent': 'Cadastory-Farm-Watch/0.2 (https://pmicka.com)',
+      },
+    })
+    if (!response.ok) throw new Error(`${source.key} returned ${response.status}`)
+    const payload = await response.json()
+    if (payload?.type !== 'FeatureCollection' || !Array.isArray(payload?.features)) {
+      throw new Error(`${source.key} returned an invalid feature collection`)
+    }
+
+    return payload.features
+      .filter((feature: any) => feature?.geometry)
+      .map((feature: any, index: number) => ({
+        source_slug: source.sourceSlug,
+        feature_kind: source.featureKind,
+        source_feature_id: sourceFeatureId(source, feature, index),
+        geometry: feature.geometry,
+        properties: normalizeHydroProperties(source, feature.properties || {}),
+      }))
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+function hydrologyNeedsRefresh(hydrology: any) {
+  const retrievedAt = Date.parse(hydrology?.summary?.retrieved_at || '')
+  if (!Number.isFinite(retrievedAt)) return true
+  const ttl = hydrology?.status === 'available' ? HYDRO_AVAILABLE_TTL_MS : HYDRO_PARTIAL_TTL_MS
+  return Date.now() - retrievedAt > ttl
+}
+
+async function refreshHydrology(slug: string, boundary: any) {
+  const envelope = expandedEnvelope(boundary, HYDRO_BUFFER_M)
+  if (!envelope) throw new Error('Property boundary is unavailable for hydrology refresh')
+
+  const settled = await Promise.allSettled(HYDRO_SOURCES.map((source) => fetchHydroSource(source, envelope)))
+  const features: any[] = []
+  const sourceStatus: Record<string, string> = {}
+
+  settled.forEach((result, index) => {
+    const source = HYDRO_SOURCES[index]
+    if (result.status === 'fulfilled') {
+      sourceStatus[source.key] = 'available'
+      features.push(...result.value)
+    } else {
+      sourceStatus[source.key] = 'unavailable'
+      console.error(`Farm Watch ${source.key} refresh failed`, result.reason instanceof Error ? result.reason.message : result.reason)
+    }
+  })
+
+  const { error } = await admin.rpc('farm_watch_replace_hydrology_v1_internal', {
+    p_slug: slug,
+    p_features: features,
+    p_buffer_m: HYDRO_BUFFER_M,
+    p_source_status: sourceStatus,
+    p_retrieved_at: new Date().toISOString(),
+  })
+  if (error) throw new Error(`farm_watch_replace_hydrology_v1_internal failed: ${error.message}`)
 }
 
 Deno.serve(async (req: Request) => {
@@ -147,6 +329,25 @@ Deno.serve(async (req: Request) => {
     console.error('farm_watch_get_soils_v1_internal failed', soilsError.message)
   }
 
+  let { data: hydrology, error: hydrologyError } = await admin.rpc('farm_watch_get_hydrology_v1_internal', {
+    p_slug: slug,
+  })
+  if (hydrologyError) {
+    console.error('farm_watch_get_hydrology_v1_internal failed', hydrologyError.message)
+  } else if (property.boundary_geojson && hydrologyNeedsRefresh(hydrology)) {
+    try {
+      await refreshHydrology(slug, property.boundary_geojson)
+      const refreshed = await admin.rpc('farm_watch_get_hydrology_v1_internal', { p_slug: slug })
+      if (refreshed.error) {
+        console.error('farm_watch_get_hydrology_v1_internal refresh read failed', refreshed.error.message)
+      } else {
+        hydrology = refreshed.data
+      }
+    } catch (error) {
+      console.error('Farm Watch hydrology refresh failed', error instanceof Error ? error.message : error)
+    }
+  }
+
   let center = storedCenter(property)
   if (!center) {
     const address = [property.street_address, property.city, property.state_code, property.postal_code]
@@ -176,6 +377,9 @@ Deno.serve(async (req: Request) => {
       soils_geojson: soilsError || !soils?.feature_collection ? EMPTY_FEATURE_COLLECTION : soils.feature_collection,
       soils_status: soilsError ? 'unavailable' : soils?.status || 'unavailable',
       soils_summary: soilsError ? null : soils?.summary || null,
+      hydrology_geojson: hydrologyError || !hydrology?.feature_collection ? EMPTY_FEATURE_COLLECTION : hydrology.feature_collection,
+      hydrology_status: hydrologyError ? 'unavailable' : hydrology?.status || 'unavailable',
+      hydrology_summary: hydrologyError ? null : hydrology?.summary || null,
     },
     access: { scope: 'owner_only' },
   }, 200, origin)
