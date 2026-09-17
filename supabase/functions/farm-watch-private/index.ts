@@ -20,6 +20,8 @@ const ALLOWED_ORIGINS = new Set([
   'http://localhost:8000',
 ])
 
+const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
+
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
     'content-type': 'application/json; charset=utf-8',
@@ -48,7 +50,7 @@ function bearer(req: Request): string | null {
 }
 
 function boundedSlug(value: string | null): string | null {
-  if (!value) return 'flat-creek-test'
+  if (!value) return DEFAULT_PROPERTY_SLUG
   const normalized = value.trim().toLowerCase()
   return /^[a-z0-9][a-z0-9-]{0,79}$/.test(normalized) ? normalized : null
 }
@@ -67,7 +69,7 @@ async function censusCenter(address: string): Promise<Center | null> {
       signal: controller.signal,
       headers: {
         'accept': 'application/json',
-        'user-agent': 'Cadastory-Farm-Watch/0.1 (https://pmicka.com)',
+        'user-agent': 'Cadastory-Property-History/0.1 (https://pmicka.com)',
       },
     })
     if (!response.ok) return null
