@@ -21,6 +21,7 @@ const ALLOWED_ORIGINS = new Set([
 ])
 
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
+const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -131,6 +132,14 @@ Deno.serve(async (req: Request) => {
   }
   if (!property) return json({ error: 'not found' }, 404, origin)
 
+  const { data: accessFeatures, error: accessFeaturesError } = await admin.rpc('farm_watch_get_access_features_v1_internal', {
+    p_slug: slug,
+    p_buffer_m: 1000,
+  })
+  if (accessFeaturesError) {
+    console.error('farm_watch_get_access_features_v1_internal failed', accessFeaturesError.message)
+  }
+
   let center = storedCenter(property)
   if (!center) {
     const address = [property.street_address, property.city, property.state_code, property.postal_code]
@@ -152,6 +161,11 @@ Deno.serve(async (req: Request) => {
       boundary_geojson: property.boundary_geojson,
       metadata: property.metadata,
       updated_at: property.updated_at,
+    },
+    analysis: {
+      access_features_geojson: accessFeaturesError || !accessFeatures ? EMPTY_FEATURE_COLLECTION : accessFeatures,
+      access_features_status: accessFeaturesError ? 'unavailable' : 'available',
+      access_buffer_m: 1000,
     },
     access: { scope: 'owner_only' },
   }, 200, origin)
