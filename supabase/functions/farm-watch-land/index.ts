@@ -28,6 +28,7 @@ const SOURCES = {
   lithology: 'https://kgs.uky.edu/arcgis/rest/services/GeologicMapData/KY24KLitho_WGS84/MapServer/0',
   sinkholes: 'https://kgs.uky.edu/arcgis/rest/services/KYWater/KYSinkholes/MapServer/0',
   huc: 'https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_8_10_12_Digit_Hydrologic_Units_WGS84WM/MapServer/0',
+  dem: 'https://kyraster.ky.gov/arcgis/rest/services/ElevationServices/Ky_DEM_KYAPED_2FT_Phase3_WGS84WM/ImageServer',
 }
 
 type Json = Record<string, any>
@@ -128,6 +129,19 @@ async function arcgisPolygon(base: string, polygon: Json, outFields: string) {
   return payload
 }
 
+async function arcgisZonalStats(base: string, polygon: Json) {
+  const url = new URL(`${base.replace(/\/$/, '')}/computeStatisticsHistograms`)
+  url.searchParams.set('f', 'json')
+  url.searchParams.set('geometry', JSON.stringify(polygon))
+  url.searchParams.set('geometryType', 'esriGeometryPolygon')
+  const payload = await fetchJson(url.toString())
+  if (payload?.error) throw new Error(payload.error.message || 'ArcGIS raster statistics query failed')
+  if (!Array.isArray(payload?.statistics) || !payload.statistics.length) {
+    throw new Error('Raster statistics response did not contain statistics')
+  }
+  return payload
+}
+
 async function arcgisNearby(base: string, lat: number, lon: number, meters: number, outFields: string) {
   const url = new URL(`${base.replace(/\/$/, '')}/query`)
   for (const [key, val] of Object.entries({
@@ -203,6 +217,28 @@ function normalizeHuc(payload: Json) {
   }
 }
 
+function normalizeElevation(payload: Json) {
+  const stats = payload?.statistics?.[0] || {}
+  const minFt = Number(stats.min)
+  const maxFt = Number(stats.max)
+  const meanFt = Number(stats.mean)
+  const medianFt = Number(stats.median)
+  const stdDevFt = Number(stats.standardDeviation)
+  const count = Number(stats.count)
+  if (![minFt, maxFt].every(Number.isFinite)) throw new Error('Raster elevation statistics are incomplete')
+  return {
+    method: 'geometry_clipped_raster_statistics',
+    source: 'KyFromAbove Phase 3 DEM',
+    min_ft: minFt,
+    max_ft: maxFt,
+    relief_ft: maxFt - minFt,
+    mean_ft: Number.isFinite(meanFt) ? meanFt : null,
+    median_ft: Number.isFinite(medianFt) ? medianFt : null,
+    standard_deviation_ft: Number.isFinite(stdDevFt) ? stdDevFt : null,
+    raster_observation_count: Number.isFinite(count) ? count : null,
+  }
+}
+
 function normalizeSinkholes(payload: Json) {
   return {
     type: 'FeatureCollection',
@@ -235,9 +271,10 @@ async function refresh(slug: string, anchor: Anchor) {
     arcgisPolygon(SOURCES.lithology, polygon, 'formation_code,KLitho_txt_DOMINANT_LITHOLOGY'),
     arcgisPolygon(SOURCES.huc, polygon, 'HUC12,Name,HUType,HUMod,ToHUC,AreaAcres'),
     arcgisNearby(SOURCES.sinkholes, lat, lon, 10000, 'county_name,quadrangle_name,Acres,ObjectID'),
+    arcgisZonalStats(SOURCES.dem, polygon),
   ])
 
-  const names = ['geology', 'lithology', 'watershed', 'sinkholes']
+  const names = ['geology', 'lithology', 'watershed', 'sinkholes', 'elevation']
   const sourceStatus: Record<string, string> = {}
   const sourceErrors: Record<string, string> = {}
   const payloads: Array<Json | null> = results.map((result, index) => {
@@ -254,6 +291,7 @@ async function refresh(slug: string, anchor: Anchor) {
   const geology = payloads[0] ? normalizeGeology(payloads[0]!, payloads[1]) : { type: 'FeatureCollection', features: [] }
   const huc = payloads[2] ? normalizeHuc(payloads[2]!) : { type: 'FeatureCollection', features: [] }
   const sinkholes = payloads[3] ? normalizeSinkholes(payloads[3]!) : { type: 'FeatureCollection', features: [] }
+  const elevation = payloads[4] ? normalizeElevation(payloads[4]!) : null
 
   const { data: computed, error: computeError } = await admin.rpc('farm_watch_compute_land_context_v1_internal', {
     p_slug: slug,
@@ -266,6 +304,8 @@ async function refresh(slug: string, anchor: Anchor) {
   const retrievedAt = new Date().toISOString()
   const context = {
     ...computed,
+    context_version: 2,
+    elevation,
     retrieved_at: retrievedAt,
     source_status: sourceStatus,
     source_errors: sourceErrors,
@@ -287,6 +327,12 @@ async function refresh(slug: string, anchor: Anchor) {
       watershed: {
         authority: 'USGS / Kentucky Division of Water',
         meaning: 'Watershed Boundary Dataset hydrologic unit boundaries for water-resource management and localized studies',
+      },
+      elevation: {
+        authority: 'Kentucky Division of Geographic Information / KyFromAbove',
+        source: 'KyFromAbove Phase 3 DEM',
+        method: 'exact parcel polygon passed to ArcGIS ImageServer computeStatisticsHistograms',
+        meaning: 'canonical displayed parcel elevation min/max/relief from geometry-clipped raster statistics; not a ground survey',
       },
       faults_in_primary_view: false,
       karst_potential_used: false,
@@ -332,7 +378,13 @@ Deno.serve(async (req: Request) => {
   const cachedAt = Date.parse(cached?.retrieved_at || '')
   let result: any
 
-  if (cached?.context && Number.isFinite(cachedAt) && Date.now() - cachedAt < CACHE_TTL_MS) {
+  const cacheHasCanonicalElevation =
+    cached?.context?.context_version === 2 &&
+    cached?.context?.elevation?.method === 'geometry_clipped_raster_statistics' &&
+    Number.isFinite(Number(cached?.context?.elevation?.min_ft)) &&
+    Number.isFinite(Number(cached?.context?.elevation?.max_ft))
+
+  if (cached?.context && cacheHasCanonicalElevation && Number.isFinite(cachedAt) && Date.now() - cachedAt < CACHE_TTL_MS) {
     result = {
       status: cached.status || 'unknown',
       context: cached.context,
