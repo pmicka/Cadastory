@@ -25,6 +25,7 @@ const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const HYDRO_BUFFER_M = 1000
 const HYDRO_AVAILABLE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const HYDRO_PARTIAL_TTL_MS = 60 * 60 * 1000
+const SOIL_DEEP_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
 const HYDRO_SOURCES = [
   {
@@ -247,6 +248,15 @@ async function fetchHydroSource(source: HydroSource, envelope: Envelope) {
   }
 }
 
+function soilDeepProfilesNeedRefresh(soils: any) {
+  const mapUnitCount = Number(soils?.summary?.map_unit_count) || 0
+  const deepProfileCount = Number(soils?.summary?.deep_profile_count) || 0
+  const retrievedAt = Date.parse(soils?.summary?.deep_retrieved_at || '')
+  if (!mapUnitCount || deepProfileCount < mapUnitCount) return true
+  if (!Number.isFinite(retrievedAt)) return true
+  return Date.now() - retrievedAt > SOIL_DEEP_TTL_MS
+}
+
 function hydrologyNeedsRefresh(hydrology: any) {
   const retrievedAt = Date.parse(hydrology?.summary?.retrieved_at || '')
   if (!Number.isFinite(retrievedAt)) return true
@@ -322,11 +332,24 @@ Deno.serve(async (req: Request) => {
     console.error('farm_watch_get_access_features_v1_internal failed', accessFeaturesError.message)
   }
 
-  const { data: soils, error: soilsError } = await admin.rpc('farm_watch_get_soils_v1_internal', {
+  let { data: soils, error: soilsError } = await admin.rpc('farm_watch_get_soils_v1_internal', {
     p_slug: slug,
   })
   if (soilsError) {
     console.error('farm_watch_get_soils_v1_internal failed', soilsError.message)
+  } else if (soilDeepProfilesNeedRefresh(soils)) {
+    try {
+      const refresh = await admin.rpc('farm_watch_refresh_soil_profiles_v1_internal', { p_slug: slug })
+      if (refresh.error) {
+        console.error('farm_watch_refresh_soil_profiles_v1_internal failed', refresh.error.message)
+      } else {
+        const reread = await admin.rpc('farm_watch_get_soils_v1_internal', { p_slug: slug })
+        if (reread.error) console.error('farm_watch_get_soils_v1_internal deep-profile reread failed', reread.error.message)
+        else soils = reread.data
+      }
+    } catch (error) {
+      console.error('Farm Watch deep SSURGO refresh failed', error instanceof Error ? error.message : error)
+    }
   }
 
   let { data: hydrology, error: hydrologyError } = await admin.rpc('farm_watch_get_hydrology_v1_internal', {
