@@ -268,6 +268,229 @@ function remapClassRows(payload: Json, definitions: Array<Json>, parcelAcres: nu
   })
 }
 
+const SYNTHESIS_SLOPE_BANDS = [
+  { value: 1, label: '0–10%', min_percent: 0, max_percent: 10 },
+  { value: 2, label: '10–20%', min_percent: 10, max_percent: 20 },
+  { value: 3, label: '20–30%', min_percent: 20, max_percent: 30 },
+  { value: 4, label: '30–50%', min_percent: 30, max_percent: 50 },
+  { value: 5, label: '50%+', min_percent: 50, max_percent: null },
+]
+
+const SYNTHESIS_ELEVATION_BANDS = [
+  { value: 1, label: '<650 ft', min_ft: null, max_ft: 650 },
+  { value: 2, label: '650–700 ft', min_ft: 650, max_ft: 700 },
+  { value: 3, label: '700–750 ft', min_ft: 700, max_ft: 750 },
+  { value: 4, label: '750–800 ft', min_ft: 750, max_ft: 800 },
+  { value: 5, label: '800 ft+', min_ft: 800, max_ft: null },
+]
+
+function unitBandRows(payload: Json, definitions: Array<Json>, unitAcres: number) {
+  return remapClassRows(payload, definitions, unitAcres).map((row: Json) => {
+    const { parcel_percent, parcel_acres, ...rest } = row
+    return {
+      ...rest,
+      unit_percent: parcel_percent,
+      unit_acres: parcel_acres,
+    }
+  })
+}
+
+function bandTotals(rows: Array<Json>, predicate: (row: Json) => boolean) {
+  const selected = rows.filter(predicate)
+  return {
+    unit_acres: selected.reduce((sum, row) => sum + Number(row.unit_acres || 0), 0),
+    unit_percent: selected.reduce((sum, row) => sum + Number(row.unit_percent || 0), 0),
+  }
+}
+
+function dominantBand(rows: Array<Json>) {
+  if (!rows.length) return null
+  const row = rows.slice().sort((a, b) => Number(b.unit_percent || 0) - Number(a.unit_percent || 0))[0]
+  return {
+    label: row.label,
+    unit_acres: row.unit_acres,
+    unit_percent: row.unit_percent,
+  }
+}
+
+async function mapConcurrent<T, R>(items: T[], concurrency: number, worker: (item: T) => Promise<R>) {
+  const results = new Array<R>(items.length)
+  let cursor = 0
+  const runners = Array.from({ length: Math.max(1, Math.min(concurrency, items.length || 1)) }, async () => {
+    while (true) {
+      const index = cursor
+      cursor += 1
+      if (index >= items.length) return
+      results[index] = await worker(items[index])
+    }
+  })
+  await Promise.all(runners)
+  return results
+}
+
+async function synthesizePolygonUnit(unit: Json, slopeClassRule: Json, elevationBandRule: Json) {
+  const properties = unit?.properties || {}
+  const unitAcres = Number(properties.parcel_acres ?? properties.intersection_acres)
+  const polygon = geojsonToEsriPolygon(unit?.geometry)
+  if (!polygon || !Number.isFinite(unitAcres) || unitAcres <= 0) {
+    return {
+      id: unit?.id || null,
+      properties,
+      status: 'unavailable',
+      area_acres: Number.isFinite(unitAcres) ? unitAcres : null,
+      slope_bands: [],
+      elevation_bands: [],
+    }
+  }
+
+  const [slopeResult, elevationResult] = await Promise.allSettled([
+    arcgisZonalStats(SOURCES.dem, polygon, slopeClassRule),
+    arcgisZonalStats(SOURCES.dem, polygon, elevationBandRule),
+  ])
+
+  const slopeBands = slopeResult.status === 'fulfilled'
+    ? unitBandRows(slopeResult.value as Json, SYNTHESIS_SLOPE_BANDS, unitAcres)
+    : []
+  const elevationBands = elevationResult.status === 'fulfilled'
+    ? unitBandRows(elevationResult.value as Json, SYNTHESIS_ELEVATION_BANDS, unitAcres)
+    : []
+  const availableParts = Number(slopeBands.length > 0) + Number(elevationBands.length > 0)
+
+  return {
+    id: unit?.id || null,
+    properties,
+    status: availableParts === 2 ? 'available' : availableParts === 1 ? 'partial' : 'unavailable',
+    area_acres: unitAcres,
+    slope_bands: slopeBands,
+    elevation_bands: elevationBands,
+    steep_30_plus: bandTotals(slopeBands, (row) => Number(row.min_percent) >= 30),
+    below_700: bandTotals(elevationBands, (row) => Number(row.max_ft) <= 700),
+    dominant_slope_band: dominantBand(slopeBands),
+    dominant_elevation_band: dominantBand(elevationBands),
+    raster_observation_count: {
+      slope: slopeBands.reduce((sum, row) => sum + Number(row.count || 0), 0),
+      elevation: elevationBands.reduce((sum, row) => sum + Number(row.count || 0), 0),
+    },
+  }
+}
+
+async function synthesizeHydrologyPolygon(unit: Json, elevationBandRule: Json) {
+  const properties = unit?.properties || {}
+  const unitAcres = Number(properties.intersection_acres)
+  const polygon = geojsonToEsriPolygon(unit?.geometry)
+  if (!polygon || !Number.isFinite(unitAcres) || unitAcres <= 0) return null
+  try {
+    const payload = await arcgisZonalStats(SOURCES.dem, polygon, elevationBandRule)
+    const bands = unitBandRows(payload, SYNTHESIS_ELEVATION_BANDS, unitAcres)
+    return {
+      id: unit?.id || null,
+      feature_kind: properties.feature_kind || null,
+      source_slug: properties.source_slug || null,
+      intersection_acres: unitAcres,
+      elevation_bands: bands,
+      below_700: bandTotals(bands, (row) => Number(row.max_ft) <= 700),
+      dominant_elevation_band: dominantBand(bands),
+    }
+  } catch {
+    return null
+  }
+}
+
+async function buildPhysicalSynthesis(
+  inputs: Json,
+  hydrologyContext: Json | null,
+  slopeClassRule: Json,
+  elevationBandRule: Json,
+  canonicalSlope: Json | null,
+  canonicalElevationBands: Json | null,
+) {
+  const soilInputs = Array.isArray(inputs?.soils) ? inputs.soils : []
+  const geologyInputs = Array.isArray(inputs?.geology) ? inputs.geology : []
+  const hydroInputs = Array.isArray(inputs?.hydrology) ? inputs.hydrology : []
+
+  const [soilUnits, geologyUnits] = await Promise.all([
+    mapConcurrent(soilInputs, 4, (unit) => synthesizePolygonUnit(unit, slopeClassRule, elevationBandRule)),
+    mapConcurrent(geologyInputs, 4, (unit) => synthesizePolygonUnit(unit, slopeClassRule, elevationBandRule)),
+  ])
+
+  const canonicalSteepAcres = (canonicalSlope?.bands || [])
+    .filter((row: Json) => Number(row.min_percent) >= 30)
+    .reduce((sum: number, row: Json) => sum + Number(row.parcel_acres || 0), 0)
+
+  for (const family of [soilUnits, geologyUnits]) {
+    for (const unit of family as Array<Json>) {
+      if (unit?.steep_30_plus) {
+        unit.steep_30_plus.share_of_parcel_steep_acres =
+          canonicalSteepAcres > 0 ? Number(unit.steep_30_plus.unit_acres || 0) / canonicalSteepAcres * 100 : null
+      }
+    }
+  }
+
+  const hydroSummary = hydrologyContext?.summary || {}
+  const hydroStatus = String(hydrologyContext?.status || 'unavailable')
+  const intersectingCount = Number(hydroSummary.intersecting_count || 0)
+  const polygonHydroInputs = hydroInputs.filter((unit: Json) =>
+    ['waterbody', 'wetland'].includes(String(unit?.properties?.feature_kind || ''))
+  )
+  const polygonElevationRaw = await mapConcurrent(
+    polygonHydroInputs,
+    3,
+    (unit) => synthesizeHydrologyPolygon(unit, elevationBandRule),
+  )
+  const polygonElevation = polygonElevationRaw.filter(Boolean)
+
+  const parcelLow = (canonicalElevationBands?.bands || [])
+    .filter((row: Json) => Number(row.max_ft) <= 700)
+    .reduce((acc: Json, row: Json) => ({
+      parcel_acres: acc.parcel_acres + Number(row.parcel_acres || 0),
+      parcel_percent: acc.parcel_percent + Number(row.parcel_percent || 0),
+    }), { parcel_acres: 0, parcel_percent: 0 })
+
+  const mappedWaterStatus =
+    hydroStatus === 'unavailable'
+      ? 'unavailable'
+      : intersectingCount > 0
+        ? 'authoritative_intersection_present'
+        : 'no_authoritative_intersection'
+
+  const unitStatuses = [...soilUnits, ...geologyUnits].map((unit: any) => unit.status)
+  const status =
+    inputs?.status !== 'available'
+      ? 'unavailable'
+      : unitStatuses.some((value) => value === 'unavailable')
+        ? 'partial'
+        : unitStatuses.some((value) => value === 'partial')
+          ? 'partial'
+          : 'available'
+
+  return {
+    method: 'cross_layer_physical_synthesis_v1',
+    status,
+    scoring_performed: false,
+    soil_units: soilUnits,
+    geology_units: geologyUnits,
+    mapped_water: {
+      status: mappedWaterStatus,
+      parcel_below_700: parcelLow,
+      flowline_intersection_m: Number(hydroSummary.flowline_intersection_m || 0),
+      waterbody_intersection_acres: Number(hydroSummary.waterbody_intersection_acres || 0),
+      wetland_intersection_acres: Number(hydroSummary.wetland_intersection_acres || 0),
+      polygon_elevation: polygonElevation,
+      note: intersectingCount > 0
+        ? 'Only authoritative 3DHP/NWI features that intersect the selected parcel are related to canonical elevation bands. Flowline intersections remain length measures and are not converted into pseudo-area.'
+        : 'No authoritative USGS 3DHP or USFWS NWI feature intersects the selected parcel; nearby off-parcel mapped water is not treated as within-parcel alignment.',
+    },
+    provenance: {
+      vector_method: 'exact parcel-clipped PostGIS geometry using already-vetted SSURGO, KGS geology, and cached 3DHP/NWI layers',
+      raster_method: 'KyFromAbove Phase 3 ImageServer slope/elevation remap histograms clipped to each exact vector unit',
+      slope_units: 'percent rise',
+      slope_z_factor: 0.3048,
+      scoring_performed: false,
+      imagery_pixels_analyzed: false,
+    },
+  }
+}
+
 function normalizeSlope(payload: Json, classPayload: Json, parcelAcres: number | null) {
   const stats = payload?.statistics?.[0] || {}
   const count = Number(stats.count)
@@ -468,16 +691,54 @@ async function refresh(slug: string, anchor: Anchor) {
   const aspect = payloads[7] ? normalizeAspect(payloads[7]!, normalizedParcelAcres) : null
   const elevationBands = payloads[8] ? normalizeElevationBands(payloads[8]!, normalizedParcelAcres) : null
 
+  let physicalSynthesis: Json = {
+    method: 'cross_layer_physical_synthesis_v1',
+    status: 'unavailable',
+    scoring_performed: false,
+    soil_units: [],
+    geology_units: [],
+    mapped_water: { status: 'unavailable', polygon_elevation: [] },
+  }
+
+  const [synthesisInputsResult, hydrologyResult] = await Promise.all([
+    admin.rpc('farm_watch_get_physical_synthesis_inputs_v1_internal', {
+      p_slug: slug,
+      p_geology: geology,
+    }),
+    admin.rpc('farm_watch_get_hydrology_v1_internal', { p_slug: slug }),
+  ])
+
+  if (!synthesisInputsResult.error && synthesisInputsResult.data) {
+    try {
+      physicalSynthesis = await buildPhysicalSynthesis(
+        synthesisInputsResult.data as Json,
+        hydrologyResult.error ? null : hydrologyResult.data as Json,
+        slopeClassRule,
+        elevationBandRule,
+        slope,
+        elevationBands,
+      )
+      sourceStatus.physical_synthesis = physicalSynthesis.status
+    } catch (error) {
+      sourceStatus.physical_synthesis = 'unavailable'
+      sourceErrors.physical_synthesis = error instanceof Error ? error.message : String(error)
+    }
+  } else {
+    sourceStatus.physical_synthesis = 'unavailable'
+    sourceErrors.physical_synthesis = synthesisInputsResult.error?.message || 'cross-layer synthesis inputs unavailable'
+  }
+
   const retrievedAt = new Date().toISOString()
   const context = {
     ...computed,
-    context_version: 3,
+    context_version: 4,
     elevation,
     terrain_surface: {
       slope,
       aspect,
       elevation_bands: elevationBands,
     },
+    physical_synthesis: physicalSynthesis,
     retrieved_at: retrievedAt,
     source_status: sourceStatus,
     source_errors: sourceErrors,
@@ -514,6 +775,11 @@ async function refresh(slug: string, anchor: Anchor) {
         slope_units: 'percent rise',
         meaning: 'canonical parcel slope/aspect distributions from the DEM raster; elevation bands are direct DEM remaps. These are terrain-model derivatives, not a ground survey or engineering-grade surface analysis.',
       },
+      physical_synthesis: {
+        authorities: ['USDA NRCS', 'Kentucky Geological Survey', 'USGS 3DHP', 'USFWS NWI', 'Kentucky Division of Geographic Information / KyFromAbove'],
+        method: 'exact existing vector-unit geometry crossed with geometry-clipped canonical Phase 3 DEM slope/elevation histograms',
+        meaning: 'descriptive spatial relationship among already-vetted terrain, soil, geology, and mapped-water layers; no suitability, quality, or site score is computed',
+      },
       faults_in_primary_view: false,
       karst_potential_used: false,
       financial_context_included: false,
@@ -522,8 +788,14 @@ async function refresh(slug: string, anchor: Anchor) {
     },
   }
 
-  const availableCount = Object.values(sourceStatus).filter((status) => status === 'available').length
-  const status = availableCount === names.length ? 'available' : availableCount > 0 ? 'partial' : 'unavailable'
+  const availableCount = names.filter((name) => sourceStatus[name] === 'available').length
+  const baseStatus = availableCount === names.length ? 'available' : availableCount > 0 ? 'partial' : 'unavailable'
+  const status =
+    baseStatus === 'unavailable'
+      ? 'unavailable'
+      : physicalSynthesis.status === 'available' && baseStatus === 'available'
+        ? 'available'
+        : 'partial'
   await admin.rpc('farm_watch_upsert_land_context_v1_internal', {
     p_slug: slug,
     p_status: status,
@@ -559,7 +831,7 @@ Deno.serve(async (req: Request) => {
   let result: any
 
   const cacheHasCanonicalTerrain =
-    cached?.context?.context_version === 3 &&
+    cached?.context?.context_version === 4 &&
     cached?.context?.elevation?.method === 'geometry_clipped_raster_statistics' &&
     Number.isFinite(Number(cached?.context?.elevation?.min_ft)) &&
     Number.isFinite(Number(cached?.context?.elevation?.max_ft)) &&
@@ -568,7 +840,11 @@ Deno.serve(async (req: Request) => {
     cached?.context?.terrain_surface?.aspect?.method === 'geometry_clipped_aspect_raster_function' &&
     Array.isArray(cached?.context?.terrain_surface?.aspect?.sectors) &&
     cached?.context?.terrain_surface?.elevation_bands?.method === 'geometry_clipped_elevation_remap' &&
-    Array.isArray(cached?.context?.terrain_surface?.elevation_bands?.bands)
+    Array.isArray(cached?.context?.terrain_surface?.elevation_bands?.bands) &&
+    cached?.context?.physical_synthesis?.method === 'cross_layer_physical_synthesis_v1' &&
+    ['available', 'partial'].includes(cached?.context?.physical_synthesis?.status) &&
+    Array.isArray(cached?.context?.physical_synthesis?.soil_units) &&
+    Array.isArray(cached?.context?.physical_synthesis?.geology_units)
 
   if (cached?.context && cacheHasCanonicalTerrain && Number.isFinite(cachedAt) && Date.now() - cachedAt < CACHE_TTL_MS) {
     result = {
