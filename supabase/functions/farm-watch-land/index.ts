@@ -565,7 +565,10 @@ Deno.serve(async (req: Request) => {
     Number.isFinite(Number(cached?.context?.elevation?.max_ft)) &&
     cached?.context?.terrain_surface?.slope?.method === 'geometry_clipped_slope_raster_function' &&
     Array.isArray(cached?.context?.terrain_surface?.slope?.bands) &&
-    cached?.context?.terrain_surface?.aspect?.method === 'geometry_clipped_aspect_raster_function'
+    cached?.context?.terrain_surface?.aspect?.method === 'geometry_clipped_aspect_raster_function' &&
+    Array.isArray(cached?.context?.terrain_surface?.aspect?.sectors) &&
+    cached?.context?.terrain_surface?.elevation_bands?.method === 'geometry_clipped_elevation_remap' &&
+    Array.isArray(cached?.context?.terrain_surface?.elevation_bands?.bands)
 
   if (cached?.context && cacheHasCanonicalTerrain && Number.isFinite(cachedAt) && Date.now() - cachedAt < CACHE_TTL_MS) {
     result = {
