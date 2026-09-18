@@ -91,6 +91,28 @@ async function fetchJson(url: string, timeoutMs = SOURCE_TIMEOUT_MS) {
   }
 }
 
+async function postFormJson(url: string, body: URLSearchParams, timeoutMs = SOURCE_TIMEOUT_MS) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        accept: 'application/json, application/geo+json, */*',
+        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'user-agent': 'Cadastory-Farm-Watch/0.5 (https://pmicka.com)',
+      },
+      body,
+    })
+    const text = await response.text()
+    if (!response.ok) throw new Error(`source returned ${response.status}`)
+    try { return JSON.parse(text) } catch { throw new Error('source returned non-JSON content') }
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 function geojsonToEsriPolygon(geometry: Json | null | undefined) {
   if (!geometry) return null
   const rings: any[] = []
@@ -130,12 +152,14 @@ async function arcgisPolygon(base: string, polygon: Json, outFields: string) {
 }
 
 async function arcgisZonalStats(base: string, polygon: Json, renderingRule?: Json) {
-  const url = new URL(`${base.replace(/\/$/, '')}/computeStatisticsHistograms`)
-  url.searchParams.set('f', 'json')
-  url.searchParams.set('geometry', JSON.stringify(polygon))
-  url.searchParams.set('geometryType', 'esriGeometryPolygon')
-  if (renderingRule) url.searchParams.set('renderingRule', JSON.stringify(renderingRule))
-  const payload = await fetchJson(url.toString())
+  const url = `${base.replace(/\/$/, '')}/computeStatisticsHistograms`
+  const body = new URLSearchParams({
+    f: 'json',
+    geometry: JSON.stringify(polygon),
+    geometryType: 'esriGeometryPolygon',
+  })
+  if (renderingRule) body.set('renderingRule', JSON.stringify(renderingRule))
+  const payload = await postFormJson(url, body)
   if (payload?.error) throw new Error(payload.error.message || 'ArcGIS raster statistics query failed')
   if (!Array.isArray(payload?.statistics) || !payload.statistics.length) {
     throw new Error('Raster statistics response did not contain statistics')
@@ -847,7 +871,7 @@ Deno.serve(async (req: Request) => {
     cached?.context?.terrain_surface?.elevation_bands?.method === 'geometry_clipped_elevation_remap' &&
     Array.isArray(cached?.context?.terrain_surface?.elevation_bands?.bands) &&
     cached?.context?.physical_synthesis?.method === 'cross_layer_physical_synthesis_v1' &&
-    ['available', 'partial'].includes(cached?.context?.physical_synthesis?.status) &&
+    cached?.context?.physical_synthesis?.status === 'available' &&
     Array.isArray(cached?.context?.physical_synthesis?.soil_units) &&
     Array.isArray(cached?.context?.physical_synthesis?.geology_units)
 
