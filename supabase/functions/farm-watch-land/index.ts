@@ -417,7 +417,7 @@ async function refresh(slug: string, anchor: Anchor) {
       InputRanges: [0,650,650,700,700,750,750,800,800,10000],
       OutputValues: [1,2,3,4,5],
       AllowUnmatched: false,
-      Raster: '$',
+      Raster: '$$',
     },
     outputPixelType: 'U8',
     variableName: 'Raster',
