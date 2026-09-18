@@ -285,7 +285,10 @@ const SYNTHESIS_ELEVATION_BANDS = [
 ]
 
 function unitBandRows(payload: Json, definitions: Array<Json>, unitAcres: number) {
-  return remapClassRows(payload, definitions, unitAcres).map((row: Json) => {
+  const rows = remapClassRows(payload, definitions, unitAcres)
+  const observationCount = rows.reduce((sum: number, row: Json) => sum + Number(row.count || 0), 0)
+  if (observationCount <= 0) return []
+  return rows.map((row: Json) => {
     const { parcel_percent, parcel_acres, ...rest } = row
     return {
       ...rest,
@@ -364,7 +367,7 @@ async function synthesizePolygonUnit(unit: Json, slopeClassRule: Json, elevation
     slope_bands: slopeBands,
     elevation_bands: elevationBands,
     steep_30_plus: bandTotals(slopeBands, (row) => Number(row.min_percent) >= 30),
-    below_700: bandTotals(elevationBands, (row) => Number(row.max_ft) <= 700),
+    below_700: bandTotals(elevationBands, (row) => row.max_ft != null && Number(row.max_ft) <= 700),
     dominant_slope_band: dominantBand(slopeBands),
     dominant_elevation_band: dominantBand(elevationBands),
     raster_observation_count: {
@@ -440,7 +443,7 @@ async function buildPhysicalSynthesis(
   const polygonElevation = polygonElevationRaw.filter(Boolean)
 
   const parcelLow = (canonicalElevationBands?.bands || [])
-    .filter((row: Json) => Number(row.max_ft) <= 700)
+    .filter((row: Json) => row.max_ft != null && Number(row.max_ft) <= 700)
     .reduce((acc: Json, row: Json) => ({
       parcel_acres: acc.parcel_acres + Number(row.parcel_acres || 0),
       parcel_percent: acc.parcel_percent + Number(row.parcel_percent || 0),
@@ -457,11 +460,13 @@ async function buildPhysicalSynthesis(
   const status =
     inputs?.status !== 'available'
       ? 'unavailable'
-      : unitStatuses.some((value) => value === 'unavailable')
+      : soilUnits.length === 0 || geologyUnits.length === 0 || hydroStatus === 'unavailable'
         ? 'partial'
-        : unitStatuses.some((value) => value === 'partial')
+        : unitStatuses.some((value) => value === 'unavailable')
           ? 'partial'
-          : 'available'
+          : unitStatuses.some((value) => value === 'partial')
+            ? 'partial'
+            : 'available'
 
   return {
     method: 'cross_layer_physical_synthesis_v1',
