@@ -1,11 +1,8 @@
 #!/usr/bin/env -S deno run --allow-env --allow-net
 
 import proj4 from 'npm:proj4@2.12.1'
+import { Copc, Las } from 'npm:copc@0.0.9'
 import { FARM_WATCH_GITHUB_OIDC_AUDIENCE } from '../supabase/functions/_shared/github-actions-oidc.ts'
-
-const { Copc, Las } = await import(
-  'https://esm.unpkg.com/copc@0.0.9?target=es2022'
-) as any
 
 const EDGE_URL =
   'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/farm-watch-lidar-worker'
@@ -127,6 +124,26 @@ function detectNativeCrs(wkt: unknown) {
   if (/\b6473\b/.test(value) || /NAD83\(2011\).*Kentucky.*Single/i.test(value)) return 'EPSG:6473'
   if (/\b3089\b/.test(value) || /NAD83[^\n]*Kentucky.*Single/i.test(value)) return 'EPSG:3089'
   return null
+}
+
+function nativeHttpRangeGetter(assetUrl: string) {
+  return async (begin: number, end: number) => {
+    if (begin < 0 || end < 0 || begin > end) throw new Error('invalid COPC byte range')
+    const expectedLength = end - begin
+    const response = await fetch(assetUrl, {
+      headers: { Range: `bytes=${begin}-${end - 1}` },
+    })
+    if (response.status !== 206) {
+      throw new Error('COPC range request expected HTTP 206, received ' + response.status)
+    }
+    const bytes = new Uint8Array(await response.arrayBuffer())
+    if (bytes.byteLength !== expectedLength) {
+      throw new Error(
+        'COPC range length mismatch: expected ' + expectedLength + ', received ' + bytes.byteLength,
+      )
+    }
+    return bytes
+  }
 }
 
 function parseKey(key: string) {
@@ -453,7 +470,8 @@ async function main() {
     for (const item of sourceItems) {
       const assetUrl = String(item.primary_asset_href || '')
       if (!assetUrl) throw new Error('Phase 3 asset URL unavailable for ' + item.id)
-      const copc = await Copc.create(assetUrl)
+      const get = nativeHttpRangeGetter(assetUrl)
+      const copc = await Copc.create(get)
       const nativeCrs = detectNativeCrs(copc.wkt)
       if (!nativeCrs) throw new Error('native CRS unresolved for ' + item.id)
       if (nativeCrs !== contract.native_crs) {
@@ -462,6 +480,7 @@ async function main() {
       opened.push({
         id: String(item.id),
         asset_url: assetUrl,
+        get,
         asset_identity: String(item.primary_asset_identity || item.primary_asset_href || ''),
         item,
         copc,
@@ -484,7 +503,7 @@ async function main() {
     const bandGrid = createBandGrid(queryBbox, structureCellNative, contract.thresholds_ft)
 
     for (const source of opened) {
-      source.nodes = await collectIntersectingNodes(source.asset_url, source.copc, supportBbox)
+      source.nodes = await collectIntersectingNodes(source.get, source.copc, supportBbox)
       source.candidate_point_count = [...source.nodes.values()]
         .reduce((sum: number, node: any) => sum + Number(node.pointCount || 0), 0)
     }
@@ -492,7 +511,7 @@ async function main() {
     let supportGroundPointCount = 0
     for (const source of opened) {
       for (const node of source.nodes.values()) {
-        const view = await Copc.loadPointDataView(source.asset_url, source.copc, node, {
+        const view = await Copc.loadPointDataView(source.get, source.copc, node, {
           lazPerf,
           include: ['X', 'Y', 'Z', 'Classification', 'Overlap', 'Withheld'],
         })
@@ -534,7 +553,7 @@ async function main() {
 
     for (const source of opened) {
       for (const node of source.nodes.values()) {
-        const view = await Copc.loadPointDataView(source.asset_url, source.copc, node, {
+        const view = await Copc.loadPointDataView(source.get, source.copc, node, {
           lazPerf,
           include: ['X', 'Y', 'Z', 'Classification', 'Overlap', 'Withheld'],
         })
