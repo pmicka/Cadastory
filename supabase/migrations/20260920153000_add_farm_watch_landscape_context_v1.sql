@@ -494,6 +494,8 @@ declare
   v_hydrology_identity text;
   v_hydrology_current boolean;
   v_hydrology_buffer integer;
+  v_hydrology_source_status jsonb;
+  v_barrier_hydrology_available boolean;
   v_rule_count integer;
   v_resolved_rule_count integer;
   v_barrier extensions.geometry;
@@ -523,17 +525,23 @@ begin
       select 1 from farm_watch.hydrology_refresh_state_v1
       where property_id=v_property_id and identity_sha256=v_hydrology_identity
     ),
-    coalesce(max(buffer_m),0)
-  into v_hydrology_current,v_hydrology_buffer
+    coalesce(max(buffer_m),0),
+    coalesce((array_agg(source_status order by retrieved_at desc))[1],'{}'::jsonb)
+  into v_hydrology_current,v_hydrology_buffer,v_hydrology_source_status
   from farm_watch.hydrology_refresh_state_v1
   where property_id=v_property_id;
 
-  if not v_hydrology_current or v_hydrology_buffer < 3000 then
+  v_barrier_hydrology_available :=
+    coalesce(v_hydrology_source_status->>'flowline','')='available'
+    and coalesce(v_hydrology_source_status->>'waterbody','')='available';
+
+  if not v_hydrology_current or v_hydrology_buffer < 3000 or not v_barrier_hydrology_available then
     return jsonb_build_object(
       'status','unavailable',
-      'reason','current 3000 m hydrology context required',
+      'reason','current 3000 m USGS 3DHP flowline and waterbody context required',
       'hydrology_identity_current',v_hydrology_current,
-      'hydrology_buffer_m',v_hydrology_buffer
+      'hydrology_buffer_m',v_hydrology_buffer,
+      'hydrology_source_status',v_hydrology_source_status
     );
   end if;
 
