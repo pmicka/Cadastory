@@ -169,7 +169,8 @@ function rasterDimensions(bounds: any, targetPixelM: number, maxDimension: numbe
 
 async function sha256Hex(value: Uint8Array | string) {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const stableBytes = Uint8Array.from(bytes)
+  const digest = await crypto.subtle.digest('SHA-256', stableBytes.buffer)
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
@@ -540,7 +541,7 @@ function compareIndependentStructureProducts(a: any, b: any) {
   const lookupA = rankLookupForOverlap(a.score, a.valid, b.valid)
   const lookupB = rankLookupForOverlap(b.score, b.valid, a.valid)
   const count = lookupA?.count || 0
-  if (count < 100 || count !== lookupB?.count) {
+  if (!lookupA || !lookupB || count < 100 || count !== lookupB.count) {
     return { status: 'insufficient_overlap', overlap_cell_count: count }
   }
 
