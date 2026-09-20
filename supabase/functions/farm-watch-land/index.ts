@@ -761,8 +761,8 @@ async function refresh(slug: string, anchor: Anchor) {
     variableName: 'Raster',
   }
   const canopy2025MosaicRule = {
-    mosaicMethod: 'esriMosaicAttribute',
-    where: 'beginyear = 2025 AND endyear = 2025',
+    mosaicMethod: 'esriMosaicNorthwest',
+    where: 'beginyear = 2025',
   }
 
   const elevationBandRule = {
@@ -822,7 +822,15 @@ async function refresh(slug: string, anchor: Anchor) {
   const slope = payloads[5] && payloads[6] ? normalizeSlope(payloads[5]!, payloads[6]!, normalizedParcelAcres) : null
   const aspect = payloads[7] ? normalizeAspect(payloads[7]!, normalizedParcelAcres) : null
   const elevationBands = payloads[8] ? normalizeElevationBands(payloads[8]!, normalizedParcelAcres) : null
-  const canopy = payloads[9] ? normalizeCanopy(payloads[9]!, normalizedParcelAcres) : null
+  let canopy: Json | null = null
+  if (payloads[9]) {
+    try {
+      canopy = normalizeCanopy(payloads[9]!, normalizedParcelAcres)
+    } catch (error) {
+      sourceStatus.canopy = 'unavailable'
+      sourceErrors.canopy = error instanceof Error ? error.message : String(error)
+    }
+  }
 
   let physicalSynthesis: Json = {
     method: 'cross_layer_physical_synthesis_v1',
