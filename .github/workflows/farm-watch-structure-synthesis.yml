@@ -1,0 +1,35 @@
+name: Farm Watch structure complementarity materialization
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  materialize:
+    if: >-
+      github.actor == 'pmicka' &&
+      github.event.issue.user.login == 'pmicka' &&
+      github.event.issue.title == '[ops] Materialize Farm Watch structure complementarity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Check structure complementarity worker
+        run: deno check scripts/farm-watch-structure-synthesis-materialize.ts
+
+      - name: Materialize validation property
+        run: >-
+          deno run
+          --allow-env
+          --allow-net
+          scripts/farm-watch-structure-synthesis-materialize.ts
+          --property validation-property-01
