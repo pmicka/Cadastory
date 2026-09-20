@@ -36,6 +36,7 @@ const HYDRO_SOURCES = [
     featureKind: 'flowline',
     url: 'https://3dhp.nationalmap.gov/arcgis/rest/services/usgs_3dhp_all/MapServer/50',
     outFields: 'OBJECTID,id3dhp,gnisidlabel,featuretypelabel,lengthkm,flowdirectionlabel,streamorder,onsurfacelabel',
+    bufferM: 1000,
     timeoutMs: 15000,
   },
   {
@@ -44,6 +45,7 @@ const HYDRO_SOURCES = [
     featureKind: 'waterbody',
     url: 'https://3dhp.nationalmap.gov/arcgis/rest/services/usgs_3dhp_all/MapServer/60',
     outFields: 'OBJECTID,id3dhp,gnisidlabel,featuretypelabel,areasqkm',
+    bufferM: 3000,
     timeoutMs: 15000,
   },
   {
@@ -52,6 +54,7 @@ const HYDRO_SOURCES = [
     featureKind: 'wetland',
     url: 'https://fwspublicservices.wim.usgs.gov/wetlandsmapservice/rest/services/Wetlands/MapServer/0',
     outFields: '*',
+    bufferM: 3000,
     timeoutMs: 15000,
   },
 ] as const
@@ -326,12 +329,17 @@ function landscapeDomainNeedsRefresh(domain: any) {
 }
 
 async function refreshHydrology(slug: string, boundary: any) {
-  const envelope = expandedEnvelope(boundary, HYDRO_BUFFER_M)
-  if (!envelope) throw new Error('Property boundary is unavailable for hydrology refresh')
+  const sourceRequests = HYDRO_SOURCES.map((source) => {
+    const envelope = expandedEnvelope(boundary, source.bufferM)
+    if (!envelope) throw new Error('Property boundary is unavailable for hydrology refresh')
+    return fetchHydroSource(source, envelope)
+  })
 
-  const settled = await Promise.allSettled(HYDRO_SOURCES.map((source) => fetchHydroSource(source, envelope)))
+  const settled = await Promise.allSettled(sourceRequests)
   const features: any[] = []
-  const sourceStatus: Record<string, any> = {}
+  const sourceStatus: Record<string, any> = {
+    coverage_m: Object.fromEntries(HYDRO_SOURCES.map((source) => [source.key, source.bufferM])),
+  }
   const sourceErrors: Record<string, string> = {}
 
   settled.forEach((result, index) => {
