@@ -164,7 +164,11 @@ function keyBounds2d(key: string, cube: number[]) {
   ]
 }
 
-async function collectIntersectingNodes(assetUrl: string, copc: any, queryBbox: number[]) {
+async function collectIntersectingNodes(
+  assetSource: string | ((begin: number, end: number) => Promise<Uint8Array>),
+  copc: any,
+  queryBbox: number[],
+) {
   const nodes = new Map<string, any>()
   const queue = [copc.info.rootHierarchyPage]
   const seenPages = new Set<string>()
@@ -174,7 +178,7 @@ async function collectIntersectingNodes(assetUrl: string, copc: any, queryBbox: 
     if (seenPages.has(pageIdentity)) continue
     seenPages.add(pageIdentity)
 
-    const subtree = await Copc.loadHierarchyPage(assetUrl, page)
+    const subtree = await Copc.loadHierarchyPage(assetSource, page)
     for (const [key, node] of Object.entries(subtree.nodes || {})) {
       if (!node || !((node as any).pointCount > 0)) continue
       const bounds = keyBounds2d(key, copc.info.cube)
