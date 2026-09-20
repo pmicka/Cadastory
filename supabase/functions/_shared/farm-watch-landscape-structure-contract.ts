@@ -97,11 +97,25 @@ export function validateLandscapeStructureArtifact(value: any) {
     'property_mask_base64',
     'lidar_valid_base64',
     'lidar_dominant_band_base64',
+    'lidar_total_returns_u16_base64',
     'leaf_valid_base64',
     'leaf_score_base64',
+    'leaf_confidence_base64',
+    'leaf_spectral_support_base64',
   ]) {
     if (typeof grid?.[key] !== 'string' || grid[key].length === 0) return false
   }
+  if (
+    !Array.isArray(grid?.lidar_band_shares_base64) ||
+    grid.lidar_band_shares_base64.length !== FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.lidarThresholdsFt.length + 1 ||
+    grid.lidar_band_shares_base64.some((value: unknown) => typeof value !== 'string' || value.length === 0)
+  ) return false
+  if (
+    value?.leaf_off_2024?.sourceId !== FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.leafSourceId ||
+    value?.leaf_off_2024?.grid?.encoding !== 'base64-u8-v1' ||
+    typeof value?.leaf_off_2024?.grid?.score_base64 !== 'string' ||
+    typeof value?.leaf_off_2024?.grid?.valid_base64 !== 'string'
+  ) return false
 
   return Boolean(
     Number(value?.summary?.domain_cell_count) > 0 &&
