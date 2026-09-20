@@ -21,6 +21,7 @@ const ALLOWED_ORIGINS = new Set([
 ])
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const LANDSCAPE_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const OPTIONAL_SOURCE_RETRY_TTL_MS = 24 * 60 * 60 * 1000
 const SOURCE_TIMEOUT_MS = 12000
 
@@ -827,6 +828,328 @@ function normalizeElevation(payload: Json) {
   }
 }
 
+
+function zoneBandRows(rows: Array<Json>) {
+  return (rows || []).map((row) => {
+    const { parcel_percent, parcel_acres, ...rest } = row
+    return {
+      ...rest,
+      zone_percent: parcel_percent,
+      zone_acres: parcel_acres,
+    }
+  })
+}
+
+function normalizeCanopyZone(payload: Json, zoneAcres: number | null) {
+  const normalized = normalizeCanopy(payload, zoneAcres)
+  return {
+    ...normalized,
+    area_basis: 'barrier_aware_landscape_ring',
+    bands: zoneBandRows(normalized.bands || []),
+    interpretation_boundary:
+      'Modeled 30 m percent tree canopy cover summarized over a barrier-aware landscape ring. This is aggregate canopy composition, not pixel-edge detection, field-measured cover, habitat quality, or deer-use evidence.',
+  }
+}
+
+function normalizeSlopeZone(payload: Json, classPayload: Json, zoneAcres: number | null) {
+  const normalized = normalizeSlope(payload, classPayload, zoneAcres)
+  return {
+    ...normalized,
+    area_basis: 'barrier_aware_landscape_ring',
+    bands: zoneBandRows(normalized.bands || []),
+  }
+}
+
+function rowPercent(row: Json) {
+  const value = Number(row?.zone_percent ?? row?.parcel_percent)
+  return Number.isFinite(value) ? value : 0
+}
+
+function canopyComposition(canopy: Json | null) {
+  const bands = Array.isArray(canopy?.bands) ? canopy.bands : []
+  if (!bands.length) return null
+  const share = (min: number, max: number) =>
+    bands
+      .filter((row: Json) => Number(row.min_percent) >= min && Number(row.max_percent) <= max)
+      .reduce((sum: number, row: Json) => sum + rowPercent(row), 0)
+  return {
+    canopy_0_20_percent: share(0,20),
+    canopy_21_60_percent: share(21,60),
+    canopy_61_100_percent: share(61,100),
+  }
+}
+
+function steepThirtyShare(slope: Json | null) {
+  const bands = Array.isArray(slope?.bands) ? slope.bands : []
+  if (!bands.length) return null
+  return bands
+    .filter((row: Json) => Number(row.min_percent) >= 30)
+    .reduce((sum: number, row: Json) => sum + rowPercent(row), 0)
+}
+
+function finiteDelta(toValue: unknown, fromValue: unknown) {
+  const to = Number(toValue)
+  const from = Number(fromValue)
+  return Number.isFinite(to) && Number.isFinite(from) ? to - from : null
+}
+
+function landscapeGradient(fromLabel: string, fromZone: Json, toLabel: string, toZone: Json) {
+  const fromCanopy = canopyComposition(fromZone?.canopy || null)
+  const toCanopy = canopyComposition(toZone?.canopy || null)
+  let canopyShift: number | null = null
+  if (fromCanopy && toCanopy) {
+    canopyShift = (
+      Math.abs(toCanopy.canopy_0_20_percent - fromCanopy.canopy_0_20_percent) +
+      Math.abs(toCanopy.canopy_21_60_percent - fromCanopy.canopy_21_60_percent) +
+      Math.abs(toCanopy.canopy_61_100_percent - fromCanopy.canopy_61_100_percent)
+    ) / 2
+  }
+  return {
+    from: fromLabel,
+    to: toLabel,
+    canopy: {
+      mean_canopy_delta_pp: finiteDelta(toZone?.canopy?.mean_percent, fromZone?.canopy?.mean_percent),
+      canopy_0_20_delta_pp: fromCanopy && toCanopy
+        ? toCanopy.canopy_0_20_percent - fromCanopy.canopy_0_20_percent
+        : null,
+      canopy_21_60_delta_pp: fromCanopy && toCanopy
+        ? toCanopy.canopy_21_60_percent - fromCanopy.canopy_21_60_percent
+        : null,
+      canopy_61_100_delta_pp: fromCanopy && toCanopy
+        ? toCanopy.canopy_61_100_percent - fromCanopy.canopy_61_100_percent
+        : null,
+      composition_shift_pp: canopyShift,
+      interpretation:
+        'Aggregate change in canopy-band composition between adjacent analysis areas. This is not a mapped edge, adjacency count, corridor, or animal-use inference.',
+    },
+    terrain: {
+      mean_elevation_delta_ft: finiteDelta(toZone?.elevation?.mean_ft, fromZone?.elevation?.mean_ft),
+      relief_delta_ft: finiteDelta(toZone?.elevation?.relief_ft, fromZone?.elevation?.relief_ft),
+      mean_slope_delta_percent_rise: finiteDelta(toZone?.slope?.mean_percent, fromZone?.slope?.mean_percent),
+      steep_30_plus_delta_pp: (() => {
+        const fromShare = steepThirtyShare(fromZone?.slope || null)
+        const toShare = steepThirtyShare(toZone?.slope || null)
+        return Number.isFinite(Number(fromShare)) && Number.isFinite(Number(toShare))
+          ? Number(toShare) - Number(fromShare)
+          : null
+      })(),
+    },
+  }
+}
+
+async function computeLandscapeRasterZone(
+  zoneKey: string,
+  zone: Json,
+  slopeRule: Json,
+  slopeClassRule: Json,
+  canopyMosaicRule: Json,
+) {
+  const polygon = geojsonToEsriPolygon(zone?.geometry)
+  const areaAcres = Number(zone?.area_acres)
+  if (!polygon || !Number.isFinite(areaAcres) || areaAcres <= 0) {
+    return {
+      zone_key: zoneKey,
+      status: 'unavailable',
+      area_acres: Number.isFinite(areaAcres) ? areaAcres : null,
+      source_status: { elevation: 'unavailable', slope: 'unavailable', slope_classes: 'unavailable', canopy: 'unavailable' },
+      source_errors: { geometry: 'barrier-aware ring geometry unavailable' },
+    }
+  }
+
+  const settled = await Promise.allSettled([
+    arcgisZonalStats(SOURCES.dem, polygon),
+    arcgisZonalStats(SOURCES.dem, polygon, slopeRule),
+    arcgisZonalStats(SOURCES.dem, polygon, slopeClassRule),
+    arcgisZonalStats(SOURCES.canopy, polygon, undefined, canopyMosaicRule),
+  ])
+  const names = ['elevation','slope','slope_classes','canopy']
+  const payloads: Array<Json | null> = []
+  const sourceStatus: Record<string,string> = {}
+  const sourceErrors: Record<string,string> = {}
+
+  settled.forEach((result, index) => {
+    const name = names[index]
+    if (result.status === 'fulfilled') {
+      sourceStatus[name] = 'available'
+      payloads[index] = result.value as Json
+    } else {
+      sourceStatus[name] = 'unavailable'
+      sourceErrors[name] = result.reason instanceof Error ? result.reason.message : String(result.reason)
+      payloads[index] = null
+    }
+  })
+
+  let elevation: Json | null = null
+  let slope: Json | null = null
+  let canopy: Json | null = null
+
+  if (payloads[0]) {
+    try {
+      elevation = normalizeElevation(payloads[0]!)
+    } catch (error) {
+      sourceStatus.elevation = 'unavailable'
+      sourceErrors.elevation = error instanceof Error ? error.message : String(error)
+    }
+  }
+  if (payloads[1] && payloads[2]) {
+    try {
+      slope = normalizeSlopeZone(payloads[1]!, payloads[2]!, areaAcres)
+    } catch (error) {
+      sourceStatus.slope = 'unavailable'
+      sourceStatus.slope_classes = 'unavailable'
+      sourceErrors.slope = error instanceof Error ? error.message : String(error)
+    }
+  }
+  if (payloads[3]) {
+    try {
+      canopy = normalizeCanopyZone(payloads[3]!, areaAcres)
+    } catch (error) {
+      sourceStatus.canopy = 'unavailable'
+      sourceErrors.canopy = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  const availableCount = ['elevation','slope','slope_classes','canopy']
+    .filter((name) => sourceStatus[name] === 'available').length
+
+  return {
+    zone_key: zoneKey,
+    status: availableCount === 4 ? 'available' : availableCount > 0 ? 'partial' : 'unavailable',
+    area_acres: areaAcres,
+    elevation,
+    slope,
+    canopy,
+    source_status: sourceStatus,
+    source_errors: sourceErrors,
+  }
+}
+
+async function refreshLandscapePhysical(slug: string, parcelContext: Json) {
+  const { data: domains, error: domainError } = await admin.rpc(
+    'farm_watch_get_landscape_raster_domains_v1_internal',
+    { p_slug: slug },
+  )
+  if (domainError) throw new Error('farm_watch_get_landscape_raster_domains_v1_internal failed: ' + domainError.message)
+  if (domains?.status !== 'available' || !domains?.zones) {
+    return {
+      status: 'unavailable',
+      context: {},
+      retrieved_at: null,
+      cache: 'miss',
+      error: domains?.reason || 'barrier-aware landscape raster domains unavailable',
+    }
+  }
+
+  const slopeRule = {
+    rasterFunction: 'Slope',
+    rasterFunctionArguments: {
+      ZFactor: 0.3048,
+      SlopeType: 2,
+      RemoveEdgeEffect: true,
+    },
+    outputPixelType: 'F32',
+    variableName: 'DEM',
+  }
+  const slopeClassRule = {
+    rasterFunction: 'Remap',
+    rasterFunctionArguments: {
+      InputRanges: [0,10,10,20,20,30,30,50,50,1000],
+      OutputValues: [1,2,3,4,5],
+      AllowUnmatched: false,
+      Raster: slopeRule,
+    },
+    outputPixelType: 'U8',
+    variableName: 'Raster',
+  }
+  const canopyMosaicRule = {
+    mosaicMethod: 'esriMosaicNorthwest',
+    where: 'beginyear = 2025',
+  }
+
+  const zoneKeys = ['local_ring_0_500m','mid_ring_500_1500m','outer_ring_1500_3000m']
+  const computed = await Promise.all(zoneKeys.map((zoneKey) =>
+    computeLandscapeRasterZone(zoneKey, domains.zones[zoneKey], slopeRule, slopeClassRule, canopyMosaicRule)
+  ))
+  const zones = Object.fromEntries(computed.map((row) => [row.zone_key, row]))
+
+  const parcelZone = {
+    zone_key: 'selected_property',
+    status: parcelContext?.canopy && parcelContext?.elevation && parcelContext?.terrain_surface?.slope
+      ? 'available'
+      : 'partial',
+    area_acres: Number(parcelContext?.parcel_geodesic_acres) || null,
+    canopy: parcelContext?.canopy || null,
+    elevation: parcelContext?.elevation || null,
+    slope: parcelContext?.terrain_surface?.slope || null,
+  }
+
+  const gradients = [
+    landscapeGradient('selected_property', parcelZone, 'local_ring_0_500m', zones.local_ring_0_500m || {}),
+    landscapeGradient('local_ring_0_500m', zones.local_ring_0_500m || {}, 'mid_ring_500_1500m', zones.mid_ring_500_1500m || {}),
+    landscapeGradient('mid_ring_500_1500m', zones.mid_ring_500_1500m || {}, 'outer_ring_1500_3000m', zones.outer_ring_1500_3000m || {}),
+  ]
+
+  const availableZones = computed.filter((row) => row.status === 'available').length
+  const availableParts = computed.filter((row) => row.status !== 'unavailable').length
+  const status =
+    parcelZone.status === 'available' && availableZones === computed.length
+      ? 'available'
+      : availableParts > 0
+        ? 'partial'
+        : 'unavailable'
+
+  const retrievedAt = new Date().toISOString()
+  const context = {
+    context_version: 1,
+    method: 'barrier_aware_landscape_raster_context_v1',
+    evidence_class: 'deterministic_derived',
+    scoring_performed: false,
+    behavioral_inference_performed: false,
+    domain_identity_sha256: domains.domain_identity_sha256 || null,
+    domain_retrieved_at: domains.domain_retrieved_at || null,
+    parcel: parcelZone,
+    zones,
+    gradients,
+    transition_semantics:
+      'Canopy transition values are aggregate composition gradients between the selected property and successive barrier-aware rings. No pixel adjacency, edge length, corridor, habitat, bedding, feeding, or animal-use inference is computed.',
+    provenance: {
+      canopy: {
+        authority: 'USDA Forest Service / Multi-Resolution Land Characteristics Consortium',
+        source: 'National Annual Tree Canopy Cover (NLCD TCC) CONUS v2025-6',
+        year: 2025,
+        spatial_resolution_m: 30,
+        method: 'ArcGIS ImageServer computeStatisticsHistograms clipped to exact barrier-aware ring geometry',
+      },
+      terrain: {
+        authority: 'Kentucky Division of Geographic Information / KyFromAbove',
+        source: 'KyFromAbove Phase 3 DEM',
+        method: 'ArcGIS geometry-clipped elevation statistics plus Slope raster-function statistics and remap histograms on exact barrier-aware ring geometry',
+        slope_units: 'percent rise',
+        slope_z_factor: 0.3048,
+      },
+      barrier_domain: {
+        source: 'Farm Watch landscape-domain v1',
+        meaning: 'Only the connected property-side component after configured hard-barrier subtraction is summarized.',
+      },
+    },
+    retrieved_at: retrievedAt,
+  }
+
+  const { error: upsertError } = await admin.rpc(
+    'farm_watch_upsert_landscape_physical_context_v1_internal',
+    {
+      p_slug: slug,
+      p_status: status,
+      p_context: context,
+      p_retrieved_at: retrievedAt,
+      p_last_error: null,
+    },
+  )
+  if (upsertError) throw new Error('farm_watch_upsert_landscape_physical_context_v1_internal failed: ' + upsertError.message)
+
+  return { status, context, retrieved_at: retrievedAt, cache: 'miss' }
+}
+
 function normalizeSinkholes(payload: Json) {
   return {
     type: 'FeatureCollection',
@@ -1206,9 +1529,53 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  let landscapePhysical: any
+  const { data: landscapeCached, error: landscapeCacheError } = await admin.rpc(
+    'farm_watch_get_landscape_physical_context_v1_internal',
+    { p_slug: slug },
+  )
+  const landscapeCachedAt = Date.parse(landscapeCached?.retrieved_at || '')
+  const landscapeCacheUsable =
+    !landscapeCacheError &&
+    landscapeCached?.status !== 'stale' &&
+    landscapeCached?.status !== 'missing' &&
+    landscapeCached?.context?.method === 'barrier_aware_landscape_raster_context_v1' &&
+    Number.isFinite(landscapeCachedAt) &&
+    Date.now() - landscapeCachedAt < LANDSCAPE_CACHE_TTL_MS
+
+  if (landscapeCacheUsable) {
+    landscapePhysical = {
+      status: landscapeCached.status,
+      context: landscapeCached.context,
+      retrieved_at: landscapeCached.retrieved_at,
+      cache: 'hit',
+    }
+  } else if (result?.context && result?.cache !== 'stale') {
+    try {
+      landscapePhysical = await refreshLandscapePhysical(slug, result.context)
+    } catch (error) {
+      landscapePhysical = {
+        status: 'unavailable',
+        context: {},
+        retrieved_at: null,
+        cache: 'miss',
+        error: error instanceof Error ? error.message : String(error),
+      }
+    }
+  } else {
+    landscapePhysical = {
+      status: landscapeCached?.status || 'unavailable',
+      context: landscapeCached?.context || {},
+      retrieved_at: landscapeCached?.retrieved_at || null,
+      cache: landscapeCached?.context ? 'stale' : 'miss',
+      error: landscapeCacheError?.message || result?.error || 'current parcel land context unavailable',
+    }
+  }
+
   return json({
     property: { slug },
     land: result,
+    landscape_physical: landscapePhysical,
     product_boundaries: {
       faults_in_primary_view: false,
       karst_potential_used: false,
