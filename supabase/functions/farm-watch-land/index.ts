@@ -29,6 +29,7 @@ const SOURCES = {
   sinkholes: 'https://kgs.uky.edu/arcgis/rest/services/KYWater/KYSinkholes/MapServer/0',
   huc: 'https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_8_10_12_Digit_Hydrologic_Units_WGS84WM/MapServer/0',
   dem: 'https://kyraster.ky.gov/arcgis/rest/services/ElevationServices/Ky_DEM_KYAPED_2FT_Phase3_WGS84WM/ImageServer',
+  canopy: 'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_EDW_NLCD_TCC_CONUS/ImageServer',
 }
 
 type Json = Record<string, any>
@@ -151,7 +152,7 @@ async function arcgisPolygon(base: string, polygon: Json, outFields: string) {
   return payload
 }
 
-async function arcgisZonalStats(base: string, polygon: Json, renderingRule?: Json) {
+async function arcgisZonalStats(base: string, polygon: Json, renderingRule?: Json, mosaicRule?: Json) {
   const url = `${base.replace(/\/$/, '')}/computeStatisticsHistograms`
   const body = new URLSearchParams({
     f: 'json',
@@ -159,6 +160,7 @@ async function arcgisZonalStats(base: string, polygon: Json, renderingRule?: Jso
     geometryType: 'esriGeometryPolygon',
   })
   if (renderingRule) body.set('renderingRule', JSON.stringify(renderingRule))
+  if (mosaicRule) body.set('mosaicRule', JSON.stringify(mosaicRule))
   const payload = await postFormJson(url, body)
   if (payload?.error) throw new Error(payload.error.message || 'ArcGIS raster statistics query failed')
   if (!Array.isArray(payload?.statistics) || !payload.statistics.length) {
@@ -290,6 +292,101 @@ function remapClassRows(payload: Json, definitions: Array<Json>, parcelAcres: nu
       parcel_acres: parcelAcres == null ? null : parcelAcres * fraction,
     }
   })
+}
+
+function histogramIntegerCounts(payload: Json, minAllowed: number, maxAllowed: number) {
+  const histogram = payload?.histograms?.[0]
+  const counts = Array.isArray(histogram?.counts) ? histogram.counts.map(Number) : []
+  const min = Number(histogram?.min)
+  const max = Number(histogram?.max)
+  const size = Number(histogram?.size)
+  if (!counts.length || !Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(size) || size <= 0) {
+    return new Map<number, number>()
+  }
+
+  const width = (max - min) / size
+  const byValue = new Map<number, number>()
+  counts.forEach((count: number, index: number) => {
+    if (!Number.isFinite(count) || count <= 0) return
+    const center = min + (index + 0.5) * width
+    const value = Math.round(center)
+    if (value < minAllowed || value > maxAllowed) return
+    byValue.set(value, (byValue.get(value) || 0) + count)
+  })
+  return byValue
+}
+
+function weightedQuantile(byValue: Map<number, number>, quantile: number) {
+  const entries = [...byValue.entries()].sort((a, b) => a[0] - b[0])
+  const total = entries.reduce((sum, [, count]) => sum + count, 0)
+  if (total <= 0) return null
+  const target = Math.min(1, Math.max(0, quantile)) * total
+  let cumulative = 0
+  for (const [value, count] of entries) {
+    cumulative += count
+    if (cumulative >= target) return value
+  }
+  return entries[entries.length - 1]?.[0] ?? null
+}
+
+function normalizeCanopy(payload: Json, parcelAcres: number | null) {
+  const byValue = histogramIntegerCounts(payload, 0, 100)
+  const total = [...byValue.values()].reduce((sum, count) => sum + count, 0)
+  if (total <= 0) throw new Error('Tree canopy histogram did not contain valid 0–100 percent observations')
+
+  const weightedSum = [...byValue.entries()].reduce((sum, [value, count]) => sum + value * count, 0)
+  const mean = weightedSum / total
+  const variance = [...byValue.entries()].reduce(
+    (sum, [value, count]) => sum + ((value - mean) ** 2) * count,
+    0,
+  ) / total
+
+  const bandDefinitions = [
+    { label: '0%', min_percent: 0, max_percent: 0 },
+    { label: '1–20%', min_percent: 1, max_percent: 20 },
+    { label: '21–40%', min_percent: 21, max_percent: 40 },
+    { label: '41–60%', min_percent: 41, max_percent: 60 },
+    { label: '61–80%', min_percent: 61, max_percent: 80 },
+    { label: '81–100%', min_percent: 81, max_percent: 100 },
+  ]
+
+  const bands = bandDefinitions.map((definition) => {
+    let count = 0
+    for (const [value, valueCount] of byValue.entries()) {
+      if (value >= definition.min_percent && value <= definition.max_percent) count += valueCount
+    }
+    const fraction = count / total
+    return {
+      ...definition,
+      count,
+      parcel_percent: fraction * 100,
+      parcel_acres: parcelAcres == null ? null : parcelAcres * fraction,
+    }
+  })
+
+  return {
+    method: 'geometry_clipped_nlcd_tcc_2025_histogram',
+    source: 'USDA Forest Service / MRLC National Annual Tree Canopy Cover',
+    product_version: 'v2025-6',
+    product_variant: 'NLCD',
+    year: 2025,
+    spatial_resolution_m: 30,
+    modeled_percent_tree_canopy_cover: true,
+    min_percent: Math.min(...byValue.keys()),
+    max_percent: Math.max(...byValue.keys()),
+    mean_percent: mean,
+    median_percent: weightedQuantile(byValue, 0.5),
+    p10_percent: weightedQuantile(byValue, 0.1),
+    p25_percent: weightedQuantile(byValue, 0.25),
+    p75_percent: weightedQuantile(byValue, 0.75),
+    p90_percent: weightedQuantile(byValue, 0.9),
+    standard_deviation_percent: Math.sqrt(variance),
+    raster_observation_count: total,
+    modeled_canopy_equivalent_acres: parcelAcres == null ? null : parcelAcres * mean / 100,
+    bands,
+    interpretation_boundary:
+      'Modeled 30 m percent tree canopy cover after NLCD post-processing. This is not field-measured canopy, tree species, understory density, stem density, mast availability, habitat quality, bedding cover, or deer-use evidence.',
+  }
 }
 
 const SYNTHESIS_SLOPE_BANDS = [
@@ -663,6 +760,11 @@ async function refresh(slug: string, anchor: Anchor) {
     outputPixelType: 'U8',
     variableName: 'Raster',
   }
+  const canopy2025MosaicRule = {
+    mosaicMethod: 'esriMosaicAttribute',
+    where: 'beginyear = 2025 AND endyear = 2025',
+  }
+
   const elevationBandRule = {
     rasterFunction: 'Remap',
     rasterFunctionArguments: {
@@ -685,9 +787,10 @@ async function refresh(slug: string, anchor: Anchor) {
     arcgisZonalStats(SOURCES.dem, polygon, slopeClassRule),
     arcgisZonalStats(SOURCES.dem, polygon, aspectClassRule),
     arcgisZonalStats(SOURCES.dem, polygon, elevationBandRule),
+    arcgisZonalStats(SOURCES.canopy, polygon, undefined, canopy2025MosaicRule),
   ])
 
-  const names = ['geology', 'lithology', 'watershed', 'sinkholes', 'elevation', 'slope', 'slope_classes', 'aspect', 'elevation_bands']
+  const names = ['geology', 'lithology', 'watershed', 'sinkholes', 'elevation', 'slope', 'slope_classes', 'aspect', 'elevation_bands', 'canopy']
   const sourceStatus: Record<string, string> = {}
   const sourceErrors: Record<string, string> = {}
   const payloads: Array<Json | null> = results.map((result, index) => {
@@ -719,6 +822,7 @@ async function refresh(slug: string, anchor: Anchor) {
   const slope = payloads[5] && payloads[6] ? normalizeSlope(payloads[5]!, payloads[6]!, normalizedParcelAcres) : null
   const aspect = payloads[7] ? normalizeAspect(payloads[7]!, normalizedParcelAcres) : null
   const elevationBands = payloads[8] ? normalizeElevationBands(payloads[8]!, normalizedParcelAcres) : null
+  const canopy = payloads[9] ? normalizeCanopy(payloads[9]!, normalizedParcelAcres) : null
 
   let physicalSynthesis: Json = {
     method: 'cross_layer_physical_synthesis_v1',
@@ -760,8 +864,9 @@ async function refresh(slug: string, anchor: Anchor) {
   const retrievedAt = new Date().toISOString()
   const context = {
     ...computed,
-    context_version: 4,
+    context_version: 5,
     elevation,
+    canopy,
     terrain_surface: {
       slope,
       aspect,
@@ -803,6 +908,14 @@ async function refresh(slug: string, anchor: Anchor) {
         slope_z_factor: 0.3048,
         slope_units: 'percent rise',
         meaning: 'canonical parcel slope/aspect distributions from the DEM raster; elevation bands are direct DEM remaps. These are terrain-model derivatives, not a ground survey or engineering-grade surface analysis.',
+      },
+      canopy: {
+        authority: 'USDA Forest Service / Multi-Resolution Land Characteristics Consortium',
+        source: 'National Annual Tree Canopy Cover (NLCD TCC) CONUS v2025-6',
+        year: 2025,
+        spatial_resolution_m: 30,
+        method: 'exact parcel polygon passed to the public USFS ArcGIS ImageServer computeStatisticsHistograms endpoint with the 2025 mosaic catalog filter',
+        meaning: 'modeled percent tree canopy cover after NLCD post-processing; useful as canopy context, not proof of species composition, understory condition, mast production, habitat quality, or animal use',
       },
       physical_synthesis: {
         authorities: ['USDA NRCS', 'Kentucky Geological Survey', 'USGS 3DHP', 'USFWS NWI', 'Kentucky Division of Geographic Information / KyFromAbove'],
@@ -860,7 +973,7 @@ Deno.serve(async (req: Request) => {
   let result: any
 
   const cacheHasCanonicalTerrain =
-    cached?.context?.context_version === 4 &&
+    cached?.context?.context_version === 5 &&
     cached?.context?.elevation?.method === 'geometry_clipped_raster_statistics' &&
     Number.isFinite(Number(cached?.context?.elevation?.min_ft)) &&
     Number.isFinite(Number(cached?.context?.elevation?.max_ft)) &&
@@ -870,6 +983,10 @@ Deno.serve(async (req: Request) => {
     Array.isArray(cached?.context?.terrain_surface?.aspect?.sectors) &&
     cached?.context?.terrain_surface?.elevation_bands?.method === 'geometry_clipped_elevation_remap' &&
     Array.isArray(cached?.context?.terrain_surface?.elevation_bands?.bands) &&
+    cached?.context?.canopy?.method === 'geometry_clipped_nlcd_tcc_2025_histogram' &&
+    cached?.context?.canopy?.year === 2025 &&
+    Number.isFinite(Number(cached?.context?.canopy?.mean_percent)) &&
+    Array.isArray(cached?.context?.canopy?.bands) &&
     cached?.context?.physical_synthesis?.method === 'cross_layer_physical_synthesis_v1' &&
     cached?.context?.physical_synthesis?.status === 'available' &&
     Array.isArray(cached?.context?.physical_synthesis?.soil_units) &&
