@@ -311,7 +311,12 @@ Deno.serve(async (req: Request) => {
       const state = operation === 'read'
         ? await readTerrainState(slug)
         : await buildTerrainMaterialization(slug, 'farm-watch-materialization-edge-v1')
-      const payload = await terrainReadPayload(slug, state, null)
+      const knownSha256 = validSha256(
+        typeof body?.known_artifact_sha256 === 'string'
+          ? body.known_artifact_sha256.trim().toLowerCase()
+          : null,
+      )
+      const payload = await terrainReadPayload(slug, state, knownSha256)
       return json(payload, 200, origin)
     } catch (error) {
       console.error('Farm Watch terrain materialization worker failed', error)
