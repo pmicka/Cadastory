@@ -17,6 +17,11 @@ import {
   buildLidarSourceArtifact,
   lidarSourceArtifactPath,
 } from '../_shared/farm-watch-lidar-source.ts'
+import {
+  FARM_WATCH_LIDAR_PHYSICAL_PRODUCT,
+  lidarPhysicalSourceSignature,
+  validateLidarPhysicalArtifact,
+} from '../_shared/farm-watch-lidar-physical-contract.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -38,7 +43,7 @@ const ALLOWED_ORIGINS = new Set([
 ])
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 
-type ProductKey = 'terrain' | 'lidar-source-coverage'
+type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure'
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -79,7 +84,8 @@ function validSha256(value: string | null) {
 function productKey(value: unknown): ProductKey | null {
   const key = String(value || '')
   return key === FARM_WATCH_TERRAIN_PRODUCT.key ||
-      key === FARM_WATCH_LIDAR_SOURCE_PRODUCT.key
+      key === FARM_WATCH_LIDAR_SOURCE_PRODUCT.key ||
+      key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key
     ? key as ProductKey
     : null
 }
@@ -94,12 +100,21 @@ function productSpec(key: ProductKey) {
       sourceSignature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
     }
   }
+  if (key === FARM_WATCH_LIDAR_SOURCE_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_LIDAR_SOURCE_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_LIDAR_SOURCE_PRODUCT.outputSchemaVersion,
+      sourceSignature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+    }
+  }
   return {
     key,
-    productKind: FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
-    algorithmVersion: FARM_WATCH_LIDAR_SOURCE_PRODUCT.algorithmVersion,
-    outputSchemaVersion: FARM_WATCH_LIDAR_SOURCE_PRODUCT.outputSchemaVersion,
-    sourceSignature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+    productKind: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.productKind,
+    algorithmVersion: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.algorithmVersion,
+    outputSchemaVersion: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.outputSchemaVersion,
+    sourceSignature: null,
   }
 }
 
@@ -138,12 +153,12 @@ function validateLidarSourceArtifact(value: any) {
 }
 
 function validateArtifact(key: ProductKey, value: any) {
-  return key === FARM_WATCH_TERRAIN_PRODUCT.key
-    ? validateTerrainArtifact(value)
-    : validateLidarSourceArtifact(value)
+  if (key === FARM_WATCH_TERRAIN_PRODUCT.key) return validateTerrainArtifact(value)
+  if (key === FARM_WATCH_LIDAR_SOURCE_PRODUCT.key) return validateLidarSourceArtifact(value)
+  return validateLidarPhysicalArtifact(value)
 }
 
-async function readState(slug: string, key: ProductKey) {
+async function readStaticState(slug: string, key: Exclude<ProductKey, 'lidar-physical-structure'>) {
   const spec = productSpec(key)
   const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
     p_slug: slug,
@@ -156,7 +171,55 @@ async function readState(slug: string, key: ProductKey) {
   return data
 }
 
-async function claimBuild(slug: string, key: ProductKey, workerId: string) {
+async function readLidarPhysicalState(slug: string) {
+  const sourceState = await readStaticState(slug, FARM_WATCH_LIDAR_SOURCE_PRODUCT.key)
+  const sourceStatus = String(sourceState?.status || 'missing')
+  if (sourceStatus !== 'available') {
+    return {
+      status: sourceStatus,
+      identity: null,
+      build: sourceState?.build || null,
+      materialization: null,
+    }
+  }
+
+  const sourcePayload = await readPayload(
+    slug,
+    FARM_WATCH_LIDAR_SOURCE_PRODUCT.key,
+    sourceState,
+  )
+  const sourceArtifact = sourcePayload?.artifact
+  const sourceArtifactSha256 = validSha256(
+    String(sourcePayload?.materialization?.artifact_sha256 || ''),
+  )
+  if (!sourceArtifact || !sourceArtifactSha256) {
+    throw new Error('LiDAR physical source plan is unavailable')
+  }
+
+  const sourceSignature = lidarPhysicalSourceSignature(sourceArtifact, sourceArtifactSha256)
+  const spec = productSpec(FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key)
+  const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
+    p_slug: slug,
+    p_product_kind: spec.productKind,
+    p_algorithm_version: spec.algorithmVersion,
+    p_output_schema_version: spec.outputSchemaVersion,
+    p_source_signature: sourceSignature,
+  })
+  if (error) throw new Error(`physical materialization state read failed: ${error.message}`)
+  return data
+}
+
+async function readState(slug: string, key: ProductKey) {
+  return key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key
+    ? readLidarPhysicalState(slug)
+    : readStaticState(slug, key)
+}
+
+async function claimBuild(
+  slug: string,
+  key: Exclude<ProductKey, 'lidar-physical-structure'>,
+  workerId: string,
+) {
   const spec = productSpec(key)
   const { data, error } = await admin.rpc('farm_watch_claim_materialization_build_v1_internal', {
     p_slug: slug,
@@ -378,6 +441,9 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
 }
 
 async function buildMaterialization(slug: string, key: ProductKey, workerId: string) {
+  if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) {
+    throw new Error('LiDAR physical materialization uses the dedicated GitHub OIDC worker')
+  }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
     : buildLidarSourceMaterialization(slug, workerId)
