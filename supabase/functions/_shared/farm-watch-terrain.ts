@@ -425,7 +425,7 @@ function conditionFlowSurface(grid: TerrainGrid): FlowConditioning {
 
   flood()
 
-  const excludedDisconnectedCellCount = filledValues.reduce(
+  const excludedDisconnectedCellCount = filledValues.reduce<number>(
     (countDisconnected, value, index) =>
       Number.isFinite(value) && !visited[index] ? countDisconnected + 1 : countDisconnected,
     0,
