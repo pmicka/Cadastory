@@ -1,7 +1,7 @@
 export const FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT = Object.freeze({
   key: 'structure-complementarity',
   productKind: 'structure-complementarity',
-  algorithmVersion: 'current-leaf-off-lidar-complementarity-v3',
+  algorithmVersion: 'current-leaf-off-lidar-complementarity-v4',
   outputSchemaVersion: 'structure-complementarity-v1',
   evidenceClass: 'deterministic_derived',
   artifactBucket: 'farm-watch-derived',
@@ -18,7 +18,8 @@ export const FARM_WATCH_STRUCTURE_SYNTHESIS_LIMITATIONS = Object.freeze([
   'Leaf-off texture is a relative within-acquisition spatial signal. It does not measure understory density, stem density, regeneration, species, habitat quality, management condition, bedding cover, mast availability, or animal use.',
   'LiDAR bands are neutral physical height strata. A dominant band does not identify vegetation type or ecological function.',
   'Canopy, terrain, and soil context may be displayed alongside this product, but they remain separate source-specific evidence and are not fused into an ecological score.',
-  'The full-profile model is an exploratory explanatory test evaluated with five held-out east-west spatial blocks. Its residual patches are out-of-fold diagnostic structure, not independent biological replication or an ecological class.',
+  'Model adequacy is stress-tested on the same five held-out east-west spatial blocks using the linear ridge baseline, a fixed quadratic/interaction ridge expansion, and a deterministic shallow CART model. These are bounded model checks, not a proof that all possible LiDAR representations have been exhausted.',
+  'Residual spatial organization is evaluated against deterministic block-permutation nulls at 15 m, 20 m, and 30 m block scales. The nulls preserve within-block selected-cell structure while disrupting between-block adjacency; they are not a universal spatial-randomness test.',
 ])
 
 export function structureSynthesisSourceSignature(
@@ -41,7 +42,9 @@ export function structureSynthesisSourceSignature(
     'overstory_conditioned_lower_share=v1',
     'vertical_horizontal_matrix=dominant_band_x_leaf_quintile_v1',
     'full_vertical_profile_model=blocked_5fold_vertical_profile_ridge_v1',
-    'out_of_fold_residual_spatial=leaf_off_profile_residual_spatial_v1',
+    'out_of_fold_residual_spatial=best_tested_profile_residual_spatial_v2',
+    'model_adequacy=blocked_5fold_ridge_quadratic_cart_v1',
+    'spatial_null=block_permutation_selected_mask_v1:blocks=3,4,6:iterations=299',
   ].join('|')
 }
 
@@ -83,7 +86,9 @@ export function validateStructureSynthesisArtifact(value: any) {
     value.summary.dominant_band_variance_partition &&
     value.summary.overstory_conditioned &&
     value.summary.full_vertical_profile_model?.status === 'available' &&
+    value.summary.model_adequacy_stress_test?.status === 'available' &&
     value.summary.out_of_fold_residual_spatial?.status === 'available' &&
+    value.summary.out_of_fold_residual_spatial?.spatial_null?.status === 'available' &&
     Array.isArray(value.summary.vertical_horizontal_matrix)
   )
 }
