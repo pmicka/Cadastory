@@ -115,7 +115,7 @@ The normal cache horizon is 30 days.
 
 `farm-watch-land` remains the authenticated execution surface.
 
-After resolving/refeshing the canonical parcel land context, it:
+After resolving/refreshing the canonical parcel land context, it:
 
 1. reads the current barrier-aware ring geometries;
 2. queries authoritative canopy/DEM raster services for the three surrounding rings;
