@@ -342,7 +342,8 @@ begin
   if p_artifact_path is null
      or length(p_artifact_path) < 1
      or length(p_artifact_path) > 700
-     or p_artifact_path !~ '^[a-zA-Z0-9._/-]+
+     or p_artifact_path !~ '^[a-zA-Z0-9._/-]+$'
+  then raise exception 'invalid artifact path'; end if;
 
   v_identity_sha256 := encode(
     extensions.digest(
