@@ -255,6 +255,346 @@ function spearman(a: number[], b: number[]) {
   return pearson(averageRanks(a), averageRanks(b))
 }
 
+function normalizedBandEntropy(shares: number[]) {
+  if (!Array.isArray(shares) || !shares.length) return null
+  let entropy = 0
+  let positive = 0
+  for (const share of shares) {
+    const value = Number(share)
+    if (!(value > 0)) continue
+    entropy -= value * Math.log(value)
+    positive += 1
+  }
+  if (positive < 2) return 0
+  return entropy / Math.log(shares.length)
+}
+
+function bandProfileSpread(shares: number[]) {
+  if (!Array.isArray(shares) || !shares.length) return null
+  let mean = 0
+  let total = 0
+  for (let band = 0; band < shares.length; band += 1) {
+    const share = Number(shares[band])
+    if (!Number.isFinite(share) || share < 0) continue
+    mean += band * share
+    total += share
+  }
+  if (!(total > 0)) return null
+  mean /= total
+  let variance = 0
+  for (let band = 0; band < shares.length; band += 1) {
+    const share = Number(shares[band])
+    if (!Number.isFinite(share) || share < 0) continue
+    variance += share * (band - mean) ** 2
+  }
+  return Math.sqrt(variance / total)
+}
+
+function dominantShare(shares: number[]) {
+  let best = 0
+  for (const share of shares || []) {
+    const value = Number(share)
+    if (Number.isFinite(value) && value > best) best = value
+  }
+  return best
+}
+
+function solveLinearSystem(matrix: number[][], vector: number[]) {
+  const n = vector.length
+  const a = matrix.map((row, index) => row.slice().concat(vector[index]))
+  for (let col = 0; col < n; col += 1) {
+    let pivot = col
+    for (let row = col + 1; row < n; row += 1) {
+      if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) pivot = row
+    }
+    if (Math.abs(a[pivot][col]) < 1e-10) return null
+    if (pivot !== col) [a[pivot], a[col]] = [a[col], a[pivot]]
+    const divisor = a[col][col]
+    for (let j = col; j <= n; j += 1) a[col][j] /= divisor
+    for (let row = 0; row < n; row += 1) {
+      if (row === col) continue
+      const factor = a[row][col]
+      if (!factor) continue
+      for (let j = col; j <= n; j += 1) a[row][j] -= factor * a[col][j]
+    }
+  }
+  return a.map((row) => row[n])
+}
+
+function fitStandardizedRidge(rows: any[], featureNames: string[], ridge = 1e-6) {
+  if (rows.length < featureNames.length + 3) return null
+  const means = new Array(featureNames.length).fill(0)
+  const stds = new Array(featureNames.length).fill(0)
+
+  for (const row of rows) {
+    for (let j = 0; j < featureNames.length; j += 1) means[j] += row.features[featureNames[j]]
+  }
+  for (let j = 0; j < featureNames.length; j += 1) means[j] /= rows.length
+
+  for (const row of rows) {
+    for (let j = 0; j < featureNames.length; j += 1) {
+      const delta = row.features[featureNames[j]] - means[j]
+      stds[j] += delta * delta
+    }
+  }
+  for (let j = 0; j < featureNames.length; j += 1) {
+    stds[j] = Math.sqrt(stds[j] / Math.max(1, rows.length - 1))
+    if (!(stds[j] > 1e-8)) stds[j] = 1
+  }
+
+  const p = featureNames.length + 1
+  const xtx = Array.from({ length: p }, () => new Array(p).fill(0))
+  const xty = new Array(p).fill(0)
+  for (const row of rows) {
+    const x = [1]
+    for (let j = 0; j < featureNames.length; j += 1) {
+      x.push((row.features[featureNames[j]] - means[j]) / stds[j])
+    }
+    for (let i = 0; i < p; i += 1) {
+      xty[i] += x[i] * row.y
+      for (let j = 0; j < p; j += 1) xtx[i][j] += x[i] * x[j]
+    }
+  }
+  for (let i = 1; i < p; i += 1) xtx[i][i] += ridge
+
+  const coefficients = solveLinearSystem(xtx, xty)
+  return coefficients ? { coefficients, means, stds, featureNames } : null
+}
+
+function predictStandardized(model: any, features: Record<string, number>) {
+  if (!model) return null
+  let value = model.coefficients[0]
+  for (let j = 0; j < model.featureNames.length; j += 1) {
+    const name = model.featureNames[j]
+    value += model.coefficients[j + 1] *
+      ((features[name] - model.means[j]) / model.stds[j])
+  }
+  return value
+}
+
+function spatialFold(index: number, width: number, foldCount = 5) {
+  const col = index % width
+  return Math.min(foldCount - 1, Math.floor(col * foldCount / Math.max(1, width)))
+}
+
+function crossValidatedProfileModel(records: any[], gridWidth: number) {
+  const featureNames = [
+    'share_4_16',
+    'share_16_32',
+    'share_32_64',
+    'share_64_plus',
+    'entropy',
+    'profile_spread',
+  ]
+  const rows = records.map((row) => ({
+    index: row.index,
+    y: row.leafScore,
+    features: {
+      share_4_16: row.shares[1] || 0,
+      share_16_32: row.shares[2] || 0,
+      share_32_64: row.shares[3] || 0,
+      share_64_plus: row.shares[4] || 0,
+      entropy: normalizedBandEntropy(row.shares) || 0,
+      profile_spread: bandProfileSpread(row.shares) || 0,
+    },
+  })).filter((row) =>
+    Number.isFinite(row.y) &&
+    featureNames.every((name) => Number.isFinite(row.features[name]))
+  )
+
+  if (rows.length < 100) {
+    return { status: 'insufficient_overlap', cell_count: rows.length, prediction_records: [] }
+  }
+
+  const observed: number[] = []
+  const predicted: number[] = []
+  const predictionRecords: any[] = []
+  const folds = []
+  const foldCount = 5
+  for (let fold = 0; fold < foldCount; fold += 1) {
+    const training = rows.filter((row) => spatialFold(row.index, gridWidth, foldCount) !== fold)
+    const testing = rows.filter((row) => spatialFold(row.index, gridWidth, foldCount) === fold)
+    if (training.length < 50 || testing.length < 10) continue
+    const model = fitStandardizedRidge(training, featureNames)
+    if (!model) continue
+    for (const row of testing) {
+      const estimate = predictStandardized(model, row.features)
+      if (!Number.isFinite(estimate)) continue
+      observed.push(row.y)
+      predicted.push(Number(estimate))
+      predictionRecords.push({
+        index: row.index,
+        observed: row.y,
+        predicted: Number(estimate),
+        residual: row.y - Number(estimate),
+      })
+    }
+    folds.push({ fold, training_cells: training.length, testing_cells: testing.length })
+  }
+
+  if (observed.length < 50) {
+    return {
+      status: 'insufficient_cross_validation',
+      cell_count: rows.length,
+      predicted_cell_count: observed.length,
+      prediction_records: predictionRecords,
+    }
+  }
+
+  const meanObserved = observed.reduce((sum, value) => sum + value, 0) / observed.length
+  let sse = 0
+  let sst = 0
+  for (let index = 0; index < observed.length; index += 1) {
+    sse += (observed[index] - predicted[index]) ** 2
+    sst += (observed[index] - meanObserved) ** 2
+  }
+
+  return {
+    status: 'available',
+    method: 'blocked_5fold_vertical_profile_ridge_v1',
+    cell_count: rows.length,
+    predicted_cell_count: observed.length,
+    fold_count: folds.length,
+    folds,
+    features: featureNames,
+    cross_validated_r2: sst > 0 ? 1 - sse / sst : null,
+    predicted_vs_observed_r: pearson(predicted, observed),
+    predictor_spearman_rho: {
+      share_0_4: spearman(records.map((row) => row.leafScore), records.map((row) => row.shares[0] || 0)),
+      share_4_16: spearman(records.map((row) => row.leafScore), records.map((row) => row.shares[1] || 0)),
+      share_16_32: spearman(records.map((row) => row.leafScore), records.map((row) => row.shares[2] || 0)),
+      share_32_64: spearman(records.map((row) => row.leafScore), records.map((row) => row.shares[3] || 0)),
+      share_64_plus: spearman(records.map((row) => row.leafScore), records.map((row) => row.shares[4] || 0)),
+      entropy: spearman(records.map((row) => row.leafScore), records.map((row) => normalizedBandEntropy(row.shares) || 0)),
+      profile_spread: spearman(records.map((row) => row.leafScore), records.map((row) => bandProfileSpread(row.shares) || 0)),
+      dominant_share: spearman(records.map((row) => row.leafScore), records.map((row) => dominantShare(row.shares) || 0)),
+    },
+    prediction_records: predictionRecords,
+    interpretation_boundary:
+      'Exploratory current-state explanatory model only. Five east-west spatial blocks are held out in turn. The model uses the full neutral LiDAR height-band composition plus vertical entropy and profile spread to estimate the frozen 2024 leaf-off score; it does not retune either source or imply that unexplained leaf-off variation is vegetation.',
+  }
+}
+
+function standardDeviation(values: number[]) {
+  const clean = values.filter(Number.isFinite)
+  if (clean.length < 2) return null
+  const mean = clean.reduce((sum, value) => sum + value, 0) / clean.length
+  let ss = 0
+  for (const value of clean) ss += (value - mean) ** 2
+  return Math.sqrt(ss / (clean.length - 1))
+}
+
+function residualSpatialSummary(
+  records: any[],
+  predictionRecords: any[],
+  gridWidth: number,
+  gridHeight: number,
+  cellMeters: number,
+) {
+  const byIndex = new Map(predictionRecords.map((row) => [row.index, row]))
+  const joined = records.map((row) => {
+    const prediction = byIndex.get(row.index)
+    if (!prediction) return null
+    return {
+      index: row.index,
+      residual: prediction.residual,
+      confidence: row.leafConfidence,
+      spectral_support: row.leafSpectralSupport,
+    }
+  }).filter(Boolean) as any[]
+
+  const allStd = standardDeviation(joined.map((row) => row.residual))
+  if (!(Number(allStd) > 0)) return { status: 'unavailable', cell_count: joined.length }
+
+  const confidenceMinimum = 0.65
+  const spectralMinimum = 0.50
+  const eligible = joined.filter((row) =>
+    Number.isFinite(row.residual) &&
+    Number.isFinite(row.confidence) &&
+    Number.isFinite(row.spectral_support) &&
+    row.confidence >= confidenceMinimum &&
+    row.spectral_support >= spectralMinimum
+  )
+  const p80 = sortedQuantile(
+    eligible.map((row) => row.residual).sort((a, b) => a - b),
+    0.80,
+  )
+  const threshold = Number.isFinite(p80) ? Math.max(0, Number(p80)) : null
+  if (!Number.isFinite(threshold)) {
+    return { status: 'insufficient_overlap', cell_count: joined.length, eligible_cell_count: eligible.length }
+  }
+
+  const selected = new Map(
+    eligible
+      .filter((row) => row.residual >= Number(threshold))
+      .map((row) => [row.index, row]),
+  )
+  const visited = new Set<number>()
+  const patches: any[] = []
+  for (const [seed] of selected) {
+    if (visited.has(seed)) continue
+    const queue = [seed]
+    visited.add(seed)
+    const cells: any[] = []
+    while (queue.length) {
+      const index = Number(queue.pop())
+      const row = selected.get(index)
+      if (!row) continue
+      cells.push(row)
+      const gridRow = Math.floor(index / gridWidth)
+      const col = index % gridWidth
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (!dx && !dy) continue
+          const rr = gridRow + dy
+          const cc = col + dx
+          if (rr < 0 || cc < 0 || rr >= gridHeight || cc >= gridWidth) continue
+          const neighbor = rr * gridWidth + cc
+          if (!selected.has(neighbor) || visited.has(neighbor)) continue
+          visited.add(neighbor)
+          queue.push(neighbor)
+        }
+      }
+    }
+    const residuals = cells.map((row) => row.residual)
+    patches.push({
+      cell_count: cells.length,
+      area_square_meters: cells.length * cellMeters * cellMeters,
+      mean_residual: residuals.reduce((sum, value) => sum + value, 0) / residuals.length,
+      max_residual: Math.max(...residuals),
+    })
+  }
+
+  patches.sort((a, b) =>
+    b.cell_count - a.cell_count ||
+    b.mean_residual - a.mean_residual ||
+    b.max_residual - a.max_residual
+  )
+  const multiCell = patches.filter((patch) => patch.cell_count >= 2)
+  const multiCellSelected = multiCell.reduce((sum, patch) => sum + patch.cell_count, 0)
+
+  return {
+    status: 'available',
+    method: 'leaf_off_profile_residual_spatial_v1',
+    cell_count: joined.length,
+    residual_stddev: allStd,
+    confidence_minimum: confidenceMinimum,
+    spectral_support_minimum: spectralMinimum,
+    positive_threshold_quantile: 0.80,
+    positive_residual_threshold: threshold,
+    eligible_cell_count: eligible.length,
+    selected_cell_count: selected.size,
+    contiguous_patch_count: patches.length,
+    multi_cell_patch_count: multiCell.length,
+    selected_cells_in_multi_cell_patches: multiCellSelected,
+    selected_multi_cell_fraction: selected.size ? multiCellSelected / selected.size : null,
+    largest_patch: patches.length ? patches[0] : null,
+    representative_patches: patches.slice(0, 6),
+    interpretation_boundary:
+      'Out-of-fold residual grouping only. High-positive cells are the gated upper 20% of residuals, clamped at zero and grouped by eight-neighbor connectivity. Multi-cell patches indicate descriptive spatial organization on this grid; this is not a spatial significance test, independent replication, vegetation class, habitat class, or causal attribution.',
+  }
+}
+
 function bandLabels(thresholds: number[]) {
   const labels: string[] = []
   let lower = 0
@@ -365,10 +705,12 @@ function buildSynthesis(physical: any, leaf: any) {
   const leafScore = decodeBase64(leafGrid.score_base64)
   const leafValid = decodeBase64(leafGrid.valid_base64)
   const leafConfidence = decodeBase64(leafGrid.confidence_base64)
+  const leafSpectralSupport = decodeBase64(leafGrid.spectral_support_base64)
   const physicalGrid = physical.grid
   const physicalLength = Number(physicalGrid.width) * Number(physicalGrid.height)
   const scoreSum = new Float64Array(physicalLength)
   const confidenceSum = new Float64Array(physicalLength)
+  const spectralSupportSum = new Float64Array(physicalLength)
   const sampleCount = new Uint32Array(physicalLength)
 
   const leafWidth = Number(leafGrid.width)
@@ -387,6 +729,7 @@ function buildSynthesis(physical: any, leaf: any) {
       if (target < 0) continue
       scoreSum[target] += leafScore[leafIndex] / 255
       confidenceSum[target] += leafConfidence[leafIndex] / 255
+      spectralSupportSum[target] += leafSpectralSupport[leafIndex] / 255
       sampleCount[target] += 1
     }
   }
@@ -408,12 +751,14 @@ function buildSynthesis(physical: any, leaf: any) {
     if (!shares) continue
     const leafMean = scoreSum[index] / sampleCount[index]
     const confidenceMean = confidenceSum[index] / sampleCount[index]
+    const spectralSupportMean = spectralSupportSum[index] / sampleCount[index]
     const lowerShare = (shares[1] || 0) + (shares[2] || 0)
     const upperShare = (shares[3] || 0) + (shares[4] || 0)
     records.push({
       index,
       leafScore: leafMean,
       leafConfidence: confidenceMean,
+      leafSpectralSupport: spectralSupportMean,
       shares,
       lowerShare,
       upperShare,
@@ -465,6 +810,23 @@ function buildSynthesis(physical: any, leaf: any) {
   const overstory = records.filter(
     (row) => row.upperShare >= FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.minimumUpperShare,
   )
+  const fullProfile = crossValidatedProfileModel(records, Number(physicalGrid.width))
+  if (fullProfile.status !== 'available') {
+    throw new Error('full vertical-profile cross-validation is unavailable')
+  }
+  const predictionRecords = fullProfile.prediction_records || []
+  const residualSpatial = residualSpatialSummary(
+    records,
+    predictionRecords,
+    Number(physicalGrid.width),
+    Number(physicalGrid.height),
+    Number(physical.cell_meters),
+  )
+  if (residualSpatial.status !== 'available') {
+    throw new Error('out-of-fold residual spatial product is unavailable')
+  }
+  delete fullProfile.prediction_records
+
   const matrix = []
   for (let band = 0; band < labels.length; band += 1) {
     for (let quintile = 0; quintile < 5; quintile += 1) {
@@ -498,6 +860,8 @@ function buildSynthesis(physical: any, leaf: any) {
       leaf_off_confidence: summarizeScalar(records.map((row) => row.leafConfidence)),
       dominant_band_texture_distribution: dominantDistribution,
       dominant_band_variance_partition: variancePartition(records),
+      full_vertical_profile_model: fullProfile,
+      out_of_fold_residual_spatial: residualSpatial,
       overstory_conditioned: {
         upper_32plus_minimum_share: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.minimumUpperShare,
         cell_count: overstory.length,
@@ -630,6 +994,8 @@ async function materialize(slug: string, identity: any) {
     const summary = {
       shared_cell_count: artifact.summary.shared_cell_count,
       dominant_band_variance_partition: artifact.summary.dominant_band_variance_partition,
+      full_vertical_profile_model: artifact.summary.full_vertical_profile_model,
+      out_of_fold_residual_spatial: artifact.summary.out_of_fold_residual_spatial,
       overstory_conditioned: artifact.summary.overstory_conditioned,
       artifact_size_bytes: bytes.byteLength,
     }
