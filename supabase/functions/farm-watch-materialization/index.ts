@@ -1,10 +1,15 @@
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import {
+  FARM_WATCH_TERRAIN_LIMITATIONS,
   FARM_WATCH_TERRAIN_PRODUCT,
   FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+  terrainArtifactPath,
 } from '../_shared/farm-watch-terrain-contract.ts'
-import { sha256Hex } from '../_shared/farm-watch-terrain.ts'
+import {
+  buildTerrainArtifact,
+  sha256Hex,
+} from '../_shared/farm-watch-terrain.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -80,10 +85,166 @@ function validateTerrainArtifact(value: any) {
   )
 }
 
+
+async function readTerrainState(slug: string) {
+  const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
+    p_slug: slug,
+    p_product_kind: FARM_WATCH_TERRAIN_PRODUCT.productKind,
+    p_algorithm_version: FARM_WATCH_TERRAIN_PRODUCT.algorithmVersion,
+    p_output_schema_version: FARM_WATCH_TERRAIN_PRODUCT.outputSchemaVersion,
+    p_source_signature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+  })
+  if (error) throw new Error(`materialization state read failed: ${error.message}`)
+  return data
+}
+
+async function buildTerrainMaterialization(slug: string, workerId: string) {
+  const { data: claim, error: claimError } = await admin.rpc(
+    'farm_watch_claim_materialization_build_v1_internal',
+    {
+      p_slug: slug,
+      p_product_kind: FARM_WATCH_TERRAIN_PRODUCT.productKind,
+      p_algorithm_version: FARM_WATCH_TERRAIN_PRODUCT.algorithmVersion,
+      p_output_schema_version: FARM_WATCH_TERRAIN_PRODUCT.outputSchemaVersion,
+      p_source_signature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+      p_worker_id: workerId,
+      p_lease_seconds: 900,
+    },
+  )
+  if (claimError) throw new Error(`materialization claim failed: ${claimError.message}`)
+
+  if (claim?.action === 'reuse') return await readTerrainState(slug)
+  if (claim?.action !== 'build') {
+    return {
+      status: claim?.action || 'not_claimed',
+      build: claim || null,
+      materialization: null,
+    }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const startedAt = performance.now()
+    const { artifact, sampledSourceSha256 } = await buildTerrainArtifact(
+      claim.boundary_geojson,
+      claim.stated_acres == null ? null : Number(claim.stated_acres),
+    )
+    const artifactJson = JSON.stringify(artifact)
+    const artifactBytes = new TextEncoder().encode(artifactJson)
+    const artifactSha256 = await sha256Hex(artifactBytes)
+    const artifactPath = terrainArtifactPath(
+      String(claim.property_id),
+      String(claim.input_signature_sha256),
+      artifactSha256,
+    )
+
+    const { error: uploadError } = await admin.storage
+      .from(FARM_WATCH_TERRAIN_PRODUCT.artifactBucket)
+      .upload(artifactPath, artifactBytes, {
+        contentType: FARM_WATCH_TERRAIN_PRODUCT.artifactMimeType,
+        cacheControl: '31536000',
+        upsert: true,
+      })
+    if (uploadError) throw new Error(`terrain artifact upload failed: ${uploadError.message}`)
+
+    const completedAt = new Date()
+    const expiresAt = new Date(
+      completedAt.getTime() + FARM_WATCH_TERRAIN_PRODUCT.refreshDays * 24 * 60 * 60 * 1000,
+    )
+    const summary = {
+      grid_size: artifact.grid.size,
+      raster_observation_count: artifact.grid.values.filter(Number.isFinite).length,
+      elevation_min_ft: artifact.grid.min,
+      elevation_max_ft: artifact.grid.max,
+      contour_interval_ft: artifact.contours.summary.interval,
+      contour_path_count: artifact.contours.summary.pathCount,
+      flow_trace_count: artifact.flow_paths.length,
+      terrain_anatomy_available: Boolean(artifact.anatomy),
+      artifact_size_bytes: artifactBytes.byteLength,
+      worker_elapsed_ms: Math.round(performance.now() - startedAt),
+    }
+    const sourceProvenance = {
+      source_slug: FARM_WATCH_TERRAIN_PRODUCT.sourceSlug,
+      source_url: FARM_WATCH_TERRAIN_PRODUCT.sourceUrl,
+      source_signature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+      source_signature_sha256: claim.source_signature_sha256,
+      source_revision_status: FARM_WATCH_TERRAIN_PRODUCT.sourceRevisionStatus,
+      sampled_source_sha256: sampledSourceSha256,
+      operation: 'ImageServer/getSamples',
+      grid_size: FARM_WATCH_TERRAIN_PRODUCT.gridSize,
+      bounds_padding_fraction: FARM_WATCH_TERRAIN_PRODUCT.boundsPaddingFraction,
+      input_srid: 4326,
+      requested_at: completedAt.toISOString(),
+    }
+
+    const { error: completeError } = await admin.rpc(
+      'farm_watch_complete_materialization_build_v1_internal',
+      {
+        p_build_id: buildId,
+        p_lease_token: leaseToken,
+        p_sampled_source_sha256: sampledSourceSha256,
+        p_evidence_class: FARM_WATCH_TERRAIN_PRODUCT.evidenceClass,
+        p_summary: summary,
+        p_source_provenance: sourceProvenance,
+        p_limitations: FARM_WATCH_TERRAIN_LIMITATIONS,
+        p_artifact_bucket: FARM_WATCH_TERRAIN_PRODUCT.artifactBucket,
+        p_artifact_path: artifactPath,
+        p_artifact_format: FARM_WATCH_TERRAIN_PRODUCT.artifactFormat,
+        p_artifact_mime_type: FARM_WATCH_TERRAIN_PRODUCT.artifactMimeType,
+        p_artifact_size_bytes: artifactBytes.byteLength,
+        p_artifact_sha256: artifactSha256,
+        p_expires_at: expiresAt.toISOString(),
+      },
+    )
+    if (completeError) throw new Error(`materialization completion failed: ${completeError.message}`)
+    return await readTerrainState(slug)
+  } catch (error) {
+    const { error: failError } = await admin.rpc('farm_watch_fail_materialization_build_v1_internal', {
+      p_build_id: buildId,
+      p_lease_token: leaseToken,
+      p_error: error instanceof Error ? error.message : String(error),
+      p_retry_delay_seconds: 300,
+    })
+    if (failError) console.error('Failed to persist materialization failure', failError.message)
+    throw error
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin') || ''
   if (origin && !ALLOWED_ORIGINS.has(origin)) return json({ error: 'not found' }, 404)
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: headers(origin) })
+
+  if (req.method === 'POST') {
+    let body: any = null
+    try { body = await req.json() } catch { return json({ error: 'invalid request' }, 400, origin) }
+
+    const workerToken = typeof body?.worker_token === 'string' ? body.worker_token : null
+    const { data: workerAllowed, error: workerError } = await admin.rpc(
+      'farm_watch_validate_materialization_worker_v1_internal',
+      { p_token: workerToken },
+    )
+    if (workerError || workerAllowed !== true) return json({ error: 'not found' }, 404, origin)
+
+    const slug = boundedSlug(typeof body?.property === 'string' ? body.property : null)
+    if (!slug || body?.product !== FARM_WATCH_TERRAIN_PRODUCT.key) {
+      return json({ error: 'invalid request' }, 400, origin)
+    }
+
+    try {
+      const state = await buildTerrainMaterialization(slug, 'farm-watch-materialization-edge-v1')
+      return json({
+        property: { slug },
+        product: FARM_WATCH_TERRAIN_PRODUCT.key,
+        ...state,
+      }, 200, origin)
+    } catch (error) {
+      console.error('Farm Watch terrain materialization worker failed', error)
+      return json({ error: 'materialization build failed' }, 503, origin)
+    }
+  }
+
   if (req.method !== 'GET') return json({ error: 'not found' }, 404, origin)
 
   const token = bearer(req)
