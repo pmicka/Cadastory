@@ -25,6 +25,7 @@ const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
 const HYDRO_BUFFER_M = 1000
 const HYDRO_AVAILABLE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const HYDRO_PARTIAL_TTL_MS = 60 * 60 * 1000
+const SOIL_MAP_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const SOIL_DEEP_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
 const HYDRO_SOURCES = [
@@ -248,6 +249,15 @@ async function fetchHydroSource(source: HydroSource, envelope: Envelope) {
   }
 }
 
+function soilMapUnitsNeedRefresh(soils: any) {
+  const mapUnitCount = Number(soils?.summary?.map_unit_count) || 0
+  const identityStatus = String(soils?.summary?.identity_status || '')
+  const retrievedAt = Date.parse(soils?.summary?.retrieved_at || '')
+  if (soils?.status !== 'available' || identityStatus !== 'current' || !mapUnitCount) return true
+  if (!Number.isFinite(retrievedAt)) return true
+  return Date.now() - retrievedAt > SOIL_MAP_TTL_MS
+}
+
 function soilDeepProfilesNeedRefresh(soils: any) {
   const mapUnitCount = Number(soils?.summary?.map_unit_count) || 0
   const deepProfileCount = Number(soils?.summary?.deep_profile_count) || 0
@@ -337,18 +347,38 @@ Deno.serve(async (req: Request) => {
   })
   if (soilsError) {
     console.error('farm_watch_get_soils_v1_internal failed', soilsError.message)
-  } else if (soilDeepProfilesNeedRefresh(soils)) {
-    try {
-      const refresh = await admin.rpc('farm_watch_refresh_soil_profiles_v1_internal', { p_slug: slug })
-      if (refresh.error) {
-        console.error('farm_watch_refresh_soil_profiles_v1_internal failed', refresh.error.message)
-      } else {
-        const reread = await admin.rpc('farm_watch_get_soils_v1_internal', { p_slug: slug })
-        if (reread.error) console.error('farm_watch_get_soils_v1_internal deep-profile reread failed', reread.error.message)
-        else soils = reread.data
+  } else {
+    if (soilMapUnitsNeedRefresh(soils)) {
+      try {
+        const refresh = await admin.rpc('farm_watch_refresh_soils_v1_internal', { p_slug: slug })
+        if (refresh.error) {
+          console.error('farm_watch_refresh_soils_v1_internal failed', refresh.error.message)
+        } else {
+          const reread = await admin.rpc('farm_watch_get_soils_v1_internal', { p_slug: slug })
+          if (reread.error) {
+            console.error('farm_watch_get_soils_v1_internal map-unit reread failed', reread.error.message)
+          } else {
+            soils = reread.data
+          }
+        }
+      } catch (error) {
+        console.error('Farm Watch SSURGO map-unit refresh failed', error instanceof Error ? error.message : error)
       }
-    } catch (error) {
-      console.error('Farm Watch deep SSURGO refresh failed', error instanceof Error ? error.message : error)
+    }
+
+    if (soils?.status === 'available' && soils?.summary?.identity_status === 'current' && soilDeepProfilesNeedRefresh(soils)) {
+      try {
+        const refresh = await admin.rpc('farm_watch_refresh_soil_profiles_v1_internal', { p_slug: slug })
+        if (refresh.error) {
+          console.error('farm_watch_refresh_soil_profiles_v1_internal failed', refresh.error.message)
+        } else {
+          const reread = await admin.rpc('farm_watch_get_soils_v1_internal', { p_slug: slug })
+          if (reread.error) console.error('farm_watch_get_soils_v1_internal deep-profile reread failed', reread.error.message)
+          else soils = reread.data
+        }
+      } catch (error) {
+        console.error('Farm Watch deep SSURGO refresh failed', error instanceof Error ? error.message : error)
+      }
     }
   }
 
