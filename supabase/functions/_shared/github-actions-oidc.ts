@@ -14,6 +14,7 @@ const TRUST = Object.freeze({
   workflowRefs: [
     'pmicka/Cadastory/.github/workflows/farm-watch-lidar-physical.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-leaf-off.yml@refs/heads/main',
+    'pmicka/Cadastory/.github/workflows/farm-watch-structure-synthesis.yml@refs/heads/main',
   ],
 })
 
