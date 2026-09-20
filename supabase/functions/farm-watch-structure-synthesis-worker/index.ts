@@ -475,6 +475,469 @@ function crossValidatedProfileModel(records: any[], gridWidth: number) {
   }
 }
 
+function profileBaseFeatures(row: any) {
+  return {
+    share_4_16: row.shares[1] || 0,
+    share_16_32: row.shares[2] || 0,
+    share_32_64: row.shares[3] || 0,
+    share_64_plus: row.shares[4] || 0,
+    entropy: normalizedBandEntropy(row.shares) || 0,
+    profile_spread: bandProfileSpread(row.shares) || 0,
+  }
+}
+
+const PROFILE_BASE_FEATURES = [
+  'share_4_16',
+  'share_16_32',
+  'share_32_64',
+  'share_64_plus',
+  'entropy',
+  'profile_spread',
+]
+
+function quadraticProfileFeatures(base: Record<string, number>) {
+  const features: Record<string, number> = { ...base }
+  for (const name of PROFILE_BASE_FEATURES) {
+    features['sq_' + name] = base[name] * base[name]
+  }
+  for (let i = 0; i < PROFILE_BASE_FEATURES.length; i += 1) {
+    for (let j = i + 1; j < PROFILE_BASE_FEATURES.length; j += 1) {
+      const a = PROFILE_BASE_FEATURES[i]
+      const b = PROFILE_BASE_FEATURES[j]
+      features['x_' + a + '__' + b] = base[a] * base[b]
+    }
+  }
+  return features
+}
+
+function predictionMetrics(observed: number[], predicted: number[]) {
+  if (observed.length !== predicted.length || observed.length < 3) {
+    return { cross_validated_r2: null, predicted_vs_observed_r: null }
+  }
+  const meanObserved = observed.reduce((sum, value) => sum + value, 0) / observed.length
+  let sse = 0
+  let sst = 0
+  for (let index = 0; index < observed.length; index += 1) {
+    sse += (observed[index] - predicted[index]) ** 2
+    sst += (observed[index] - meanObserved) ** 2
+  }
+  return {
+    cross_validated_r2: sst > 0 ? 1 - sse / sst : null,
+    predicted_vs_observed_r: pearson(predicted, observed),
+  }
+}
+
+function crossValidatedQuadraticProfileModel(records: any[], gridWidth: number) {
+  const baseRows = records.map((row) => ({
+    index: row.index,
+    y: row.leafScore,
+    features: quadraticProfileFeatures(profileBaseFeatures(row)),
+  }))
+  const featureNames = Object.keys(baseRows[0]?.features || {}).sort()
+  const rows = baseRows.filter((row) =>
+    Number.isFinite(row.y) &&
+    featureNames.every((name) => Number.isFinite(row.features[name]))
+  )
+  if (rows.length < 100) {
+    return { status: 'insufficient_overlap', cell_count: rows.length, prediction_records: [] }
+  }
+
+  const observed: number[] = []
+  const predicted: number[] = []
+  const predictionRecords: any[] = []
+  const folds = []
+  const foldCount = 5
+  for (let fold = 0; fold < foldCount; fold += 1) {
+    const training = rows.filter((row) => spatialFold(row.index, gridWidth, foldCount) !== fold)
+    const testing = rows.filter((row) => spatialFold(row.index, gridWidth, foldCount) === fold)
+    if (training.length < 100 || testing.length < 10) continue
+    const model = fitStandardizedRidge(training, featureNames, 0.05)
+    if (!model) continue
+    for (const row of testing) {
+      const estimate = predictStandardized(model, row.features)
+      if (!Number.isFinite(estimate)) continue
+      observed.push(row.y)
+      predicted.push(Number(estimate))
+      predictionRecords.push({
+        index: row.index,
+        observed: row.y,
+        predicted: Number(estimate),
+        residual: row.y - Number(estimate),
+      })
+    }
+    folds.push({ fold, training_cells: training.length, testing_cells: testing.length })
+  }
+
+  const metrics = predictionMetrics(observed, predicted)
+  return {
+    status: observed.length >= 50 ? 'available' : 'insufficient_cross_validation',
+    method: 'blocked_5fold_quadratic_interaction_ridge_v1',
+    cell_count: rows.length,
+    predicted_cell_count: observed.length,
+    fold_count: folds.length,
+    folds,
+    feature_count: featureNames.length,
+    ridge_lambda: 0.05,
+    cross_validated_r2: metrics.cross_validated_r2,
+    predicted_vs_observed_r: metrics.predicted_vs_observed_r,
+    prediction_records: predictionRecords,
+    interpretation_boundary:
+      'Fixed second-order expansion of the same neutral LiDAR vertical-profile features, evaluated on the same five held-out east-west folds. This checks bounded nonlinear interactions without tuning the leaf-off target.',
+  }
+}
+
+function regressionSse(count: number, sum: number, sumSq: number) {
+  return count > 0 ? Math.max(0, sumSq - sum * sum / count) : 0
+}
+
+function fitRegressionTree(
+  rows: any[],
+  featureNames: string[],
+  maxDepth = 5,
+  minLeaf = 60,
+) {
+  function build(nodeRows: any[], depth: number): any {
+    const count = nodeRows.length
+    const sum = nodeRows.reduce((acc, row) => acc + row.y, 0)
+    const sumSq = nodeRows.reduce((acc, row) => acc + row.y * row.y, 0)
+    const value = count ? sum / count : 0
+    const parentSse = regressionSse(count, sum, sumSq)
+    if (depth >= maxDepth || count < minLeaf * 2 || !(parentSse > 1e-10)) {
+      return { value, count }
+    }
+
+    let best: any = null
+    for (const feature of featureNames) {
+      const values = nodeRows.map((row) => row.features[feature]).filter(Number.isFinite)
+      const thresholds = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+        .map((q) => sortedQuantile(values, q))
+        .filter((threshold, index, array) =>
+          Number.isFinite(Number(threshold)) &&
+          (index === 0 || Number(threshold) !== Number(array[index - 1]))
+        )
+      for (const rawThreshold of thresholds) {
+        const threshold = Number(rawThreshold)
+        let leftCount = 0, rightCount = 0
+        let leftSum = 0, rightSum = 0
+        let leftSq = 0, rightSq = 0
+        for (const row of nodeRows) {
+          if (row.features[feature] <= threshold) {
+            leftCount += 1
+            leftSum += row.y
+            leftSq += row.y * row.y
+          } else {
+            rightCount += 1
+            rightSum += row.y
+            rightSq += row.y * row.y
+          }
+        }
+        if (leftCount < minLeaf || rightCount < minLeaf) continue
+        const loss =
+          regressionSse(leftCount, leftSum, leftSq) +
+          regressionSse(rightCount, rightSum, rightSq)
+        if (!best || loss < best.loss) {
+          best = { feature, threshold, loss }
+        }
+      }
+    }
+
+    if (!best || parentSse - best.loss <= Math.max(1e-8, parentSse * 1e-5)) {
+      return { value, count }
+    }
+    const leftRows = nodeRows.filter((row) => row.features[best.feature] <= best.threshold)
+    const rightRows = nodeRows.filter((row) => row.features[best.feature] > best.threshold)
+    return {
+      value,
+      count,
+      feature: best.feature,
+      threshold: best.threshold,
+      left: build(leftRows, depth + 1),
+      right: build(rightRows, depth + 1),
+    }
+  }
+  return build(rows, 0)
+}
+
+function predictRegressionTree(tree: any, features: Record<string, number>) {
+  let node = tree
+  while (node?.left && node?.right && node?.feature) {
+    node = features[node.feature] <= node.threshold ? node.left : node.right
+  }
+  return Number(node?.value)
+}
+
+function crossValidatedTreeProfileModel(records: any[], gridWidth: number) {
+  const rows = records.map((row) => ({
+    index: row.index,
+    y: row.leafScore,
+    features: profileBaseFeatures(row),
+  })).filter((row) =>
+    Number.isFinite(row.y) &&
+    PROFILE_BASE_FEATURES.every((name) => Number.isFinite(row.features[name]))
+  )
+  if (rows.length < 100) {
+    return { status: 'insufficient_overlap', cell_count: rows.length, prediction_records: [] }
+  }
+
+  const observed: number[] = []
+  const predicted: number[] = []
+  const predictionRecords: any[] = []
+  const folds = []
+  const foldCount = 5
+  for (let fold = 0; fold < foldCount; fold += 1) {
+    const training = rows.filter((row) => spatialFold(row.index, gridWidth, foldCount) !== fold)
+    const testing = rows.filter((row) => spatialFold(row.index, gridWidth, foldCount) === fold)
+    if (training.length < 100 || testing.length < 10) continue
+    const tree = fitRegressionTree(training, PROFILE_BASE_FEATURES, 5, 60)
+    for (const row of testing) {
+      const estimate = predictRegressionTree(tree, row.features)
+      if (!Number.isFinite(estimate)) continue
+      observed.push(row.y)
+      predicted.push(estimate)
+      predictionRecords.push({
+        index: row.index,
+        observed: row.y,
+        predicted: estimate,
+        residual: row.y - estimate,
+      })
+    }
+    folds.push({ fold, training_cells: training.length, testing_cells: testing.length })
+  }
+
+  const metrics = predictionMetrics(observed, predicted)
+  return {
+    status: observed.length >= 50 ? 'available' : 'insufficient_cross_validation',
+    method: 'blocked_5fold_deterministic_cart_v1',
+    cell_count: rows.length,
+    predicted_cell_count: observed.length,
+    fold_count: folds.length,
+    folds,
+    features: PROFILE_BASE_FEATURES,
+    max_depth: 5,
+    minimum_leaf_cells: 60,
+    threshold_candidates: 'per-node deciles',
+    cross_validated_r2: metrics.cross_validated_r2,
+    predicted_vs_observed_r: metrics.predicted_vs_observed_r,
+    prediction_records: predictionRecords,
+    interpretation_boundary:
+      'Deterministic shallow CART stress test using the same neutral profile features and held-out spatial folds. It is intentionally bounded and auditable rather than an exhaustive machine-learning search.',
+  }
+}
+
+function compactModel(model: any) {
+  const copy = { ...model }
+  delete copy.prediction_records
+  return copy
+}
+
+function modelAdequacyStressTest(
+  records: any[],
+  gridWidth: number,
+  baseline: any,
+) {
+  const quadratic = crossValidatedQuadraticProfileModel(records, gridWidth)
+  const tree = crossValidatedTreeProfileModel(records, gridWidth)
+  const candidates = [baseline, quadratic, tree]
+    .filter((model) => model?.status === 'available' && Number.isFinite(Number(model.cross_validated_r2)))
+  if (!candidates.length) {
+    return { status: 'unavailable', models: [], best_prediction_records: [] }
+  }
+  const best = candidates.reduce((winner, model) =>
+    Number(model.cross_validated_r2) > Number(winner.cross_validated_r2) ? model : winner
+  )
+  return {
+    status: 'available',
+    method: 'blocked_5fold_ridge_quadratic_cart_v1',
+    models: candidates.map(compactModel),
+    best_method: best.method,
+    best_cross_validated_r2: Number(best.cross_validated_r2),
+    best_predicted_vs_observed_r: Number(best.predicted_vs_observed_r),
+    best_prediction_records: best.prediction_records || [],
+    interpretation_boundary:
+      'Bounded model-adequacy stress test only. The same five east-west folds are used for the linear ridge baseline, a fixed quadratic/interaction ridge expansion, and a deterministic shallow CART model. Failure of these tested models to explain leaf-off variation does not prove that no richer LiDAR representation could do so.',
+  }
+}
+
+function hashSeed(text: string) {
+  let hash = 2166136261 >>> 0
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index)
+    hash = Math.imul(hash, 16777619) >>> 0
+  }
+  return hash || 0x9e3779b9
+}
+
+function createPrng(seed: number) {
+  let state = seed >>> 0 || 0x9e3779b9
+  return () => {
+    state ^= state << 13
+    state ^= state >>> 17
+    state ^= state << 5
+    return (state >>> 0) / 4294967296
+  }
+}
+
+function patchStatsFromMask(
+  mask: Uint8Array,
+  gridWidth: number,
+  gridHeight: number,
+  cellMeters: number,
+) {
+  const visited = new Uint8Array(mask.length)
+  let selectedCount = 0
+  let multiCellSelected = 0
+  let multiCellPatchCount = 0
+  let contiguousPatchCount = 0
+  let largestPatchCells = 0
+  for (let index = 0; index < mask.length; index += 1) {
+    if (mask[index]) selectedCount += 1
+    if (!mask[index] || visited[index]) continue
+    contiguousPatchCount += 1
+    const queue = [index]
+    visited[index] = 1
+    let count = 0
+    while (queue.length) {
+      const current = Number(queue.pop())
+      count += 1
+      const gridRow = Math.floor(current / gridWidth)
+      const col = current % gridWidth
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          if (!dx && !dy) continue
+          const rr = gridRow + dy
+          const cc = col + dx
+          if (rr < 0 || cc < 0 || rr >= gridHeight || cc >= gridWidth) continue
+          const neighbor = rr * gridWidth + cc
+          if (!mask[neighbor] || visited[neighbor]) continue
+          visited[neighbor] = 1
+          queue.push(neighbor)
+        }
+      }
+    }
+    largestPatchCells = Math.max(largestPatchCells, count)
+    if (count >= 2) {
+      multiCellPatchCount += 1
+      multiCellSelected += count
+    }
+  }
+  return {
+    selected_cell_count: selectedCount,
+    contiguous_patch_count: contiguousPatchCount,
+    multi_cell_patch_count: multiCellPatchCount,
+    selected_multi_cell_fraction: selectedCount ? multiCellSelected / selectedCount : null,
+    largest_patch_cells: largestPatchCells,
+    largest_patch_square_meters: largestPatchCells * cellMeters * cellMeters,
+  }
+}
+
+function permuteMaskByBlocks(
+  source: Uint8Array,
+  gridWidth: number,
+  gridHeight: number,
+  blockSize: number,
+  random: () => number,
+) {
+  const target = new Uint8Array(source.length)
+  const groups = new Map<string, any[]>()
+  for (let row0 = 0; row0 < gridHeight; row0 += blockSize) {
+    for (let col0 = 0; col0 < gridWidth; col0 += blockSize) {
+      const height = Math.min(blockSize, gridHeight - row0)
+      const width = Math.min(blockSize, gridWidth - col0)
+      const key = width + 'x' + height
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push({ row0, col0, width, height })
+    }
+  }
+
+  for (const blocks of groups.values()) {
+    const sources = blocks.slice()
+    for (let index = sources.length - 1; index > 0; index -= 1) {
+      const swap = Math.floor(random() * (index + 1))
+      ;[sources[index], sources[swap]] = [sources[swap], sources[index]]
+    }
+    for (let destinationIndex = 0; destinationIndex < blocks.length; destinationIndex += 1) {
+      const destination = blocks[destinationIndex]
+      const origin = sources[destinationIndex]
+      for (let dy = 0; dy < destination.height; dy += 1) {
+        for (let dx = 0; dx < destination.width; dx += 1) {
+          const sourceIndex = (origin.row0 + dy) * gridWidth + origin.col0 + dx
+          const targetIndex = (destination.row0 + dy) * gridWidth + destination.col0 + dx
+          target[targetIndex] = source[sourceIndex]
+        }
+      }
+    }
+  }
+  return target
+}
+
+function blockPermutationSpatialNull(
+  selectedMask: Uint8Array,
+  gridWidth: number,
+  gridHeight: number,
+  cellMeters: number,
+  seedText: string,
+) {
+  const observed = patchStatsFromMask(selectedMask, gridWidth, gridHeight, cellMeters)
+  const blockSizes = [3, 4, 6]
+  const iterations = 299
+  const scales = []
+  for (const blockSize of blockSizes) {
+    const random = createPrng(hashSeed(seedText + '|block=' + blockSize))
+    const fractions: number[] = []
+    const largest: number[] = []
+    for (let iteration = 0; iteration < iterations; iteration += 1) {
+      const permuted = permuteMaskByBlocks(
+        selectedMask,
+        gridWidth,
+        gridHeight,
+        blockSize,
+        random,
+      )
+      const stats = patchStatsFromMask(permuted, gridWidth, gridHeight, cellMeters)
+      if (Number.isFinite(Number(stats.selected_multi_cell_fraction))) {
+        fractions.push(Number(stats.selected_multi_cell_fraction))
+      }
+      largest.push(Number(stats.largest_patch_cells))
+    }
+    const observedFraction = Number(observed.selected_multi_cell_fraction)
+    const fractionExceedances = fractions.filter((value) => value >= observedFraction).length
+    const largestExceedances = largest.filter((value) => value >= observed.largest_patch_cells).length
+    scales.push({
+      block_size_cells: blockSize,
+      block_size_meters: blockSize * cellMeters,
+      iterations,
+      selected_multi_cell_fraction: {
+        observed: observedFraction,
+        null_mean: fractions.length
+          ? fractions.reduce((sum, value) => sum + value, 0) / fractions.length
+          : null,
+        null_p95: sortedQuantile(fractions, 0.95),
+        exceedance_p_value: (fractionExceedances + 1) / (iterations + 1),
+      },
+      largest_patch_cells: {
+        observed: observed.largest_patch_cells,
+        null_mean: largest.length
+          ? largest.reduce((sum, value) => sum + value, 0) / largest.length
+          : null,
+        null_p95: sortedQuantile(largest, 0.95),
+        exceedance_p_value: (largestExceedances + 1) / (iterations + 1),
+      },
+    })
+  }
+
+  return {
+    status: 'available',
+    method: 'block_permutation_selected_mask_v1',
+    iterations_per_scale: iterations,
+    block_scales_cells: blockSizes,
+    block_scales_meters: blockSizes.map((size) => size * cellMeters),
+    observed,
+    scales,
+    interpretation_boundary:
+      'Conditional tile-rearrangement null. Selected-cell masks are permuted as intact 15 m, 20 m, and 30 m tiles, preserving within-tile selected-cell structure while disrupting between-tile adjacency. The result tests whether observed connectivity exceeds these local-structure-preserving rearrangements; it is not a universal test of spatial randomness and does not identify a biological process.',
+  }
+}
+
 function standardDeviation(values: number[]) {
   const clean = values.filter(Number.isFinite)
   if (clean.length < 2) return null
@@ -490,6 +953,8 @@ function residualSpatialSummary(
   gridWidth: number,
   gridHeight: number,
   cellMeters: number,
+  sourceModelMethod: string,
+  nullSeed: string,
 ) {
   const byIndex = new Map(predictionRecords.map((row) => [row.index, row]))
   const joined = records.map((row) => {
@@ -573,9 +1038,21 @@ function residualSpatialSummary(
   const multiCell = patches.filter((patch) => patch.cell_count >= 2)
   const multiCellSelected = multiCell.reduce((sum, patch) => sum + patch.cell_count, 0)
 
+  const selectedMask = new Uint8Array(gridWidth * gridHeight)
+  for (const index of selected.keys()) selectedMask[Number(index)] = 1
+  const spatialNull = blockPermutationSpatialNull(
+    selectedMask,
+    gridWidth,
+    gridHeight,
+    cellMeters,
+    nullSeed,
+  )
+
   return {
     status: 'available',
-    method: 'leaf_off_profile_residual_spatial_v1',
+    method: 'best_tested_profile_residual_spatial_v2',
+    source_model_method: sourceModelMethod,
+    spatial_null: spatialNull,
     cell_count: joined.length,
     residual_stddev: allStd,
     confidence_minimum: confidenceMinimum,
@@ -591,7 +1068,7 @@ function residualSpatialSummary(
     largest_patch: patches.length ? patches[0] : null,
     representative_patches: patches.slice(0, 6),
     interpretation_boundary:
-      'Out-of-fold residual grouping only. High-positive cells are the gated upper 20% of residuals, clamped at zero and grouped by eight-neighbor connectivity. Multi-cell patches indicate descriptive spatial organization on this grid; this is not a spatial significance test, independent replication, vegetation class, habitat class, or causal attribution.',
+      'Out-of-fold residual grouping from the best tested LiDAR-only profile model. High-positive cells are the gated upper 20% of residuals, clamped at zero and grouped by eight-neighbor connectivity. The attached block-permutation null preserves within-tile selected-cell structure at 15 m, 20 m, and 30 m scales while disrupting between-tile adjacency. Neither the residuals nor the null identify vegetation, habitat, causation, or change.',
   }
 }
 
@@ -692,7 +1169,7 @@ function physicalGridIndex(grid: any, x: number, y: number) {
   return row * Number(grid.width) + col
 }
 
-function buildSynthesis(physical: any, leaf: any) {
+function buildSynthesis(physical: any, leaf: any, nullSeed: string) {
   if (!validateLidarPhysicalArtifact(physical)) throw new Error('LiDAR physical artifact failed validation')
   if (!validateLeafOffArtifact(leaf)) throw new Error('leaf-off artifact failed validation')
 
@@ -814,17 +1291,27 @@ function buildSynthesis(physical: any, leaf: any) {
   if (fullProfile.status !== 'available') {
     throw new Error('full vertical-profile cross-validation is unavailable')
   }
-  const predictionRecords = fullProfile.prediction_records || []
+  const modelAdequacy = modelAdequacyStressTest(
+    records,
+    Number(physicalGrid.width),
+    fullProfile,
+  )
+  if (modelAdequacy.status !== 'available') {
+    throw new Error('LiDAR profile model-adequacy stress test is unavailable')
+  }
   const residualSpatial = residualSpatialSummary(
     records,
-    predictionRecords,
+    modelAdequacy.best_prediction_records || [],
     Number(physicalGrid.width),
     Number(physicalGrid.height),
     Number(physical.cell_meters),
+    String(modelAdequacy.best_method || 'unknown'),
+    nullSeed,
   )
-  if (residualSpatial.status !== 'available') {
-    throw new Error('out-of-fold residual spatial product is unavailable')
+  if (residualSpatial.status !== 'available' || residualSpatial?.spatial_null?.status !== 'available') {
+    throw new Error('out-of-fold residual spatial/null product is unavailable')
   }
+  delete modelAdequacy.best_prediction_records
   delete fullProfile.prediction_records
 
   const matrix = []
@@ -861,6 +1348,7 @@ function buildSynthesis(physical: any, leaf: any) {
       dominant_band_texture_distribution: dominantDistribution,
       dominant_band_variance_partition: variancePartition(records),
       full_vertical_profile_model: fullProfile,
+      model_adequacy_stress_test: modelAdequacy,
       out_of_fold_residual_spatial: residualSpatial,
       overstory_conditioned: {
         upper_32plus_minimum_share: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.minimumUpperShare,
@@ -937,7 +1425,11 @@ async function materialize(slug: string, identity: any) {
       downloadArtifact(dependencies.physicalState),
       downloadArtifact(dependencies.leafState),
     ])
-    const artifact = buildSynthesis(physicalPayload.artifact, leafPayload.artifact)
+    const artifact = buildSynthesis(
+      physicalPayload.artifact,
+      leafPayload.artifact,
+      dependencies.sourceSignature,
+    )
     if (!validateStructureSynthesisArtifact(artifact)) {
       throw new Error('structure synthesis artifact failed contract validation')
     }
@@ -995,6 +1487,7 @@ async function materialize(slug: string, identity: any) {
       shared_cell_count: artifact.summary.shared_cell_count,
       dominant_band_variance_partition: artifact.summary.dominant_band_variance_partition,
       full_vertical_profile_model: artifact.summary.full_vertical_profile_model,
+      model_adequacy_stress_test: artifact.summary.model_adequacy_stress_test,
       out_of_fold_residual_spatial: artifact.summary.out_of_fold_residual_spatial,
       overstory_conditioned: artifact.summary.overstory_conditioned,
       artifact_size_bytes: bytes.byteLength,
