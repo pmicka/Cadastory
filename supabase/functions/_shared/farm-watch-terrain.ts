@@ -191,7 +191,9 @@ export function contourSegments(grid: TerrainGrid, level: number) {
       const crossings: any[] = []
       for (let edge = 0; edge < edges.length; edge += 1) {
         const [a, b] = edges[edge]
-        if ((a.value < level && b.value >= level) || (b.value < level && a.value >= level)) {
+        const aValue = Number(a.value)
+        const bValue = Number(b.value)
+        if ((aValue < level && bValue >= level) || (bValue < level && aValue >= level)) {
           crossings.push({ edge, point: interpolateEdge(a, b, level) })
         }
       }
@@ -297,56 +299,223 @@ export function buildContourProduct(grid: TerrainGrid) {
   }
 }
 
+export function gridCellMetrics(grid: TerrainGrid) {
+  const centerLat = (grid.south + grid.north) / 2
+  const lonStep = Math.abs(grid.east - grid.west) / Math.max(1, grid.size - 1)
+  const latStep = Math.abs(grid.north - grid.south) / Math.max(1, grid.size - 1)
+  const eastWestM = lonStep * 111320 * Math.max(0.2, Math.cos(centerLat * Math.PI / 180))
+  const northSouthM = latStep * 111320
+  const cellAreaM2 = eastWestM * northSouthM
+  return {
+    east_west_m: eastWestM,
+    north_south_m: northSouthM,
+    cell_area_m2: cellAreaM2,
+    cell_area_acres: cellAreaM2 / 4046.8564224,
+  }
+}
+
 export function neighborCells(grid: TerrainGrid, index: number) {
   const row = Math.floor(index / grid.size)
   const col = index % grid.size
-  const neighbors: Array<{ index: number; distance: number }> = []
+  const metrics = gridCellMetrics(grid)
+  const neighbors: Array<{ index: number; distance_m: number }> = []
   for (let dr = -1; dr <= 1; dr += 1) {
     for (let dc = -1; dc <= 1; dc += 1) {
       if (dr === 0 && dc === 0) continue
       const r = row + dr
       const c = col + dc
       if (r < 0 || r >= grid.size || c < 0 || c >= grid.size) continue
+      const dx = Math.abs(dc) * metrics.east_west_m
+      const dy = Math.abs(dr) * metrics.north_south_m
       neighbors.push({
         index: r * grid.size + c,
-        distance: dr === 0 || dc === 0 ? 1 : Math.SQRT2,
+        distance_m: Math.hypot(dx, dy),
       })
     }
   }
   return neighbors
 }
 
+type FlowConditioning = {
+  filledValues: Array<number | null>
+  parent: number[]
+  routableMask: boolean[]
+  filledCellCount: number
+  maxFillDepthFt: number
+  excludedDisconnectedCellCount: number
+}
+
+function conditionFlowSurface(grid: TerrainGrid): FlowConditioning {
+  const count = grid.values.length
+  const filledValues: Array<number | null> = grid.values.map((value) =>
+    Number.isFinite(value) ? Number(value) : null
+  )
+  const parent = new Array(count).fill(-1)
+  const visited = new Array(count).fill(false)
+  const heap: Array<{ index: number; elevation: number }> = []
+
+  function heapPush(item: { index: number; elevation: number }) {
+    heap.push(item)
+    let i = heap.length - 1
+    while (i > 0) {
+      const p = Math.floor((i - 1) / 2)
+      if (heap[p].elevation <= heap[i].elevation) break
+      ;[heap[p], heap[i]] = [heap[i], heap[p]]
+      i = p
+    }
+  }
+
+  function heapPop() {
+    if (!heap.length) return null
+    const root = heap[0]
+    const last = heap.pop()!
+    if (heap.length) {
+      heap[0] = last
+      let i = 0
+      while (true) {
+        const left = i * 2 + 1
+        const right = left + 1
+        let smallest = i
+        if (left < heap.length && heap[left].elevation < heap[smallest].elevation) smallest = left
+        if (right < heap.length && heap[right].elevation < heap[smallest].elevation) smallest = right
+        if (smallest === i) break
+        ;[heap[i], heap[smallest]] = [heap[smallest], heap[i]]
+        i = smallest
+      }
+    }
+    return root
+  }
+
+  function seed(index: number) {
+    if (visited[index] || !Number.isFinite(filledValues[index])) return
+    visited[index] = true
+    heapPush({ index, elevation: Number(filledValues[index]) })
+  }
+
+  for (let index = 0; index < count; index += 1) {
+    if (!Number.isFinite(filledValues[index])) continue
+    const row = Math.floor(index / grid.size)
+    const col = index % grid.size
+    const perimeter = row === 0 || col === 0 || row === grid.size - 1 || col === grid.size - 1
+    if (perimeter) seed(index)
+  }
+
+  let filledCellCount = 0
+  let maxFillDepthFt = 0
+
+  function flood() {
+    while (heap.length) {
+      const current = heapPop()!
+      for (const neighbor of neighborCells(grid, current.index)) {
+        if (visited[neighbor.index] || !Number.isFinite(filledValues[neighbor.index])) continue
+        visited[neighbor.index] = true
+        const original = Number(grid.values[neighbor.index])
+        const conditioned = Math.max(original, current.elevation)
+        filledValues[neighbor.index] = conditioned
+        parent[neighbor.index] = current.index
+        const fillDepth = conditioned - original
+        if (fillDepth > 1e-9) {
+          filledCellCount += 1
+          maxFillDepthFt = Math.max(maxFillDepthFt, fillDepth)
+        }
+        heapPush({ index: neighbor.index, elevation: conditioned })
+      }
+    }
+  }
+
+  flood()
+
+  const excludedDisconnectedCellCount = filledValues.reduce<number>(
+    (countDisconnected, value, index) =>
+      Number.isFinite(value) && !visited[index] ? countDisconnected + 1 : countDisconnected,
+    0,
+  )
+
+  return {
+    filledValues,
+    parent,
+    routableMask: visited,
+    filledCellCount,
+    maxFillDepthFt,
+    excludedDisconnectedCellCount,
+  }
+}
+
 export function buildFlowNetwork(grid: TerrainGrid) {
+  const conditioning = conditionFlowSurface(grid)
   const downstream = new Array(grid.values.length).fill(-1)
   const accumulation = new Array(grid.values.length).fill(0)
   const validIndexes = grid.values
-    .map((value, index) => Number.isFinite(value) ? index : -1)
+    .map((value, index) =>
+      Number.isFinite(value) && conditioning.routableMask[index] ? index : -1
+    )
     .filter((index) => index >= 0)
 
   for (const index of validIndexes) {
-    const value = Number(grid.values[index])
+    const value = Number(conditioning.filledValues[index])
     let best = -1
     let bestSlope = 0
     for (const neighbor of neighborCells(grid, index)) {
-      const neighborValue = grid.values[neighbor.index]
-      if (!Number.isFinite(neighborValue)) continue
+      const neighborValue = conditioning.filledValues[neighbor.index]
+      if (!Number.isFinite(neighborValue) || neighbor.distance_m <= 0) continue
       const drop = value - Number(neighborValue)
-      const slope = drop / neighbor.distance
+      if (drop <= 1e-9) continue
+      const slope = drop / neighbor.distance_m
       if (slope > bestSlope) {
         best = neighbor.index
         bestSlope = slope
       }
     }
+
+    if (best < 0) {
+      const parent = conditioning.parent[index]
+      if (
+        parent >= 0 &&
+        Number.isFinite(conditioning.filledValues[parent]) &&
+        Number(conditioning.filledValues[parent]) <= value + 1e-9
+      ) best = parent
+    }
+
     downstream[index] = best
     accumulation[index] = 1
   }
 
-  for (const index of validIndexes.slice().sort((a, b) => Number(grid.values[b]) - Number(grid.values[a]))) {
+  const upstream: number[][] = Array.from({ length: grid.values.length }, () => [])
+  const indegree = new Array(grid.values.length).fill(0)
+  for (const index of validIndexes) {
     const next = downstream[index]
-    if (next >= 0) accumulation[next] += accumulation[index]
+    if (next < 0) continue
+    upstream[next].push(index)
+    indegree[next] += 1
   }
 
-  return { downstream, accumulation, validIndexes }
+  const queue = validIndexes.filter((index) => indegree[index] === 0)
+  let cursor = 0
+  let processed = 0
+  while (cursor < queue.length) {
+    const index = queue[cursor++]
+    processed += 1
+    const next = downstream[index]
+    if (next < 0) continue
+    accumulation[next] += accumulation[index]
+    indegree[next] -= 1
+    if (indegree[next] === 0) queue.push(next)
+  }
+
+  return {
+    downstream,
+    accumulation,
+    upstream,
+    validIndexes,
+    conditioning: {
+      filled_cell_count: conditioning.filledCellCount,
+      max_fill_depth_ft: conditioning.maxFillDepthFt,
+      excluded_disconnected_cell_count: conditioning.excludedDisconnectedCellCount,
+      unresolved_flow_cell_count: Math.max(0, validIndexes.length - processed),
+      routing_surface: 'priority_flood_conditioned_sampled_dem',
+    },
+    cell_metrics: gridCellMetrics(grid),
+  }
 }
 
 export function gridDirection(grid: TerrainGrid, index: number) {
@@ -362,8 +531,11 @@ export function gridDirection(grid: TerrainGrid, index: number) {
   return labels[Math.round(angle / 45) % 8]
 }
 
-export function deriveTerrainAnatomy(grid: TerrainGrid, statedAcres: number | null | undefined) {
-  const network = buildFlowNetwork(grid)
+export function deriveTerrainAnatomy(
+  grid: TerrainGrid,
+  statedAcres: number | null | undefined,
+  network = buildFlowNetwork(grid),
+) {
   const interior = network.validIndexes.filter((index) => {
     const [lon, lat] = grid.points[index]
     return pointInPolygonGeometry(lon, lat, grid.boundary)
@@ -402,13 +574,13 @@ export function deriveTerrainAnatomy(grid: TerrainGrid, statedAcres: number | nu
       }
       const next = network.downstream[cursor]
       if (next < 0) {
-        terminal = { kind: 'local_minimum', index: cursor }
+        terminal = { kind: 'grid_terminal', index: cursor }
         break
       }
       cursor = next
     }
 
-    if (!terminal) terminal = { kind: 'local_minimum', index: cursor >= 0 ? cursor : start }
+    if (!terminal) terminal = { kind: 'grid_terminal', index: cursor >= 0 ? cursor : start }
     for (const index of path) terminalMemo.set(index, terminal)
     return terminal
   }
@@ -464,8 +636,8 @@ export function deriveTerrainAnatomy(grid: TerrainGrid, statedAcres: number | nu
   const routedExitCount = [...exitGroups.values()].reduce((sum, row) => sum + row.count, 0)
 
   return {
-    method: '61x61_sampled_dem_d8',
-    routing_scope: 'unconditioned_local_downhill_only',
+    method: '61x61_sampled_dem_conditioned_d8',
+    routing_scope: 'priority_flood_conditioned_metric_d8',
     sample_count: total,
     sampled_high: {
       elevation_ft: grid.values[highIndex],
@@ -478,44 +650,115 @@ export function deriveTerrainAnatomy(grid: TerrainGrid, statedAcres: number | nu
     outlet_zone_count: outletZones.length,
     outlet_zones: outletZones,
     outlet_routed_percent: routedExitCount / total * 100,
+    conditioning: network.conditioning,
   }
 }
 
-export function buildFlowPaths(grid: TerrainGrid) {
-  const { downstream, accumulation, validIndexes } = buildFlowNetwork(grid)
+function traceFlowIndexes(grid: TerrainGrid, downstream: number[], start: number) {
+  const indexes: number[] = []
+  const seen = new Set<number>()
+  let cursor = start
+  while (cursor >= 0 && indexes.length < grid.values.length && !seen.has(cursor)) {
+    seen.add(cursor)
+    indexes.push(cursor)
+    const [lon, lat] = grid.points[cursor]
+    if (!pointInPolygonGeometry(lon, lat, grid.boundary) && indexes.length > 1) break
+    cursor = downstream[cursor]
+  }
+  return indexes
+}
 
-  const candidates = validIndexes
-    .filter((index) => {
-      const point = grid.points[index]
-      return accumulation[index] >= 10 && pointInPolygonGeometry(point[0], point[1], grid.boundary)
+export function buildFlowProduct(grid: TerrainGrid, network = buildFlowNetwork(grid)) {
+  const minAreaAcres = FARM_WATCH_TERRAIN_PRODUCT.flowMinContributingAreaAcres
+  const thresholdCells = Math.max(
+    2,
+    Math.ceil(minAreaAcres / Math.max(Number.EPSILON, network.cell_metrics.cell_area_acres)),
+  )
+
+  const channelIndexes = network.validIndexes.filter((index) => {
+    const [lon, lat] = grid.points[index]
+    return network.accumulation[index] >= thresholdCells &&
+      pointInPolygonGeometry(lon, lat, grid.boundary)
+  })
+  const channelSet = new Set(channelIndexes)
+
+  let starts = channelIndexes.filter((index) => {
+    const upstreamInside = network.upstream[index].filter((upstreamIndex) => {
+      if (!channelSet.has(upstreamIndex)) return false
+      const [lon, lat] = grid.points[upstreamIndex]
+      return pointInPolygonGeometry(lon, lat, grid.boundary)
     })
-    .sort((a, b) => accumulation[b] - accumulation[a])
+    return upstreamInside.length === 0
+  })
+
+  if (!starts.length && channelIndexes.length) starts = channelIndexes.slice()
+
+  const ranked = starts
+    .map((index) => ({
+      index,
+      fullPath: traceFlowIndexes(grid, network.downstream, index),
+      startAccumulation: network.accumulation[index],
+    }))
+    .sort((a, b) =>
+      b.fullPath.length - a.fullPath.length ||
+      b.startAccumulation - a.startAccumulation ||
+      a.index - b.index
+    )
 
   const used = new Set<number>()
   const paths: number[][][] = []
-  for (const start of candidates) {
-    if (used.has(start) || paths.length >= 8) continue
+
+  for (const candidate of ranked) {
+    if (paths.length >= FARM_WATCH_TERRAIN_PRODUCT.flowMaxTraces) break
     const indexes: number[] = []
-    const pathSeen = new Set<number>()
-    let cursor = start
-    while (cursor >= 0 && indexes.length < 160 && !pathSeen.has(cursor)) {
-      pathSeen.add(cursor)
+    const seen = new Set<number>()
+    let cursor = candidate.index
+
+    while (cursor >= 0 && indexes.length < grid.values.length && !seen.has(cursor)) {
+      seen.add(cursor)
+      if (used.has(cursor) && indexes.length > 0) {
+        indexes.push(cursor)
+        break
+      }
       indexes.push(cursor)
       used.add(cursor)
       const [lon, lat] = grid.points[cursor]
       if (!pointInPolygonGeometry(lon, lat, grid.boundary) && indexes.length > 1) break
-      cursor = downstream[cursor]
+      cursor = network.downstream[cursor]
     }
+
     if (indexes.length >= 3) {
       paths.push(indexes.map((index) => [grid.points[index][1], grid.points[index][0]]))
     }
   }
-  return paths
+
+  return {
+    paths,
+    summary: {
+      routing_scope: 'priority_flood_conditioned_metric_d8',
+      min_contributing_area_acres: minAreaAcres,
+      threshold_cells: thresholdCells,
+      cell_area_acres: network.cell_metrics.cell_area_acres,
+      cell_east_west_m: network.cell_metrics.east_west_m,
+      cell_north_south_m: network.cell_metrics.north_south_m,
+      channel_cell_count: channelIndexes.length,
+      headwater_candidate_count: starts.length,
+      path_count: paths.length,
+      max_trace_count: FARM_WATCH_TERRAIN_PRODUCT.flowMaxTraces,
+      conditioning: network.conditioning,
+    },
+  }
+}
+
+export function buildFlowPaths(grid: TerrainGrid) {
+  return buildFlowProduct(grid).paths
 }
 
 export async function sha256Hex(value: string | Uint8Array) {
-  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const source = typeof value === 'string' ? new TextEncoder().encode(value) : value
+  const bytes = new Uint8Array(source.byteLength)
+  bytes.set(source)
+  const digest = await crypto.subtle.digest('SHA-256', bytes.buffer)
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
@@ -526,8 +769,9 @@ export async function buildTerrainArtifact(
 ) {
   const grid = await sampleDem(boundary, fetchImpl)
   const contours = buildContourProduct(grid)
-  const flowPaths = buildFlowPaths(grid)
-  const anatomy = deriveTerrainAnatomy(grid, statedAcres)
+  const flowNetwork = buildFlowNetwork(grid)
+  const flowProduct = buildFlowProduct(grid, flowNetwork)
+  const anatomy = deriveTerrainAnatomy(grid, statedAcres, flowNetwork)
   const sampledSourceSha256 = await sha256Hex(JSON.stringify(grid.values))
 
   return {
@@ -537,7 +781,8 @@ export async function buildTerrainArtifact(
       method: FARM_WATCH_TERRAIN_PRODUCT.algorithmVersion,
       grid,
       contours,
-      flow_paths: flowPaths,
+      flow_paths: flowProduct.paths,
+      flow_summary: flowProduct.summary,
       anatomy,
     },
   }

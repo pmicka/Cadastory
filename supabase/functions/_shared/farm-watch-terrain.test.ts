@@ -1,8 +1,11 @@
 import {
+  buildFlowNetwork,
   buildFlowPaths,
+  buildFlowProduct,
   buildSampleGrid,
   buildTerrainArtifact,
   deriveTerrainAnatomy,
+  gridCellMetrics,
   pointInPolygonGeometry,
   sampleDem,
 } from './farm-watch-terrain.ts'
@@ -141,4 +144,118 @@ Deno.test('stated acreage affects only acreage-bearing anatomy output, not sampl
     const bAcres = Number(b?.outlet_zones?.[0]?.estimated_acres)
     assert(Math.abs(bAcres - aAcres * 2) < 1e-9)
   }
+})
+
+
+function syntheticGrid(values: Array<Array<number | null>>) {
+  const size = values.length
+  const west = -84.89
+  const east = -84.88
+  const south = 38.32
+  const north = 38.33
+  const points: Array<[number, number]> = []
+  for (let row = 0; row < size; row += 1) {
+    const lat = south + ((north - south) * row) / (size - 1)
+    for (let col = 0; col < size; col += 1) {
+      const lon = west + ((east - west) * col) / (size - 1)
+      points.push([lon, lat])
+    }
+  }
+  const flat = values.flat()
+  const valid = flat.filter((value): value is number => Number.isFinite(value))
+  return {
+    west,east,south,north,size,points,
+    values: flat,
+    min: Math.min(...valid),
+    max: Math.max(...valid),
+    boundary: {
+      type: 'Polygon' as const,
+      coordinates: [[
+        [west + 0.001, south + 0.001],
+        [east - 0.001, south + 0.001],
+        [east - 0.001, north - 0.001],
+        [west + 0.001, north - 0.001],
+        [west + 0.001, south + 0.001],
+      ]],
+    },
+  }
+}
+
+Deno.test('metric D8 uses physical grid spacing rather than unit cell steps', () => {
+  const grid = syntheticGrid([
+    [10,9,8,7,6],
+    [11,10,9,8,7],
+    [12,11,10,9,8],
+    [13,12,11,10,9],
+    [14,13,12,11,10],
+  ])
+  const metrics = gridCellMetrics(grid)
+  assert(metrics.east_west_m > 0)
+  assert(metrics.north_south_m > 0)
+  assert(Math.abs(metrics.east_west_m - metrics.north_south_m) > 1, 'geographic grid should not be treated as square index steps')
+})
+
+Deno.test('priority-flood conditioning routes an enclosed sampled sink toward the grid exterior', () => {
+  const grid = syntheticGrid([
+    [12,11,10,9,8],
+    [13,12,11,10,7],
+    [14,13,1,9,6],
+    [15,14,13,8,5],
+    [16,15,14,7,4],
+  ])
+  const center = 2 * grid.size + 2
+  const network = buildFlowNetwork(grid)
+  assert(network.conditioning.filled_cell_count > 0, 'sampled sink should be conditioned')
+  assert(network.conditioning.max_fill_depth_ft > 0)
+
+  const seen = new Set<number>()
+  let cursor = center
+  let reachedExterior = false
+  for (let step = 0; step < grid.values.length && cursor >= 0 && !seen.has(cursor); step += 1) {
+    seen.add(cursor)
+    const [lon, lat] = grid.points[cursor]
+    if (!pointInPolygonGeometry(lon, lat, grid.boundary) && cursor !== center) {
+      reachedExterior = true
+      break
+    }
+    cursor = network.downstream[cursor]
+  }
+  assert(reachedExterior, 'conditioned sink should route beyond the parcel rather than terminate locally')
+})
+
+Deno.test('conditioned flow product reports contributing-area and conditioning metadata', () => {
+  const grid = syntheticGrid([
+    [12,11,10,9,8],
+    [13,12,11,10,7],
+    [14,13,8,9,6],
+    [15,14,10,8,5],
+    [16,15,14,7,4],
+  ])
+  const product = buildFlowProduct(grid)
+  assert(product.summary.min_contributing_area_acres > 0)
+  assert(product.summary.threshold_cells >= 2)
+  assert(product.summary.cell_area_acres > 0)
+  assert(typeof product.summary.conditioning.filled_cell_count === 'number')
+  assert(Array.isArray(product.paths))
+})
+
+
+Deno.test('interior DEM no-data does not become a synthetic flow outlet', () => {
+  const grid = syntheticGrid([
+    [20,19,18,17,16,15,14],
+    [21,20,19,18,17,16,13],
+    [22,21,20,19,18,15,12],
+    [23,22,21,null,17,14,11],
+    [24,23,22,21,18,13,10],
+    [25,24,23,22,19,12,9],
+    [26,25,24,23,20,11,8],
+  ])
+  const network = buildFlowNetwork(grid)
+  const aroundGap = [17,18,19,23,25,30,31,32]
+  for (const index of aroundGap) {
+    if (!Number.isFinite(grid.values[index])) continue
+    assert(network.validIndexes.includes(index), 'valid cell beside no-data gap should remain routable')
+    assert(network.downstream[index] >= 0, 'valid cell beside interior no-data must not terminate as an outlet')
+  }
+  assertEquals(network.conditioning.excluded_disconnected_cell_count, 0)
 })

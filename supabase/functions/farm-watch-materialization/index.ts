@@ -162,7 +162,9 @@ function validateTerrainArtifact(value: any) {
     grid.values.length === FARM_WATCH_TERRAIN_PRODUCT.gridSize ** 2 &&
     contours?.summary &&
     Array.isArray(contours?.levels) &&
-    Array.isArray(value?.flow_paths)
+    Array.isArray(value?.flow_paths) &&
+    value?.flow_summary &&
+    value?.flow_summary?.routing_scope === 'priority_flood_conditioned_metric_d8'
   )
 }
 
@@ -395,6 +397,12 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
         contour_interval_ft: artifact.contours.summary.interval,
         contour_path_count: artifact.contours.summary.pathCount,
         flow_trace_count: artifact.flow_paths.length,
+        flow_routing_scope: artifact.flow_summary?.routing_scope || null,
+        flow_min_contributing_area_acres: artifact.flow_summary?.min_contributing_area_acres ?? null,
+        flow_threshold_cells: artifact.flow_summary?.threshold_cells ?? null,
+        flow_channel_cell_count: artifact.flow_summary?.channel_cell_count ?? null,
+        flow_conditioned_cell_count: artifact.flow_summary?.conditioning?.filled_cell_count ?? null,
+        flow_max_fill_depth_ft: artifact.flow_summary?.conditioning?.max_fill_depth_ft ?? null,
         terrain_anatomy_available: Boolean(artifact.anatomy),
         artifact_size_bytes: bytes.byteLength,
         worker_elapsed_ms: Math.round(performance.now() - startedAt),
