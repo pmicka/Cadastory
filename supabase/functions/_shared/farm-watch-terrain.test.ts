@@ -147,7 +147,7 @@ Deno.test('stated acreage affects only acreage-bearing anatomy output, not sampl
 })
 
 
-function syntheticGrid(values: number[][]) {
+function syntheticGrid(values: Array<Array<number | null>>) {
   const size = values.length
   const west = -84.89
   const east = -84.88
@@ -162,11 +162,12 @@ function syntheticGrid(values: number[][]) {
     }
   }
   const flat = values.flat()
+  const valid = flat.filter((value): value is number => Number.isFinite(value))
   return {
     west,east,south,north,size,points,
     values: flat,
-    min: Math.min(...flat),
-    max: Math.max(...flat),
+    min: Math.min(...valid),
+    max: Math.max(...valid),
     boundary: {
       type: 'Polygon' as const,
       coordinates: [[
@@ -236,4 +237,25 @@ Deno.test('conditioned flow product reports contributing-area and conditioning m
   assert(product.summary.cell_area_acres > 0)
   assert(typeof product.summary.conditioning.filled_cell_count === 'number')
   assert(Array.isArray(product.paths))
+})
+
+
+Deno.test('interior DEM no-data does not become a synthetic flow outlet', () => {
+  const grid = syntheticGrid([
+    [20,19,18,17,16,15,14],
+    [21,20,19,18,17,16,13],
+    [22,21,20,19,18,15,12],
+    [23,22,21,null,17,14,11],
+    [24,23,22,21,18,13,10],
+    [25,24,23,22,19,12,9],
+    [26,25,24,23,20,11,8],
+  ])
+  const network = buildFlowNetwork(grid)
+  const aroundGap = [17,18,19,23,25,30,31,32]
+  for (const index of aroundGap) {
+    if (!Number.isFinite(grid.values[index])) continue
+    assert(network.validIndexes.includes(index), 'valid cell beside no-data gap should remain routable')
+    assert(network.downstream[index] >= 0, 'valid cell beside interior no-data must not terminate as an outlet')
+  }
+  assertEquals(network.conditioning.excluded_disconnected_cell_count, 0)
 })
