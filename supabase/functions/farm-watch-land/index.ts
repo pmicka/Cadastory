@@ -1535,13 +1535,16 @@ Deno.serve(async (req: Request) => {
     { p_slug: slug },
   )
   const landscapeCachedAt = Date.parse(landscapeCached?.retrieved_at || '')
+  const landscapeCacheTtlMs = landscapeCached?.status === 'available'
+    ? LANDSCAPE_CACHE_TTL_MS
+    : OPTIONAL_SOURCE_RETRY_TTL_MS
   const landscapeCacheUsable =
     !landscapeCacheError &&
     landscapeCached?.status !== 'stale' &&
     landscapeCached?.status !== 'missing' &&
     landscapeCached?.context?.method === 'barrier_aware_landscape_raster_context_v1' &&
     Number.isFinite(landscapeCachedAt) &&
-    Date.now() - landscapeCachedAt < LANDSCAPE_CACHE_TTL_MS
+    Date.now() - landscapeCachedAt < landscapeCacheTtlMs
 
   if (landscapeCacheUsable) {
     landscapePhysical = {
