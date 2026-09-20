@@ -11,8 +11,10 @@ const TRUST = Object.freeze({
   actorId: '30001949',
   ref: 'refs/heads/main',
   eventName: 'issues',
-  workflowRef:
+  workflowRefs: [
     'pmicka/Cadastory/.github/workflows/farm-watch-lidar-physical.yml@refs/heads/main',
+    'pmicka/Cadastory/.github/workflows/farm-watch-leaf-off.yml@refs/heads/main',
+  ],
 })
 
 let jwksPromise: Promise<any> | null = null
@@ -129,12 +131,14 @@ export async function verifyFarmWatchGitHubActionsOidc(token: string) {
     ['actor_id', TRUST.actorId],
     ['ref', TRUST.ref],
     ['event_name', TRUST.eventName],
-    ['workflow_ref', TRUST.workflowRef],
   ]
   for (const [keyName, expected] of required) {
     if (claimString(claims, keyName) !== expected) {
       throw new Error('untrusted GitHub OIDC claim: ' + keyName)
     }
+  }
+  if (!TRUST.workflowRefs.includes(claimString(claims, 'workflow_ref'))) {
+    throw new Error('untrusted GitHub OIDC claim: workflow_ref')
   }
 
   return {
