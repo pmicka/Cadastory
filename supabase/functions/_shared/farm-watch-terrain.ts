@@ -191,7 +191,9 @@ export function contourSegments(grid: TerrainGrid, level: number) {
       const crossings: any[] = []
       for (let edge = 0; edge < edges.length; edge += 1) {
         const [a, b] = edges[edge]
-        if ((a.value < level && b.value >= level) || (b.value < level && a.value >= level)) {
+        const aValue = Number(a.value)
+        const bValue = Number(b.value)
+        if ((aValue < level && bValue >= level) || (bValue < level && aValue >= level)) {
           crossings.push({ edge, point: interpolateEdge(a, b, level) })
         }
       }
@@ -337,8 +339,10 @@ export function neighborCells(grid: TerrainGrid, index: number) {
 type FlowConditioning = {
   filledValues: Array<number | null>
   parent: number[]
+  routableMask: boolean[]
   filledCellCount: number
   maxFillDepthFt: number
+  excludedDisconnectedCellCount: number
 }
 
 function conditionFlowSurface(grid: TerrainGrid): FlowConditioning {
@@ -393,9 +397,7 @@ function conditionFlowSurface(grid: TerrainGrid): FlowConditioning {
     const row = Math.floor(index / grid.size)
     const col = index % grid.size
     const perimeter = row === 0 || col === 0 || row === grid.size - 1 || col === grid.size - 1
-    const touchesNoData = neighborCells(grid, index)
-      .some((neighbor) => !Number.isFinite(filledValues[neighbor.index]))
-    if (perimeter || touchesNoData) seed(index)
+    if (perimeter) seed(index)
   }
 
   let filledCellCount = 0
@@ -423,15 +425,20 @@ function conditionFlowSurface(grid: TerrainGrid): FlowConditioning {
 
   flood()
 
-  // Rare disconnected valid islands caused by no-data are conditioned independently.
-  for (let index = 0; index < count; index += 1) {
-    if (!visited[index] && Number.isFinite(filledValues[index])) {
-      seed(index)
-      flood()
-    }
-  }
+  const excludedDisconnectedCellCount = filledValues.reduce(
+    (countDisconnected, value, index) =>
+      Number.isFinite(value) && !visited[index] ? countDisconnected + 1 : countDisconnected,
+    0,
+  )
 
-  return { filledValues, parent, filledCellCount, maxFillDepthFt }
+  return {
+    filledValues,
+    parent,
+    routableMask: visited,
+    filledCellCount,
+    maxFillDepthFt,
+    excludedDisconnectedCellCount,
+  }
 }
 
 export function buildFlowNetwork(grid: TerrainGrid) {
@@ -439,7 +446,9 @@ export function buildFlowNetwork(grid: TerrainGrid) {
   const downstream = new Array(grid.values.length).fill(-1)
   const accumulation = new Array(grid.values.length).fill(0)
   const validIndexes = grid.values
-    .map((value, index) => Number.isFinite(value) ? index : -1)
+    .map((value, index) =>
+      Number.isFinite(value) && conditioning.routableMask[index] ? index : -1
+    )
     .filter((index) => index >= 0)
 
   for (const index of validIndexes) {
@@ -501,6 +510,7 @@ export function buildFlowNetwork(grid: TerrainGrid) {
     conditioning: {
       filled_cell_count: conditioning.filledCellCount,
       max_fill_depth_ft: conditioning.maxFillDepthFt,
+      excluded_disconnected_cell_count: conditioning.excludedDisconnectedCellCount,
       unresolved_flow_cell_count: Math.max(0, validIndexes.length - processed),
       routing_surface: 'priority_flood_conditioned_sampled_dem',
     },
@@ -745,8 +755,10 @@ export function buildFlowPaths(grid: TerrainGrid) {
 }
 
 export async function sha256Hex(value: string | Uint8Array) {
-  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const source = typeof value === 'string' ? new TextEncoder().encode(value) : value
+  const bytes = new Uint8Array(source.byteLength)
+  bytes.set(source)
+  const digest = await crypto.subtle.digest('SHA-256', bytes.buffer)
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
