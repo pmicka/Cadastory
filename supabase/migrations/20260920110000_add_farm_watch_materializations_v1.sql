@@ -518,11 +518,12 @@ begin
     'status',v_status,
     'build',jsonb_build_object(
       'id',v_build.id,
+      'status',v_build.status,
       'attempt_count',v_build.attempt_count,
       'max_attempts',v_build.max_attempts,
       'next_attempt_at',v_build.next_attempt_at,
       'lease_expires_at',v_build.lease_expires_at,
-      'last_error',case when v_status='failed' then v_build.last_error else null end
+      'last_error',case when v_build.status='failed' then v_build.last_error else null end
     ),
     'identity',jsonb_build_object(
       'input_signature_sha256',v_identity->>'input_signature_sha256',
