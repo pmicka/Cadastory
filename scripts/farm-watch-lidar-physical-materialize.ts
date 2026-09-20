@@ -1,8 +1,11 @@
 #!/usr/bin/env -S deno run --allow-env --allow-net
 
 import proj4 from 'npm:proj4@2.12.1'
-import { Copc, Las } from 'npm:copc@0.0.9'
 import { FARM_WATCH_GITHUB_OIDC_AUDIENCE } from '../supabase/functions/_shared/github-actions-oidc.ts'
+
+const { Copc, Las } = await import(
+  'https://esm.unpkg.com/copc@0.0.9?target=es2022'
+) as any
 
 const EDGE_URL =
   'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/farm-watch-lidar-worker'
