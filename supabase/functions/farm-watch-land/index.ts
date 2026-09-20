@@ -887,10 +887,16 @@ function steepThirtyShare(slope: Json | null) {
     .reduce((sum: number, row: Json) => sum + rowPercent(row), 0)
 }
 
+function finiteNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function finiteDelta(toValue: unknown, fromValue: unknown) {
-  const to = Number(toValue)
-  const from = Number(fromValue)
-  return Number.isFinite(to) && Number.isFinite(from) ? to - from : null
+  const to = finiteNumber(toValue)
+  const from = finiteNumber(fromValue)
+  return to !== null && from !== null ? to - from : null
 }
 
 function landscapeGradient(fromLabel: string, fromZone: Json, toLabel: string, toZone: Json) {
@@ -929,8 +935,8 @@ function landscapeGradient(fromLabel: string, fromZone: Json, toLabel: string, t
       steep_30_plus_delta_pp: (() => {
         const fromShare = steepThirtyShare(fromZone?.slope || null)
         const toShare = steepThirtyShare(toZone?.slope || null)
-        return Number.isFinite(Number(fromShare)) && Number.isFinite(Number(toShare))
-          ? Number(toShare) - Number(fromShare)
+        return fromShare !== null && toShare !== null
+          ? toShare - fromShare
           : null
       })(),
     },
