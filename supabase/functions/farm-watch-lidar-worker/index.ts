@@ -200,15 +200,15 @@ async function claimPhysical(slug: string, identity: any) {
 }
 
 async function readBuild(buildId: string) {
-  const { data, error } = await admin
-    .schema('farm_watch')
-    .from('property_materialization_builds_v1')
-    .select(
-      'id,property_id,product_kind,algorithm_version,output_schema_version,input_signature_sha256,source_signature,status,lease_token,lease_expires_at',
+  const { data, error } = await admin.rpc(
+    'farm_watch_get_materialization_build_v1_internal',
+    { p_build_id: buildId },
+  )
+  if (error || !data) {
+    throw new Error(
+      'materialization build unavailable' + (error?.message ? ': ' + error.message : ''),
     )
-    .eq('id', buildId)
-    .maybeSingle()
-  if (error || !data) throw new Error('materialization build unavailable')
+  }
   return data
 }
 
