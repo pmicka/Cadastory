@@ -36,7 +36,7 @@ const HYDRO_SOURCES = [
     featureKind: 'flowline',
     url: 'https://3dhp.nationalmap.gov/arcgis/rest/services/usgs_3dhp_all/MapServer/50',
     outFields: 'OBJECTID,id3dhp,gnisidlabel,featuretypelabel,lengthkm,flowdirectionlabel,streamorder,onsurfacelabel',
-    timeoutMs: 9000,
+    timeoutMs: 15000,
   },
   {
     key: 'waterbody',
@@ -44,7 +44,7 @@ const HYDRO_SOURCES = [
     featureKind: 'waterbody',
     url: 'https://3dhp.nationalmap.gov/arcgis/rest/services/usgs_3dhp_all/MapServer/60',
     outFields: 'OBJECTID,id3dhp,gnisidlabel,featuretypelabel,areasqkm',
-    timeoutMs: 9000,
+    timeoutMs: 15000,
   },
   {
     key: 'wetland',
@@ -207,7 +207,7 @@ function sourceFeatureId(source: HydroSource, feature: any, index: number) {
   return String(candidate ?? feature?.id ?? `${source.featureKind}-${index}`)
 }
 
-async function fetchHydroSource(source: HydroSource, envelope: Envelope) {
+async function fetchHydroSourceAttempt(source: HydroSource, envelope: Envelope) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), source.timeoutMs)
   try {
@@ -230,10 +230,15 @@ async function fetchHydroSource(source: HydroSource, envelope: Envelope) {
         'user-agent': 'Cadastory-Farm-Watch/0.2 (https://pmicka.com)',
       },
     })
-    if (!response.ok) throw new Error(`${source.key} returned ${response.status}`)
+    if (!response.ok) throw new Error(`${source.key} returned HTTP ${response.status}`)
     const payload = await response.json()
     if (payload?.type !== 'FeatureCollection' || !Array.isArray(payload?.features)) {
-      throw new Error(`${source.key} returned an invalid feature collection`)
+      const serviceMessage = payload?.error?.message
+      throw new Error(
+        serviceMessage
+          ? `${source.key} returned ArcGIS error: ${serviceMessage}`
+          : `${source.key} returned an invalid feature collection`
+      )
     }
 
     return payload.features
@@ -245,9 +250,33 @@ async function fetchHydroSource(source: HydroSource, envelope: Envelope) {
         geometry: feature.geometry,
         properties: normalizeHydroProperties(source, feature.properties || {}),
       }))
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new Error(`${source.key} timed out after ${source.timeoutMs} ms`)
+    }
+    throw error
   } finally {
     clearTimeout(timeout)
   }
+}
+
+async function fetchHydroSource(source: HydroSource, envelope: Envelope) {
+  let firstError: unknown = null
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      return await fetchHydroSourceAttempt(source, envelope)
+    } catch (error) {
+      if (attempt === 1) {
+        firstError = error
+        await new Promise((resolve) => setTimeout(resolve, 400))
+        continue
+      }
+      const firstMessage = firstError instanceof Error ? firstError.message : String(firstError)
+      const finalMessage = error instanceof Error ? error.message : String(error)
+      throw new Error(`${source.key} failed after 2 attempts; first=${firstMessage}; final=${finalMessage}`)
+    }
+  }
+  throw new Error(`${source.key} failed without an attempt result`)
 }
 
 function soilMapUnitsNeedRefresh(soils: any) {
@@ -302,7 +331,8 @@ async function refreshHydrology(slug: string, boundary: any) {
 
   const settled = await Promise.allSettled(HYDRO_SOURCES.map((source) => fetchHydroSource(source, envelope)))
   const features: any[] = []
-  const sourceStatus: Record<string, string> = {}
+  const sourceStatus: Record<string, any> = {}
+  const sourceErrors: Record<string, string> = {}
 
   settled.forEach((result, index) => {
     const source = HYDRO_SOURCES[index]
@@ -311,9 +341,11 @@ async function refreshHydrology(slug: string, boundary: any) {
       features.push(...result.value)
     } else {
       sourceStatus[source.key] = 'unavailable'
-      console.error(`Farm Watch ${source.key} refresh failed`, result.reason instanceof Error ? result.reason.message : result.reason)
+      sourceErrors[source.key] = result.reason instanceof Error ? result.reason.message : String(result.reason)
+      console.error(`Farm Watch ${source.key} refresh failed`, sourceErrors[source.key])
     }
   })
+  if (Object.keys(sourceErrors).length) sourceStatus.errors = sourceErrors
 
   const { error } = await admin.rpc('farm_watch_replace_hydrology_v1_internal', {
     p_slug: slug,
