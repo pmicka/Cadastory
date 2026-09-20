@@ -342,7 +342,7 @@ async function readState(slug: string, key: ProductKey) {
 
 async function claimBuild(
   slug: string,
-  key: Exclude<ProductKey, 'lidar-physical-structure' | 'structure-complementarity'>,
+  key: Exclude<ProductKey, 'lidar-physical-structure' | 'structure-complementarity' | 'landscape-structure-context'>,
   workerId: string,
 ) {
   const spec = productSpec(key)
