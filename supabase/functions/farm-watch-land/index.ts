@@ -30,6 +30,8 @@ const SOURCES = {
   huc: 'https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_8_10_12_Digit_Hydrologic_Units_WGS84WM/MapServer/0',
   dem: 'https://kyraster.ky.gov/arcgis/rest/services/ElevationServices/Ky_DEM_KYAPED_2FT_Phase3_WGS84WM/ImageServer',
   canopy: 'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_EDW_NLCD_TCC_CONUS/ImageServer',
+  canopyScience: 'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_EDW_Science_TCC_CONUS/ImageServer',
+  canopyScienceSe: 'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_EDW_TCC_Science_SE_CONUS/ImageServer',
 }
 
 type Json = Record<string, any>
@@ -388,6 +390,129 @@ function normalizeCanopy(payload: Json, parcelAcres: number | null) {
       'Modeled 30 m percent tree canopy cover after NLCD post-processing. This is not field-measured canopy, tree species, understory density, stem density, mast availability, habitat quality, bedding cover, or deer-use evidence.',
   }
 }
+
+function histogramContinuousBins(payload: Json, minAllowed: number, maxAllowed: number, scale = 1) {
+  const histogram = payload?.histograms?.[0]
+  const counts = Array.isArray(histogram?.counts) ? histogram.counts.map(Number) : []
+  const min = Number(histogram?.min)
+  const max = Number(histogram?.max)
+  const size = Number(histogram?.size)
+  if (!counts.length || !Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(size) || size <= 0) {
+    return { bins: [], raw_bin_width: null }
+  }
+  const rawBinWidth = (max - min) / size
+  const bins = []
+  for (let index = 0; index < counts.length; index += 1) {
+    const count = Number(counts[index])
+    if (!Number.isFinite(count) || count <= 0) continue
+    const rawCenter = min + (index + 0.5) * rawBinWidth
+    if (rawCenter < minAllowed || rawCenter > maxAllowed) continue
+    bins.push({ value: rawCenter * scale, count })
+  }
+  return { bins, raw_bin_width: rawBinWidth }
+}
+
+function weightedBinQuantile(bins: Array<Json>, quantile: number) {
+  const ordered = bins.slice().sort((a, b) => Number(a.value) - Number(b.value))
+  const total = ordered.reduce((sum, row) => sum + Number(row.count || 0), 0)
+  if (total <= 0) return null
+  const target = Math.min(1, Math.max(0, quantile)) * total
+  let cumulative = 0
+  for (const row of ordered) {
+    cumulative += Number(row.count || 0)
+    if (cumulative >= target) return Number(row.value)
+  }
+  return Number(ordered[ordered.length - 1]?.value ?? NaN)
+}
+
+function normalizeScienceCanopy(payload: Json, parcelAcres: number | null) {
+  const byValue = histogramIntegerCounts(payload, 0, 100)
+  const total = [...byValue.values()].reduce((sum, count) => sum + count, 0)
+  if (total <= 0) throw new Error('Science TCC histogram did not contain valid 0–100 percent observations')
+  const weightedSum = [...byValue.entries()].reduce((sum, [value, count]) => sum + value * count, 0)
+  const mean = weightedSum / total
+  const variance = [...byValue.entries()].reduce(
+    (sum, [value, count]) => sum + ((value - mean) ** 2) * count,
+    0,
+  ) / total
+  return {
+    method: 'geometry_clipped_science_tcc_2025_histogram',
+    source: 'USDA Forest Service National Annual Tree Canopy Cover — Science TCC',
+    product_version: 'v2025-6',
+    product_variant: 'Science',
+    year: 2025,
+    spatial_resolution_m: 30,
+    modeled_percent_tree_canopy_cover: true,
+    min_percent: Math.min(...byValue.keys()),
+    max_percent: Math.max(...byValue.keys()),
+    mean_percent: mean,
+    median_percent: weightedQuantile(byValue, 0.5),
+    p10_percent: weightedQuantile(byValue, 0.1),
+    p90_percent: weightedQuantile(byValue, 0.9),
+    standard_deviation_percent: Math.sqrt(variance),
+    raster_observation_count: total,
+    modeled_canopy_equivalent_acres: parcelAcres == null ? null : parcelAcres * mean / 100,
+    interpretation_boundary:
+      'Direct annual random-forest model output before NLCD post-processing. It is retained to pair correctly with the Science TCC standard-error surface; it is not the canonical cartographic canopy layer and is not habitat or animal-use evidence.',
+  }
+}
+
+function normalizeScienceCanopyStandardError(payload: Json) {
+  const parsed = histogramContinuousBins(payload, 0, 4500, 0.01)
+  const bins = parsed.bins
+  const total = bins.reduce((sum, row) => sum + Number(row.count || 0), 0)
+  if (total <= 0) throw new Error('Science TCC standard-error histogram did not contain valid 0–4500 observations')
+  const weightedSum = bins.reduce((sum, row) => sum + Number(row.value) * Number(row.count), 0)
+  const mean = weightedSum / total
+  const variance = bins.reduce(
+    (sum, row) => sum + ((Number(row.value) - mean) ** 2) * Number(row.count),
+    0,
+  ) / total
+
+  const bandDefinitions = [
+    { label: '≤5 pp', min_pp: 0, max_pp: 5 },
+    { label: '>5–10 pp', min_pp: 5, max_pp: 10 },
+    { label: '>10–15 pp', min_pp: 10, max_pp: 15 },
+    { label: '>15 pp', min_pp: 15, max_pp: null },
+  ]
+  const bands = bandDefinitions.map((definition) => {
+    const count = bins.reduce((sum, row) => {
+      const value = Number(row.value)
+      const aboveMin = definition.min_pp === 0 ? value >= 0 : value > definition.min_pp
+      const belowMax = definition.max_pp == null ? true : value <= definition.max_pp
+      return aboveMin && belowMax ? sum + Number(row.count) : sum
+    }, 0)
+    return {
+      ...definition,
+      count,
+      parcel_percent: count / total * 100,
+    }
+  })
+
+  return {
+    method: 'geometry_clipped_science_tcc_se_2025_histogram',
+    source: 'USDA Forest Service National Annual Tree Canopy Cover — Science standard error',
+    product_version: 'v2025-6',
+    product_variant: 'Science standard error',
+    year: 2025,
+    spatial_resolution_m: 30,
+    scale_factor: 0.01,
+    source_value_semantics: 'published integer values are standard error multiplied by 100',
+    valid_source_range: [0, 4500],
+    excluded_source_values: [65534, 65535],
+    mean_standard_error_pp: mean,
+    median_standard_error_pp: weightedBinQuantile(bins, 0.5),
+    p10_standard_error_pp: weightedBinQuantile(bins, 0.1),
+    p90_standard_error_pp: weightedBinQuantile(bins, 0.9),
+    standard_deviation_pp: Math.sqrt(variance),
+    raster_observation_count: total,
+    histogram_raw_bin_width: parsed.raw_bin_width,
+    bands,
+    interpretation_boundary:
+      'This is model uncertainty for the Science TCC random-forest output, expressed in canopy percentage points. It is not a confidence interval for the post-processed NLCD TCC layer, field measurement error, or biological uncertainty.',
+  }
+}
+
 
 const SYNTHESIS_SLOPE_BANDS = [
   { value: 1, label: '0–10%', min_percent: 0, max_percent: 10 },
@@ -788,9 +913,12 @@ async function refresh(slug: string, anchor: Anchor) {
     arcgisZonalStats(SOURCES.dem, polygon, aspectClassRule),
     arcgisZonalStats(SOURCES.dem, polygon, elevationBandRule),
     arcgisZonalStats(SOURCES.canopy, polygon, undefined, canopy2025MosaicRule),
+    arcgisZonalStats(SOURCES.canopyScience, polygon, undefined, canopy2025MosaicRule),
+    arcgisZonalStats(SOURCES.canopyScienceSe, polygon, undefined, canopy2025MosaicRule),
   ])
 
-  const names = ['geology', 'lithology', 'watershed', 'sinkholes', 'elevation', 'slope', 'slope_classes', 'aspect', 'elevation_bands', 'canopy']
+  const names = ['geology', 'lithology', 'watershed', 'sinkholes', 'elevation', 'slope', 'slope_classes', 'aspect', 'elevation_bands', 'canopy', 'canopy_science', 'canopy_science_se']
+  const requiredNames = ['geology', 'lithology', 'watershed', 'sinkholes', 'elevation', 'slope', 'slope_classes', 'aspect', 'elevation_bands', 'canopy']
   const sourceStatus: Record<string, string> = {}
   const sourceErrors: Record<string, string> = {}
   const payloads: Array<Json | null> = results.map((result, index) => {
@@ -829,6 +957,26 @@ async function refresh(slug: string, anchor: Anchor) {
     } catch (error) {
       sourceStatus.canopy = 'unavailable'
       sourceErrors.canopy = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  let canopyScience: Json | null = null
+  if (payloads[10]) {
+    try {
+      canopyScience = normalizeScienceCanopy(payloads[10]!, normalizedParcelAcres)
+    } catch (error) {
+      sourceStatus.canopy_science = 'unavailable'
+      sourceErrors.canopy_science = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  let canopyScienceSe: Json | null = null
+  if (payloads[11]) {
+    try {
+      canopyScienceSe = normalizeScienceCanopyStandardError(payloads[11]!)
+    } catch (error) {
+      sourceStatus.canopy_science_se = 'unavailable'
+      sourceErrors.canopy_science_se = error instanceof Error ? error.message : String(error)
     }
   }
 
@@ -872,9 +1020,11 @@ async function refresh(slug: string, anchor: Anchor) {
   const retrievedAt = new Date().toISOString()
   const context = {
     ...computed,
-    context_version: 5,
+    context_version: 6,
     elevation,
     canopy,
+    canopy_science: canopyScience,
+    canopy_science_standard_error: canopyScienceSe,
     terrain_surface: {
       slope,
       aspect,
@@ -925,6 +1075,23 @@ async function refresh(slug: string, anchor: Anchor) {
         method: 'exact parcel polygon passed to the public USFS ArcGIS ImageServer computeStatisticsHistograms endpoint with the 2025 mosaic catalog filter',
         meaning: 'modeled percent tree canopy cover after NLCD post-processing; useful as canopy context, not proof of species composition, understory condition, mast production, habitat quality, or animal use',
       },
+      canopy_science: {
+        authority: 'USDA Forest Service / Multi-Resolution Land Characteristics Consortium',
+        source: 'National Annual Tree Canopy Cover Science TCC CONUS v2025-6',
+        year: 2025,
+        spatial_resolution_m: 30,
+        method: 'exact parcel polygon passed to the public USFS Science TCC ArcGIS ImageServer with the 2025 mosaic catalog filter',
+        meaning: 'direct annual random-forest canopy model output retained for statistical analysis and correct pairing with Science TCC standard error; not the canonical post-processed canopy display layer',
+      },
+      canopy_science_standard_error: {
+        authority: 'USDA Forest Service / Multi-Resolution Land Characteristics Consortium',
+        source: 'National Annual Tree Canopy Cover Science standard error CONUS v2025-6',
+        year: 2025,
+        spatial_resolution_m: 30,
+        scale_factor: 0.01,
+        method: 'exact parcel polygon passed to the public USFS Science TCC standard-error ArcGIS ImageServer with the 2025 mosaic catalog filter; published integer SE values are divided by 100',
+        meaning: 'pixel-model uncertainty for Science TCC in canopy percentage points; not a confidence interval for the post-processed NLCD TCC layer and not field measurement uncertainty',
+      },
       physical_synthesis: {
         authorities: ['USDA NRCS', 'Kentucky Geological Survey', 'USGS 3DHP', 'USFWS NWI', 'Kentucky Division of Geographic Information / KyFromAbove'],
         method: 'exact existing vector-unit geometry crossed with geometry-clipped canonical Phase 3 DEM slope/elevation histograms',
@@ -938,8 +1105,8 @@ async function refresh(slug: string, anchor: Anchor) {
     },
   }
 
-  const availableCount = names.filter((name) => sourceStatus[name] === 'available').length
-  const baseStatus = availableCount === names.length ? 'available' : availableCount > 0 ? 'partial' : 'unavailable'
+  const availableCount = requiredNames.filter((name) => sourceStatus[name] === 'available').length
+  const baseStatus = availableCount === requiredNames.length ? 'available' : availableCount > 0 ? 'partial' : 'unavailable'
   const status =
     baseStatus === 'unavailable'
       ? 'unavailable'
@@ -981,7 +1148,7 @@ Deno.serve(async (req: Request) => {
   let result: any
 
   const cacheHasCanonicalTerrain =
-    cached?.context?.context_version === 5 &&
+    cached?.context?.context_version === 6 &&
     cached?.context?.elevation?.method === 'geometry_clipped_raster_statistics' &&
     Number.isFinite(Number(cached?.context?.elevation?.min_ft)) &&
     Number.isFinite(Number(cached?.context?.elevation?.max_ft)) &&
@@ -995,6 +1162,10 @@ Deno.serve(async (req: Request) => {
     cached?.context?.canopy?.year === 2025 &&
     Number.isFinite(Number(cached?.context?.canopy?.mean_percent)) &&
     Array.isArray(cached?.context?.canopy?.bands) &&
+    cached?.context?.canopy_science?.method === 'geometry_clipped_science_tcc_2025_histogram' &&
+    Number.isFinite(Number(cached?.context?.canopy_science?.mean_percent)) &&
+    cached?.context?.canopy_science_standard_error?.method === 'geometry_clipped_science_tcc_se_2025_histogram' &&
+    Number.isFinite(Number(cached?.context?.canopy_science_standard_error?.mean_standard_error_pp)) &&
     cached?.context?.physical_synthesis?.method === 'cross_layer_physical_synthesis_v1' &&
     cached?.context?.physical_synthesis?.status === 'available' &&
     Array.isArray(cached?.context?.physical_synthesis?.soil_units) &&
