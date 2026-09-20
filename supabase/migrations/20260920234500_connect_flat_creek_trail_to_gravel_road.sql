@@ -105,12 +105,19 @@ set
   ),
   notes = regexp_replace(
     coalesce(o.notes, ''),
-    ' Road/trail topology will be reconciled after final placement verification\.$',
+    ' Road/trail topology will be reconciled after final placement verification\.
+
+commit;
+,
     ''
   ) || ' Final canonical trail geometry is topologically connected to the gravel-road north branch.',
   updated_at = now()
-from property_row p
-where o.property_id = p.id
+where o.property_id = (
+    select id
+    from farm_watch.properties
+    where slug = 'validation-property-01'
+    limit 1
+  )
   and o.path_key = 'flat-creek-phase3-image-trails';
 
 commit;
