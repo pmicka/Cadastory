@@ -1,7 +1,7 @@
 #!/usr/bin/env -S deno run --allow-env --allow-net
 
 import proj4 from 'npm:proj4@2.12.1'
-import { Copc, Las } from 'https://esm.unpkg.com/copc@0.0.9?target=es2022'
+import { Copc, Las } from 'npm:copc@0.0.9'
 import { FARM_WATCH_GITHUB_OIDC_AUDIENCE } from '../supabase/functions/_shared/github-actions-oidc.ts'
 
 const EDGE_URL =
@@ -464,6 +464,8 @@ async function main() {
         copc,
         native_crs: nativeCrs,
         projected_geometry: projectGeometry(item.geometry, nativeCrs),
+        nodes: new Map<string, any>(),
+        candidate_point_count: 0,
       })
     }
 
