@@ -215,23 +215,51 @@ async function fetchRaster(
   url.searchParams.set('f', 'image')
   if (renderingRule) url.searchParams.set('renderingRule', JSON.stringify(renderingRule))
 
-  const response = await fetch(url, { headers: { accept: 'image/png,image/*' } })
-  if (!response.ok) throw new Error('Raster source returned ' + response.status)
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  const pngBytes = trimPngStream(bytes)
-  const png = PNG.sync.read(Buffer.from(pngBytes))
-  if (png.width !== dimensions.width || png.height !== dimensions.height) {
-    throw new Error(
-      'Raster dimension mismatch: expected ' + dimensions.width + 'x' + dimensions.height +
-      ', received ' + png.width + 'x' + png.height,
-    )
+  let lastError: Error | null = null
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          accept: 'image/png,image/*',
+          'user-agent': 'Cadastory-Farm-Watch/0.6 (https://pmicka.com)',
+        },
+      })
+      if (!response.ok) throw new Error('Raster source returned ' + response.status)
+      const bytes = new Uint8Array(await response.arrayBuffer())
+      const isPng =
+        bytes.length >= 8 &&
+        bytes[0] === 137 && bytes[1] === 80 && bytes[2] === 78 && bytes[3] === 71 &&
+        bytes[4] === 13 && bytes[5] === 10 && bytes[6] === 26 && bytes[7] === 10
+      if (!isPng) {
+        const contentType = response.headers.get('content-type') || 'unknown'
+        const prefix = new TextDecoder().decode(bytes.slice(0, Math.min(240, bytes.length)))
+          .replace(/\\s+/g, ' ')
+          .slice(0, 240)
+        throw new Error(
+          'Raster response is not PNG; content-type=' + contentType +
+          '; bytes=' + bytes.length + '; prefix=' + prefix,
+        )
+      }
+      const pngBytes = trimPngStream(bytes)
+      const png = PNG.sync.read(Buffer.from(pngBytes))
+      if (png.width !== dimensions.width || png.height !== dimensions.height) {
+        throw new Error(
+          'Raster dimension mismatch: expected ' + dimensions.width + 'x' + dimensions.height +
+          ', received ' + png.width + 'x' + png.height,
+        )
+      }
+      return {
+        rgba: new Uint8Array(png.data),
+        sha256: await sha256Hex(bytes),
+        request_url: url.toString(),
+        byte_length: bytes.byteLength,
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
+      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 1000))
+    }
   }
-  return {
-    rgba: new Uint8Array(png.data),
-    sha256: await sha256Hex(bytes),
-    request_url: url.toString(),
-    byte_length: bytes.byteLength,
-  }
+  throw lastError || new Error('Raster source unavailable')
 }
 
 function buildIntegral(values: Float32Array, width: number, height: number) {
