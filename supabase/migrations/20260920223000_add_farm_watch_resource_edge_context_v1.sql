@@ -319,7 +319,7 @@ begin
     select
       radius_m,
       count(distinct id)::integer field_count,
-      extensions.st_area(max(zone_geom)::extensions.geography) zone_area_m2,
+      extensions.st_area(zone_geom::extensions.geography) zone_area_m2,
       coalesce(
         extensions.st_area(
           extensions.st_unaryunion(extensions.st_collect(field_geom))::extensions.geography
@@ -333,7 +333,7 @@ begin
         0
       ) field_edge_m
     from zone_parts
-    group by radius_m
+    group by radius_m,zone_geom
   ),
   proximity_buffers as (
     select
