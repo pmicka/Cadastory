@@ -21,6 +21,7 @@ const ALLOWED_ORIGINS = new Set([
 ])
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 const CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const OPTIONAL_SOURCE_RETRY_TTL_MS = 24 * 60 * 60 * 1000
 const SOURCE_TIMEOUT_MS = 12000
 
 const SOURCES = {
@@ -1147,6 +1148,18 @@ Deno.serve(async (req: Request) => {
   const cachedAt = Date.parse(cached?.retrieved_at || '')
   let result: any
 
+  const cacheHasScienceCanopy =
+    cached?.context?.canopy_science?.method === 'geometry_clipped_science_tcc_2025_histogram' &&
+    Number.isFinite(Number(cached?.context?.canopy_science?.mean_percent))
+  const cacheHasScienceSe =
+    cached?.context?.canopy_science_standard_error?.method === 'geometry_clipped_science_tcc_se_2025_histogram' &&
+    Number.isFinite(Number(cached?.context?.canopy_science_standard_error?.mean_standard_error_pp))
+  const cacheHasScienceSourceState =
+    ['available', 'unavailable'].includes(String(cached?.context?.source_status?.canopy_science || '')) &&
+    ['available', 'unavailable'].includes(String(cached?.context?.source_status?.canopy_science_se || ''))
+  const cacheHasScienceContext =
+    (cacheHasScienceCanopy && cacheHasScienceSe) || cacheHasScienceSourceState
+
   const cacheHasCanonicalTerrain =
     cached?.context?.context_version === 6 &&
     cached?.context?.elevation?.method === 'geometry_clipped_raster_statistics' &&
@@ -1162,16 +1175,17 @@ Deno.serve(async (req: Request) => {
     cached?.context?.canopy?.year === 2025 &&
     Number.isFinite(Number(cached?.context?.canopy?.mean_percent)) &&
     Array.isArray(cached?.context?.canopy?.bands) &&
-    cached?.context?.canopy_science?.method === 'geometry_clipped_science_tcc_2025_histogram' &&
-    Number.isFinite(Number(cached?.context?.canopy_science?.mean_percent)) &&
-    cached?.context?.canopy_science_standard_error?.method === 'geometry_clipped_science_tcc_se_2025_histogram' &&
-    Number.isFinite(Number(cached?.context?.canopy_science_standard_error?.mean_standard_error_pp)) &&
+    cacheHasScienceContext &&
     cached?.context?.physical_synthesis?.method === 'cross_layer_physical_synthesis_v1' &&
     cached?.context?.physical_synthesis?.status === 'available' &&
     Array.isArray(cached?.context?.physical_synthesis?.soil_units) &&
     Array.isArray(cached?.context?.physical_synthesis?.geology_units)
 
-  if (cached?.context && cacheHasCanonicalTerrain && Number.isFinite(cachedAt) && Date.now() - cachedAt < CACHE_TTL_MS) {
+  const cacheTtlMs = cacheHasScienceCanopy && cacheHasScienceSe
+    ? CACHE_TTL_MS
+    : OPTIONAL_SOURCE_RETRY_TTL_MS
+
+  if (cached?.context && cacheHasCanonicalTerrain && Number.isFinite(cachedAt) && Date.now() - cachedAt < cacheTtlMs) {
     result = {
       status: cached.status || 'unknown',
       context: cached.context,
