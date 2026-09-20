@@ -339,7 +339,330 @@ begin
   if p_artifact_sha256 !~ '^[0-9a-f]{64}$' then raise exception 'invalid artifact checksum'; end if;
   if p_artifact_size_bytes <= 0 then raise exception 'invalid artifact size'; end if;
   if p_artifact_bucket <> 'farm-watch-derived' then raise exception 'invalid artifact bucket'; end if;
-  if p_artifact_path is null or p_artifact_path !~ '^[a-zA-Z0-9._/-]{1,700}$' then raise exception 'invalid artifact path'; end if;
+  if p_artifact_path is null
+     or length(p_artifact_path) < 1
+     or length(p_artifact_path) > 700
+     or p_artifact_path !~ '^[a-zA-Z0-9._/-]+
+
+  v_identity_sha256 := encode(
+    extensions.digest(
+      convert_to(
+        concat_ws(
+          '|',
+          v_build.property_id::text,
+          v_build.input_signature_sha256,
+          p_sampled_source_sha256,
+          p_artifact_sha256,
+          p_artifact_format
+        ),
+        'UTF8'
+      ),
+      'sha256'
+    ),
+    'hex'
+  );
+
+  insert into farm_watch.property_materializations_v1 (
+    property_id, product_kind, algorithm_version, output_schema_version,
+    boundary_sha256, source_signature_sha256, input_signature_sha256,
+    sampled_source_sha256, identity_sha256, evidence_class, summary,
+    source_provenance, limitations, artifact_bucket, artifact_path,
+    artifact_format, artifact_mime_type, artifact_size_bytes, artifact_sha256,
+    completed_at, expires_at
+  )
+  values (
+    v_build.property_id, v_build.product_kind, v_build.algorithm_version, v_build.output_schema_version,
+    v_build.boundary_sha256, v_build.source_signature_sha256, v_build.input_signature_sha256,
+    p_sampled_source_sha256, v_identity_sha256, p_evidence_class, coalesce(p_summary,'{}'::jsonb),
+    coalesce(p_source_provenance,'{}'::jsonb), coalesce(p_limitations,'[]'::jsonb),
+    p_artifact_bucket, p_artifact_path, p_artifact_format, p_artifact_mime_type,
+    p_artifact_size_bytes, p_artifact_sha256, now(), p_expires_at
+  )
+  on conflict (identity_sha256) do update set
+    summary=excluded.summary,
+    source_provenance=excluded.source_provenance,
+    limitations=excluded.limitations,
+    artifact_bucket=excluded.artifact_bucket,
+    artifact_path=excluded.artifact_path,
+    artifact_format=excluded.artifact_format,
+    artifact_mime_type=excluded.artifact_mime_type,
+    artifact_size_bytes=excluded.artifact_size_bytes,
+    artifact_sha256=excluded.artifact_sha256,
+    completed_at=excluded.completed_at,
+    expires_at=excluded.expires_at
+  returning id into v_materialization_id;
+
+  update farm_watch.property_materialization_builds_v1
+  set status='available',
+      materialization_id=v_materialization_id,
+      lease_owner=null,
+      lease_token=null,
+      lease_expires_at=null,
+      next_attempt_at=null,
+      last_error=null,
+      finished_at=now(),
+      updated_at=now()
+  where id=v_build.id;
+
+  return jsonb_build_object(
+    'status','available',
+    'build_id',v_build.id,
+    'materialization_id',v_materialization_id,
+    'identity_sha256',v_identity_sha256
+  );
+end;
+$$;
+
+create or replace function farm_watch.farm_watch_fail_materialization_build_v1_internal(
+  p_build_id uuid,
+  p_lease_token uuid,
+  p_error text,
+  p_retry_delay_seconds integer default 300
+) returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, farm_watch
+as $$
+begin
+  update farm_watch.property_materialization_builds_v1
+  set status='failed',
+      lease_owner=null,
+      lease_token=null,
+      lease_expires_at=null,
+      next_attempt_at=case
+        when attempt_count < max_attempts
+          then now()+make_interval(secs=>greatest(60,least(coalesce(p_retry_delay_seconds,300),86400)))
+        else null
+      end,
+      last_error=left(coalesce(p_error,'unknown materialization build failure'),4000),
+      finished_at=now(),
+      updated_at=now()
+  where id=p_build_id
+    and status='processing'
+    and lease_token=p_lease_token;
+
+  if not found then
+    raise exception 'active build lease not found';
+  end if;
+end;
+$$;
+
+create or replace function farm_watch.farm_watch_get_materialization_v1_internal(
+  p_slug text,
+  p_product_kind text,
+  p_algorithm_version text,
+  p_output_schema_version text,
+  p_source_signature text
+) returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = pg_catalog, farm_watch, extensions
+as $$
+declare
+  v_property farm_watch.properties%rowtype;
+  v_identity jsonb;
+  v_build farm_watch.property_materialization_builds_v1%rowtype;
+  v_materialization farm_watch.property_materializations_v1%rowtype;
+  v_status text;
+begin
+  select * into v_property
+  from farm_watch.properties
+  where slug=p_slug and status='active'
+  limit 1;
+
+  if v_property.id is null or v_property.boundary is null then
+    return jsonb_build_object('status','missing');
+  end if;
+
+  v_identity := farm_watch.farm_watch_materialization_identity_v1(
+    v_property.id,
+    v_property.boundary,
+    v_property.stated_acres,
+    p_product_kind,
+    p_algorithm_version,
+    p_output_schema_version,
+    p_source_signature
+  );
+
+  select * into v_build
+  from farm_watch.property_materialization_builds_v1
+  where input_signature_sha256=v_identity->>'input_signature_sha256'
+  limit 1;
+
+  if v_build.id is null then
+    return jsonb_build_object(
+      'status','missing',
+      'input_signature_sha256',v_identity->>'input_signature_sha256',
+      'boundary_sha256',v_identity->>'boundary_sha256'
+    );
+  end if;
+
+  if v_build.materialization_id is not null then
+    select * into v_materialization
+    from farm_watch.property_materializations_v1
+    where id=v_build.materialization_id;
+  end if;
+
+  if v_materialization.id is not null then
+    v_status := case
+      when v_materialization.expires_at is not null and v_materialization.expires_at <= now() then 'stale'
+      else 'available'
+    end;
+  elsif v_build.status='processing' and v_build.lease_expires_at is not null and v_build.lease_expires_at > now() then
+    v_status := 'processing';
+  elsif v_build.status='failed' then
+    v_status := 'failed';
+  else
+    v_status := 'missing';
+  end if;
+
+  return jsonb_build_object(
+    'status',v_status,
+    'build',jsonb_build_object(
+      'id',v_build.id,
+      'status',v_build.status,
+      'attempt_count',v_build.attempt_count,
+      'max_attempts',v_build.max_attempts,
+      'next_attempt_at',v_build.next_attempt_at,
+      'lease_expires_at',v_build.lease_expires_at,
+      'last_error',case when v_build.status='failed' then v_build.last_error else null end
+    ),
+    'identity',jsonb_build_object(
+      'input_signature_sha256',v_identity->>'input_signature_sha256',
+      'boundary_sha256',v_identity->>'boundary_sha256',
+      'source_signature_sha256',v_identity->>'source_signature_sha256'
+    ),
+    'materialization',case when v_materialization.id is null then null else jsonb_build_object(
+      'id',v_materialization.id,
+      'identity_sha256',v_materialization.identity_sha256,
+      'evidence_class',v_materialization.evidence_class,
+      'summary',v_materialization.summary,
+      'source_provenance',v_materialization.source_provenance,
+      'limitations',v_materialization.limitations,
+      'artifact_bucket',v_materialization.artifact_bucket,
+      'artifact_path',v_materialization.artifact_path,
+      'artifact_format',v_materialization.artifact_format,
+      'artifact_mime_type',v_materialization.artifact_mime_type,
+      'artifact_size_bytes',v_materialization.artifact_size_bytes,
+      'artifact_sha256',v_materialization.artifact_sha256,
+      'completed_at',v_materialization.completed_at,
+      'expires_at',v_materialization.expires_at
+    ) end
+  );
+end;
+$$;
+
+revoke all on function farm_watch.farm_watch_materialization_identity_v1(uuid,extensions.geometry,numeric,text,text,text,text)
+  from public, anon, authenticated;
+revoke all on function farm_watch.farm_watch_claim_materialization_build_v1_internal(text,text,text,text,text,text,integer)
+  from public, anon, authenticated;
+revoke all on function farm_watch.farm_watch_complete_materialization_build_v1_internal(uuid,uuid,text,text,jsonb,jsonb,jsonb,text,text,text,text,bigint,text,timestamptz)
+  from public, anon, authenticated;
+revoke all on function farm_watch.farm_watch_fail_materialization_build_v1_internal(uuid,uuid,text,integer)
+  from public, anon, authenticated;
+revoke all on function farm_watch.farm_watch_get_materialization_v1_internal(text,text,text,text,text)
+  from public, anon, authenticated;
+
+grant execute on function farm_watch.farm_watch_materialization_identity_v1(uuid,extensions.geometry,numeric,text,text,text,text)
+  to postgres, service_role;
+grant execute on function farm_watch.farm_watch_claim_materialization_build_v1_internal(text,text,text,text,text,text,integer)
+  to postgres, service_role;
+grant execute on function farm_watch.farm_watch_complete_materialization_build_v1_internal(uuid,uuid,text,text,jsonb,jsonb,jsonb,text,text,text,text,bigint,text,timestamptz)
+  to postgres, service_role;
+grant execute on function farm_watch.farm_watch_fail_materialization_build_v1_internal(uuid,uuid,text,integer)
+  to postgres, service_role;
+grant execute on function farm_watch.farm_watch_get_materialization_v1_internal(text,text,text,text,text)
+  to postgres, service_role;
+
+create or replace function public.farm_watch_claim_materialization_build_v1_internal(
+  p_slug text,
+  p_product_kind text,
+  p_algorithm_version text,
+  p_output_schema_version text,
+  p_source_signature text,
+  p_worker_id text,
+  p_lease_seconds integer default 900
+) returns jsonb
+language sql security definer set search_path=pg_catalog
+as $$
+  select farm_watch.farm_watch_claim_materialization_build_v1_internal(
+    p_slug,p_product_kind,p_algorithm_version,p_output_schema_version,
+    p_source_signature,p_worker_id,p_lease_seconds
+  );
+$$;
+
+create or replace function public.farm_watch_complete_materialization_build_v1_internal(
+  p_build_id uuid,
+  p_lease_token uuid,
+  p_sampled_source_sha256 text,
+  p_evidence_class text,
+  p_summary jsonb,
+  p_source_provenance jsonb,
+  p_limitations jsonb,
+  p_artifact_bucket text,
+  p_artifact_path text,
+  p_artifact_format text,
+  p_artifact_mime_type text,
+  p_artifact_size_bytes bigint,
+  p_artifact_sha256 text,
+  p_expires_at timestamptz
+) returns jsonb
+language sql security definer set search_path=pg_catalog
+as $$
+  select farm_watch.farm_watch_complete_materialization_build_v1_internal(
+    p_build_id,p_lease_token,p_sampled_source_sha256,p_evidence_class,p_summary,
+    p_source_provenance,p_limitations,p_artifact_bucket,p_artifact_path,
+    p_artifact_format,p_artifact_mime_type,p_artifact_size_bytes,p_artifact_sha256,p_expires_at
+  );
+$$;
+
+create or replace function public.farm_watch_fail_materialization_build_v1_internal(
+  p_build_id uuid,
+  p_lease_token uuid,
+  p_error text,
+  p_retry_delay_seconds integer default 300
+) returns void
+language sql security definer set search_path=pg_catalog
+as $$
+  select farm_watch.farm_watch_fail_materialization_build_v1_internal(
+    p_build_id,p_lease_token,p_error,p_retry_delay_seconds
+  );
+$$;
+
+create or replace function public.farm_watch_get_materialization_v1_internal(
+  p_slug text,
+  p_product_kind text,
+  p_algorithm_version text,
+  p_output_schema_version text,
+  p_source_signature text
+) returns jsonb
+language sql stable security definer set search_path=pg_catalog
+as $$
+  select farm_watch.farm_watch_get_materialization_v1_internal(
+    p_slug,p_product_kind,p_algorithm_version,p_output_schema_version,p_source_signature
+  );
+$$;
+
+revoke all on function public.farm_watch_claim_materialization_build_v1_internal(text,text,text,text,text,text,integer)
+  from public, anon, authenticated;
+revoke all on function public.farm_watch_complete_materialization_build_v1_internal(uuid,uuid,text,text,jsonb,jsonb,jsonb,text,text,text,text,bigint,text,timestamptz)
+  from public, anon, authenticated;
+revoke all on function public.farm_watch_fail_materialization_build_v1_internal(uuid,uuid,text,integer)
+  from public, anon, authenticated;
+revoke all on function public.farm_watch_get_materialization_v1_internal(text,text,text,text,text)
+  from public, anon, authenticated;
+
+grant execute on function public.farm_watch_claim_materialization_build_v1_internal(text,text,text,text,text,text,integer)
+  to postgres, service_role;
+grant execute on function public.farm_watch_complete_materialization_build_v1_internal(uuid,uuid,text,text,jsonb,jsonb,jsonb,text,text,text,text,bigint,text,timestamptz)
+  to postgres, service_role;
+grant execute on function public.farm_watch_fail_materialization_build_v1_internal(uuid,uuid,text,integer)
+  to postgres, service_role;
+grant execute on function public.farm_watch_get_materialization_v1_internal(text,text,text,text,text)
+  to postgres, service_role;
+
+  then raise exception 'invalid artifact path'; end if;
 
   v_identity_sha256 := encode(
     extensions.digest(
