@@ -84,7 +84,9 @@ For each 500 / 1,500 / 3,000 m barrier-aware zone:
 - fields with crop-history metadata;
 - mapped field acreage intersecting the domain.
 
-Interpretation boundary: a mapped agricultural field does not by itself establish current forage quality, crop availability, or deer use.
+The 3,000 m broad context also reports the latest available CDL class composition for intersecting mapped fields, retaining year, class code, class name, field count, and intersected acreage.
+
+Interpretation boundary: mapped fields and CDL classes do not by themselves establish current forage quality, crop availability, harvest state, or deer use.
 
 ### Human access
 
@@ -145,6 +147,8 @@ Agricultural context after Kentucky River barrier handling:
 | 500 m | 1 | 2.79 ac |
 | 1,500 m | 12 | 36.82 ac |
 | 3,000 m | 37 | 205.73 ac |
+
+The same 3,000 m field set resolved to the current 2025 CDL classes as approximately 119.90 ac Grassland/Pasture, 82.37 ac Soybeans, and 3.47 ac Corn. These are mapped land-cover/crop classes, not an assertion about present forage condition or harvest state.
 
 At 1,500 m the same prototype found 16 Scout access features: 6 drivable, 4 driveways, 1 track, 1 access point, and 1 routing barrier.
 
