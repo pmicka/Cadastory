@@ -500,13 +500,15 @@ function quadraticProfileFeatures(base: Record<string, number>) {
   for (const name of PROFILE_BASE_FEATURES) {
     features['sq_' + name] = base[name] * base[name]
   }
-  for (let i = 0; i < PROFILE_BASE_FEATURES.length; i += 1) {
-    for (let j = i + 1; j < PROFILE_BASE_FEATURES.length; j += 1) {
-      const a = PROFILE_BASE_FEATURES[i]
-      const b = PROFILE_BASE_FEATURES[j]
+  const shareNames = ['share_4_16','share_16_32','share_32_64','share_64_plus']
+  for (let i = 0; i < shareNames.length; i += 1) {
+    for (let j = i + 1; j < shareNames.length; j += 1) {
+      const a = shareNames[i]
+      const b = shareNames[j]
       features['x_' + a + '__' + b] = base[a] * base[b]
     }
   }
+  features.x_entropy__profile_spread = base.entropy * base.profile_spread
   return features
 }
 
@@ -593,8 +595,8 @@ function regressionSse(count: number, sum: number, sumSq: number) {
 function fitRegressionTree(
   rows: any[],
   featureNames: string[],
-  maxDepth = 5,
-  minLeaf = 60,
+  maxDepth = 4,
+  minLeaf = 100,
 ) {
   function build(nodeRows: any[], depth: number): any {
     const count = nodeRows.length
@@ -608,9 +610,20 @@ function fitRegressionTree(
 
     let best: any = null
     for (const feature of featureNames) {
-      const values = nodeRows.map((row) => row.features[feature]).filter(Number.isFinite)
-      const thresholds = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
-        .map((q) => sortedQuantile(values, q))
+      const values = nodeRows
+        .map((row) => row.features[feature])
+        .filter(Number.isFinite)
+        .sort((a, b) => a - b)
+      const thresholds = [0.2,0.4,0.6,0.8]
+        .map((q) => {
+          if (!values.length) return null
+          const position = q * (values.length - 1)
+          const lower = Math.floor(position)
+          const upper = Math.ceil(position)
+          if (lower === upper) return values[lower]
+          const weight = position - lower
+          return values[lower] * (1 - weight) + values[upper] * weight
+        })
         .filter((threshold, index, array) =>
           Number.isFinite(Number(threshold)) &&
           (index === 0 || Number(threshold) !== Number(array[index - 1]))
@@ -688,7 +701,7 @@ function crossValidatedTreeProfileModel(records: any[], gridWidth: number) {
     const training = rows.filter((row) => spatialFold(row.index, gridWidth, foldCount) !== fold)
     const testing = rows.filter((row) => spatialFold(row.index, gridWidth, foldCount) === fold)
     if (training.length < 100 || testing.length < 10) continue
-    const tree = fitRegressionTree(training, PROFILE_BASE_FEATURES, 5, 60)
+    const tree = fitRegressionTree(training, PROFILE_BASE_FEATURES, 4, 100)
     for (const row of testing) {
       const estimate = predictRegressionTree(tree, row.features)
       if (!Number.isFinite(estimate)) continue
@@ -713,9 +726,9 @@ function crossValidatedTreeProfileModel(records: any[], gridWidth: number) {
     fold_count: folds.length,
     folds,
     features: PROFILE_BASE_FEATURES,
-    max_depth: 5,
-    minimum_leaf_cells: 60,
-    threshold_candidates: 'per-node deciles',
+    max_depth: 4,
+    minimum_leaf_cells: 100,
+    threshold_candidates: 'per-node 20/40/60/80 percentiles',
     cross_validated_r2: metrics.cross_validated_r2,
     predicted_vs_observed_r: metrics.predicted_vs_observed_r,
     prediction_records: predictionRecords,
@@ -879,7 +892,7 @@ function blockPermutationSpatialNull(
 ) {
   const observed = patchStatsFromMask(selectedMask, gridWidth, gridHeight, cellMeters)
   const blockSizes = [3, 4, 6]
-  const iterations = 299
+  const iterations = 99
   const scales = []
   for (const blockSize of blockSizes) {
     const random = createPrng(hashSeed(seedText + '|block=' + blockSize))
