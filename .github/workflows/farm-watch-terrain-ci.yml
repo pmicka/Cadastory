@@ -13,8 +13,6 @@ on:
 
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
 
 jobs:
   terrain:
@@ -25,27 +23,6 @@ jobs:
         with:
           deno-version: v2.x
       - name: Check terrain module
-        id: terrain_check
-        shell: bash
-        run: |
-          set +e
-          deno check supabase/functions/_shared/farm-watch-terrain.ts > terrain-check.log 2>&1
-          code=$?
-          cat terrain-check.log
-          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
-          exit "$code"
-      - name: Report terrain check diagnostics
-        if: failure() && github.event_name == 'pull_request'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          {
-            echo '<!-- farm-watch-terrain-ci-diagnostic -->'
-            echo 'Temporary terrain CI diagnostic:'
-            sed 's/^/    /' terrain-check.log
-          } > terrain-comment.md
-          gh pr comment "$PR_NUMBER" --body-file terrain-comment.md
+        run: deno check supabase/functions/_shared/farm-watch-terrain.ts
       - name: Run terrain tests
-        if: success()
         run: deno test supabase/functions/_shared/farm-watch-terrain.test.ts
