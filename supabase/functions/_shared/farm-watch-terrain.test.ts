@@ -1,8 +1,11 @@
 import {
+  buildFlowNetwork,
   buildFlowPaths,
+  buildFlowProduct,
   buildSampleGrid,
   buildTerrainArtifact,
   deriveTerrainAnatomy,
+  gridCellMetrics,
   pointInPolygonGeometry,
   sampleDem,
 } from './farm-watch-terrain.ts'
@@ -141,4 +144,96 @@ Deno.test('stated acreage affects only acreage-bearing anatomy output, not sampl
     const bAcres = Number(b?.outlet_zones?.[0]?.estimated_acres)
     assert(Math.abs(bAcres - aAcres * 2) < 1e-9)
   }
+})
+
+
+function syntheticGrid(values: number[][]) {
+  const size = values.length
+  const west = -84.89
+  const east = -84.88
+  const south = 38.32
+  const north = 38.33
+  const points: Array<[number, number]> = []
+  for (let row = 0; row < size; row += 1) {
+    const lat = south + ((north - south) * row) / (size - 1)
+    for (let col = 0; col < size; col += 1) {
+      const lon = west + ((east - west) * col) / (size - 1)
+      points.push([lon, lat])
+    }
+  }
+  const flat = values.flat()
+  return {
+    west,east,south,north,size,points,
+    values: flat,
+    min: Math.min(...flat),
+    max: Math.max(...flat),
+    boundary: {
+      type: 'Polygon' as const,
+      coordinates: [[
+        [west + 0.001, south + 0.001],
+        [east - 0.001, south + 0.001],
+        [east - 0.001, north - 0.001],
+        [west + 0.001, north - 0.001],
+        [west + 0.001, south + 0.001],
+      ]],
+    },
+  }
+}
+
+Deno.test('metric D8 uses physical grid spacing rather than unit cell steps', () => {
+  const grid = syntheticGrid([
+    [10,9,8,7,6],
+    [11,10,9,8,7],
+    [12,11,10,9,8],
+    [13,12,11,10,9],
+    [14,13,12,11,10],
+  ])
+  const metrics = gridCellMetrics(grid)
+  assert(metrics.east_west_m > 0)
+  assert(metrics.north_south_m > 0)
+  assert(Math.abs(metrics.east_west_m - metrics.north_south_m) > 1, 'geographic grid should not be treated as square index steps')
+})
+
+Deno.test('priority-flood conditioning routes an enclosed sampled sink toward the grid exterior', () => {
+  const grid = syntheticGrid([
+    [12,11,10,9,8],
+    [13,12,11,10,7],
+    [14,13,1,9,6],
+    [15,14,13,8,5],
+    [16,15,14,7,4],
+  ])
+  const center = 2 * grid.size + 2
+  const network = buildFlowNetwork(grid)
+  assert(network.conditioning.filled_cell_count > 0, 'sampled sink should be conditioned')
+  assert(network.conditioning.max_fill_depth_ft > 0)
+
+  const seen = new Set<number>()
+  let cursor = center
+  let reachedExterior = false
+  for (let step = 0; step < grid.values.length && cursor >= 0 && !seen.has(cursor); step += 1) {
+    seen.add(cursor)
+    const [lon, lat] = grid.points[cursor]
+    if (!pointInPolygonGeometry(lon, lat, grid.boundary) && cursor !== center) {
+      reachedExterior = true
+      break
+    }
+    cursor = network.downstream[cursor]
+  }
+  assert(reachedExterior, 'conditioned sink should route beyond the parcel rather than terminate locally')
+})
+
+Deno.test('conditioned flow product reports contributing-area and conditioning metadata', () => {
+  const grid = syntheticGrid([
+    [12,11,10,9,8],
+    [13,12,11,10,7],
+    [14,13,8,9,6],
+    [15,14,10,8,5],
+    [16,15,14,7,4],
+  ])
+  const product = buildFlowProduct(grid)
+  assert(product.summary.min_contributing_area_acres > 0)
+  assert(product.summary.threshold_cells >= 2)
+  assert(product.summary.cell_area_acres > 0)
+  assert(typeof product.summary.conditioning.filled_cell_count === 'number')
+  assert(Array.isArray(product.paths))
 })
