@@ -845,7 +845,7 @@ function buildScaleSurface(args: any) {
   }
 }
 
-async function buildSourceProduct(
+export async function buildLeafOffSourceProduct(
   source: any,
   boundary: any,
   projectedBoundary: any,
@@ -1042,7 +1042,7 @@ async function main() {
     const built = []
     for (const source of FARM_WATCH_LEAF_OFF_PRODUCT.sources) {
       console.log('Building leaf-off source', source.id)
-      built.push(await buildSourceProduct(source, boundary, projectedBoundary, bounds, center))
+      built.push(await buildLeafOffSourceProduct(source, boundary, projectedBoundary, bounds, center))
     }
 
     const transfer = compareIndependentStructureProducts(built[1].product, built[0].product)
@@ -1111,4 +1111,4 @@ async function main() {
   }
 }
 
-await main()
+if (import.meta.main) await main()
