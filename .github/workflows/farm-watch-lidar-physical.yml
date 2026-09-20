@@ -24,12 +24,11 @@ jobs:
           deno-version: v2.x
 
       - name: Check LiDAR physical worker
-        run: deno check --allow-import=esm.unpkg.com scripts/farm-watch-lidar-physical-materialize.ts
+        run: deno check scripts/farm-watch-lidar-physical-materialize.ts
 
       - name: Materialize validation property
         run: >-
           deno run
-          --allow-import=esm.unpkg.com
           --allow-env
           --allow-net
           scripts/farm-watch-lidar-physical-materialize.ts
