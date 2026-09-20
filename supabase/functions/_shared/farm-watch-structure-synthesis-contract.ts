@@ -43,8 +43,8 @@ export function structureSynthesisSourceSignature(
     'vertical_horizontal_matrix=dominant_band_x_leaf_quintile_v1',
     'full_vertical_profile_model=blocked_5fold_vertical_profile_ridge_v1',
     'out_of_fold_residual_spatial=best_tested_profile_residual_spatial_v2',
-    'model_adequacy=blocked_5fold_ridge_quadratic_cart_v1',
-    'spatial_null=block_permutation_selected_mask_v1:blocks=3,4,6:iterations=299',
+    'model_adequacy=blocked_5fold_ridge_quadratic_cart_v1:quadratic=base+squares+band_pairwise+entropy_x_spread:lambda=0.05:cart_depth=4:cart_min_leaf=100:cart_quantiles=0.2,0.4,0.6,0.8',
+    'spatial_null=block_permutation_selected_mask_v1:blocks=3,4,6:iterations=99',
   ].join('|')
 }
 
