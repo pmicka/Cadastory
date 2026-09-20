@@ -1,0 +1,370 @@
+# Farm Watch Structure Evidence Ledger
+
+Status: current as of 2026-09-20  
+Validation property: `validation-property-01`
+
+## Purpose
+
+This document is the durable index for Farm Watch structural-science work involving LiDAR, leaf-off aerial imagery, and their cross-layer diagnostics.
+
+Its primary purpose is to prevent repeated analysis from being proposed as new work.
+
+Before adding another structural analysis, check this ledger and the cited implementation/artifact first. If a prior result is not durably preserved, that is a provenance/recovery problem, not permission to silently rerun or reinterpret the experiment.
+
+## Status vocabulary
+
+- **canonical-central** — current result is centrally materialized with dependency identity/provenance.
+- **persisted-QA** — experimental/QA result has a durable artifact, but is not a canonical Farm Watch product.
+- **implemented-QA** — method exists in the notebook and has been exercised historically, but the current audit did not locate a durable numeric result.
+- **historical-session-only** — a prior session reported a result, but no authoritative current artifact was located.
+- **protocol-ready** — experimental protocol exists, but completion/result evidence was not located.
+- **superseded** — replaced by a more current central implementation/result.
+
+## Current canonical products
+
+| Product | Current identity | Status | Key facts |
+| --- | --- | --- | --- |
+| LiDAR source coverage | `kyfromabove-stac-coverage-plan-v1` | canonical-central | Phase 2 and Phase 3 parcel coverage plans are explicit and source-selected rather than “first STAC result wins.” |
+| Phase 3 LiDAR physical structure | `phase3-copc-physical-v3-multiasset` | canonical-central | 5 m height-above-ground grid; 6,621 eligible cells; 496,417 normalized structure points; current artifact SHA `af8ee1d3ff4fcb09a7ee5c983edb1a9c8fbdd93754715337a0f2afab7d5759a4`. |
+| Leaf-off woody-pattern context | `leaf_off_structure_v1_2_7m` | canonical-central, experimental_derived | 2019 and 2024 products, each 253×445 with 70,806 valid cells; current artifact SHA `7b8127da0a729d79b5a521cc4f27599334651a83db24f1036906771ffecfce75`. |
+| Structural complementarity | `current-leaf-off-lidar-complementarity-v4` | canonical-central | 6,662 shared 5 m cells; current artifact SHA `01dc786d4f258bc1b5b78f43e935ff397f931293d298b9548da48ef1d600c074`. |
+
+Current central materializations are stored in `farm_watch.property_materializations_v1`. The structural complementarity source signature binds to the exact current LiDAR and leaf-off artifact SHA-256 values.
+
+## Experiment ledger
+
+### FW-S01 — LiDAR source coverage / parcel source selection
+
+**Question:** Which KyFromAbove point-cloud assets actually cover the parcel, and can point processing proceed without silently selecting an arbitrary STAC result?
+
+**Method:** `kyfromabove_parcel_lidar_stac_coverage_audit_v2` / central `kyfromabove-stac-coverage-plan-v1`.
+
+**Implementation:** `pmicka/notebook/public/projects/farm-watch/lidar-audit.js`; central source materialization in Cadastory.
+
+**Result:** Phase 2 and Phase 3 each currently resolve to one parcel-covering COPC asset with sampled parcel coverage of 100%.
+
+**Boundary:** Source-selection evidence only; not a vegetation interpretation.
+
+**Status:** canonical-central.
+
+---
+
+### FW-S02 — LiDAR raw point-content audit and source-specific ground normalization
+
+**Question:** Can each LiDAR phase support a defensible height-above-ground normalization without assuming classification semantics beyond what is observed?
+
+**Methods:** raw point-content audit; `source_specific_class2_ground_grid_idw_v1`; parcel-clipped COPC historical QA product.
+
+**Implementation:** `lidar-point-audit.js`.
+
+**Result durability:** The current Phase 3 physical product is central and reports 100% ground-supported parcel coverage. Historical Phase 2/Phase 3 QA numeric outputs remain browser-QA and are not represented by a current canonical artifact.
+
+**Boundary:** Ground normalization only; no brush/midstory/canopy/species/habitat labels.
+
+**Status:** canonical-central for current Phase 3 physical structure; implemented-QA for historical cross-phase diagnostics.
+
+---
+
+### FW-S03 — Vertical height distributions and candidate thresholds
+
+**Question:** What does the normalized vertical return distribution look like before assigning any ecological semantics?
+
+**Methods:** height quantiles, 1 ft histogram, threshold shares, candidate histogram valleys.
+
+**Implementation:** `summarizeVerticalHeights()` in `lidar-point-audit.js`.
+
+**Result durability:** Method and historical run path remain available; the audit did not locate a durable standalone numeric result artifact.
+
+**Boundary:** Descriptive diagnostics only. Histogram valleys and thresholds are not vegetation classes.
+
+**Status:** implemented-QA.
+
+---
+
+### FW-S04 — Neutral LiDAR strata and threshold sensitivity
+
+**Question:** Are fixed neutral height bands spatially stable enough to use as a structural representation, and how sensitive are results to nearby band schemes?
+
+**Methods:** neutral height-band grids, `neutral_height_band_surface_sensitivity_v1`, `common_10m_anchor_band_share_comparison_v1`.
+
+**Implementation:** `lidar-point-audit.js`.
+
+**Result durability:** Historical browser QA exists in code/history; no durable standalone numeric result located in this audit.
+
+**Boundary:** Height strata remain neutral physical bands.
+
+**Status:** implemented-QA.
+
+---
+
+### FW-S05 — Historical/cross-phase LiDAR temporal structure
+
+**Question:** How do neutral height-band composition and presence patterns differ/persist between Phase 2 and Phase 3 on a common grid?
+
+**Methods:** `common_10m_neutral_strata_temporal_structure_v1`; dominant-band transition matrix; composition overlap; ordinal-band deltas; spatial shift coherence; presence persistence.
+
+**Implementation:** `temporalStructureAudit()` in `lidar-point-audit.js`.
+
+**Result durability:** Browser/Internal-QA only; no current canonical result artifact located.
+
+**Boundary:** Differences are not automatically vegetation growth, succession, habitat change, or hunting significance.
+
+**Status:** implemented-QA.
+
+---
+
+### FW-S06 — Leaf-off woody-pattern estimator construction
+
+**Question:** Can leaf-off aerial imagery provide a stable horizontal woody-pattern observation distinct from LiDAR vertical structure?
+
+**Method:** luminance local standard deviation + gradient magnitude, 45/55 weighting, slope surface correction, independent within-acquisition robust normalization, false-color support/confidence.
+
+**Scale work:** 5/7/9 m neighborhood diagnostic was implemented; 7 m was selected and frozen as the working estimator on 2026-09-18.
+
+**Sources:** 2024 Phase 3 RGB/IR plus DEM; independent 2019 Phase 2 RGB/IR observation.
+
+**Implementation:** `leaf-off-structure.js`; central contract `farm-watch-leaf-off-contract.ts`.
+
+**Result:** Current central artifact contains both supported acquisitions. 2024 has 89.64% high-observation-support cells; 2019 has 94.00%.
+
+**Boundary:** Horizontal woody-pattern context only. Not understory density, stem density, regeneration, species, habitat quality, management condition, bedding, mast, or animal use.
+
+**Status:** canonical-central, experimental_derived.
+
+---
+
+### FW-S07 — Independent 2019↔2024 leaf-off transfer
+
+**Question:** Does the independently normalized spatial ranking recur across two leaf-off acquisitions?
+
+**Method:** `independent_relative_rank_transfer_v1`.
+
+**Current central result:** 70,806 overlapping cells; Spearman rank correlation 0.1037; exact-quintile agreement 22.93%; within-one-quintile 56.11%; sparse-20% Dice 22.87%; dense-20% Dice 27.95%.
+
+**Interpretation:** Weak but non-zero rank transfer. Independently normalized products are not subtracted, and disagreement is not classified as vegetation change.
+
+**Status:** canonical-central as a diagnostic embedded in the leaf-off artifact.
+
+---
+
+### FW-S08 — Leaf-off registration sensitivity
+
+**Question:** Could apparent cross-year disagreement be explained by small translational registration error?
+
+**Method:** `registration_shift_sensitivity_v1`; translation sweep over ±10 m, tracking Spearman and sparse/dense overlap.
+
+**Implementation:** `sweepRegistrationSensitivity()` in `leaf-off-structure.js`.
+
+**Result durability:** Diagnostic path exists and was exercised historically; exact output was not found in a durable artifact during this consolidation.
+
+**Boundary:** Diagnostic translation sweep only; no image is moved, corrected, or treated as registered by the result.
+
+**Status:** implemented-QA.
+
+---
+
+### FW-S09 — Leaf-off transfer component decomposition
+
+**Question:** Which stages of the leaf-off estimator drive cross-year agreement/disagreement?
+
+**Method:** `leaf_off_transfer_component_decomposition_v1`; compares luminance standard deviation, gradient magnitude, combined pre-slope texture, terrain-adjusted signal, and final relative score.
+
+**Implementation:** `compareTransferComponents()` in `leaf-off-structure.js`.
+
+**Result durability:** Method exists and was exercised historically; exact numeric output not durably located.
+
+**Boundary:** Diagnostic decomposition; does not retune weights or classify disagreement as change.
+
+**Status:** implemented-QA.
+
+---
+
+### FW-S10 — Leaf-off aggregation/spatial-support transfer
+
+**Question:** Does broader spatial aggregation improve transfer between acquisitions?
+
+**Method:** `leaf_off_transfer_spatial_support_v1`; block aggregation at 10, 15, and 20 m while leaving the canonical 7 m estimator unchanged.
+
+**Implementation:** `compareAggregationScales()` in `leaf-off-structure.js`.
+
+**Result durability:** Method exists and was exercised historically; exact numeric output not durably located.
+
+**Boundary:** Diagnostic aggregation only; no estimator retuning.
+
+**Status:** implemented-QA.
+
+---
+
+### FW-S11 — Frozen aerial × independent LiDAR Batch 5 comparison
+
+**Question:** After both estimators are frozen independently, how does leaf-off horizontal structure relate to neutral LiDAR vertical structure?
+
+**Method:** `frozen_leaf_off_vs_independent_lidar_strata_v1`.
+
+**Implementation:** `leaf-off-lidar-audit.js`; introduced in the 2026-09-19 Batch 5 work.
+
+**Boundary:** Does not retune either estimator, infer species, label habitat, or turn association into causation. The imagery and LiDAR observations are non-contemporaneous.
+
+**Status:** implemented-QA; current-state portions were later promoted into FW-S12–FW-S15.
+
+---
+
+### FW-S12 — Current dominant-band complementarity
+
+**Question:** How much leaf-off variation exists within the same LiDAR dominant-height regime, and how does leaf-off vary with 4–32 ft share where 32+ ft returns are present?
+
+**Original QA method:** `current_leaf_off_lidar_complementarity_v1`.
+
+**Current central result:** 6,662 shared 5 m cells. Dominant LiDAR band explains 0.6569% of leaf-off variance; 99.3431% remains within dominant-band groups. Among 5,945 cells with ≥10% 32+ ft returns, 4–32 ft share vs leaf-off score Spearman rho = +0.0889.
+
+**Interpretation:** The dominant-band rendering is a lossy summary and the two layers are complementary. This does not identify the residual dimension as understory or any ecological class.
+
+**Status:** canonical-central in structure-complementarity v4.
+
+---
+
+### FW-S13 — Full LiDAR-profile explanatory model
+
+**Question:** Can the full neutral LiDAR vertical profile explain the frozen leaf-off score better than dominant-band classification?
+
+**Method:** `blocked_5fold_vertical_profile_ridge_v1`; five east-west held-out spatial folds; predictors are 4–16, 16–32, 32–64, 64+ ft shares with 0–4 ft as reference, plus vertical entropy and profile spread.
+
+**Current central result:** 6,662 out-of-fold predictions; cross-validated R² = 0.01993; predicted-vs-observed r = 0.14505.
+
+**Interpretation:** The tested linear vertical-profile representation explains about 2.0% of held-out leaf-off variance. This is model performance, not the theoretical maximum information contained in LiDAR.
+
+**Status:** canonical-central in structure-complementarity v4.
+
+**Reconciliation note:** A prior chat/session reported an older browser-QA value near R² = 0.057. No durable artifact matching that number was located in this audit. Do not use or average the 0.057 result as canonical until its exact source/grid/provenance is recovered.
+
+---
+
+### FW-S14 — Residual attribution, spatial patches, and matched controls
+
+**Question:** What remains after the LiDAR profile model, is it associated with aerial observation/support variables, and is the residual spatially organized?
+
+**Methods:** `leaf_off_profile_residual_attribution_v1`; correlations against spectral support, confidence, slope, illumination, mean luminance, luminance standard deviation, and gradient; standardized residual classes; eight-neighbor positive-residual patches; matched near-zero controls with similar LiDAR profiles.
+
+**Implementation:** `buildResidualAttribution()`, `residualSpatialProduct()`, matched-control helpers in `leaf-off-lidar-audit.js`.
+
+**Important distinction:** Luminance standard deviation and gradient are direct components of the leaf-off score, not independent validation signals. Spectral support/confidence are observation/support context.
+
+**What was *not* found:** No existing model in the current repo conditions these residuals jointly against canopy + terrain position + SSURGO + hydrology/wetlands. Physical/landscape context exists elsewhere, but a residual-environmental-covariate model was not located.
+
+**Status:** implemented-QA; residual spatial core later promoted and strengthened in FW-S15.
+
+---
+
+### FW-S15 — Model-adequacy stress test and residual spatial null
+
+**Question:** Is the leaf-off signal readily recoverable by several bounded LiDAR-only profile models, and does best-model residual connectivity exceed local-structure-preserving null rearrangements?
+
+**Models, same five held-out east-west folds:**
+- linear ridge: R² = 0.01993;
+- fixed quadratic/interactions ridge: R² = 0.02666;
+- deterministic shallow CART: R² = 0.01144.
+
+Best tested method: quadratic/interactions ridge. About 97.3% of held-out mean-baseline variance remains uncaptured by that tested model.
+
+**Residual spatial result:** 655 confidence/spectral-support-gated cells; upper-tail residual selection = 131 cells; 77.10% of selected cells occur in multi-cell patches; 33 multi-cell patches; largest patch = 10 cells / 250 m².
+
+**Conditional block-permutation null:** 99 deterministic permutations at 15, 20, and 30 m tile scales. Observed multi-cell fraction = 77.10%; null means = 57.01%, 64.98%, and 67.33%; exceedance p = 0.01 at all three scales. Largest-patch exceedance p = 0.02, 0.01, and 0.02 respectively.
+
+**Boundary:** Bounded model stress test, not exhaustive LiDAR modeling. Tile null preserves within-tile selected-cell structure and is not a universal test of spatial randomness or evidence of a biological process.
+
+**Status:** canonical-central in structure-complementarity v4.
+
+---
+
+### FW-S16 — Blind matched-pair morphology review, first follow-up
+
+**Question:** With LiDAR profile held closely matched, are high-positive residual locations visually/morphologically distinguishable from near-zero controls without revealing which side is which?
+
+**Design:** 24 deterministic A/B matched pairs; high-positive residual target vs matched near-zero control; LiDAR-share RMSE matching; morphology coding frozen before reveal.
+
+**Persisted evidence located:** `farm-watch-blind-morphology-reveal-v1.json` (File Library, created 2026-09-19) contains all 24 role assignments and post-reveal deltas. It explicitly warns that the reveal is only for post-annotation attribution.
+
+**What is *not* durably located:** The actual frozen morphology annotation labels/notes were not found in the repo or File Library during this consolidation. Therefore the reveal key alone must not be treated as a completed morphology result.
+
+**Status:** persisted-QA for reveal metadata; morphology-result durability unresolved.
+
+---
+
+### FW-S17 — Strict second-round blind morphology sample
+
+**Question:** Can the blind morphology comparison be repeated on a stricter, non-overlapping holdout with tighter LiDAR matching and balanced residual severity?
+
+**Method:** `blind_morphology_matched_pair_sample_v3_balanced_global`.
+
+**Protocol:** 12 pairs balanced 4/4/4 across positive-residual quartiles 2–4; excludes six exploratory pairs plus every target/control from the revealed 24-pair first follow-up; globally unique controls; |control residual| ≤ 0.50 sigma; LiDAR-share RMSE ≤ 0.06; target-minus-control residual ≥ 0.05; target-to-target spacing ≥ 2 grid cells; deterministic blinded A/B role assignment.
+
+**Implementation:** `buildExpandedBlindReviewSample()` in `leaf-off-lidar-audit.js`. Supporting diagnostics include global unique-control matching capacity and control residual-band sweeps.
+
+**Completion evidence:** No second-round reveal/annotation artifact was located during this consolidation.
+
+**Status:** protocol-ready. Do not describe the second-round morphology result as completed unless its frozen annotations/reveal artifact are recovered.
+
+## Provenance discrepancies that must remain explicit
+
+### LiDAR acquisition-time basis
+
+The older browser QA path contains point-time logic and a historical note using a 2025-03-09 point-time inference under a documented COPC/header conflict.
+
+The current central Phase 3 physical artifact intentionally uses **central STAC item datetime metadata**, currently `2025-12-13T00:00:00Z`, as `acquisition_utc_range` / display provenance.
+
+These are different provenance interpretations. The structural computations do not depend on the displayed date, but any temporal language does.
+
+**Status:** unresolved provenance reconciliation. Do not silently substitute one date for the other.
+
+### Historical R² ≈ 0.057
+
+A prior session reported a browser-QA full-profile result around R² ≈ 0.057. No durable artifact matching that value was found here, while the current central reproduction yields linear R² = 0.01993 and best tested bounded-model R² = 0.02666.
+
+**Status:** historical-session-only. Recover the exact old artifact/source state before drawing conclusions from the discrepancy.
+
+## What is already answered well enough not to repeat by default
+
+1. **Is the 7 m leaf-off product merely the LiDAR dominant-height rendering in disguise?** No under the tested current representation; dominant band explains only ~0.7% of leaf-off variance.
+2. **Does using the full tested LiDAR vertical profile remove the complementarity?** No; linear held-out R² is ~0.020 and the best bounded nonlinear tested model reaches ~0.027.
+3. **Are high-positive best-model residuals only isolated single cells?** No under the current gated upper-tail definition; 77.1% occur in multi-cell patches.
+4. **Does that connectivity exceed the specific 15/20/30 m local-structure-preserving tile nulls?** Yes for the current validation parcel and v4 artifact.
+5. **Did we already investigate residual morphology with LiDAR-matched controls?** Yes. Exploratory matched controls, a 24-pair blinded follow-up/reveal, and a stricter second-round protocol all exist. The missing piece is durable annotation/result preservation, not invention of another generic morphology experiment.
+6. **Did we already examine cross-year leaf-off transfer, registration sensitivity, estimator-component decomposition, and broader spatial support?** Yes as QA. Only the basic independent rank-transfer result is currently central; the other numeric outputs are not durably preserved.
+
+## Actually unresolved / high-value follow-ups
+
+These are the current gaps after consolidation:
+
+1. **Recover or formally retire the missing morphology annotations.** Locate the frozen first-round morphology labels/notes and any strict second-round review output. If they cannot be recovered, record that loss explicitly before deciding whether a rerun is scientifically justified.
+2. **Reconcile LiDAR temporal provenance.** Resolve STAC 2025-12-13 versus the older point-time/header interpretation before using LiDAR timing in any temporal/change claim.
+3. **Recover the historical ~0.057 R² artifact or retire that number.** Determine whether it came from a different grid, source selection, date interpretation, product version, or transient browser state.
+4. **Decide whether non-central QA results need preservation.** Registration, decomposition, aggregation, and historical LiDAR temporal outputs are method-complete but numerically fragile because their outputs were not centrally materialized.
+5. **Environmental conditioning is genuinely separate work.** No current code was found that jointly models best-model residuals against canopy, terrain position, SSURGO, and hydrology/wetland context. If pursued, it should be framed as a new named experiment and should reuse the frozen central v4 residual definition rather than recomputing the earlier pipeline.
+
+## Source map
+
+Notebook:
+- `public/projects/farm-watch/lidar-audit.js`
+- `public/projects/farm-watch/lidar-point-audit.js`
+- `public/projects/farm-watch/leaf-off-structure.js`
+- `public/projects/farm-watch/leaf-off-lidar-audit.js`
+- `public/projects/farm-watch/structure-synthesis.js`
+
+Cadastory:
+- `supabase/functions/_shared/farm-watch-lidar-physical-contract.ts`
+- `supabase/functions/_shared/farm-watch-leaf-off-contract.ts`
+- `supabase/functions/_shared/farm-watch-structure-synthesis-contract.ts`
+- `scripts/farm-watch-lidar-physical-materialize.ts`
+- `scripts/farm-watch-leaf-off-materialize.ts`
+- `supabase/functions/farm-watch-structure-synthesis-worker/index.ts`
+- `docs/FARM_WATCH_LANDSCAPE_CONTEXT_V1.md`
+- `docs/FARM_WATCH_LANDSCAPE_PHYSICAL_CONTEXT_V1.md`
+
+External preserved artifact located during consolidation:
+- `farm-watch-blind-morphology-reveal-v1.json` — 24-pair first-follow-up reveal metadata only; morphology labels were not located.
+
+## Rule for future Farm Watch structural work
+
+A proposed experiment must identify which ledger item it extends and state exactly what new uncertainty it resolves.
+
+“Correlate leaf-off with LiDAR,” “look at residual patches,” “compare matched controls,” “test whether the layers are complementary,” and “see whether broader spatial support helps” are not new experiments without a materially different, pre-specified question.
