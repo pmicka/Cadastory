@@ -22,7 +22,8 @@ const ALLOWED_ORIGINS = new Set([
 
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] }
-const HYDRO_BUFFER_M = 1000
+const HYDRO_BUFFER_M = 3000
+const HYDRO_DISPLAY_BUFFER_M = 1000
 const HYDRO_AVAILABLE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const HYDRO_PARTIAL_TTL_MS = 60 * 60 * 1000
 const SOIL_MAP_TTL_MS = 30 * 24 * 60 * 60 * 1000
@@ -268,10 +269,31 @@ function soilDeepProfilesNeedRefresh(soils: any) {
 }
 
 function hydrologyNeedsRefresh(hydrology: any) {
+  const identityStatus = String(hydrology?.summary?.identity_status || '')
+  const bufferM = Number(hydrology?.summary?.buffer_m)
   const retrievedAt = Date.parse(hydrology?.summary?.retrieved_at || '')
+  if (identityStatus !== 'current') return true
+  if (!Number.isFinite(bufferM) || bufferM < HYDRO_BUFFER_M) return true
   if (!Number.isFinite(retrievedAt)) return true
   const ttl = hydrology?.status === 'available' ? HYDRO_AVAILABLE_TTL_MS : HYDRO_PARTIAL_TTL_MS
   return Date.now() - retrievedAt > ttl
+}
+
+function filterFeatureCollectionByDistance(collection: any, maxDistanceM: number) {
+  const features = Array.isArray(collection?.features) ? collection.features : []
+  return {
+    type: 'FeatureCollection',
+    features: features.filter((feature: any) => {
+      const properties = feature?.properties || {}
+      if (properties.intersects_property === true) return true
+      const distanceM = Number(properties.distance_m)
+      return Number.isFinite(distanceM) && distanceM <= maxDistanceM
+    }),
+  }
+}
+
+function landscapeDomainNeedsRefresh(domain: any) {
+  return domain?.status === 'missing' || domain?.status === 'stale'
 }
 
 async function refreshHydrology(slug: string, boundary: any) {
@@ -401,6 +423,43 @@ Deno.serve(async (req: Request) => {
     }
   }
 
+  let landscapeDomain: any = null
+  let landscapeDomainError: any = null
+  let landscapeContext: any = null
+  let landscapeContextError: any = null
+
+  if (!hydrologyError && hydrology?.status === 'available' && hydrology?.summary?.identity_status === 'current') {
+    const domainRead = await admin.rpc('farm_watch_get_landscape_domain_v1_internal', { p_slug: slug })
+    landscapeDomain = domainRead.data
+    landscapeDomainError = domainRead.error
+
+    if (landscapeDomainError) {
+      console.error('farm_watch_get_landscape_domain_v1_internal failed', landscapeDomainError.message)
+    } else if (landscapeDomainNeedsRefresh(landscapeDomain)) {
+      const refresh = await admin.rpc('farm_watch_refresh_landscape_domain_v1_internal', { p_slug: slug })
+      if (refresh.error) {
+        console.error('farm_watch_refresh_landscape_domain_v1_internal failed', refresh.error.message)
+      } else {
+        const reread = await admin.rpc('farm_watch_get_landscape_domain_v1_internal', { p_slug: slug })
+        if (reread.error) {
+          console.error('farm_watch_get_landscape_domain_v1_internal refresh read failed', reread.error.message)
+          landscapeDomainError = reread.error
+        } else {
+          landscapeDomain = reread.data
+        }
+      }
+    }
+
+    if (!landscapeDomainError && landscapeDomain?.status === 'available') {
+      const contextRead = await admin.rpc('farm_watch_get_landscape_context_v1_internal', { p_slug: slug })
+      landscapeContext = contextRead.data
+      landscapeContextError = contextRead.error
+      if (landscapeContextError) {
+        console.error('farm_watch_get_landscape_context_v1_internal failed', landscapeContextError.message)
+      }
+    }
+  }
+
   let center = storedCenter(property)
   if (!center) {
     const address = [property.street_address, property.city, property.state_code, property.postal_code]
@@ -430,9 +489,20 @@ Deno.serve(async (req: Request) => {
       soils_geojson: soilsError || !soils?.feature_collection ? EMPTY_FEATURE_COLLECTION : soils.feature_collection,
       soils_status: soilsError ? 'unavailable' : soils?.status || 'unavailable',
       soils_summary: soilsError ? null : soils?.summary || null,
-      hydrology_geojson: hydrologyError || !hydrology?.feature_collection ? EMPTY_FEATURE_COLLECTION : hydrology.feature_collection,
+      hydrology_geojson: hydrologyError || !hydrology?.feature_collection
+        ? EMPTY_FEATURE_COLLECTION
+        : filterFeatureCollectionByDistance(hydrology.feature_collection, HYDRO_DISPLAY_BUFFER_M),
       hydrology_status: hydrologyError ? 'unavailable' : hydrology?.status || 'unavailable',
       hydrology_summary: hydrologyError ? null : hydrology?.summary || null,
+      hydrology_display_buffer_m: HYDRO_DISPLAY_BUFFER_M,
+      hydrology_model_buffer_m: HYDRO_BUFFER_M,
+      landscape_context: landscapeContextError ? null : landscapeContext,
+      landscape_context_status: landscapeContextError
+        ? 'unavailable'
+        : landscapeContext?.status || landscapeDomain?.status || 'unavailable',
+      landscape_domain_identity: landscapeDomainError || !landscapeDomain?.identity
+        ? null
+        : landscapeDomain.identity,
     },
     access: { scope: 'owner_only' },
   }, 200, origin)
