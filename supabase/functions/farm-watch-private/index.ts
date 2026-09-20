@@ -383,6 +383,14 @@ Deno.serve(async (req: Request) => {
   })
   if (accessError || allowed !== true) return json({ error: 'not found' }, 404, origin)
 
+  const { data: accountRole, error: accountRoleError } = await admin.rpc('farm_watch_get_account_role_v1_internal', {
+    p_user_id: user.id,
+  })
+  if (accountRoleError || typeof accountRole !== 'string') {
+    console.error('farm_watch_get_account_role_v1_internal failed', accountRoleError?.message || 'role unavailable')
+    return json({ error: 'not found' }, 404, origin)
+  }
+
   const requestUrl = new URL(req.url)
   const slug = boundedSlug(requestUrl.searchParams.get('property'))
   if (!slug) return json({ error: 'invalid property selector' }, 400, origin)
@@ -548,6 +556,12 @@ Deno.serve(async (req: Request) => {
         ? null
         : landscapeDomain.identity,
     },
-    access: { scope: 'owner_only' },
+    access: {
+      scope: 'private',
+      account_role: accountRole,
+      capabilities: {
+        qa_controls: accountRole === 'owner',
+      },
+    },
   }, 200, origin)
 })
