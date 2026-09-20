@@ -428,7 +428,11 @@ Deno.serve(async (req: Request) => {
   let landscapeContext: any = null
   let landscapeContextError: any = null
 
-  if (!hydrologyError && hydrology?.status === 'available' && hydrology?.summary?.identity_status === 'current') {
+  if (
+    !hydrologyError &&
+    hydrology?.summary?.identity_status === 'current' &&
+    Number(hydrology?.summary?.buffer_m) >= HYDRO_BUFFER_M
+  ) {
     const domainRead = await admin.rpc('farm_watch_get_landscape_domain_v1_internal', { p_slug: slug })
     landscapeDomain = domainRead.data
     landscapeDomainError = domainRead.error
