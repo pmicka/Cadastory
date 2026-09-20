@@ -32,6 +32,11 @@ import {
   structureSynthesisSourceSignature,
   validateStructureSynthesisArtifact,
 } from '../_shared/farm-watch-structure-synthesis-contract.ts'
+import {
+  FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT,
+  landscapeStructureSourceSignature,
+  validateLandscapeStructureArtifact,
+} from '../_shared/farm-watch-landscape-structure-contract.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -53,7 +58,7 @@ const ALLOWED_ORIGINS = new Set([
 ])
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 
-type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity'
+type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context'
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -97,7 +102,8 @@ function productKey(value: unknown): ProductKey | null {
       key === FARM_WATCH_LIDAR_SOURCE_PRODUCT.key ||
       key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key ||
       key === FARM_WATCH_LEAF_OFF_PRODUCT.key ||
-      key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key
+      key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key ||
+      key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key
     ? key as ProductKey
     : null
 }
@@ -137,6 +143,15 @@ function productSpec(key: ProductKey) {
       algorithmVersion: FARM_WATCH_LEAF_OFF_PRODUCT.algorithmVersion,
       outputSchemaVersion: FARM_WATCH_LEAF_OFF_PRODUCT.outputSchemaVersion,
       sourceSignature: FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
+    }
+  }
+  if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
     }
   }
   return {
@@ -189,12 +204,13 @@ function validateArtifact(key: ProductKey, value: any) {
   if (key === FARM_WATCH_LIDAR_SOURCE_PRODUCT.key) return validateLidarSourceArtifact(value)
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) return validateLidarPhysicalArtifact(value)
   if (key === FARM_WATCH_LEAF_OFF_PRODUCT.key) return validateLeafOffArtifact(value)
+  if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return validateLandscapeStructureArtifact(value)
   return validateStructureSynthesisArtifact(value)
 }
 
 async function readStaticState(
   slug: string,
-  key: Exclude<ProductKey, 'lidar-physical-structure' | 'structure-complementarity'>,
+  key: Exclude<ProductKey, 'lidar-physical-structure' | 'structure-complementarity' | 'landscape-structure-context'>,
 ) {
   const spec = productSpec(key)
   const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
@@ -279,9 +295,48 @@ async function readStructureSynthesisState(slug: string) {
   return data
 }
 
+async function readLandscapeStructureState(slug: string) {
+  const { data: domain, error: domainError } = await admin.rpc(
+    'farm_watch_get_landscape_domain_v1_internal',
+    { p_slug: slug },
+  )
+  if (domainError) {
+    throw new Error(`landscape domain state read failed: ${domainError.message}`)
+  }
+  const domainIdentity = String(domain?.identity?.identity_sha256 || '').toLowerCase()
+  if (
+    domain?.status !== 'available' ||
+    !domain?.zones?.local_500m ||
+    !/^[0-9a-f]{64}$/.test(domainIdentity)
+  ) {
+    return {
+      status: String(domain?.status || 'missing'),
+      identity: null,
+      build: null,
+      materialization: null,
+    }
+  }
+  const sourceSignature = landscapeStructureSourceSignature({
+    landscapeDomainIdentitySha256: domainIdentity,
+    landscapeDomainAlgorithmVersion: String(domain?.identity?.algorithm_version || ''),
+    lidarSourceContractSignature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+  })
+  const spec = productSpec(FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key)
+  const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
+    p_slug: slug,
+    p_product_kind: spec.productKind,
+    p_algorithm_version: spec.algorithmVersion,
+    p_output_schema_version: spec.outputSchemaVersion,
+    p_source_signature: sourceSignature,
+  })
+  if (error) throw new Error(`landscape structure materialization state read failed: ${error.message}`)
+  return data
+}
+
 async function readState(slug: string, key: ProductKey) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) return readLidarPhysicalState(slug)
   if (key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key) return readStructureSynthesisState(slug)
+  if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return readLandscapeStructureState(slug)
   return readStaticState(slug, key)
 }
 
@@ -525,6 +580,9 @@ async function buildMaterialization(slug: string, key: ProductKey, workerId: str
   }
   if (key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key) {
     throw new Error('Structure synthesis materialization uses the dedicated GitHub OIDC worker')
+  }
+  if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) {
+    throw new Error('Landscape structure materialization uses the dedicated GitHub OIDC worker')
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
