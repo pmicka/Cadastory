@@ -85,6 +85,7 @@ on conflict (id) do update set
   updated_at = now();
 
 create or replace function farm_watch.farm_watch_materialization_identity_v1(
+  p_property_id uuid,
   p_boundary extensions.geometry,
   p_stated_acres numeric,
   p_product_kind text,
@@ -118,6 +119,7 @@ as $$
           convert_to(
             concat_ws(
               '|',
+              coalesce(p_property_id::text,''),
               coalesce(p_product_kind,''),
               coalesce(p_algorithm_version,''),
               coalesce(p_output_schema_version,''),
@@ -171,6 +173,7 @@ begin
   end if;
 
   v_identity := farm_watch.farm_watch_materialization_identity_v1(
+    v_property.id,
     v_property.boundary,
     v_property.stated_acres,
     p_product_kind,
@@ -343,6 +346,7 @@ begin
       convert_to(
         concat_ws(
           '|',
+          v_build.property_id::text,
           v_build.input_signature_sha256,
           p_sampled_source_sha256,
           p_artifact_sha256,
@@ -469,6 +473,7 @@ begin
   end if;
 
   v_identity := farm_watch.farm_watch_materialization_identity_v1(
+    v_property.id,
     v_property.boundary,
     v_property.stated_acres,
     p_product_kind,
@@ -544,7 +549,7 @@ begin
 end;
 $$;
 
-revoke all on function farm_watch.farm_watch_materialization_identity_v1(extensions.geometry,numeric,text,text,text,text)
+revoke all on function farm_watch.farm_watch_materialization_identity_v1(uuid,extensions.geometry,numeric,text,text,text,text)
   from public, anon, authenticated;
 revoke all on function farm_watch.farm_watch_claim_materialization_build_v1_internal(text,text,text,text,text,text,integer)
   from public, anon, authenticated;
@@ -555,7 +560,7 @@ revoke all on function farm_watch.farm_watch_fail_materialization_build_v1_inter
 revoke all on function farm_watch.farm_watch_get_materialization_v1_internal(text,text,text,text,text)
   from public, anon, authenticated;
 
-grant execute on function farm_watch.farm_watch_materialization_identity_v1(extensions.geometry,numeric,text,text,text,text)
+grant execute on function farm_watch.farm_watch_materialization_identity_v1(uuid,extensions.geometry,numeric,text,text,text,text)
   to postgres, service_role;
 grant execute on function farm_watch.farm_watch_claim_materialization_build_v1_internal(text,text,text,text,text,text,integer)
   to postgres, service_role;
