@@ -488,7 +488,7 @@ function buildSynthesis(physical: any, leaf: any) {
       leaf_off_acquisition_date: leafProduct.acquisitionDate,
       lidar_acquisition_utc_range: physical.acquisition_utc_range,
       note:
-        'The leaf-off observation precedes the LiDAR acquisition by approximately one year; this is current structural context, not a same-day sensor fusion or change product.',
+        'The leaf-off observation predates the current LiDAR acquisition. The sensors are not contemporaneous; this is structural context, not a same-day fusion or change product.',
     },
     summary: {
       shared_cell_count: records.length,
