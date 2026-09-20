@@ -174,6 +174,30 @@ async function sha256Hex(value: Uint8Array | string) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+function trimPngStream(bytes: Uint8Array) {
+  const signature = [137, 80, 78, 71, 13, 10, 26, 10]
+  if (bytes.length < 20 || !signature.every((value, index) => bytes[index] === value)) {
+    throw new Error('Raster response is not a PNG stream')
+  }
+  let offset = 8
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  while (offset + 12 <= bytes.length) {
+    const length = view.getUint32(offset, false)
+    const typeOffset = offset + 4
+    const end = offset + 12 + length
+    if (end > bytes.length) throw new Error('PNG chunk exceeds response length')
+    const type = String.fromCharCode(
+      bytes[typeOffset],
+      bytes[typeOffset + 1],
+      bytes[typeOffset + 2],
+      bytes[typeOffset + 3],
+    )
+    if (type === 'IEND') return bytes.slice(0, end)
+    offset = end
+  }
+  throw new Error('PNG IEND chunk is unavailable')
+}
+
 async function fetchRaster(
   baseUrl: string,
   bounds: any,
@@ -194,7 +218,8 @@ async function fetchRaster(
   const response = await fetch(url, { headers: { accept: 'image/png,image/*' } })
   if (!response.ok) throw new Error('Raster source returned ' + response.status)
   const bytes = new Uint8Array(await response.arrayBuffer())
-  const png = PNG.sync.read(Buffer.from(bytes))
+  const pngBytes = trimPngStream(bytes)
+  const png = PNG.sync.read(Buffer.from(pngBytes))
   if (png.width !== dimensions.width || png.height !== dimensions.height) {
     throw new Error(
       'Raster dimension mismatch: expected ' + dimensions.width + 'x' + dimensions.height +
