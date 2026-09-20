@@ -22,6 +22,11 @@ import {
   lidarPhysicalSourceSignature,
   validateLidarPhysicalArtifact,
 } from '../_shared/farm-watch-lidar-physical-contract.ts'
+import {
+  FARM_WATCH_LEAF_OFF_PRODUCT,
+  FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
+  validateLeafOffArtifact,
+} from '../_shared/farm-watch-leaf-off-contract.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -43,7 +48,7 @@ const ALLOWED_ORIGINS = new Set([
 ])
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 
-type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure'
+type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure'
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -85,7 +90,8 @@ function productKey(value: unknown): ProductKey | null {
   const key = String(value || '')
   return key === FARM_WATCH_TERRAIN_PRODUCT.key ||
       key === FARM_WATCH_LIDAR_SOURCE_PRODUCT.key ||
-      key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key
+      key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key ||
+      key === FARM_WATCH_LEAF_OFF_PRODUCT.key
     ? key as ProductKey
     : null
 }
@@ -109,12 +115,21 @@ function productSpec(key: ProductKey) {
       sourceSignature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
     }
   }
+  if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
   return {
     key,
-    productKind: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.productKind,
-    algorithmVersion: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.algorithmVersion,
-    outputSchemaVersion: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.outputSchemaVersion,
-    sourceSignature: null,
+    productKind: FARM_WATCH_LEAF_OFF_PRODUCT.productKind,
+    algorithmVersion: FARM_WATCH_LEAF_OFF_PRODUCT.algorithmVersion,
+    outputSchemaVersion: FARM_WATCH_LEAF_OFF_PRODUCT.outputSchemaVersion,
+    sourceSignature: FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
   }
 }
 
@@ -155,7 +170,8 @@ function validateLidarSourceArtifact(value: any) {
 function validateArtifact(key: ProductKey, value: any) {
   if (key === FARM_WATCH_TERRAIN_PRODUCT.key) return validateTerrainArtifact(value)
   if (key === FARM_WATCH_LIDAR_SOURCE_PRODUCT.key) return validateLidarSourceArtifact(value)
-  return validateLidarPhysicalArtifact(value)
+  if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) return validateLidarPhysicalArtifact(value)
+  return validateLeafOffArtifact(value)
 }
 
 async function readStaticState(slug: string, key: Exclude<ProductKey, 'lidar-physical-structure'>) {
@@ -443,6 +459,9 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
 async function buildMaterialization(slug: string, key: ProductKey, workerId: string) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) {
     throw new Error('LiDAR physical materialization uses the dedicated GitHub OIDC worker')
+  }
+  if (key === FARM_WATCH_LEAF_OFF_PRODUCT.key) {
+    throw new Error('Leaf-off materialization uses the dedicated GitHub OIDC worker')
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
