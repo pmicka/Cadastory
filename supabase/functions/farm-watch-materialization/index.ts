@@ -155,8 +155,8 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
     const summary = {
       grid_size: artifact.grid.size,
       raster_observation_count: artifact.grid.values.filter(Number.isFinite).length,
-      elevation_min_ft: artifact.grid.min,
-      elevation_max_ft: artifact.grid.max,
+      grid_extent_min_ft: artifact.grid.min,
+      grid_extent_max_ft: artifact.grid.max,
       contour_interval_ft: artifact.contours.summary.interval,
       contour_path_count: artifact.contours.summary.pathCount,
       flow_trace_count: artifact.flow_paths.length,
@@ -211,6 +211,80 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
   }
 }
 
+
+async function terrainReadPayload(slug: string, state: any, knownSha256: string | null = null) {
+  const status = String(state?.status || 'missing')
+  const materialization = state?.materialization || null
+  const safeState = {
+    status,
+    identity: state?.identity || null,
+    build: state?.build || null,
+    materialization: materialization ? {
+      id: materialization.id,
+      identity_sha256: materialization.identity_sha256,
+      evidence_class: materialization.evidence_class,
+      summary: materialization.summary || {},
+      source_provenance: materialization.source_provenance || {},
+      limitations: materialization.limitations || [],
+      artifact_format: materialization.artifact_format,
+      artifact_size_bytes: materialization.artifact_size_bytes,
+      artifact_sha256: materialization.artifact_sha256,
+      completed_at: materialization.completed_at,
+      expires_at: materialization.expires_at,
+    } : null,
+  }
+
+  if (status !== 'available' || !materialization) {
+    return {
+      property: { slug },
+      product: FARM_WATCH_TERRAIN_PRODUCT.key,
+      ...safeState,
+      artifact: null,
+      not_modified: false,
+    }
+  }
+
+  const artifactSha256 = validSha256(String(materialization.artifact_sha256 || ''))
+  if (!artifactSha256) throw new Error('materialization artifact checksum is invalid')
+
+  if (knownSha256 === artifactSha256) {
+    return {
+      property: { slug },
+      product: FARM_WATCH_TERRAIN_PRODUCT.key,
+      ...safeState,
+      artifact: null,
+      not_modified: true,
+    }
+  }
+
+  const { data: blob, error: downloadError } = await admin.storage
+    .from(String(materialization.artifact_bucket))
+    .download(String(materialization.artifact_path))
+  if (downloadError || !blob) {
+    throw new Error(`materialization artifact download failed: ${downloadError?.message || 'empty artifact'}`)
+  }
+
+  const bytes = new Uint8Array(await blob.arrayBuffer())
+  const downloadedSha256 = await sha256Hex(bytes)
+  if (downloadedSha256 !== artifactSha256) throw new Error('materialization artifact checksum mismatch')
+
+  let artifact: any
+  try {
+    artifact = JSON.parse(new TextDecoder().decode(bytes))
+  } catch {
+    throw new Error('materialization artifact JSON is invalid')
+  }
+  if (!validateTerrainArtifact(artifact)) throw new Error('materialization artifact is incompatible')
+
+  return {
+    property: { slug },
+    product: FARM_WATCH_TERRAIN_PRODUCT.key,
+    ...safeState,
+    artifact,
+    not_modified: false,
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin') || ''
   if (origin && !ALLOWED_ORIGINS.has(origin)) return json({ error: 'not found' }, 404)
@@ -233,12 +307,12 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
-      const state = await buildTerrainMaterialization(slug, 'farm-watch-materialization-edge-v1')
-      return json({
-        property: { slug },
-        product: FARM_WATCH_TERRAIN_PRODUCT.key,
-        ...state,
-      }, 200, origin)
+      const operation = body?.operation === 'read' ? 'read' : 'build'
+      const state = operation === 'read'
+        ? await readTerrainState(slug)
+        : await buildTerrainMaterialization(slug, 'farm-watch-materialization-edge-v1')
+      const payload = await terrainReadPayload(slug, state, null)
+      return json(payload, 200, origin)
     } catch (error) {
       console.error('Farm Watch terrain materialization worker failed', error)
       return json({ error: 'materialization build failed' }, 503, origin)
@@ -280,83 +354,11 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'materialization unavailable' }, 503, origin)
   }
 
-  const status = String(state?.status || 'missing')
-  const materialization = state?.materialization || null
-  const safeState = {
-    status,
-    identity: state?.identity || null,
-    build: state?.build || null,
-    materialization: materialization ? {
-      id: materialization.id,
-      identity_sha256: materialization.identity_sha256,
-      evidence_class: materialization.evidence_class,
-      summary: materialization.summary || {},
-      source_provenance: materialization.source_provenance || {},
-      limitations: materialization.limitations || [],
-      artifact_format: materialization.artifact_format,
-      artifact_size_bytes: materialization.artifact_size_bytes,
-      artifact_sha256: materialization.artifact_sha256,
-      completed_at: materialization.completed_at,
-      expires_at: materialization.expires_at,
-    } : null,
-  }
-
-  if (status !== 'available' || !materialization) {
-    return json({
-      property: { slug },
-      product: FARM_WATCH_TERRAIN_PRODUCT.key,
-      ...safeState,
-      artifact: null,
-      not_modified: false,
-    }, 200, origin)
-  }
-
-  const artifactSha256 = validSha256(String(materialization.artifact_sha256 || ''))
-  if (!artifactSha256) {
-    console.error('Farm Watch materialization artifact checksum is invalid')
-    return json({ error: 'materialization unavailable' }, 503, origin)
-  }
-
-  if (knownSha256 === artifactSha256) {
-    return json({
-      property: { slug },
-      product: FARM_WATCH_TERRAIN_PRODUCT.key,
-      ...safeState,
-      artifact: null,
-      not_modified: true,
-    }, 200, origin)
-  }
-
-  const { data: blob, error: downloadError } = await admin.storage
-    .from(String(materialization.artifact_bucket))
-    .download(String(materialization.artifact_path))
-  if (downloadError || !blob) {
-    console.error('Farm Watch materialization download failed', downloadError?.message || 'empty artifact')
-    return json({ error: 'materialization unavailable' }, 503, origin)
-  }
-
-  const bytes = new Uint8Array(await blob.arrayBuffer())
-  const downloadedSha256 = await sha256Hex(bytes)
-  if (downloadedSha256 !== artifactSha256) {
-    console.error('Farm Watch materialization checksum mismatch')
-    return json({ error: 'materialization integrity failure' }, 503, origin)
-  }
-
-  let artifact: any
   try {
-    artifact = JSON.parse(new TextDecoder().decode(bytes))
-  } catch {
-    return json({ error: 'materialization integrity failure' }, 503, origin)
+    const payload = await terrainReadPayload(slug, state, knownSha256)
+    return json(payload, 200, origin)
+  } catch (error) {
+    console.error('Farm Watch materialization read failed', error)
+    return json({ error: 'materialization unavailable' }, 503, origin)
   }
-  if (!validateTerrainArtifact(artifact)) {
-    return json({ error: 'materialization incompatible' }, 503, origin)
-  }
-
-  return json({
-    property: { slug },
-    product: FARM_WATCH_TERRAIN_PRODUCT.key,
-    ...safeState,
-    artifact,
-    not_modified: false,
-  }, 200, origin)
 })
