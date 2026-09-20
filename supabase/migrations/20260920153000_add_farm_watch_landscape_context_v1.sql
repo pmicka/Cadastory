@@ -836,6 +836,35 @@ as $$
       on z.geom is not null and f.geometry is not null and extensions.st_intersects(f.geometry,z.geom)
     group by z.radius_m
   ),
+  crop_rows as (
+    select
+      f.latest_crop_year,
+      f.latest_crop_code,
+      c.class_name,
+      f.id field_id,
+      extensions.st_area(
+        extensions.st_intersection(f.geometry,d.broad_3000m)::extensions.geography
+      )/4046.8564224 intersected_acres
+    from agriculture.field_boundaries f
+    cross join domain d
+    left join agriculture.cdl_classes c
+      on c.year=f.latest_crop_year
+     and c.class_code=f.latest_crop_code
+    where d.broad_3000m is not null
+      and f.geometry is not null
+      and extensions.st_intersects(f.geometry,d.broad_3000m)
+  ),
+  crop_stats as (
+    select
+      latest_crop_year,
+      latest_crop_code,
+      class_name,
+      count(distinct field_id)::integer field_count,
+      sum(intersected_acres) intersected_acres
+    from crop_rows
+    where latest_crop_year is not null and latest_crop_code is not null
+    group by latest_crop_year,latest_crop_code,class_name
+  ),
   access_rows as (
     select
       a.*,
@@ -917,7 +946,17 @@ as $$
           ) order by radius_m)
           from field_stats
         ),'[]'::jsonb),
-        'interpretation_boundary','Mapped agricultural-field context only. A mapped field is not itself evidence of current forage quality or deer use.'
+        'latest_crop_composition_3000m',coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'year',latest_crop_year,
+            'class_code',latest_crop_code,
+            'class_name',class_name,
+            'field_count',field_count,
+            'intersected_field_acres',round(intersected_acres::numeric,2)
+          ) order by intersected_acres desc,latest_crop_code)
+          from crop_stats
+        ),'[]'::jsonb),
+        'interpretation_boundary','Mapped field and CDL crop/land-cover context only. A mapped class does not itself establish current forage quality, crop availability, harvest state, or deer use.'
       ),
       'human_access',jsonb_build_object(
         'radius_m',1500,
