@@ -1,0 +1,28 @@
+name: Farm Watch terrain CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-terrain.ts'
+      - 'supabase/functions/_shared/farm-watch-terrain-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-terrain.test.ts'
+      - 'supabase/functions/farm-watch-materialization/index.ts'
+      - 'scripts/farm-watch-terrain-materialize.ts'
+      - '.github/workflows/farm-watch-terrain-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  terrain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check terrain module
+        run: deno check supabase/functions/_shared/farm-watch-terrain.ts
+      - name: Run terrain tests
+        run: deno test supabase/functions/_shared/farm-watch-terrain.test.ts
