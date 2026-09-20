@@ -2,6 +2,16 @@
 
 These instructions apply to the entire repository.
 
+## Farm Watch structural-science ledger
+
+Before proposing, implementing, rerunning, or promoting a Farm Watch experiment involving LiDAR vertical structure, leaf-off aerial texture/woody-pattern structure, cross-year transfer, cross-layer complementarity, residual attribution, spatial residuals, matched controls, or blind morphology review, read:
+
+- `docs/FARM_WATCH_STRUCTURE_EVIDENCE_LEDGER.md`
+
+Treat that ledger as the durable index of already-run science. A new experiment must identify which ledger item it extends and what genuinely new uncertainty it resolves. Do not repeat an existing analysis merely because its old numeric output was browser-local; if the result is not durably preserved, treat that first as a provenance/recovery decision.
+
+Keep experimental interpretation boundaries intact. Structural evidence does not silently become understory, species, habitat quality, bedding, animal-use, causation, or vegetation-change evidence.
+
 ## Scout MCP architecture doctrine
 
 Before changing any Scout MCP tool, public/model-visible capability, routing contract, privacy/exposure rule, presentation contract, external-capability handoff, persistent agent state, or specialized Scout surface, read and follow:
