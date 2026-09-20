@@ -75,6 +75,8 @@ begin
   left join farm_watch.property_landscape_domains_v1 d
     on d.property_id=p.id
    and d.status='available'
+   and d.identity_sha256 =
+     farm_watch.farm_watch_context_identity_v1(p.id,'landscape-domain')->>'identity_sha256'
   where p.id=p_property_id
     and p.status='active'
   limit 1;
@@ -294,25 +296,44 @@ begin
     union all
     select 3000,v_broad
   ),
-  zone_stats as (
+  zone_parts as (
     select
       z.radius_m,
-      count(distinct f.id)::integer field_count,
-      extensions.st_area(z.geom::extensions.geography) zone_area_m2,
-      coalesce(sum(
-        extensions.st_area(
-          extensions.st_intersection(f.geometry,z.geom)::extensions.geography
-        )
-      ),0) field_area_m2,
-      coalesce(sum(
-        extensions.st_length(
-          extensions.st_intersection(extensions.st_boundary(f.geometry),z.geom)::extensions.geography
-        )
-      ),0) field_edge_m
+      z.geom zone_geom,
+      f.id,
+      extensions.st_collectionextract(
+        extensions.st_makevalid(extensions.st_intersection(f.geometry,z.geom)),
+        3
+      ) field_geom,
+      extensions.st_collectionextract(
+        extensions.st_makevalid(
+          extensions.st_intersection(extensions.st_boundary(f.geometry),z.geom)
+        ),
+        2
+      ) edge_geom
     from zones z
     left join fields f
       on extensions.st_intersects(f.geometry,z.geom)
-    group by z.radius_m,z.geom
+  ),
+  zone_stats as (
+    select
+      radius_m,
+      count(distinct id)::integer field_count,
+      extensions.st_area(max(zone_geom)::extensions.geography) zone_area_m2,
+      coalesce(
+        extensions.st_area(
+          extensions.st_unaryunion(extensions.st_collect(field_geom))::extensions.geography
+        ),
+        0
+      ) field_area_m2,
+      coalesce(
+        extensions.st_length(
+          extensions.st_unaryunion(extensions.st_collect(edge_geom))::extensions.geography
+        ),
+        0
+      ) field_edge_m
+    from zone_parts
+    group by radius_m
   ),
   proximity_buffers as (
     select
@@ -323,24 +344,42 @@ begin
       ) geom
     from (values (100),(250),(500)) x(radius_m)
   ),
-  proximity_stats as (
+  proximity_parts as (
     select
       b.radius_m,
-      count(distinct f.id)::integer field_count,
-      coalesce(sum(
-        extensions.st_area(
-          extensions.st_intersection(f.geometry,b.geom)::extensions.geography
-        )
-      ),0) field_area_m2,
-      coalesce(sum(
-        extensions.st_length(
-          extensions.st_intersection(extensions.st_boundary(f.geometry),b.geom)::extensions.geography
-        )
-      ),0) field_edge_m
+      f.id,
+      extensions.st_collectionextract(
+        extensions.st_makevalid(extensions.st_intersection(f.geometry,b.geom)),
+        3
+      ) field_geom,
+      extensions.st_collectionextract(
+        extensions.st_makevalid(
+          extensions.st_intersection(extensions.st_boundary(f.geometry),b.geom)
+        ),
+        2
+      ) edge_geom
     from proximity_buffers b
     left join fields f
       on extensions.st_intersects(f.geometry,b.geom)
-    group by b.radius_m
+  ),
+  proximity_stats as (
+    select
+      radius_m,
+      count(distinct id)::integer field_count,
+      coalesce(
+        extensions.st_area(
+          extensions.st_unaryunion(extensions.st_collect(field_geom))::extensions.geography
+        ),
+        0
+      ) field_area_m2,
+      coalesce(
+        extensions.st_length(
+          extensions.st_unaryunion(extensions.st_collect(edge_geom))::extensions.geography
+        ),
+        0
+      ) field_edge_m
+    from proximity_parts
+    group by radius_m
   ),
   crop_stats as (
     select
