@@ -969,6 +969,19 @@ export async function buildLeafOffSourceProduct(
   return { product, compact, fingerprint }
 }
 
+export async function buildLeafOffSourceProductForGeometry(
+  sourceId: string,
+  boundary: any,
+  center: { lat: number; lon: number },
+) {
+  const source = FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === sourceId)
+  if (!source) throw new Error('unknown leaf-off source: ' + sourceId)
+  const projectedBoundary = projectBoundaryGeometry(boundary)
+  const bounds = projectedBounds(boundary)
+  if (!projectedBoundary || !bounds) throw new Error('leaf-off analysis geometry unavailable')
+  return await buildLeafOffSourceProduct(source, boundary, projectedBoundary, bounds, center)
+}
+
 async function freshOidcToken() {
   const requestUrl = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_URL') || ''
   const requestToken = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_TOKEN') || ''
