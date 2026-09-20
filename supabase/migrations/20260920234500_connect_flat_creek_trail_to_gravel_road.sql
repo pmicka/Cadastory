@@ -86,11 +86,8 @@ set
     ),
     true
   ),
-  notes = regexp_replace(
-    coalesce(o.notes, ''),
-    ' North branch terminates at the corrected operator-marked Phase 3 imagery-derived trail junction\.$',
-    ''
-  ) || ' North branch is restored from the source-registered gravel-road geometry and terminates exactly at the final canonical imagery-derived trail junction.',
+  notes = coalesce(o.notes, '') ||
+    ' North branch is restored from the source-registered gravel-road geometry and terminates exactly at the final canonical imagery-derived trail junction.',
   updated_at = now()
 from updated u
 where o.id = u.id;
@@ -103,14 +100,8 @@ set
     to_jsonb('connected_to_gravel_road'::text),
     true
   ),
-  notes = regexp_replace(
-    coalesce(o.notes, ''),
-    ' Road/trail topology will be reconciled after final placement verification\.
-
-commit;
-,
-    ''
-  ) || ' Final canonical trail geometry is topologically connected to the gravel-road north branch.',
+  notes = coalesce(o.notes, '') ||
+    ' Final canonical trail geometry is topologically connected to the gravel-road north branch.',
   updated_at = now()
 where o.property_id = (
     select id
