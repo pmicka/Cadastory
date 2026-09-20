@@ -1,7 +1,7 @@
 export const FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT = Object.freeze({
   key: 'structure-complementarity',
   productKind: 'structure-complementarity',
-  algorithmVersion: 'current-leaf-off-lidar-complementarity-v1',
+  algorithmVersion: 'current-leaf-off-lidar-complementarity-v2',
   outputSchemaVersion: 'structure-complementarity-v1',
   evidenceClass: 'deterministic_derived',
   artifactBucket: 'farm-watch-derived',
