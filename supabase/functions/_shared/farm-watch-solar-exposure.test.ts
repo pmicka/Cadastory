@@ -149,6 +149,8 @@ Deno.test('solar source signatures bind dependencies, date, and physical contrac
     spatialPatternArtifactSha256: 'd'.repeat(64),
   })
   assert(staticSig.includes('horizon_sector_count=24'))
+  assert(staticSig.includes('dem_support_sampling=required_orientation_and_horizon_ray_union_v2'))
+  assert(staticSig.includes('dem_required_coverage=100pct'))
   const day1 = solarExposureSourceSignature({
     solarTerrainMaterializationIdentitySha256: 'e'.repeat(64),
     solarTerrainArtifactSha256: 'f'.repeat(64),
@@ -171,6 +173,12 @@ Deno.test('static solar terrain artifact reuses target elevations and keeps neut
   assert(built.artifact.local_grid.width === 5)
   assert(built.artifact.landscape_grid.width === 3)
   assert(built.artifact.horizon_contract.sector_count === 24)
+  assert(built.artifact.method === 'terrain-horizon-canopy-context-v2')
+  assert(built.artifact.summary.support_dem_required_cell_count > 0)
+  assert(
+    built.artifact.summary.support_dem_available_required_cell_count ===
+      built.artifact.summary.support_dem_required_cell_count,
+  )
   assert(built.artifact.scoring_performed === false)
   assert(built.artifact.behavioral_inference_performed === false)
   assert(
