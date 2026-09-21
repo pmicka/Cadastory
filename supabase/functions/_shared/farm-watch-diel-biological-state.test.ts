@@ -78,8 +78,8 @@ Deno.test('unknown individual state stays unknown while regional context remains
       breeding_end_month: 1,
       peak_timing_label: 'mid-November',
       evidence_class: 'authoritative_regional_summary',
-      source_ids: ['uky-white-tailed-deer-biology-kentucky'],
-      ledger_ids: ['FW-D21','FW-D23'],
+      source_ids: ['kdfwr-deer-peak-breeding-reference','uky-white-tailed-deer-biology-kentucky'],
+      ledger_ids: ['FW-D21'],
     },
   })
   assert(validateDeerBiologicalState(value))
@@ -106,8 +106,8 @@ Deno.test('female age context uses relationship form but never transfers Illinoi
       breeding_end_month: 1,
       peak_timing_label: 'mid-November',
       evidence_class: 'authoritative_regional_summary',
-      source_ids: ['kdfwr-deer-fetal-breeding-phenology'],
-      ledger_ids: ['FW-D21','FW-D23'],
+      source_ids: ['kdfwr-deer-peak-breeding-reference','uky-white-tailed-deer-biology-kentucky'],
+      ledger_ids: ['FW-D21'],
     },
   })
   assert(validateDeerBiologicalState(value))
