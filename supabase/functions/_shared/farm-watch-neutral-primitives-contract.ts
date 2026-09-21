@@ -158,10 +158,12 @@ export function spatialPatternArtifactPath(
   ].join('/')
 }
 
-function validGridCommon(grid: any) {
+function validGridCommon(grid: any, expectedCrs: string | null = null) {
   return Boolean(
     grid &&
-    grid.native_crs === 'EPSG:32616' &&
+    typeof grid.native_crs === 'string' &&
+    grid.native_crs.length > 0 &&
+    (!expectedCrs || grid.native_crs === expectedCrs) &&
     Number.isInteger(Number(grid.width)) &&
     Number(grid.width) > 0 &&
     Number.isInteger(Number(grid.height)) &&
@@ -180,7 +182,7 @@ export function validateTerrainFormArtifact(value: any) {
     value?.status === 'available' &&
     value?.evidence_class === FARM_WATCH_TERRAIN_FORM_PRODUCT.evidenceClass &&
     /^[0-9a-f]{64}$/.test(String(value?.domain?.identity_sha256 || '')) &&
-    validGridCommon(local) &&
+    validGridCommon(local, 'EPSG:32616') &&
     Number(local.cell_meters) === FARM_WATCH_TERRAIN_FORM_PRODUCT.localCellMeters &&
     typeof local.elevation_tenths_ft_u16_base64 === 'string' &&
     typeof local.slope_centipercent_u16_base64 === 'string' &&
@@ -191,7 +193,7 @@ export function validateTerrainFormArtifact(value: any) {
     typeof local.form_flags_u8_base64 === 'string' &&
     typeof local.cost_x100_u16_base64 === 'string' &&
     typeof local.permeability_u8_base64 === 'string' &&
-    validGridCommon(landscape) &&
+    validGridCommon(landscape, 'EPSG:32616') &&
     Number(landscape.cell_meters) === FARM_WATCH_TERRAIN_FORM_PRODUCT.landscapeCellMeters &&
     typeof landscape.slope_centipercent_u16_base64 === 'string' &&
     typeof landscape.cost_x100_u16_base64 === 'string' &&
@@ -213,7 +215,7 @@ export function validateSpatialPatternArtifact(value: any) {
     value?.evidence_class === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.evidenceClass &&
     /^[0-9a-f]{64}$/.test(String(value?.domain?.identity_sha256 || '')) &&
     /^[0-9a-f]{64}$/.test(String(value?.dependencies?.landscape_structure_artifact_sha256 || '')) &&
-    validGridCommon(canopy?.grid) &&
+    validGridCommon(canopy?.grid, 'EPSG:32616') &&
     Number(canopy?.grid?.cell_meters) === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.canopyCellMeters &&
     typeof canopy?.grid?.canopy_percent_u8_base64 === 'string' &&
     typeof canopy?.grid?.canopy_class_u8_base64 === 'string' &&

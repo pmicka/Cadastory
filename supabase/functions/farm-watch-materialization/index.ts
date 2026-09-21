@@ -54,6 +54,10 @@ import {
   buildTerrainFormArtifact,
 } from '../_shared/farm-watch-neutral-primitives.ts'
 import {
+  FARM_WATCH_GITHUB_OIDC_AUDIENCE,
+  verifyFarmWatchGitHubActionsOidc,
+} from '../_shared/github-actions-oidc.ts'
+import {
   materializationPresentationMode,
   normalizeFarmWatchAccountRole,
 } from '../_shared/farm-watch-presentation-policy.ts'
@@ -77,6 +81,8 @@ const ALLOWED_ORIGINS = new Set([
   'http://localhost:8000',
 ])
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
+const NEUTRAL_PRIMITIVES_WORKFLOW_REF =
+  'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main'
 
 type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context'
 
@@ -1016,11 +1022,31 @@ Deno.serve(async (req: Request) => {
     try { body = await req.json() } catch { return json({ error: 'invalid request' }, 400, origin) }
 
     const workerToken = typeof body?.worker_token === 'string' ? body.worker_token : null
-    const { data: workerAllowed, error: workerError } = await admin.rpc(
-      'farm_watch_validate_materialization_worker_v1_internal',
-      { p_token: workerToken },
-    )
-    if (workerError || workerAllowed !== true) return json({ error: 'not found' }, 404, origin)
+    let workerAllowed = false
+    if (workerToken) {
+      const { data, error } = await admin.rpc(
+        'farm_watch_validate_materialization_worker_v1_internal',
+        { p_token: workerToken },
+      )
+      if (error) console.error('Farm Watch materialization worker-token validation failed', error.message)
+      workerAllowed = data === true
+    }
+
+    let oidcIdentity: any = null
+    if (!workerAllowed) {
+      const token = bearer(req)
+      if (token) {
+        try {
+          const identity = await verifyFarmWatchGitHubActionsOidc(token)
+          if (identity?.workflow_ref === NEUTRAL_PRIMITIVES_WORKFLOW_REF) {
+            oidcIdentity = identity
+          }
+        } catch (error) {
+          console.error('Farm Watch neutral-primitives GitHub OIDC rejected', error)
+        }
+      }
+    }
+    if (!workerAllowed && !oidcIdentity) return json({ error: 'not found' }, 404, origin)
 
     const slug = boundedSlug(typeof body?.property === 'string' ? body.property : null)
     const key = productKey(body?.product)
@@ -1030,7 +1056,17 @@ Deno.serve(async (req: Request) => {
       const operation = body?.operation === 'read' ? 'read' : 'build'
       const state = operation === 'read'
         ? await readState(slug, key)
-        : await buildMaterialization(slug, key, 'farm-watch-materialization-edge-v2')
+        : await buildMaterialization(
+          slug,
+          key,
+          oidcIdentity
+            ? [
+                'github-actions-neutral-primitives',
+                oidcIdentity.run_id || 'run',
+                oidcIdentity.run_attempt || 'attempt',
+              ].join(':')
+            : 'farm-watch-materialization-edge-v2',
+        )
       const knownSha256 = validSha256(
         typeof body?.known_artifact_sha256 === 'string'
           ? body.known_artifact_sha256.trim().toLowerCase()
