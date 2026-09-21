@@ -1,5 +1,5 @@
-import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
-import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { withCollectorRun } from '../_shared/collector-runtime.ts'
 import {
   HRRR_ALGORITHM_VERSION,
