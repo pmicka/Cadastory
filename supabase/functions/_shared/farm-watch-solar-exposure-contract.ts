@@ -204,6 +204,7 @@ export function validateSolarExposureArtifact(value: any) {
   const p = FARM_WATCH_SOLAR_EXPOSURE_PRODUCT
   const gridValid = (grid: any, expectedCellMeters: number) => Boolean(
     gridCommon(grid, expectedCellMeters) &&
+    typeof grid.orientation_valid_u8_base64 === 'string' &&
     typeof grid.canopy_valid_u8_base64 === 'string' &&
     typeof grid.terrain_shadow_fraction_u8_base64 === 'string' &&
     ['full_day','morning','midday','evening'].every((window) =>
