@@ -23,7 +23,7 @@ Date-independent physical context.
 
 Algorithm:
 
-`terrain-horizon-canopy-context-v2`
+`terrain-horizon-canopy-context-v3`
 
 Product key:
 
@@ -76,9 +76,11 @@ For that reason, Solar Terrain v1 samples one bounded **unmasked** DEM support g
 - azimuth sectors: 24, at 15° spacing;
 - CRS: EPSG:32616;
 - sampling mask: only cells actually required by target-boundary orientation neighbors and the configured 24-sector horizon rays;
-- required-set DEM support coverage: exactly 100%, otherwise the build fails closed.
+- primary source: KyFromAbove Phase 3 2-foot DEM;
+- fallback source: KyFromAbove Phase 2 2-foot DEM, used **only** when a required Phase 3 sample is NoData;
+- required-set final DEM support coverage: exactly 100%, otherwise the build fails closed.
 
-The surrounding rectangular support extent is only an indexing envelope; irrelevant cells that no derivative or horizon ray can touch are not part of the coverage gate. Missing **required** horizon-support DEM cells are never treated as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
+The surrounding rectangular support extent is only an indexing envelope; irrelevant cells that no derivative or horizon ray can touch are not part of the coverage gate. Missing **required** Phase 3 samples are filled from the authoritative Phase 2 DEM without interpolation. If a required cell remains unavailable after that fallback, the build fails rather than treating it as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
 
 ### Canopy
 
@@ -283,7 +285,7 @@ The Solar Terrain identity binds:
 - current spatial-pattern materialization identity and artifact SHA;
 - KyFromAbove source;
 - DEM support resolution;
-- required-cell sampling contract and 100% required coverage rule;
+- required-cell sampling contract, Phase 3→Phase 2 NoData-only fallback policy, and 100% final required coverage rule;
 - horizon sector count;
 - horizon search radius;
 - ray step;
