@@ -139,6 +139,15 @@ function validSha256(value: string | null) {
   return value && /^[0-9a-f]{64}$/.test(value) ? value : null
 }
 
+function boundedSolarDate(value: unknown) {
+  if (value == null || value === '') return null
+  try {
+    return requireSolarDate(String(value))
+  } catch {
+    return null
+  }
+}
+
 function productKey(value: unknown): ProductKey | null {
   const key = String(value || '')
   return key === FARM_WATCH_TERRAIN_PRODUCT.key ||
@@ -1302,12 +1311,19 @@ Deno.serve(async (req: Request) => {
 
     const slug = boundedSlug(typeof body?.property === 'string' ? body.property : null)
     const key = productKey(body?.product)
+    const solarDate = boundedSolarDate(body?.date)
     if (!slug || !key) return json({ error: 'invalid request' }, 400, origin)
+    if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key && !solarDate) {
+      return json({ error: 'solar exposure date is required' }, 400, origin)
+    }
+    if (body?.date != null && !solarDate) {
+      return json({ error: 'invalid solar date' }, 400, origin)
+    }
 
     try {
       const operation = body?.operation === 'read' ? 'read' : 'build'
       const state = operation === 'read'
-        ? await readState(slug, key)
+        ? await readState(slug, key, solarDate)
         : await buildMaterialization(
           slug,
           key,
@@ -1318,6 +1334,7 @@ Deno.serve(async (req: Request) => {
                 oidcIdentity.run_attempt || 'attempt',
               ].join(':')
             : 'farm-watch-materialization-edge-v2',
+          solarDate,
         )
       const knownSha256 = validSha256(
         typeof body?.known_artifact_sha256 === 'string'
@@ -1361,10 +1378,16 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url)
   const slug = boundedSlug(url.searchParams.get('property'))
   const key = productKey(url.searchParams.get('product') || FARM_WATCH_TERRAIN_PRODUCT.key)
+  const dateParam = url.searchParams.get('date')
+  const solarDate = boundedSolarDate(dateParam)
   if (!slug || !key) return json({ error: 'invalid request' }, 400, origin)
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key && !solarDate) {
+    return json({ error: 'solar exposure date is required' }, 400, origin)
+  }
+  if (dateParam && !solarDate) return json({ error: 'invalid solar date' }, 400, origin)
 
   try {
-    const state = await readState(slug, key)
+    const state = await readState(slug, key, solarDate)
     const knownSha256 = validSha256(url.searchParams.get('known_artifact_sha256'))
     const presentationMode = materializationPresentationMode(accountRole, key)
     return json(
