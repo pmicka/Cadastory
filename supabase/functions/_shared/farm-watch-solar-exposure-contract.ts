@@ -1,7 +1,7 @@
 export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
   key: 'solar-terrain-context',
   productKind: 'solar-terrain-context',
-  algorithmVersion: 'terrain-horizon-canopy-context-v2',
+  algorithmVersion: 'terrain-horizon-canopy-context-v3',
   outputSchemaVersion: 'solar-terrain-context-v1',
   evidenceClass: 'deterministic_derived',
   artifactBucket: 'farm-watch-derived',
@@ -18,6 +18,8 @@ export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
     'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_EDW_NLCD_TCC_CONUS/ImageServer',
   demSourceUrl:
     'https://kyraster.ky.gov/arcgis/rest/services/ElevationServices/Ky_DEM_KYAPED_2FT_Phase3_WGS84WM/ImageServer',
+  demFallbackSourceUrl:
+    'https://kyraster.ky.gov/arcgis/rest/services/ElevationServices/Ky_DEM_KYAPED_2FT_Phase2_WGS84WM/ImageServer',
   refreshDays: 30,
 })
 
@@ -36,7 +38,7 @@ export const FARM_WATCH_SOLAR_EXPOSURE_PRODUCT = Object.freeze({
 
 export const FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS = Object.freeze([
   'Terrain horizon is a deterministic line-of-sight estimate from the KyFromAbove DEM using the stated azimuth sectors, ray step, support resolution, and search radius. Features outside the search radius cannot contribute to the horizon.',
-  'Horizon support is intentionally not clipped by Farm Watch hydrologic/barrier domains because off-domain terrain can still obstruct sunlight. Only support cells actually required by target-orientation neighbors and configured horizon rays are sampled, and that required set must be complete.',
+  'Horizon support is intentionally not clipped by Farm Watch hydrologic/barrier domains because off-domain terrain can still obstruct sunlight. Only support cells actually required by target-orientation neighbors and configured horizon rays are sampled. Phase 3 is authoritative primary support; Phase 2 is used only where a required Phase 3 sample is NoData, and the final required set must be complete.',
   'Slope and aspect are deterministic finite-difference terrain derivatives and are resolution dependent.',
   'NLCD Tree Canopy Cover is modeled percent tree-canopy cover at the stated year and grain. It is not leaf area index, gap fraction, crown transmissivity, species, or measured optical attenuation.',
   'The local canopy grid reuses the current canonical spatial-edge-patch-context artifact. Landscape canopy is sampled from the same authoritative TCC product only where the canonical local artifact does not provide coverage.',
@@ -87,6 +89,8 @@ export function solarTerrainSourceSignature(args: {
     'dem_source=kyfromabove-phase3-dem',
     'dem_support_cell_m=' + p.supportCellMeters,
     'dem_support_sampling=required_orientation_and_horizon_ray_union_v2',
+    'dem_support_source_policy=phase3_then_phase2_required_nodata_only_v1',
+    'dem_fallback_source=kyfromabove-phase2-dem',
     'dem_required_coverage=100pct',
     'horizon_sector_count=' + p.horizonSectorCount,
     'horizon_search_radius_m=' + p.horizonSearchRadiusMeters,
