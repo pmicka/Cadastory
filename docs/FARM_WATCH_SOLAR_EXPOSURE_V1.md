@@ -1,6 +1,6 @@
 # Farm Watch Solar Exposure v1
 
-Status: implementation candidate — not deployed  
+Status: production — deployed 2026-09-21  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -384,16 +384,45 @@ Solar Exposure v1 does not yet model:
 
 Those belong in the later `thermal-exposure-context-v1` layer, where current meteorological forcing from Batch 1 can be combined with this neutral geometric exposure context.
 
-## Deployment boundary
+## Production deployment verification — 2026-09-21
 
-This Batch 2A implementation is intended to be merged only after CI and physical contract validation.
+Production Solar Terrain:
 
-Deployment/materialization is a separate explicit action.
+- algorithm: `terrain-horizon-canopy-context-v3`;
+- identity SHA-256: `e33bd91e280d9bfd2fb46600d24c8250909fedd7dcf392d34be6aa7cc3688866`;
+- artifact SHA-256: `25b0cfd4acf1dd96f6d4c7d76eb79ea405ca13a46004b8cd6fcb861f62ff369f`;
+- artifact size: 1,699,221 bytes;
+- local valid cells: 17,136;
+- landscape valid cells: 6,550;
+- required horizon-support cells: 69,663;
+- required cells from KyFromAbove Phase 3: 69,065;
+- required cells from USGS 3DEP Dynamic Elevation fallback: 598;
+- unresolved required support cells: 0;
+- DEM support source-mask SHA-256: `8e245f094f9fba7beaa48bb1ab1ac6cb4590327c01979b7a5b90a15a391dfcf6`.
 
-Before deployment:
+Production Solar Exposure for `2026-09-21`:
 
-- `farm-watch-materialization` must remain `verify_jwt:false`;
-- the OIDC workflow ref gate must remain exact;
-- both Scout architecture assertions must pass;
-- production dependencies must resolve to the current canonical terrain/spatial artifacts;
-- no new browser-side raster processing may be introduced.
+- algorithm: `terrain-canopy-potential-solar-exposure-v1`;
+- identity SHA-256: `21eb9635173d0aa980a64f6e581d7958b6341243a30520c8d3b96fc19a7ec58b`;
+- artifact SHA-256: `39b0e9468c1f3d83fb9efef54bef0b8da980b14230f25e5301836420cd441b8c`;
+- artifact size: 947,284 bytes;
+- exact Solar Terrain dependency identity: `e33bd91e280d9bfd2fb46600d24c8250909fedd7dcf392d34be6aa7cc3688866`.
+
+The production materialization path preserves:
+
+- private central Storage;
+- checksum-validated artifact reads;
+- owner full-artifact access;
+- viewer summary-only presentation for fine solar grids;
+- exact GitHub Actions OIDC workflow-ref gate;
+- no browser-side raw DEM/canopy recomputation.
+
+The deployed `farm-watch-materialization` function remains `verify_jwt:false` because it retains the established custom worker/OIDC authorization posture.
+
+Both Scout architecture assertions passed after production materialization.
+
+## Deployment state
+
+Batch 2A is production-operational for the validation property.
+
+The Solar Terrain artifact is reusable until an input identity/contract changes or its refresh policy expires. Date-specific Solar Exposure artifacts remain deterministic, date-keyed products and are not a substitute for current meteorological forcing.

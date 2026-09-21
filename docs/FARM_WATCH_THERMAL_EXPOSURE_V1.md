@@ -1,6 +1,6 @@
 # Farm Watch Thermal Exposure v1
 
-Status: implementation candidate — not deployed  
+Status: production — deployed 2026-09-21  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -283,17 +283,56 @@ Any deer-specific use still requires:
 - explicit source-study transfer limitations;
 - abstention when required inputs are unavailable.
 
-## Deployment boundary
+## Production deployment verification — 2026-09-21
 
-Deployment is separate from implementation.
+Production materialization:
 
-Production release requires:
+- algorithm: `hrrr-solar-component-context-v1`;
+- schema: `thermal-exposure-context-v1`;
+- identity SHA-256: `5ffb6225cc3d40d6a1133f03ca59ba51c040bf62876ab95241546cdf0638e58d`;
+- artifact SHA-256: `94fec6846448e3a175dd2453f636c19cb4ff263905dd03797417d02596069a99`;
+- artifact size: 381,501 bytes;
+- exact HRRR analysis valid time: `2026-09-21T21:00:00Z`;
+- exact HRRR forcing identity: `2df4c084680b7c9a4531100b80bcf2414d0add43ba1a11a6ab38fc18b49f0dd6`;
+- exact Solar Terrain identity: `e33bd91e280d9bfd2fb46600d24c8250909fedd7dcf392d34be6aa7cc3688866`;
+- HRRR nearest-grid distance: 1,024.1 m.
 
-- Batch 2A Solar Terrain support deployed first;
-- current HRRR forcing available;
-- `farm-watch-materialization` deployed with `verify_jwt:false`;
-- exact OIDC workflow ref preserved;
-- successful validation-property materialization;
-- checksum/read-back verification;
-- viewer/owner policy verification;
-- Scout tool-registry and architecture-doctrine assertions passing.
+The private production reader downloaded the stored artifact, recalculated its SHA-256, validated it against the persisted artifact SHA, parsed the artifact, and passed the current `thermal-exposure-context-v1` validator.
+
+Production summary at the selected HRRR analysis:
+
+- local orientation-valid cells: 17,136;
+- local canopy-valid cells: 16,959;
+- local terrain-shadow cells: 523;
+- local mean terrain direct-beam factor: 0.4424181505;
+- local mean canopy-screened direct-beam factor: 0.1535636723;
+- landscape orientation-valid cells: 6,550;
+- landscape terrain-shadow cells: 101;
+- landscape mean terrain direct-beam factor: 0.4673252878;
+- landscape mean canopy-screened direct-beam factor: 0.2440134527.
+
+The HRRR forcing remained component-wise and provenance-bound:
+
+- air temperature: 27.093378 °C;
+- dew point: 19.05166 °C;
+- relative humidity: 64.1%;
+- true 10 m wind: 4.232197 m/s from 1.735°;
+- downward shortwave: 433.6 W/m²;
+- downward longwave: 374.7 W/m²;
+- total cloud cover: 7%;
+- precipitation rate: 0 mm/hr.
+
+The artifact explicitly retained:
+
+- `operative_temperature_calculated:false`;
+- `composite_thermal_index_calculated:false`;
+- `scoring_performed:false`;
+- `behavioral_inference_performed:false`.
+
+The deployed `farm-watch-materialization` function is ACTIVE, version 22, with `verify_jwt:false`. Fine thermal grids remain viewer-summary-only under the shared presentation policy. Both Scout architecture assertions passed after deployment.
+
+## Deployment state
+
+Batch 2B is production-operational for the validation property.
+
+A new HRRR analysis changes the thermal source identity and therefore supports a new deterministic thermal materialization. Historical artifacts remain identity-bound evidence and do not become “current” merely because they remain stored.
