@@ -48,6 +48,25 @@ A published association does not become a universal deer preference. A study of 
 - **extreme-event-only** — relationship is specific to an extreme climatic event and must not be used for ordinary weather.
 - **coefficient-transfer-not-supported** — default unless a future review establishes close population/design comparability and the original coefficient/model can be reconstructed faithfully.
 
+## Review scope and source acceptance
+
+This v1 review used fresh external literature discovery rather than attempting to reconstruct the deleted chat's source list. Priority was given to peer-reviewed primary studies with white-tailed-deer telemetry, resource selection, experimental manipulation, direct field observation, or long-term survey designs. Systematic reviews are retained as synthesis anchors but do not supply population-specific coefficients.
+
+Search themes included:
+
+- thermal environment, operative temperature, solar exposure, canopy and microclimate;
+- routine weather, extreme weather, diel activity and reproductive timing;
+- mast, forage, crops, crop phenology and harvest;
+- hunting pressure, hunter activity, roads/trails and anthropogenic risk;
+- topography, landscape context, dispersal and movement state;
+- vegetation structure, concealment and bedsite selection;
+- water, precipitation, drought and hydrologic context;
+- sex, age, reproductive state and scale dependence.
+
+Evidence was rejected or downgraded when it was hunting-media advice, anecdote, a different cervid species without a clear transferable mechanism, a mismatched movement state, or a landscape/population context that could reverse the reported direction.
+
+A targeted first-pass search for directly matched central-Kentucky/lower-Ohio-Valley peer-reviewed studies did not surface a study suitable for transferring a local thermal-selection coefficient or exact rut-movement date. This is a search result, not evidence that no such study exists. Local/regional transfer remains an explicit research priority.
+
 ## Current Farm Watch implementation substrate
 
 Current neutral products that may feed future science-backed deer terms:
@@ -278,7 +297,7 @@ The generic Scout weather snapshot table is not currently a defensible substitut
 
 ## FW-D11 — Adult males can temporally avoid hunter-selected space while retaining nocturnal food use
 
-**Citation:** Henderson, C.B. et al. 2023/2024. *Temporal effects of relative hunter activity on adult male white-tailed deer habitat use.* Wildlife Research 51. DOI: 10.1071/WR22145.
+**Citation:** Henderson, C.B., Demarais, S., Strickland, B.K., McKinley, W.T., and Street, G.M. 2023. *Temporal effects of relative hunter activity on adult male white-tailed deer habitat use.* Wildlife Research 51:WR22145. DOI: 10.1071/WR22145.
 
 **Population/design:** Mississippi; 42 adult males; GPS collars during 2017–2018 and 2018–2019 firearm seasons.
 
@@ -433,6 +452,22 @@ The generic Scout weather snapshot table is not currently a defensible substitut
 **Farm Watch mapping:** recent precipitation, actual water-source availability/persistence, drought; current stream-gauge discharge alone is not enough.
 
 **Boundary:** Arid/semiarid artificial-water context. Do not infer that central Kentucky deer select nearest water whenever precipitation declines.
+
+---
+
+## FW-D20 — Systematic climate synthesis supports conditional, locally mediated deer responses
+
+**Citation:** Felton, A.M., Wam, H.K., Borowski, Z., Granhus, A., Juvany, L., Matala, J., Melin, M., Wallgren, M., and Mårell, A. 2024. *Climate change and deer in boreal and temperate regions: From physiology to population dynamics and species distributions.* Global Change Biology 30:e17505. DOI: 10.1111/gcb.17505.
+
+**Design:** Systematic review of 218 peer-reviewed papers published 2000–2022 across 10 deer species in boreal and temperate Northern Hemisphere forests, including white-tailed deer.
+
+**Synthesis:** Temperature, rainfall, snow, compound climate measures, and extreme events can affect deer physiology, spatial use, and population dynamics. The review documents behavioral plasticity, including shifts in habitat use and daily activity, and emphasizes that local variables such as population density, predation, and regional climate mediate outcomes. Warmer winters and hotter/drier summers can produce opposing effects.
+
+**Transfer disposition:** **synthesis-anchor / mechanism-support; no coefficient transfer.**
+
+**Farm Watch implication:** Reinforces the modular state-conditioned architecture and the need to separate thermal, precipitation/drought, snow, and extreme-event states rather than create a single weather score.
+
+**Boundary:** Multi-species review. It supports architecture and mechanism prioritization, not a white-tailed-deer coefficient or a Kentucky-specific effect direction.
 
 ---
 
