@@ -3,6 +3,8 @@ export type FarmWatchAccountRole = 'owner' | 'viewer'
 export const FARM_WATCH_PRESENTATION_POLICY = Object.freeze({
   viewerSummaryOnlyMaterializations: Object.freeze([
     'landscape-structure-context',
+    'terrain-form-permeability',
+    'spatial-edge-patch-context',
   ]),
 })
 

@@ -398,3 +398,28 @@ External preserved artifact located during consolidation:
 A proposed experiment must identify which ledger item it extends and state exactly what new uncertainty it resolves.
 
 “Correlate leaf-off with LiDAR,” “look at residual patches,” “compare matched controls,” “test whether the layers are complementary,” and “see whether broader spatial support helps” are not new experiments without a materially different, pre-specified question.
+
+
+---
+
+### FW-S19 — Neutral terrain and spatial pattern primitives
+
+**Question:** Can Farm Watch materialize reusable terrain-form, reference terrain-friction, canopy/field-edge, and fine structural patch/transition geometry without introducing deer-use semantics or repeating raw structural source processing?
+
+**Relationship to prior work:** Extends FW-S18. FW-S18 established the canonical barrier-aware local-500 m structural grid and property-boundary continuity statistics. FW-S19 adds neutral intra-domain spatial derivatives and an independent DEM-derived terrain-form/reference-friction family. It does not repeat the LiDAR or leaf-off source estimators.
+
+**Products:**
+- `terrain-form-permeability-v1`: 10 m local terrain-form candidate grid over `local_500m`, plus a 30 m reference slope-friction grid over `landscape_1500m`.
+- `spatial-edge-patch-context-v1`: 30 m NLCD TCC patch/edge geometry, mapped field-edge proximity from the current resource-edge product, and 5 m structure patch/transition metrics derived from the existing FW-S18 artifact.
+
+**Terrain-form method:** Explicit fixed-threshold geometry using metric slope, 30 m and 90 m topographic-position indices, 90 m neighborhood relief, orthogonal second-difference sign, and local slope-break contrast. Labels are suffixed `_candidate` and remain geometric candidates rather than field-surveyed landforms.
+
+**Permeability method:** `reference-slope-only-v1`, an explicitly parameterized dimensionless friction scenario. It is not calibrated to deer or another species. Configured hard barriers are inherited from the current barrier-aware domain; other hydrology is not silently assigned a biological cost.
+
+**Spatial-pattern method:** Fixed 2025 NLCD TCC bins (0–20%, 21–60%, 61–100%) with 8-neighbor patch identities and edge metrics; mapped-field membership/edge distance from current resource-edge geometry; 8-neighbor leaf-off absolute-difference and LiDAR neutral-profile total-variation transitions; leaf-score-quartile and LiDAR-dominant-band patches.
+
+**Evidence reuse:** The 5 m structural component consumes the exact current `landscape-structure-context` artifact by identity and SHA-256. It performs no COPC or aerial-imagery source reprocessing.
+
+**Boundary:** No deer score, travel route, corridor, funnel, bedding, security-cover, habitat-quality, forage-quality, stand-location, or hunting recommendation is computed. All outputs remain deterministic physical/measurement-space derivatives.
+
+**Status:** implementation candidate pending CI and production materialization.
