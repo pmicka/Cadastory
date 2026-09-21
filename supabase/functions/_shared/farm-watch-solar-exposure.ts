@@ -703,7 +703,7 @@ export function geometricSolarDay(solarDate: string, latitude: number, longitude
   }
 }
 
-function decodeSolarTerrainGrid(grid: any) {
+export function decodeSolarTerrainGrid(grid: any) {
   const shape = requireGridShape(grid)
   const count = shape.width * shape.height
   const domain = decodeU8(String(grid.domain_valid_base64 || ''))
