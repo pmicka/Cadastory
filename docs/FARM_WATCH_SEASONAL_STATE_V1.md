@@ -1,6 +1,6 @@
 # Farm Watch Seasonal State v1
 
-Status: implementation candidate  
+Status: production deployment in progress  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -211,6 +211,19 @@ The test exercised:
 The expected live classification passed with six current `known`/`proxy` components and two `stale` components.
 
 A post-test catalog check confirmed that the rollback left no seasonal-state table or function in production.
+
+## Operational refresh
+
+The validation property is refreshed once daily through `pg_cron` using the database-native resolver:
+
+- job name: `farm-watch-seasonal-state-pilot-v1`;
+- schedule: `5 14 * * *` (14:05 UTC);
+- target: `validation-property-01`;
+- as-of date: database `current_date`.
+
+The schedule is intentionally after the daily QPE snapshot at 12:30 UTC and both Crop-CASMA root-zone collector passes at 13:20 and 13:32 UTC. It also follows the 13:42 UTC hourly stream-collector invocation closely enough to consume the morning hydrologic state without turning the seasonal snapshot into an hourly identity churn surface.
+
+Weekly fieldwork, crop-stage, crop-progress, and drought sources may update later in the day; those changes enter the next morning's snapshot. Their own freshness and observation dates remain explicit in the stored context.
 
 ## Evidence boundary
 
