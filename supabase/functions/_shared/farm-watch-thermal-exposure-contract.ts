@@ -8,7 +8,7 @@ export const FARM_WATCH_THERMAL_EXPOSURE_PRODUCT = Object.freeze({
   artifactMimeType: 'application/json',
   forcingSourceState: 'analysis',
   forcingMaxAgeMinutes: 180,
-  refreshDays: 7,
+  refreshDays: 3650,
 })
 
 export const FARM_WATCH_THERMAL_EXPOSURE_LIMITATIONS = Object.freeze([
