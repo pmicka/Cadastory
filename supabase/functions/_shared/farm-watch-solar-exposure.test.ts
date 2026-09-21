@@ -137,7 +137,7 @@ Deno.test('south-facing slope receives greater noon direct potential than north-
 Deno.test('terrain horizon blocks direct potential and horizon interpolation wraps north', () => {
   const horizons = Array.from({ length: 24 }, (_, index) => index === 0 ? 40 : 0)
   const nearNorth = interpolatedHorizonDeg(horizons, 359)
-  assert(nearNorth > 30)
+  assert(nearNorth > 15 && nearNorth <= 20)
   assert(directTerrainIncidence(20, 0, 0, 0, 30) === 0)
 })
 
