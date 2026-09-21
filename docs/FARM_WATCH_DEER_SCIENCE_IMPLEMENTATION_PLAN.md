@@ -1038,14 +1038,23 @@ That is already materially more scientifically defensible than a conventional ha
 
 ---
 
+# Current production milestone — Batches 1–2 complete
+
+The neutral meteorological/solar/thermal chain is now production-operational for `validation-property-01`:
+
+1. property-grade HRRR meteorological forcing;
+2. static Solar Terrain v3 with complete authoritative elevation support;
+3. date-specific Solar Exposure v1;
+4. HRRR-bound Thermal Exposure v1.
+
+The chain remains neutral: no operative temperature, composite thermal score, deer-use inference, or habitat label is produced.
+
 # Recommended next implementation batch
 
-Start with **Batch 1 + Batch 2A**:
+Proceed to **Batch 3 — diel and biological-state contracts**:
 
-1. implement the property-grade HRRR forcing contract and collector;
-2. implement deterministic terrain/canopy solar exposure;
-3. materialize both for `validation-property-01`;
-4. verify physical/provenance contracts;
-5. only then add `thermal-exposure-context-v1`.
+1. implement deterministic diel/photoperiod context from the existing solar geometry;
+2. complete the targeted Kentucky/lower-Ohio-Valley breeding/reproductive phenology review;
+3. implement `deer-biological-state-v1` with explicit sex/age/reproductive/movement-state scenarios and abstention when state is unknown.
 
-This sequence resolves the highest-priority gap in the science ledger while remaining entirely neutral and reusable outside the deer model.
+Batch 3 should remain separate from the science-relationship registry and deer-specific evaluation modules; those follow once biological state is explicit.
