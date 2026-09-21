@@ -1,6 +1,6 @@
 # Farm Watch Neutral Terrain and Spatial Primitives v1
 
-Status: implementation candidate  
+Status: production materialized  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -151,6 +151,35 @@ Raw fine-grid artifacts follow the existing owner-only fine-structure presentati
 ## Invalidation
 
 A change to any bound upstream identity or artifact checksum changes the materialization source signature. The generic Farm Watch materialization identity therefore invalidates the stale derivative rather than silently reusing it.
+
+## Production validation — 2026-09-21
+
+Both v1 products are centrally materialized for `validation-property-01` through the owner-only GitHub Actions OIDC workflow `.github/workflows/farm-watch-neutral-primitives.yml`.
+
+### Terrain form / permeability
+
+- materialization identity: `a4d02fa0738ea005efd0456027b0940a66b1155f7cd1a6c24a1287312e1f102f`;
+- artifact SHA-256: `b69a778cb91aa0d87e92fedfe9213d07b72caadf551ba6dfb2b95f4b45af45ee`;
+- stored size: 632,109 bytes; Storage metadata size matches exactly;
+- barrier-aware local grid: 17,136 domain-valid 10 m cells, with 16,697 cells carrying valid slope/form output;
+- barrier-aware 1.5 km grid: 6,550 domain-valid 30 m cells;
+- current source signature binds to landscape-domain identity `bd69c24e98c485a9320c07db036548c4b065a2c381e77f2ab5cd73fc73e9ae5f` and landscape-physical identity `c89b681dd724390087249d4b92dbacc0fdfaea06f3bf1acbe46999a6d2547bc6`.
+
+The current form counts among cells with valid local slope/form output are 2,139 ridge-like candidates, 2,033 draw-like candidates, 1,078 saddle-like candidates, 999 bench-like candidates, 77 slope-break candidates, and 10,371 unclassified-surface cells. These remain computational geometry labels only.
+
+### Spatial edge / patch context
+
+- materialization identity: `9cdb6dd495a1e6e6de158e2686485b95ef94e83394b9121171f6455012f9ee4c`;
+- artifact SHA-256: `99edf000a5c5ad846b25be8d61c36b352ecb5fb25f30db1468499ea3ddc532e0`;
+- stored size: 1,406,006 bytes; Storage metadata size matches exactly;
+- current source signature binds to:
+  - landscape-domain identity `bd69c24e98c485a9320c07db036548c4b065a2c381e77f2ab5cd73fc73e9ae5f`;
+  - landscape-physical identity `c89b681dd724390087249d4b92dbacc0fdfaea06f3bf1acbe46999a6d2547bc6`;
+  - resource-edge identity `2a57436d1c289f0496972cfe020071db2c8e7e1fc82bacb22a060b02d06e9051`;
+  - landscape-structure identity `403f75926234f88e5ebc69e1cec7c0af3fbeac5b1ca23468a7d1cbc3464c5b69`;
+  - exact landscape-structure artifact SHA-256 `8dee53eaf17e725e467806cbfc7a0ca6c5106f87d2f117123c36703ca5a2fccf`.
+
+The production read path downloaded and contract-validated both stored artifacts immediately after materialization. Both builds completed on their first attempt with no persisted error.
 
 ## Relationship to future deer modeling
 

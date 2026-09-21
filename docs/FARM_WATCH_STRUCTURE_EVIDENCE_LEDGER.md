@@ -1,6 +1,6 @@
 # Farm Watch Structure Evidence Ledger
 
-Status: current as of 2026-09-20  
+Status: current as of 2026-09-21  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -28,6 +28,8 @@ Before adding another structural analysis, check this ledger and the cited imple
 | Phase 3 LiDAR physical structure | `phase3-copc-physical-v3-multiasset` | canonical-central | 5 m height-above-ground grid; 6,621 eligible cells; 496,417 normalized structure points; current artifact SHA `af8ee1d3ff4fcb09a7ee5c983edb1a9c8fbdd93754715337a0f2afab7d5759a4`. |
 | Leaf-off woody-pattern context | `leaf_off_structure_v1_2_7m` | canonical-central, experimental_derived | 2019 and 2024 products, each 253×445 with 70,806 valid cells; current artifact SHA `7b8127da0a729d79b5a521cc4f27599334651a83db24f1036906771ffecfce75`. |
 | Structural complementarity | `current-leaf-off-lidar-complementarity-v4` | canonical-central | 6,662 shared 5 m cells; current artifact SHA `01dc786d4f258bc1b5b78f43e935ff397f931293d298b9548da48ef1d600c074`. |
+| Terrain form / reference permeability | `barrier-aware-phase3-dem-terrain-form-permeability-v1` | canonical-central | 10 m local terrain-form candidates + 30 m 1.5 km reference slope-friction; identity `a4d02fa0738ea005efd0456027b0940a66b1155f7cd1a6c24a1287312e1f102f`; artifact SHA `b69a778cb91aa0d87e92fedfe9213d07b72caadf551ba6dfb2b95f4b45af45ee`. |
+| Spatial edge / patch context | `local500m-canopy-field-structure-pattern-v1` | canonical-central | 30 m canopy/field pattern + reused 5 m structural transitions; identity `9cdb6dd495a1e6e6de158e2686485b95ef94e83394b9121171f6455012f9ee4c`; artifact SHA `99edf000a5c5ad846b25be8d61c36b352ecb5fb25f30db1468499ea3ddc532e0`. |
 
 Current central materializations are stored in `farm_watch.property_materializations_v1`. The structural complementarity source signature binds to the exact current LiDAR and leaf-off artifact SHA-256 values.
 
@@ -422,4 +424,10 @@ A proposed experiment must identify which ledger item it extends and state exact
 
 **Boundary:** No deer score, travel route, corridor, funnel, bedding, security-cover, habitat-quality, forage-quality, stand-location, or hunting recommendation is computed. All outputs remain deterministic physical/measurement-space derivatives.
 
-**Status:** implementation candidate pending CI and production materialization.
+**Production validation — 2026-09-21:**
+- `terrain-form-permeability`: materialization identity `a4d02fa0738ea005efd0456027b0940a66b1155f7cd1a6c24a1287312e1f102f`; artifact SHA-256 `b69a778cb91aa0d87e92fedfe9213d07b72caadf551ba6dfb2b95f4b45af45ee`; 632,109 bytes; 17,136 local-domain cells and 6,550 1.5 km-domain cells.
+- `spatial-edge-patch-context`: materialization identity `9cdb6dd495a1e6e6de158e2686485b95ef94e83394b9121171f6455012f9ee4c`; artifact SHA-256 `99edf000a5c5ad846b25be8d61c36b352ecb5fb25f30db1468499ea3ddc532e0`; 1,406,006 bytes.
+- The spatial product is checksum-bound to current resource-edge identity `2a57436d1c289f0496972cfe020071db2c8e7e1fc82bacb22a060b02d06e9051` and FW-S18 artifact SHA `8dee53eaf17e725e467806cbfc7a0ca6c5106f87d2f117123c36703ca5a2fccf`.
+- Storage metadata sizes match materialization-record sizes exactly. Both builds completed on attempt 1 with no persisted error, and the production edge read path revalidated each artifact after upload.
+
+**Status:** canonical-central for `validation-property-01`.
