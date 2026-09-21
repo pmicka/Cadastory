@@ -43,6 +43,8 @@ type SupportGrid = {
   height: number
   values_ft: Float64Array
   required_cell_count: number
+  phase3_available_required_cell_count: number
+  phase2_fallback_filled_cell_count: number
   available_required_cell_count: number
 }
 
@@ -314,6 +316,34 @@ async function buildDemSupport(
     {},
     fetchImpl,
   )
+  const phase3Available = required.reduce(
+    (sum, needed, index) =>
+      sum + (needed && Number.isFinite(values[index]) ? 1 : 0),
+    0,
+  )
+
+  const fallbackMask = new Uint8Array(count)
+  for (let index = 0; index < count; index += 1) {
+    if (required[index] && !Number.isFinite(values[index])) fallbackMask[index] = 1
+  }
+  const fallbackRequired = fallbackMask.reduce((sum, value) => sum + (value ? 1 : 0), 0)
+
+  let fallbackFilled = 0
+  if (fallbackRequired) {
+    const fallbackValues = await sampleTargetGrid(
+      supportShape,
+      fallbackMask,
+      p.demFallbackSourceUrl,
+      {},
+      fetchImpl,
+    )
+    for (let index = 0; index < count; index += 1) {
+      if (!fallbackMask[index] || !Number.isFinite(fallbackValues[index])) continue
+      values[index] = fallbackValues[index]
+      fallbackFilled += 1
+    }
+  }
+
   const availableRequired = required.reduce(
     (sum, needed, index) =>
       sum + (needed && Number.isFinite(values[index]) ? 1 : 0),
@@ -321,7 +351,7 @@ async function buildDemSupport(
   )
   if (availableRequired !== requiredCount) {
     throw new Error(
-      'solar DEM required horizon support coverage is incomplete: ' +
+      'solar DEM required horizon support coverage is incomplete after Phase 2 fallback: ' +
       availableRequired + '/' + requiredCount,
     )
   }
@@ -332,6 +362,8 @@ async function buildDemSupport(
     height,
     values_ft: values,
     required_cell_count: requiredCount,
+    phase3_available_required_cell_count: phase3Available,
+    phase2_fallback_filled_cell_count: fallbackFilled,
     available_required_cell_count: availableRequired,
   }
 }
@@ -647,14 +679,20 @@ export async function buildSolarTerrainArtifact(args: {
       landscape_mean_horizon_deg: average(landscapeHorizons.mean, landscape.domain, 0.5),
       support_dem_grid_cell_count: support.values_ft.length,
       support_dem_required_cell_count: support.required_cell_count,
+      support_dem_phase3_available_required_cell_count:
+        support.phase3_available_required_cell_count,
+      support_dem_phase2_fallback_filled_cell_count:
+        support.phase2_fallback_filled_cell_count,
       support_dem_available_required_cell_count: support.available_required_cell_count,
     },
     source_provenance: {
       terrain_target_reuse:
         'canonical terrain-form-permeability elevation grids; no target DEM resampling',
       terrain_horizon_support:
-        'KyFromAbove Phase 3 DEM unmasked support sampled only at cells required by target orientation neighbors and 24-sector horizon rays; required support must be complete',
+        'KyFromAbove Phase 3 DEM is sampled only at cells required by target orientation neighbors and 24-sector horizon rays; required Phase 3 NoData cells are filled from the authoritative Phase 2 2-foot DEM and the final required support must be complete',
       dem_source_url: p.demSourceUrl,
+      dem_fallback_source_url: p.demFallbackSourceUrl,
+      dem_fallback_policy: 'phase3_then_phase2_required_nodata_only_v1',
       canopy_source_url: p.canopySourceUrl,
       analysis_crs: EPSG_32616,
       sampled_source_sha256: sampledSourceSha256,
