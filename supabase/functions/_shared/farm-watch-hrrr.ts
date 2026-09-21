@@ -149,6 +149,27 @@ function windFromEarthUv(uEastMps: number, vNorthMps: number) {
   return { speed, directionFrom }
 }
 
+export function rotateHrrrGridWind(
+  uGridMps: number,
+  vGridMps: number,
+  longitude: number,
+) {
+  const [uEast, vNorth] = lambertEarthWind(
+    uGridMps,
+    vGridMps,
+    longitude,
+    HRRR_LAMBERT_ORIENTATION_DEG,
+    HRRR_LAMBERT_CONE,
+  )
+  const wind = windFromEarthUv(uEast, vNorth)
+  return {
+    uEastMps: uEast,
+    vNorthMps: vNorth,
+    speedMps: wind.speed,
+    directionFromDeg: wind.directionFrom,
+  }
+}
+
 function rounded(value: number, digits = 6) {
   const scale = 10 ** digits
   return Math.round(value * scale) / scale
@@ -251,20 +272,15 @@ export async function sampleHrrrAnalysisTargets(
 
     const gridU = finite(state.fields.wind_grid_u_10m_mps, '10 m grid U wind')
     const gridV = finite(state.fields.wind_grid_v_10m_mps, '10 m grid V wind')
-    const [uEast, vNorth] = lambertEarthWind(
-      gridU,
-      gridV,
-      grid.longitude,
-      HRRR_LAMBERT_ORIENTATION_DEG,
-      HRRR_LAMBERT_CONE,
-    )
-    const wind = windFromEarthUv(uEast, vNorth)
+    const wind = rotateHrrrGridWind(gridU, gridV, grid.longitude)
+    const uEast = wind.uEastMps
+    const vNorth = wind.vNorthMps
     const fields: Record<string, number> = {
       ...state.fields as Record<string, number>,
       wind_east_10m_mps: rounded(uEast),
       wind_north_10m_mps: rounded(vNorth),
-      wind_speed_10m_mps: rounded(wind.speed),
-      wind_direction_from_deg: rounded(wind.directionFrom, 3),
+      wind_speed_10m_mps: rounded(wind.speedMps),
+      wind_direction_from_deg: rounded(wind.directionFromDeg, 3),
     }
 
     output[target.slug] = {
