@@ -223,10 +223,12 @@ function sampledCoverage(boundary: any, items: any[]) {
       if (items.some((item) => pointInGeometry(lon, lat, item.geometry))) coveredCount += 1
     }
   }
+  const coveragePercent = sampleCount ? coveredCount / sampleCount * 100 : null
   return {
     sample_count: sampleCount,
     covered_sample_count: coveredCount,
-    sampled_parcel_coverage_percent: sampleCount ? coveredCount / sampleCount * 100 : null,
+    sampled_parcel_coverage_percent: coveragePercent,
+    sampled_analysis_coverage_percent: coveragePercent,
   }
 }
 
@@ -299,7 +301,7 @@ export async function buildLidarSourceArtifact(
   collectionIds: string[] | null = null,
 ) {
   const bbox = geometryBbox(boundary)
-  if (!bbox) throw new Error('Property boundary bbox unavailable')
+  if (!bbox) throw new Error('Analysis boundary bbox unavailable')
   const requestedCollections = collectionIds == null
     ? FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections
     : FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections.filter((collection) =>
