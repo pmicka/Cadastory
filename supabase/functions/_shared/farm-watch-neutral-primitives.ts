@@ -11,6 +11,10 @@ import {
 } from './farm-watch-terrain.ts'
 
 const EPSG_32616 = 'EPSG:32616'
+proj4.defs(
+  EPSG_32616,
+  '+proj=utm +zone=16 +datum=WGS84 +units=m +no_defs +type=crs',
+)
 
 type MetricGrid = {
   native_crs: string
