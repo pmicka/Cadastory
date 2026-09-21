@@ -71,6 +71,17 @@ import {
   buildSolarTerrainArtifact,
 } from '../_shared/farm-watch-solar-exposure.ts'
 import {
+  FARM_WATCH_THERMAL_EXPOSURE_LIMITATIONS,
+  FARM_WATCH_THERMAL_EXPOSURE_PRODUCT,
+  requireThermalValidAt,
+  thermalExposureArtifactPath,
+  thermalExposureSourceSignature,
+  validateThermalExposureArtifact,
+} from '../_shared/farm-watch-thermal-exposure-contract.ts'
+import {
+  buildThermalExposureArtifact,
+} from '../_shared/farm-watch-thermal-exposure.ts'
+import {
   FARM_WATCH_GITHUB_OIDC_AUDIENCE,
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
