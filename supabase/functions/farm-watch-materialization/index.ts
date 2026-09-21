@@ -670,7 +670,109 @@ async function readSolarExposureState(slug: string, solarDate: string) {
   return readDynamicState(slug, FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key, deps.sourceSignature)
 }
 
-async function readState(slug: string, key: ProductKey, solarDate: string | null = null) {
+async function thermalExposureDependencies(
+  slug: string,
+  requestedAt: string,
+  includeArtifact = false,
+) {
+  const targetAt = requireThermalValidAt(requestedAt)
+  const solarTerrainState = await readSolarTerrainState(slug)
+  const solarTerrainIdentity = validSha256(
+    String(solarTerrainState?.materialization?.identity_sha256 || ''),
+  )
+  const solarTerrainArtifactSha256 = validSha256(
+    String(solarTerrainState?.materialization?.artifact_sha256 || ''),
+  )
+  if (
+    solarTerrainState?.status !== 'available' ||
+    !solarTerrainIdentity ||
+    !solarTerrainArtifactSha256
+  ) throw new Error('current solar terrain materialization is unavailable')
+
+  const { data: forcingResponse, error: forcingError } = await admin.rpc(
+    'farm_watch_get_meteorological_forcing_v1_internal',
+    {
+      p_slug: slug,
+      p_valid_at: targetAt,
+      p_max_age_minutes: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.forcingMaxAgeMinutes,
+      p_source_state: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.forcingSourceState,
+    },
+  )
+  if (forcingError) {
+    throw new Error('meteorological forcing dependency failed: ' + forcingError.message)
+  }
+  if (forcingResponse?.status !== 'available' || !forcingResponse?.context) {
+    throw new Error(
+      'meteorological forcing dependency is ' + String(forcingResponse?.status || 'missing'),
+    )
+  }
+
+  const forcingIdentity = validSha256(
+    String(forcingResponse?.identity?.identity_sha256 || ''),
+  )
+  const sourceIndexSha256 = validSha256(
+    String(forcingResponse?.identity?.source_index_sha256 || ''),
+  )
+  const sourceRecordsSha256 = validSha256(
+    String(forcingResponse?.identity?.source_records_sha256 || ''),
+  )
+  const forcingValidAt = requireThermalValidAt(
+    String(forcingResponse?.valid_at || forcingResponse?.context?.valid_at || ''),
+  )
+  if (!forcingIdentity || !sourceIndexSha256 || !sourceRecordsSha256) {
+    throw new Error('meteorological forcing identity is unavailable')
+  }
+
+  const sourceSignature = thermalExposureSourceSignature({
+    solarTerrainMaterializationIdentitySha256: solarTerrainIdentity,
+    solarTerrainArtifactSha256,
+    meteorologicalForcingIdentitySha256: forcingIdentity,
+    meteorologicalForcingValidAt: forcingValidAt,
+    sourceIndexSha256,
+    sourceRecordsSha256,
+  })
+
+  let solarTerrainArtifact: any = null
+  if (includeArtifact) {
+    const payload = await readPayload(
+      slug,
+      FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
+      solarTerrainState,
+    )
+    solarTerrainArtifact = payload?.artifact
+    if (!solarTerrainArtifact) throw new Error('solar terrain artifact payload is unavailable')
+  }
+
+  return {
+    requestedAt: targetAt,
+    solarTerrainState,
+    solarTerrainIdentity,
+    solarTerrainArtifactSha256,
+    solarTerrainArtifact,
+    forcingResponse,
+    forcingIdentity,
+    forcingValidAt,
+    sourceIndexSha256,
+    sourceRecordsSha256,
+    sourceSignature,
+  }
+}
+
+async function readThermalExposureState(slug: string, requestedAt: string) {
+  const deps = await thermalExposureDependencies(slug, requestedAt, false)
+  return readDynamicState(
+    slug,
+    FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+    deps.sourceSignature,
+  )
+}
+
+async function readState(
+  slug: string,
+  key: ProductKey,
+  solarDate: string | null = null,
+  thermalAt: string | null = null,
+) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) return readLidarPhysicalState(slug)
   if (key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key) return readStructureSynthesisState(slug)
   if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return readLandscapeStructureState(slug)
@@ -680,6 +782,10 @@ async function readState(slug: string, key: ProductKey, solarDate: string | null
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
     if (!solarDate) throw new Error('solar exposure date is required')
     return readSolarExposureState(slug, solarDate)
+  }
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) {
+    if (!thermalAt) throw new Error('thermal exposure timestamp is required')
+    return readThermalExposureState(slug, thermalAt)
   }
   return readStaticState(slug, key)
 }
