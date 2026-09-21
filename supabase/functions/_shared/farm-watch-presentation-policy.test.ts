@@ -47,7 +47,7 @@ Deno.test('unknown account roles fail closed', () => {
 
 
 Deno.test('viewer receives summaries only for new neutral fine-grid materializations', () => {
-  for (const product of ['terrain-form-permeability','spatial-edge-patch-context']) {
+  for (const product of ['terrain-form-permeability','spatial-edge-patch-context','solar-terrain-context','solar-exposure-context']) {
     if (canReadFarmWatchMaterializationArtifact('viewer', product)) {
       throw new Error('viewer must not receive raw ' + product + ' artifact')
     }
