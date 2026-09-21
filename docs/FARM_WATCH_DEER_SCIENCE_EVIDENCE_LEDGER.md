@@ -69,7 +69,7 @@ Search themes included:
 
 Evidence was rejected or downgraded when it was hunting-media advice, anecdote, a different cervid species without a clear transferable mechanism, a mismatched movement state, or a landscape/population context that could reverse the reported direction.
 
-A targeted first-pass search for directly matched central-Kentucky/lower-Ohio-Valley peer-reviewed studies did not surface a study suitable for transferring a local thermal-selection coefficient or exact rut-movement date. This is a search result, not evidence that no such study exists. Local/regional transfer remains an explicit research priority.
+The initial targeted search did not surface a directly transferable central-Kentucky thermal-selection coefficient or an exact Kentucky rut-movement coefficient. A deeper breeding-phenology review did surface authoritative Kentucky population timing: University of Kentucky Extension describes breeding from October through January with peak activity usually in mid-November, and Kentucky Fish and Wildlife independently describes its mid-November modern gun season as designed to coincide with peak fall breeding. Those sources support a statewide qualitative reproductive-timing gate, not an individual reproductive state or a numeric movement coefficient. Exact annual physiographic-region conception dates remain a source-capture priority rather than a hard-coded rule.
 
 ## Current Farm Watch implementation substrate
 
@@ -89,8 +89,8 @@ Current neutral products that may feed future science-backed deer terms:
 
 Important current gaps include:
 
-- production deployment/materialization of the implemented neutral solar/thermal context chain;
 - a validated operative-temperature or animal heat-balance formulation, if later science requires one;
+- source-controlled exact Kentucky physiographic-region breeding-date series beyond the statewide qualitative timing gate;
 - current field-level crop phenology/harvest state;
 - mast abundance/species/vintage;
 - measured localized hunting pressure or human-use intensity;
@@ -473,6 +473,56 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 ---
 
+## FW-D21 — Kentucky breeding phenology supports a statewide qualitative timing gate, not an individual rut state
+
+**Sources:** University of Kentucky Cooperative Extension / Forestry and Natural Resources, *White-tailed Deer* (Kentucky biology reference; https://forestry.mgcafe.uky.edu/deer). Kentucky Department of Fish and Wildlife Resources, *Kentucky’s Modern Gun Deer Season Opens Nov. 13* (2021; https://fw.ky.gov/News/Pages/Kentucky%E2%80%99s-Modern-Gun-Deer-Season-Opens-Nov.-13.aspx).
+
+**Geography/evidence type:** Kentucky statewide extension and state wildlife-agency biological guidance.
+
+**Supported relationship:** University of Kentucky states that white-tailed deer in Kentucky breed from October through January and that peak breeding activity usually occurs in mid-November. Kentucky Fish and Wildlife independently describes the season beginning in mid-November as designed to coincide with peak fall breeding.
+
+**What this does not establish:** These are population-level timing summaries. They do not establish estrus, conception, mating, pregnancy, mate-searching intensity, or movement rate for an individual deer on a given date. They also do not supply a physiographic-region-specific numeric coefficient.
+
+**Transfer disposition:** **form-transfer-ready for Kentucky regional reproductive-state gating; coefficient-transfer-not-supported.**
+
+**Farm Watch mapping:** property state code + calendar date + explicit individual sex/age/reproductive/movement scenario. The v1 machine contract may represent October–January as the documented breeding season and November as a qualitative peak-month context while retaining individual reproductive state as explicit/unknown.
+
+**Boundary:** Do not turn “mid-November peak” into a universal peak day, an individual estrus flag, a movement multiplier, or an assumption that every Kentucky physiographic region peaks simultaneously.
+
+---
+
+## FW-D22 — Female conception timing varies materially with maternal age in a Midwestern population
+
+**Citation:** Green, M.L., Kelly, A.C., Satterthwaite-Phillips, D., Manjerovic, M.B., Shelton, P., Novakofski, J., and Mateus-Pinilla, N. 2017. *Reproductive characteristics of female white-tailed deer (Odocoileus virginianus) in the Midwestern USA.* Theriogenology 94:71–78. DOI: 10.1016/j.theriogenology.2017.02.010.
+
+**Population/design:** Illinois; 3,884 tested females with fetal/reproductive measurements. The study estimated conception timing from fetal development and evaluated maternal-age effects on reproductive characteristics.
+
+**Supported relationship:** Breeding peaked in November overall, but estimated mean conception date varied with maternal age. Fawns were later (December 2) than yearlings (November 11) and adults (November 8). Maternal age, year, and geography contributed to reproductive variation.
+
+**Transfer disposition:** **form-transfer-ready for age-aware female reproductive timing; coefficient/date-transfer-not-supported to Kentucky.**
+
+**Farm Watch mapping:** if female age class is explicitly known, preserve age as a biological-state dimension and allow a relationship module to distinguish juvenile/fawn timing from yearling/adult timing. The Illinois dates are provenance for the relationship form, not Kentucky calendar parameters.
+
+**Boundary:** Do not assign the Illinois November 8/11 or December 2 means to Kentucky deer, and do not infer an individual doe’s conception/estrus state from age plus calendar date.
+
+---
+
+## FW-D23 — Ohio evidence corroborates early-November onset in mature does but does not define Kentucky timing
+
+**Citation:** Harder, J.D., and Moorhead, D.L. 1980. *Development of Corpora Lutea and Plasma Progesterone Levels Associated with the Onset of the Breeding Season in White-tailed Deer (Odocoileus virginianus).* Biology of Reproduction 22:185–191. DOI: 10.1095/biolreprod22.2.185.
+
+**Population/design:** Mature female white-tailed deer at Plum Brook Station, Ohio; ovaries collected monthly August–October and weekly in November 1976.
+
+**Supported relationship:** The study documented physiological onset of the breeding season; active corpora lutea were first observed in does collected on November 6.
+
+**Transfer disposition:** **regional mechanism/context support; not an applicable Kentucky date coefficient.**
+
+**Farm Watch mapping:** retained as lower-Ohio-region corroboration that reproductive physiology changes in early November in a nearby population. It does not itself fire a Kentucky relationship module.
+
+**Boundary:** Do not use November 6 as a Kentucky onset date or peak date, and do not treat physiological onset in mature does as equivalent to peak male movement.
+
+---
+
 # Cross-study synthesis for model architecture
 
 ## 1. Thermal state should be modeled physically, then behaviorally gated
@@ -617,9 +667,9 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 
 | Scientific term family | Evidence status | Farm Watch input readiness | Next neutral work |
 | --- | --- | --- | --- |
-| Thermal exposure / refuge | strong mechanism + conditional field evidence | near-ready neutral substrate | deploy/materialize Solar/Thermal v1; deer interpretation still requires explicit state/resource gates |
-| Diel state | strong | ready | compute solar time/photoperiod deterministically |
-| Rut / reproductive timing | strong, region-dependent | partial | formal regional phenology/state contract; do not copy Wisconsin dates |
+| Thermal exposure / refuge | strong mechanism + conditional field evidence | production neutral substrate | deer interpretation still requires explicit state/resource gates |
+| Diel state | strong | implementation candidate | deterministic solar/photoperiod contract in Batch 3 |
+| Rut / reproductive timing | strong, region-dependent | statewide Kentucky qualitative gate ready; exact regional dates incomplete | use FW-D21 statewide gate; capture authoritative annual physiographic-region dates before finer regionalization |
 | Terrain/topography | strong evidence of context dependence | neutral inputs ready | no new physical data required before conditional model; movement-state gate required |
 | Fine vegetation structure | moderate-to-strong mechanism evidence; state-specific | strong neutral structure inputs | derive/validate neutral visibility/concealment metric before biological labeling |
 | Mast | strong direct evidence | not ready | oak/mast-species inventory + annual mast state |
@@ -644,7 +694,7 @@ This v1 ledger is sufficient to prevent unsupported first-model terms, but it is
 3. **Oak mast spatial prediction** — studies connecting oak species/acorn production to deer space use at usable spatial/temporal scales.
 4. **Corn/soy phenology and harvest** — modern GPS studies to complement FW-D08 and determine whether crop-state interactions generalize beyond one refuge/agricultural system.
 5. **Hydrology/water in humid eastern landscapes** — distinguish water need from riparian movement structure.
-6. **Kentucky / lower Ohio Valley breeding phenology** — define appropriate local rut state rather than importing Wisconsin dates.
+6. **Kentucky physiographic-region breeding phenology** — capture the authoritative annual KDFWR regional conception-date product in structured form; statewide qualitative timing is now covered by FW-D21, with Illinois age effects (FW-D22) and Ohio onset evidence (FW-D23) retained at their actual transfer scope.
 7. **Hunter-pressure measurement** — identify studies using explicit hunter GPS/effort data suitable for translating pressure into a dynamic risk surface.
 8. **Fawning/female state** — quantify concealment/structure selection and movement changes during parturition/lactation in eastern forests.
 9. **Browse availability/phenology** — identify measurable remote or field proxies that can complement agriculture and mast.
