@@ -9,6 +9,9 @@ on:
       - 'supabase/functions/_shared/farm-watch-presentation-policy.ts'
       - 'supabase/functions/_shared/farm-watch-presentation-policy.test.ts'
       - 'supabase/functions/farm-watch-materialization/index.ts'
+      - 'supabase/functions/_shared/github-actions-oidc.ts'
+      - 'scripts/farm-watch-neutral-primitives-materialize.ts'
+      - '.github/workflows/farm-watch-neutral-primitives.yml'
       - 'supabase/migrations/*farm_watch_resource_edge_service_wrapper*.sql'
       - '.github/workflows/farm-watch-neutral-primitives-ci.yml'
   workflow_dispatch:
@@ -28,6 +31,10 @@ jobs:
         run: deno check supabase/functions/_shared/farm-watch-neutral-primitives.ts
       - name: Check materialization edge
         run: deno check supabase/functions/farm-watch-materialization/index.ts
+      - name: Check GitHub OIDC trust module
+        run: deno check supabase/functions/_shared/github-actions-oidc.ts
+      - name: Check neutral primitive materializer
+        run: deno check scripts/farm-watch-neutral-primitives-materialize.ts
       - name: Run neutral primitive tests
         run: deno test supabase/functions/_shared/farm-watch-neutral-primitives.test.ts
       - name: Run presentation policy tests
