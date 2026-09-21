@@ -308,15 +308,27 @@ Best tested method: quadratic/interactions ridge. About 97.3% of held-out mean-b
 
 **Question:** Does fine structural evidence on the selected property continue into the immediate surrounding landscape, transition at the ownership boundary, or meet a larger structural contrast?
 
-**Method:** Planned `landscape-structure-context-v1` product over the exact barrier-aware `local_500m` domain. Reuses the frozen Phase 3 LiDAR physical method from FW-S02/FW-S04 and the frozen 2024 leaf-off estimator from FW-S06 without retuning. LiDAR source coverage is resolved against the full local domain rather than reusing the parcel source plan. LiDAR and leaf-off evidence are synthesized on a common 5 m grid with property/domain masks and descriptive cross-boundary adjacency contrasts.
+**Method:** Deployed `landscape-structure-context-v1` product over the exact barrier-aware `local_500m` domain. Reuses the frozen Phase 3 LiDAR physical method from FW-S02/FW-S04 and the frozen 2024 leaf-off estimator from FW-S06 without retuning. LiDAR source coverage is resolved against the full local domain rather than reusing the parcel source plan. LiDAR and leaf-off evidence are synthesized on a common 5 m grid with property/domain masks and descriptive cross-boundary adjacency contrasts.
 
 **New uncertainty resolved:** Existing canonical products stop at the parcel boundary and therefore cannot distinguish a real structural termination from an ownership-boundary processing artifact. This product extends spatial support only; it does not repeat the prior complementarity experiments.
 
+**Production validation — 2026-09-21:**
+- Current barrier-aware domain identity: `bd69c24e98c485a9320c07db036548c4b065a2c381e77f2ab5cd73fc73e9ae5f`.
+- Phase 3 source plan required four COPC assets: `N071E278_LAS_Phase3.copc`, `N071E279_LAS_Phase3.copc`, `N072E278_LAS_Phase3.copc`, and `N072E279_LAS_Phase3.copc`.
+- Sampled Phase 3 coverage of the barrier-aware local domain: 100%.
+- Common 5 m grid: 277 × 336 cells; 68,472 valid domain cells, including 6,941 property cells and 61,531 surrounding local-ring cells.
+- Neutral LiDAR composition: property 4–32 ft share 0.34097 and 32+ ft share 0.64145; local ring 4–32 ft share 0.38085 and 32+ ft share 0.59096.
+- Leaf-off score median: property 0.41961; local ring 0.45490. These are within-product relative scores, not habitat values.
+- Cross-boundary adjacency: 1,114 boundary pairs; 1,062 with valid LiDAR on both sides. Median absolute leaf-off score difference 0.25882; median LiDAR profile total-variation distance 0.24902; dominant-band agreement 59.23%.
+- Central materialization identity: `403f75926234f88e5ebc69e1cec7c0af3fbeac5b1ca23468a7d1cbc3464c5b69`.
+- Artifact SHA-256: `8dee53eaf17e725e467806cbfc7a0ca6c5106f87d2f117123c36703ca5a2fccf`; stored size 6,261,256 bytes. Storage metadata size matches the materialization record.
+- Artifact domain identity matches the current landscape-domain identity exactly.
+
 **Implementation contract:** `supabase/functions/_shared/farm-watch-landscape-structure-contract.ts`; `docs/FARM_WATCH_LANDSCAPE_STRUCTURE_CONTEXT_V1.md`.
 
-**Boundary:** No security-cover label, corridor/funnel inference, deer movement, bedding, habitat quality, or hunting recommendation. The 2024 leaf-off surface is normalized within the local domain and must not replace the canonical parcel-normalized artifact.
+**Boundary:** No security-cover label, corridor/funnel inference, deer movement, bedding, habitat quality, or hunting recommendation. The 2024 leaf-off surface is normalized within the local domain and must not replace the canonical parcel-normalized artifact. Cross-boundary differences are descriptive physical contrasts only.
 
-**Status:** protocol-ready. Contract and evidence boundaries are durable; central materialization has not yet been implemented or run.
+**Status:** centrally materialized and checksum-addressed. The first production artifact is available and current for `validation-property-01`.
 
 ---
 
