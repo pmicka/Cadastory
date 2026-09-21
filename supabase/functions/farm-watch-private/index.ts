@@ -417,6 +417,14 @@ Deno.serve(async (req: Request) => {
     console.error('farm_watch_get_access_features_v1_internal failed', accessFeaturesError.message)
   }
 
+  const { data: operatorObservations, error: operatorObservationsError } = await admin.rpc(
+    'farm_watch_get_operator_observations_v1_internal',
+    { p_slug: slug, p_observation_kind: null },
+  )
+  if (operatorObservationsError) {
+    console.error('farm_watch_get_operator_observations_v1_internal failed', operatorObservationsError.message)
+  }
+
   let { data: soils, error: soilsError } = await admin.rpc('farm_watch_get_soils_v1_internal', {
     p_slug: slug,
   })
@@ -543,6 +551,8 @@ Deno.serve(async (req: Request) => {
       access_features_geojson: accessFeaturesError || !accessFeatures ? EMPTY_FEATURE_COLLECTION : accessFeatures,
       access_features_status: accessFeaturesError ? 'unavailable' : 'available',
       access_buffer_m: 1000,
+      operator_observations: operatorObservationsError || !Array.isArray(operatorObservations) ? [] : operatorObservations,
+      operator_observations_status: operatorObservationsError ? 'unavailable' : 'available',
       soils_geojson: soilsError || !soils?.feature_collection ? EMPTY_FEATURE_COLLECTION : soils.feature_collection,
       soils_status: soilsError ? 'unavailable' : soils?.status || 'unavailable',
       soils_summary: soilsError ? null : soils?.summary || null,
