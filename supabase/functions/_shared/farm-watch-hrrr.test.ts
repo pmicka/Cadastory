@@ -1,10 +1,12 @@
 import {
   HRRR_LAMBERT_CONE,
+  HRRR_REQUIRED_FIELDS,
   candidateReferenceTimes,
   findAnalysisRecord,
   hrrrAnalysisFileUrl,
   hrrrAnalysisIndexUrl,
   selectRequiredAnalysisRecords,
+  rotateHrrrGridWind,
 } from './farm-watch-hrrr.ts'
 
 function assert(condition: unknown, message = 'assertion failed'): asserts condition {
@@ -67,4 +69,38 @@ Deno.test('analysis selector rejects a forecast-only record', () => {
     threw = true
   }
   assert(threw)
+})
+
+Deno.test('HRRR candidate reference times cross the UTC date boundary correctly', () => {
+  const values = candidateReferenceTimes(new Date('2026-09-21T01:12:00Z'), 3)
+  assert(values[0]!.toISOString() === '2026-09-21T01:00:00.000Z')
+  assert(values[2]!.toISOString() === '2026-09-20T23:00:00.000Z')
+  assert(
+    hrrrAnalysisFileUrl(values[2]!) ===
+      'https://noaa-hrrr-bdp-pds.s3.amazonaws.com/hrrr.20260920/conus/hrrr.t23z.wrfsfcf00.grib2',
+  )
+})
+
+Deno.test('HRRR field conversions preserve documented units', () => {
+  const byKey = Object.fromEntries(HRRR_REQUIRED_FIELDS.map((field) => [field.key, field]))
+  approx(byKey.air_temperature_2m_c.convert(300), 26.85, 1e-12)
+  approx(byKey.dew_point_2m_c.convert(280), 6.85, 1e-12)
+  approx(byKey.precipitation_rate_mm_hr.convert(0.001), 3.6, 1e-12)
+  approx(byKey.downward_shortwave_wm2.convert(725), 725, 0)
+  approx(byKey.downward_longwave_wm2.convert(340), 340, 0)
+})
+
+Deno.test('HRRR Lambert wind rotation preserves speed and true direction at orientation longitude', () => {
+  const wind = rotateHrrrGridWind(3, 4, 262.5)
+  approx(wind.speedMps, 5, 1e-12)
+  approx(wind.uEastMps, 3, 1e-12)
+  approx(wind.vNorthMps, 4, 1e-12)
+  approx(wind.directionFromDeg, 216.86989764584402, 1e-9)
+})
+
+Deno.test('HRRR Lambert wind rotation changes orientation away from central meridian without changing speed', () => {
+  const wind = rotateHrrrGridWind(3, 4, 275)
+  approx(wind.speedMps, 5, 1e-12)
+  assert(Math.abs(wind.uEastMps - 3) > 0.01)
+  assert(wind.directionFromDeg >= 0 && wind.directionFromDeg < 360)
 })
