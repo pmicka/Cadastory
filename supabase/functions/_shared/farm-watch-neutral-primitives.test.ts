@@ -81,7 +81,7 @@ function syntheticStructureArtifact(width=8,height=8){
   }
   return {
     combined_grid:{
-      native_crs:'EPSG:32616',
+      native_crs:'EPSG:6473',
       bbox:{west:680000,east:680040,south:4242000,north:4242040},
       cell_meters:5,
       width,height,
@@ -167,6 +167,7 @@ Deno.test('spatial pattern artifact derives from existing compact structure with
     fetchImpl:demFetch as typeof fetch,
   })
   assert(validateSpatialPatternArtifact(built.artifact))
+  assert(built.artifact.structure_pattern.grid.native_crs==='EPSG:6473')
   assert(built.artifact.scoring_performed===false)
   assert(built.artifact.behavioral_inference_performed===false)
   assert(built.artifact.source_provenance.structure_reuse.includes('no COPC or imagery recomputation'))
