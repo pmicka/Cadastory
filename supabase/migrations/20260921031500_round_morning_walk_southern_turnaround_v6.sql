@@ -71,18 +71,18 @@ with candidate as (
   where cc.component_index=2
 ), raw_south as (
   select
-    ctrl.id,
+    n.id,
     extensions.st_makeline(q.pt order by q.ord) as geom_utm
-  from controls ctrl
+  from north_prefix n
   cross join lateral (
-    select 0 as ord,ctrl.junction_utm as pt
+    select 0 as ord,extensions.st_endpoint(n.geom_utm) as pt
     union all
     select rp.idx-30 as ord,rp.pt
     from raw_points rp
-    where rp.id=ctrl.id
+    where rp.id=n.id
       and rp.idx between 31 and 79
   ) q
-  group by ctrl.id
+  group by n.id
 ), smooth_south as (
   select
     id,
@@ -112,13 +112,14 @@ with candidate as (
         extensions.st_setpoint(
           cc.geom_utm,
           0,
-          ctrl.junction_utm
+          extensions.st_endpoint(np.geom_utm)
         )
       else cc.geom_utm
     end as geom_utm
   from current_components cc
   join rebuilt_trunk rt using(id)
   join controls ctrl using(id)
+  join north_prefix np using(id)
 ), presentation as (
   select
     id,
@@ -146,13 +147,14 @@ with candidate as (
       extensions.st_startpoint(
         (select geom_utm from rebuilt_components bc where bc.id=rt.id and bc.component_index=4)
       ),
-      ctrl.junction_utm
+      extensions.st_endpoint(np.geom_utm)
     ) as spur_junction_gap_m,
     extensions.st_isclosed(rt.geom_utm) as trunk_closed,
     extensions.st_issimple(rt.geom_utm) as trunk_simple
   from rebuilt_trunk rt
   join smooth_south ss using(id)
   join controls ctrl using(id)
+  join north_prefix np using(id)
 )
 update farm_watch.property_operator_observations_v1 o
 set source_context = jsonb_set(
