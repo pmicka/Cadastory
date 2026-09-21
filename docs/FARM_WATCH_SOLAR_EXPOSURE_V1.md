@@ -76,9 +76,10 @@ For that reason, Solar Terrain v1 samples one bounded **unmasked** DEM support g
 - azimuth sectors: 24, at 15° spacing;
 - CRS: EPSG:32616;
 - sampling mask: only cells actually required by target-boundary orientation neighbors and the configured 24-sector horizon rays;
-- required-set DEM support coverage: exactly 100%, otherwise the build fails closed.
+- required-set DEM support coverage: exactly 100%, otherwise the build fails closed;
+- acquisition retry policy: initial 900-point batches at concurrency 4, then omitted points only at 250×2 and 50×1.
 
-The surrounding rectangular support extent is only an indexing envelope; irrelevant cells that no derivative or horizon ray can touch are not part of the coverage gate. Missing **required** horizon-support DEM cells are never treated as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
+The surrounding rectangular support extent is only an indexing envelope; irrelevant cells that no derivative or horizon ray can touch are not part of the coverage gate. ArcGIS sample omissions are retried only for the missing required points; the retry path does not interpolate, substitute, or alter returned elevation values. Missing **required** horizon-support DEM cells after all retries are never treated as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
 
 ### Canopy
 
