@@ -464,10 +464,11 @@ async function main() {
     }
 
     console.log('Resolving Phase 3 LiDAR coverage for barrier-aware local_500m domain')
-    const sourceBuild = await buildLidarSourceArtifact(domain)
+    const phase3CollectionId = String(claim.contract.lidar.source_collection)
+    const sourceBuild = await buildLidarSourceArtifact(domain, fetch, [phase3CollectionId])
     const sourcePlan = sourceBuild.artifact
     const phase3 = sourcePlan.collections?.find(
-      (row: any) => row?.id === FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections[0].id,
+      (row: any) => row?.id === phase3CollectionId,
     )
     const coveragePercent = Number(phase3?.coverage?.sampled_parcel_coverage_percent)
     if (
@@ -537,7 +538,23 @@ async function main() {
         output_schema_version: claim.landscape_domain_identity.output_schema_version,
         barrier_aware: true,
       },
-      lidar_physical: lidar,
+      lidar_physical: {
+        source_collection: lidar.source_collection,
+        source_plan_artifact_sha256: lidar.source_plan_artifact_sha256,
+        processing_item_ids: lidar.processing_item_ids,
+        native_crs: lidar.native_crs,
+        height_unit: lidar.height_unit,
+        cell_meters: lidar.cell_meters,
+        minimum_cell_returns: lidar.minimum_cell_returns,
+        acquisition_utc_range: lidar.acquisition_utc_range,
+        acquisition_time_basis: lidar.acquisition_time_basis,
+        current_summary: lidar.current_summary,
+        processing_summary: lidar.processing_summary,
+        processing_source_fingerprint: lidar.processing_source_fingerprint,
+        interpretation_boundary: lidar.interpretation_boundary,
+        grid_storage_note:
+          'Full local_500m LiDAR cell counts are represented in combined_grid as 5 m band-share bytes plus uint16 return counts; the duplicate raw JSON count arrays are intentionally not stored.',
+      },
       leaf_off_2024: compactLeafOffForLandscape(leaf),
       combined_grid: combined.compact,
       summary: combined.summary,
