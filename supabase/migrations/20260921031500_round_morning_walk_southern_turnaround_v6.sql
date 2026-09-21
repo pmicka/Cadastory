@@ -61,10 +61,9 @@ with candidate as (
 ), north_prefix as (
   select
     cc.id,
-    extensions.st_linesubstring(
-      cc.geom_utm,
-      0,
-      extensions.st_linelocatepoint(cc.geom_utm,ctrl.junction_utm)
+    extensions.st_makeline(
+      extensions.st_startpoint(cc.geom_utm),
+      ctrl.junction_utm
     ) as geom_utm
   from current_components cc
   join controls ctrl using(id)
