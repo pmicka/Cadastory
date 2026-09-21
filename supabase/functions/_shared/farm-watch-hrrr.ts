@@ -46,15 +46,15 @@ type FieldSpec = {
 }
 
 export const HRRR_REQUIRED_FIELDS: readonly FieldSpec[] = Object.freeze([
-  { key: 'air_temperature_2m_c', variable: 'TMP', level: '2 m above ground', convert: (v) => v - 273.15 },
-  { key: 'dew_point_2m_c', variable: 'DPT', level: '2 m above ground', convert: (v) => v - 273.15 },
-  { key: 'relative_humidity_2m_pct', variable: 'RH', level: '2 m above ground', convert: (v) => v },
-  { key: 'wind_grid_u_10m_mps', variable: 'UGRD', level: '10 m above ground', convert: (v) => v },
-  { key: 'wind_grid_v_10m_mps', variable: 'VGRD', level: '10 m above ground', convert: (v) => v },
-  { key: 'downward_shortwave_wm2', variable: 'DSWRF', level: 'surface', convert: (v) => v },
-  { key: 'downward_longwave_wm2', variable: 'DLWRF', level: 'surface', convert: (v) => v },
-  { key: 'total_cloud_cover_pct', variable: 'TCDC', level: 'entire atmosphere', convert: (v) => v },
-  { key: 'precipitation_rate_mm_hr', variable: 'PRATE', level: 'surface', convert: (v) => v * 3600 },
+  { key: 'air_temperature_2m_c', variable: 'TMP', level: '2 m above ground', convert: (v: number) => v - 273.15 },
+  { key: 'dew_point_2m_c', variable: 'DPT', level: '2 m above ground', convert: (v: number) => v - 273.15 },
+  { key: 'relative_humidity_2m_pct', variable: 'RH', level: '2 m above ground', convert: (v: number) => v },
+  { key: 'wind_grid_u_10m_mps', variable: 'UGRD', level: '10 m above ground', convert: (v: number) => v },
+  { key: 'wind_grid_v_10m_mps', variable: 'VGRD', level: '10 m above ground', convert: (v: number) => v },
+  { key: 'downward_shortwave_wm2', variable: 'DSWRF', level: 'surface', convert: (v: number) => v },
+  { key: 'downward_longwave_wm2', variable: 'DLWRF', level: 'surface', convert: (v: number) => v },
+  { key: 'total_cloud_cover_pct', variable: 'TCDC', level: 'entire atmosphere', convert: (v: number) => v },
+  { key: 'precipitation_rate_mm_hr', variable: 'PRATE', level: 'surface', convert: (v: number) => v * 3600 },
 ] as const)
 
 export function floorUtcHour(value: Date): Date {
@@ -119,7 +119,7 @@ export function byteRange(record: IdxRecord): string {
 
 async function sha256Hex(value: string | Uint8Array): Promise<string> {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+  const payload = Uint8Array.from(bytes).buffer\n  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
   return [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
