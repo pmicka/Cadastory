@@ -40,6 +40,7 @@ export const FARM_WATCH_DIEL_BIOLOGICAL_STATE_LIMITATIONS = Object.freeze([
   'Population breeding phenology is regional context and must not be promoted to an individual deer estrus, conception, pregnancy, or mating state.',
   'Kentucky v1 uses a statewide qualitative breeding summary because the annual KDFWR physiographic-region map has not yet been captured as a source-controlled machine-readable dataset.',
   'Published Illinois age-specific conception dates support age gating but are not copied as Kentucky date coefficients.',
+  'Ohio early-November breeding-onset evidence is regional corroboration only and is not an applicable Kentucky relationship or date coefficient.',
   'Movement state, sex, age class, and individual reproductive state remain explicit scenario inputs. Unknown values remain unknown.',
   'No moon-phase, barometric-pressure, generic cold-front, ridge/draw/saddle, hunting-pressure, bedding, or habitat-quality inference is performed.',
 ])
