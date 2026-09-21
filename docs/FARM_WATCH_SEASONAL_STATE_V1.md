@@ -181,7 +181,7 @@ Even a `known` mapped crop class does not establish standing crop, harvest state
 
 Live source inspection before deployment indicates the validation property should currently resolve to a **partial** state:
 
-- precipitation: `unavailable` — no active configured QPE sample point was found within the 25 km contract radius;
+- precipitation: `proxy` — configured QPE sample `qpe_2_0` is about 17.1 km away; the latest daily snapshot is 2026-09-19, exactly at the 2-day freshness boundary;
 - drought: `known` — latest available map vintage is 2026-09-15 and the property point is outside mapped D0+ polygons;
 - stream: `proxy` — USGS gauge 03289500 is about 8.8 km away with a same-day provisional discharge observation;
 - root-zone soil moisture: `proxy` — nearest available Crop-CASMA/SMAP context is about 17.1 km away, observed 2026-09-17;
@@ -189,6 +189,8 @@ Live source inspection before deployment indicates the validation property shoul
 - regional crop progress: `proxy` — latest usable gridded layer week ending 2026-09-13;
 - state crop stage: `proxy` — latest Kentucky stage observations week ending 2026-09-13;
 - mapped crop context: `stale` for current-crop identity — resource-edge evidence currently carries 2025 CDL classes.
+
+The first read-only integration test initially assumed precipitation was unavailable because the convenience current view was null. The resolver correctly found the underlying daily QPE history instead; this is why Seasonal State reads the authoritative snapshot tables directly.
 
 These are verification expectations, not a persisted canonical result. Production state should be recorded only after deployment and successful materialization.
 
