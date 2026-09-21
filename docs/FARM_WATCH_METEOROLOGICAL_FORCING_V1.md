@@ -220,6 +220,35 @@ Deployment verification should additionally establish for `validation-property-0
 - the edge function remains `verify_jwt:false`;
 - no deer semantics are present.
 
+## Pre-deployment integration validation — 2026-09-21
+
+The complete migration DDL was executed against the live production schema inside one explicit PostgreSQL transaction and then rolled back.
+
+The rollback test exercised:
+
+- source registration and table/function creation;
+- `validation-property-01` meteorological target resolution;
+- property-boundary identity binding;
+- storage of one contract-valid synthetic HRRR analysis payload;
+- `available` read-back within the configured age window;
+- `stale` but inspectable read-back outside the age window;
+- rejection of an analysis payload with a nonzero forecast lead;
+- neutral evidence flags;
+- anonymous/authenticated denial and service-role access;
+- `agent_contract.assert_tool_registry_integrity_v1()`;
+- `agent_contract.assert_architecture_doctrine_v1()`.
+
+A post-rollback catalog check confirmed that production retained:
+
+- no `property_meteorological_forcing_v1` table;
+- no Farm Watch meteorological-forcing functions;
+- no public meteorological-forcing wrappers;
+- no `noaa-hrrr-conus-3km` source row.
+
+Therefore Batch 1 remains **not deployed**.
+
+The pre-deployment test validates persistence, security, identity, and read semantics. It does **not** claim that the live collector has decoded a current HRRR grid point for the private validation property. That requires the collector and migration to be deployed and is an explicit deployment-verification gate.
+
 ## Next dependency
 
 Batch 2A, `solar-exposure-context-v1`, may use this forcing product's shortwave/cloud state only after Batch 1 is deployed and validated.
