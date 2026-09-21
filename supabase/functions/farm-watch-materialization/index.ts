@@ -112,7 +112,7 @@ const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 const NEUTRAL_PRIMITIVES_WORKFLOW_REF =
   'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main'
 
-type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context' | 'solar-terrain-context' | 'solar-exposure-context'
+type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context' | 'solar-terrain-context' | 'solar-exposure-context' | 'thermal-exposure-context'
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -159,6 +159,15 @@ function boundedSolarDate(value: unknown) {
   }
 }
 
+function boundedThermalAt(value: unknown) {
+  if (value == null || value === '') return null
+  try {
+    return requireThermalValidAt(String(value))
+  } catch {
+    return null
+  }
+}
+
 function productKey(value: unknown): ProductKey | null {
   const key = String(value || '')
   return key === FARM_WATCH_TERRAIN_PRODUCT.key ||
@@ -170,7 +179,8 @@ function productKey(value: unknown): ProductKey | null {
       key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key ||
       key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key ||
       key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key ||
-      key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key
+      key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key ||
+      key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key
     ? key as ProductKey
     : null
 }
