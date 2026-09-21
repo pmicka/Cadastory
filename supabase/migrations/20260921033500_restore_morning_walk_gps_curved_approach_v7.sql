@@ -18,9 +18,10 @@ with candidate as (
   limit 1
 ), raw as (
   select
-    o.id,
+    c.id,
     extensions.st_transform(o.geometry,32616) as raw_utm
-  from farm_watch.property_operator_observations_v1 o
+  from candidate c
+  join farm_watch.property_operator_observations_v1 o on true
   join farm_watch.properties p on p.id=o.property_id
   where p.slug='validation-property-01'
     and o.observation_key='morning-walk-2025-08-29-raw-gpx'
