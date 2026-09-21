@@ -132,7 +132,7 @@ The first production deer output should be a vector of evidence-backed module re
 
 | Product | Type | Primary evidence | Status |
 | --- | --- | --- | --- |
-| `meteorological-forcing-v1` | dated/hourly state | NOAA HRRR + historical Daymet fallback where appropriate | build |
+| `meteorological-forcing-v1` | dated/hourly state | NOAA HRRR + historical Daymet fallback where appropriate | implementation candidate |
 | `solar-exposure-context-v1` | gridded physical | DEM + solar geometry + horizon + canopy | build |
 | `thermal-exposure-context-v1` | dated gridded physical/proxy | solar exposure + meteorological forcing | build |
 | `field-phenology-context-v1` | dated field state | CDL + NASA HLS VI + NASS regional context | build |
@@ -177,6 +177,7 @@ No deer-specific model term may ship without a ledger relationship ID and transf
 
 # Batch 1 — Property-grade meteorological forcing
 
+Status: implementation candidate; not deployed  
 Priority: P0  
 Ledger dependencies: FW-D01, D02, D03, D05, D18, D19, D20.
 
@@ -186,7 +187,7 @@ Create a central, property-relevant meteorological state suitable for physical t
 
 ## Preferred current source
 
-NOAA HRRR should be the first implementation candidate because it is:
+NOAA HRRR is the selected v1 source. The implementation uses authoritative NOAA Open Data GRIB2 sidecar indexes plus byte-range retrieval of the required `wrfsfcf00` analysis records. It was selected because it is:
 
 - operational over CONUS;
 - approximately 3 km;
@@ -198,6 +199,8 @@ NOAA HRRR should be the first implementation candidate because it is:
 - precipitation and other near-surface state.
 
 Historical Daymet remains useful for historical daily environmental context but is not a substitute for hourly thermal forcing.
+
+The v1 collector is analysis-only (`f00`, lead 0) even though the persistence schema records analysis/forecast state explicitly for future extension. Grid-relative HRRR 10 m winds are retained and rotated to true east/north before wind speed/direction are derived. Full model files are not persisted.
 
 ## Proposed contract
 
