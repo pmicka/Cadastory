@@ -54,6 +54,23 @@ import {
   buildTerrainFormArtifact,
 } from '../_shared/farm-watch-neutral-primitives.ts'
 import {
+  FARM_WATCH_SOLAR_EXPOSURE_LIMITATIONS,
+  FARM_WATCH_SOLAR_EXPOSURE_PRODUCT,
+  FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS,
+  FARM_WATCH_SOLAR_TERRAIN_PRODUCT,
+  requireSolarDate,
+  solarExposureArtifactPath,
+  solarExposureSourceSignature,
+  solarTerrainArtifactPath,
+  solarTerrainSourceSignature,
+  validateSolarExposureArtifact,
+  validateSolarTerrainArtifact,
+} from '../_shared/farm-watch-solar-exposure-contract.ts'
+import {
+  buildSolarExposureArtifact,
+  buildSolarTerrainArtifact,
+} from '../_shared/farm-watch-solar-exposure.ts'
+import {
   FARM_WATCH_GITHUB_OIDC_AUDIENCE,
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
@@ -84,7 +101,7 @@ const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 const NEUTRAL_PRIMITIVES_WORKFLOW_REF =
   'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main'
 
-type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context'
+type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context' | 'solar-terrain-context' | 'solar-exposure-context'
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -122,6 +139,15 @@ function validSha256(value: string | null) {
   return value && /^[0-9a-f]{64}$/.test(value) ? value : null
 }
 
+function boundedSolarDate(value: unknown) {
+  if (value == null || value === '') return null
+  try {
+    return requireSolarDate(String(value))
+  } catch {
+    return null
+  }
+}
+
 function productKey(value: unknown): ProductKey | null {
   const key = String(value || '')
   return key === FARM_WATCH_TERRAIN_PRODUCT.key ||
@@ -131,7 +157,9 @@ function productKey(value: unknown): ProductKey | null {
       key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key ||
       key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key ||
       key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key ||
-      key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key
+      key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key ||
+      key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key ||
+      key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key
     ? key as ProductKey
     : null
 }
@@ -200,6 +228,24 @@ function productSpec(key: ProductKey) {
       sourceSignature: null,
     }
   }
+  if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
   return {
     key,
     productKind: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.productKind,
@@ -253,6 +299,8 @@ function validateArtifact(key: ProductKey, value: any) {
   if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return validateLandscapeStructureArtifact(value)
   if (key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key) return validateTerrainFormArtifact(value)
   if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) return validateSpatialPatternArtifact(value)
+  if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) return validateSolarTerrainArtifact(value)
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) return validateSolarExposureArtifact(value)
   return validateStructureSynthesisArtifact(value)
 }
 
@@ -479,12 +527,129 @@ async function readSpatialPatternState(slug: string) {
   return readDynamicState(slug, FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key, deps.sourceSignature)
 }
 
-async function readState(slug: string, key: ProductKey) {
+async function solarTerrainDependencies(slug: string, includeArtifacts = false) {
+  const [terrainState, spatialState] = await Promise.all([
+    readTerrainFormState(slug),
+    readSpatialPatternState(slug),
+  ])
+  const terrainIdentity = validSha256(String(terrainState?.materialization?.identity_sha256 || ''))
+  const terrainArtifactSha256 = validSha256(
+    String(terrainState?.materialization?.artifact_sha256 || ''),
+  )
+  const spatialIdentity = validSha256(String(spatialState?.materialization?.identity_sha256 || ''))
+  const spatialArtifactSha256 = validSha256(
+    String(spatialState?.materialization?.artifact_sha256 || ''),
+  )
+  if (
+    terrainState?.status !== 'available' ||
+    spatialState?.status !== 'available' ||
+    !terrainIdentity ||
+    !terrainArtifactSha256 ||
+    !spatialIdentity ||
+    !spatialArtifactSha256
+  ) throw new Error('current solar terrain dependencies are unavailable')
+
+  const sourceSignature = solarTerrainSourceSignature({
+    terrainMaterializationIdentitySha256: terrainIdentity,
+    terrainArtifactSha256,
+    spatialPatternMaterializationIdentitySha256: spatialIdentity,
+    spatialPatternArtifactSha256: spatialArtifactSha256,
+  })
+
+  let terrainArtifact: any = null
+  let spatialArtifact: any = null
+  if (includeArtifacts) {
+    const [terrainPayload, spatialPayload] = await Promise.all([
+      readPayload(slug, FARM_WATCH_TERRAIN_FORM_PRODUCT.key, terrainState),
+      readPayload(slug, FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key, spatialState),
+    ])
+    terrainArtifact = terrainPayload?.artifact
+    spatialArtifact = spatialPayload?.artifact
+    if (!terrainArtifact || !spatialArtifact) {
+      throw new Error('solar terrain dependency artifact payload is unavailable')
+    }
+  }
+
+  return {
+    terrainState,
+    spatialState,
+    terrainIdentity,
+    terrainArtifactSha256,
+    spatialIdentity,
+    spatialArtifactSha256,
+    terrainArtifact,
+    spatialArtifact,
+    sourceSignature,
+  }
+}
+
+async function readSolarTerrainState(slug: string) {
+  const deps = await solarTerrainDependencies(slug, false)
+  return readDynamicState(slug, FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key, deps.sourceSignature)
+}
+
+async function solarExposureDependencies(
+  slug: string,
+  solarDate: string,
+  includeArtifact = false,
+) {
+  const date = requireSolarDate(solarDate)
+  const solarTerrainState = await readSolarTerrainState(slug)
+  const solarTerrainIdentity = validSha256(
+    String(solarTerrainState?.materialization?.identity_sha256 || ''),
+  )
+  const solarTerrainArtifactSha256 = validSha256(
+    String(solarTerrainState?.materialization?.artifact_sha256 || ''),
+  )
+  if (
+    solarTerrainState?.status !== 'available' ||
+    !solarTerrainIdentity ||
+    !solarTerrainArtifactSha256
+  ) throw new Error('current solar terrain materialization is unavailable')
+
+  const sourceSignature = solarExposureSourceSignature({
+    solarTerrainMaterializationIdentitySha256: solarTerrainIdentity,
+    solarTerrainArtifactSha256,
+    solarDate: date,
+  })
+
+  let solarTerrainArtifact: any = null
+  if (includeArtifact) {
+    const payload = await readPayload(
+      slug,
+      FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
+      solarTerrainState,
+    )
+    solarTerrainArtifact = payload?.artifact
+    if (!solarTerrainArtifact) throw new Error('solar terrain artifact payload is unavailable')
+  }
+
+  return {
+    solarDate: date,
+    solarTerrainState,
+    solarTerrainIdentity,
+    solarTerrainArtifactSha256,
+    solarTerrainArtifact,
+    sourceSignature,
+  }
+}
+
+async function readSolarExposureState(slug: string, solarDate: string) {
+  const deps = await solarExposureDependencies(slug, solarDate, false)
+  return readDynamicState(slug, FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key, deps.sourceSignature)
+}
+
+async function readState(slug: string, key: ProductKey, solarDate: string | null = null) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) return readLidarPhysicalState(slug)
   if (key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key) return readStructureSynthesisState(slug)
   if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return readLandscapeStructureState(slug)
   if (key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key) return readTerrainFormState(slug)
   if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) return readSpatialPatternState(slug)
+  if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) return readSolarTerrainState(slug)
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
+    if (!solarDate) throw new Error('solar exposure date is required')
+    return readSolarExposureState(slug, solarDate)
+  }
   return readStaticState(slug, key)
 }
 
@@ -895,7 +1060,96 @@ async function buildSpatialPatternMaterialization(slug: string, workerId: string
   }
 }
 
-async function buildMaterialization(slug: string, key: ProductKey, workerId: string) {
+async function buildSolarTerrainMaterialization(slug: string, workerId: string) {
+  const deps = await solarTerrainDependencies(slug, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') return readSolarTerrainState(slug)
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const built = await buildSolarTerrainArtifact({
+      terrainArtifact: deps.terrainArtifact,
+      terrainMaterializationIdentitySha256: deps.terrainIdentity!,
+      terrainArtifactSha256: deps.terrainArtifactSha256!,
+      spatialPatternArtifact: deps.spatialArtifact,
+      spatialPatternMaterializationIdentitySha256: deps.spatialIdentity!,
+      spatialPatternArtifactSha256: deps.spatialArtifactSha256!,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact: built.artifact,
+      sampledSourceSha256: built.sampledSourceSha256,
+      key: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
+      sourceSignature: deps.sourceSignature,
+      limitations: FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS,
+      refreshDays: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.refreshDays,
+      artifactPath: solarTerrainArtifactPath,
+    })
+    return readSolarTerrainState(slug)
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
+async function buildSolarExposureMaterialization(
+  slug: string,
+  solarDate: string,
+  workerId: string,
+) {
+  const deps = await solarExposureDependencies(slug, solarDate, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') return readSolarExposureState(slug, deps.solarDate)
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const built = await buildSolarExposureArtifact({
+      solarDate: deps.solarDate,
+      solarTerrainArtifact: deps.solarTerrainArtifact,
+      solarTerrainMaterializationIdentitySha256: deps.solarTerrainIdentity!,
+      solarTerrainArtifactSha256: deps.solarTerrainArtifactSha256!,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact: built.artifact,
+      sampledSourceSha256: built.sampledSourceSha256,
+      key: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key,
+      sourceSignature: deps.sourceSignature,
+      limitations: FARM_WATCH_SOLAR_EXPOSURE_LIMITATIONS,
+      refreshDays: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.refreshDays,
+      artifactPath: solarExposureArtifactPath,
+    })
+    return readSolarExposureState(slug, deps.solarDate)
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
+async function buildMaterialization(
+  slug: string,
+  key: ProductKey,
+  workerId: string,
+  solarDate: string | null = null,
+) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) {
     throw new Error('LiDAR physical materialization uses the dedicated GitHub OIDC worker')
   }
@@ -913,6 +1167,13 @@ async function buildMaterialization(slug: string, key: ProductKey, workerId: str
   }
   if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) {
     return buildSpatialPatternMaterialization(slug, workerId)
+  }
+  if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) {
+    return buildSolarTerrainMaterialization(slug, workerId)
+  }
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
+    if (!solarDate) throw new Error('solar exposure date is required')
+    return buildSolarExposureMaterialization(slug, solarDate, workerId)
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
@@ -1050,12 +1311,19 @@ Deno.serve(async (req: Request) => {
 
     const slug = boundedSlug(typeof body?.property === 'string' ? body.property : null)
     const key = productKey(body?.product)
+    const solarDate = boundedSolarDate(body?.date)
     if (!slug || !key) return json({ error: 'invalid request' }, 400, origin)
+    if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key && !solarDate) {
+      return json({ error: 'solar exposure date is required' }, 400, origin)
+    }
+    if (body?.date != null && !solarDate) {
+      return json({ error: 'invalid solar date' }, 400, origin)
+    }
 
     try {
       const operation = body?.operation === 'read' ? 'read' : 'build'
       const state = operation === 'read'
-        ? await readState(slug, key)
+        ? await readState(slug, key, solarDate)
         : await buildMaterialization(
           slug,
           key,
@@ -1066,6 +1334,7 @@ Deno.serve(async (req: Request) => {
                 oidcIdentity.run_attempt || 'attempt',
               ].join(':')
             : 'farm-watch-materialization-edge-v2',
+          solarDate,
         )
       const knownSha256 = validSha256(
         typeof body?.known_artifact_sha256 === 'string'
@@ -1109,10 +1378,16 @@ Deno.serve(async (req: Request) => {
   const url = new URL(req.url)
   const slug = boundedSlug(url.searchParams.get('property'))
   const key = productKey(url.searchParams.get('product') || FARM_WATCH_TERRAIN_PRODUCT.key)
+  const dateParam = url.searchParams.get('date')
+  const solarDate = boundedSolarDate(dateParam)
   if (!slug || !key) return json({ error: 'invalid request' }, 400, origin)
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key && !solarDate) {
+    return json({ error: 'solar exposure date is required' }, 400, origin)
+  }
+  if (dateParam && !solarDate) return json({ error: 'invalid solar date' }, 400, origin)
 
   try {
-    const state = await readState(slug, key)
+    const state = await readState(slug, key, solarDate)
     const knownSha256 = validSha256(url.searchParams.get('known_artifact_sha256'))
     const presentationMode = materializationPresentationMode(accountRole, key)
     return json(
