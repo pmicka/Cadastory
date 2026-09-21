@@ -16,6 +16,7 @@ const TRUST = Object.freeze({
     'pmicka/Cadastory/.github/workflows/farm-watch-leaf-off.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-structure-synthesis.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-landscape-structure.yml@refs/heads/main',
+    'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main',
   ],
 })
 
