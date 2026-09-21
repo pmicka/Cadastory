@@ -1281,11 +1281,65 @@ async function buildSolarExposureMaterialization(
   }
 }
 
+async function buildThermalExposureMaterialization(
+  slug: string,
+  requestedAt: string,
+  workerId: string,
+) {
+  const deps = await thermalExposureDependencies(slug, requestedAt, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') {
+    return readDynamicState(
+      slug,
+      FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+      deps.sourceSignature,
+    )
+  }
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const built = await buildThermalExposureArtifact({
+      solarTerrainArtifact: deps.solarTerrainArtifact,
+      solarTerrainMaterializationIdentitySha256: deps.solarTerrainIdentity!,
+      solarTerrainArtifactSha256: deps.solarTerrainArtifactSha256!,
+      meteorologicalForcingResponse: deps.forcingResponse,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact: built.artifact,
+      sampledSourceSha256: built.sampledSourceSha256,
+      key: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+      sourceSignature: deps.sourceSignature,
+      limitations: FARM_WATCH_THERMAL_EXPOSURE_LIMITATIONS,
+      refreshDays: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.refreshDays,
+      artifactPath: thermalExposureArtifactPath,
+    })
+    return readDynamicState(
+      slug,
+      FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+      deps.sourceSignature,
+    )
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
 async function buildMaterialization(
   slug: string,
   key: ProductKey,
   workerId: string,
   solarDate: string | null = null,
+  thermalAt: string | null = null,
 ) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) {
     throw new Error('LiDAR physical materialization uses the dedicated GitHub OIDC worker')
@@ -1311,6 +1365,10 @@ async function buildMaterialization(
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
     if (!solarDate) throw new Error('solar exposure date is required')
     return buildSolarExposureMaterialization(slug, solarDate, workerId)
+  }
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) {
+    if (!thermalAt) throw new Error('thermal exposure timestamp is required')
+    return buildThermalExposureMaterialization(slug, thermalAt, workerId)
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
