@@ -1568,7 +1568,10 @@ Deno.serve(async (req: Request) => {
         return json({ property: { slug }, landscape_physical: landscapePhysical }, 503, origin)
       } catch (error) {
         console.error('Farm Watch landscape physical prerequisite failure could not be persisted', error)
-        return json({ error: 'landscape physical unavailable' }, 503, origin)
+        return json({
+          error: 'landscape physical unavailable',
+          detail: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+        }, 503, origin)
       }
     }
 
@@ -1578,7 +1581,10 @@ Deno.serve(async (req: Request) => {
       return json({ property: { slug }, landscape_physical: landscapePhysical }, status, origin)
     } catch (error) {
       console.error('Farm Watch landscape physical worker failed', error)
-      return json({ error: 'landscape physical unavailable' }, 503, origin)
+      return json({
+        error: 'landscape physical unavailable',
+        detail: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+      }, 503, origin)
     }
   }
 
