@@ -1,5 +1,6 @@
 begin;
 
+create temporary table _fw_trail_road_separation_v1 on commit drop as
 with property_row as (
   select id
   from farm_watch.properties
@@ -23,29 +24,31 @@ with property_row as (
     4326
   ) as geometry
 ), trail as (
-  select o.id,o.geometry
+  select o.geometry
   from farm_watch.property_operator_paths_v1 o
   join property_row p on p.id=o.property_id
   where o.path_key='flat-creek-phase3-image-trails'
     and o.active
   limit 1
-), separation as (
-  select
-    round(
-      extensions.st_distance(
-        r.geometry::extensions.geography,
-        t.geometry::extensions.geography
-      )::numeric,
-      2
-    ) as gap_m,
-    extensions.st_closestpoint(r.geometry,t.geometry) as road_point,
-    extensions.st_closestpoint(t.geometry,r.geometry) as trail_point
-  from restored_road r
-  cross join trail t
 )
+select
+  (select id from property_row) as property_id,
+  r.geometry as restored_road_geometry,
+  round(
+    extensions.st_distance(
+      r.geometry::extensions.geography,
+      t.geometry::extensions.geography
+    )::numeric,
+    2
+  ) as gap_m,
+  extensions.st_closestpoint(r.geometry,t.geometry) as road_point,
+  extensions.st_closestpoint(t.geometry,r.geometry) as trail_point
+from restored_road r
+cross join trail t;
+
 update farm_watch.property_operator_paths_v1 o
 set
-  geometry=r.geometry,
+  geometry=x.restored_road_geometry,
   source_context=
     (o.source_context - 'trail_extension')
     || jsonb_build_object(
@@ -55,9 +58,9 @@ set
         'trail_path_key','flat-creek-phase3-image-trails',
         'restored_geometry_source','20260920204500_source_register_flat_creek_road_v6.sql',
         'removed_connection_source','20260920234500_connect_flat_creek_trail_to_gravel_road.sql',
-        'nearest_gap_m',s.gap_m,
-        'road_nearest_point_geojson',extensions.st_asgeojson(s.road_point,7)::jsonb,
-        'trail_nearest_point_geojson',extensions.st_asgeojson(s.trail_point,7)::jsonb,
+        'nearest_gap_m',x.gap_m,
+        'road_nearest_point_geojson',extensions.st_asgeojson(x.road_point,7)::jsonb,
+        'trail_nearest_point_geojson',extensions.st_asgeojson(x.trail_point,7)::jsonb,
         'operator_feedback_local_date','2026-09-20'
       )
     ),
@@ -75,9 +78,8 @@ set
     )
     || ' The gravel access road is intentionally maintained as a separate canonical object from the unified trail network. Its source-registered v6 geometry is restored; the prior 2.88 m road-to-trail snap is removed.',
   updated_at=now()
-from restored_road r
-cross join separation s
-where o.property_id=(select id from property_row)
+from _fw_trail_road_separation_v1 x
+where o.property_id=x.property_id
   and o.path_key='flat-creek-gravel-access-road'
   and o.active;
 
@@ -97,7 +99,7 @@ set
         'gravel_access_road_included',false,
         'gravel_access_road_path_key','flat-creek-gravel-access-road',
         'gravel_access_road_relation','separate_canonical_object',
-        'nearest_gravel_road_gap_m',s.gap_m
+        'nearest_gravel_road_gap_m',x.gap_m
       ),
       true
     )
@@ -106,9 +108,9 @@ set
       'road_relation_v1',jsonb_build_object(
         'status','separate_canonical_objects',
         'road_path_key','flat-creek-gravel-access-road',
-        'nearest_gap_m',s.gap_m,
-        'road_nearest_point_geojson',extensions.st_asgeojson(s.road_point,7)::jsonb,
-        'trail_nearest_point_geojson',extensions.st_asgeojson(s.trail_point,7)::jsonb,
+        'nearest_gap_m',x.gap_m,
+        'road_nearest_point_geojson',extensions.st_asgeojson(x.road_point,7)::jsonb,
+        'trail_nearest_point_geojson',extensions.st_asgeojson(x.trail_point,7)::jsonb,
         'operator_feedback_local_date','2026-09-20'
       )
     ),
@@ -121,8 +123,8 @@ set
     )
     || ' The unified imagery + field-GNSS trail network is intentionally separate from the canonical gravel access road. The road-side snap has been removed; the nearest road/trail gap is preserved from the source-registered road geometry.',
   updated_at=now()
-from separation s
-where o.property_id=(select id from property_row)
+from _fw_trail_road_separation_v1 x
+where o.property_id=x.property_id
   and o.path_key='flat-creek-phase3-image-trails'
   and o.active;
 
