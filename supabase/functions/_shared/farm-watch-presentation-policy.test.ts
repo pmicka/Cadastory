@@ -44,3 +44,18 @@ Deno.test('unknown account roles fail closed', () => {
     throw new Error('unknown role should not be normalized')
   }
 })
+
+
+Deno.test('viewer receives summaries only for new neutral fine-grid materializations', () => {
+  for (const product of ['terrain-form-permeability','spatial-edge-patch-context']) {
+    if (canReadFarmWatchMaterializationArtifact('viewer', product)) {
+      throw new Error('viewer must not receive raw ' + product + ' artifact')
+    }
+    if (materializationPresentationMode('viewer', product) !== 'summary_only') {
+      throw new Error(product + ' viewer mode must be summary_only')
+    }
+    if (!canReadFarmWatchMaterializationArtifact('owner', product)) {
+      throw new Error('owner should retain raw ' + product + ' artifact access')
+    }
+  }
+})
