@@ -132,7 +132,7 @@ The first production deer output should be a vector of evidence-backed module re
 
 | Product | Type | Primary evidence | Status |
 | --- | --- | --- | --- |
-| `meteorological-forcing-v1` | dated/hourly state | NOAA HRRR + historical Daymet fallback where appropriate | implementation candidate |
+| `meteorological-forcing-v1` | dated/hourly state | NOAA HRRR + historical Daymet fallback where appropriate | production |
 | `solar-exposure-context-v1` | gridded physical | DEM + solar geometry + horizon + canopy | build |
 | `thermal-exposure-context-v1` | dated gridded physical/proxy | solar exposure + meteorological forcing | build |
 | `field-phenology-context-v1` | dated field state | CDL + NASA HLS VI + NASS regional context | build |
@@ -177,7 +177,7 @@ No deer-specific model term may ship without a ledger relationship ID and transf
 
 # Batch 1 — Property-grade meteorological forcing
 
-Status: implementation candidate; not deployed  
+Status: production; deployed and hourly pilot refresh active  
 Priority: P0  
 Ledger dependencies: FW-D01, D02, D03, D05, D18, D19, D20.
 
