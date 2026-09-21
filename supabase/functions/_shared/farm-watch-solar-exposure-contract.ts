@@ -87,6 +87,7 @@ export function solarTerrainSourceSignature(args: {
     'dem_source=kyfromabove-phase3-dem',
     'dem_support_cell_m=' + p.supportCellMeters,
     'dem_support_sampling=required_orientation_and_horizon_ray_union_v2',
+    'raster_sampling_retry=900x4_then_250x2_then_50x1_v1',
     'dem_required_coverage=100pct',
     'horizon_sector_count=' + p.horizonSectorCount,
     'horizon_search_radius_m=' + p.horizonSearchRadiusMeters,
