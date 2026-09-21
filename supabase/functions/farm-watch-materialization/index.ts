@@ -267,6 +267,15 @@ function productSpec(key: ProductKey) {
       sourceSignature: null,
     }
   }
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
   return {
     key,
     productKind: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.productKind,
@@ -322,6 +331,7 @@ function validateArtifact(key: ProductKey, value: any) {
   if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) return validateSpatialPatternArtifact(value)
   if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) return validateSolarTerrainArtifact(value)
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) return validateSolarExposureArtifact(value)
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) return validateThermalExposureArtifact(value)
   return validateStructureSynthesisArtifact(value)
 }
 
