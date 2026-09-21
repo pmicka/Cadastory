@@ -217,7 +217,7 @@ async function completeLandscapeStructure(slug: string, body: any) {
 
   const sampledSourceSha256 = await sha256Hex(JSON.stringify(fingerprint))
   const bytes = new TextEncoder().encode(JSON.stringify(artifact))
-  if (bytes.byteLength <= 0 || bytes.byteLength > 15 * 1024 * 1024) {
+  if (bytes.byteLength <= 0 || bytes.byteLength > 10 * 1024 * 1024) {
     throw new Error('landscape structure artifact size is invalid')
   }
   const artifactSha256 = await sha256Hex(bytes)
