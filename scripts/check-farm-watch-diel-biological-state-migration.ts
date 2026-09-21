@@ -36,7 +36,6 @@ for (const needle of required) {
 }
 
 for (const forbidden of [
-  "'FW-D23');",
   "array_append(v_ids,'FW-D23')",
   "'kdfwr-deer-fetal-breeding-phenology'",
   "grant execute on function public.farm_watch_resolve_deer_biological_state_v1_internal(text,timestamptz,text,text,text,text) to authenticated",
@@ -58,3 +57,28 @@ if (!sql.includes("'FW-D06'") || !sql.includes("'FW-D22'")) {
 }
 
 console.log('Farm Watch diel/biological-state migration invariants passed')
+
+
+function count(needle: string) {
+  return sql.split(needle).length - 1
+}
+
+for (const [needle, expected] of [
+  ['begin;', 1],
+  ['commit;', 1],
+  ['create table if not exists farm_watch.property_diel_photoperiod_context_v1', 1],
+  ['create table if not exists farm_watch.deer_regional_breeding_evidence_v1', 1],
+  ['create or replace function farm_watch.farm_watch_diel_photoperiod_contract_v1()', 1],
+  ['create or replace function farm_watch.farm_watch_resolve_deer_biological_state_v1_internal(', 1],
+  ["'kdfwr-deer-peak-breeding-reference'", 2],
+  ["'kdfwr-deer-fetal-breeding-phenology'", 0],
+  ["array_append(v_ids,'FW-D23')", 0],
+]) {
+  const actual = count(needle)
+  if (actual !== expected) {
+    throw new Error(
+      'diel/biological-state migration count mismatch for ' +
+      needle + ': expected ' + expected + ', got ' + actual,
+    )
+  }
+}
