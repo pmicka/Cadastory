@@ -42,6 +42,8 @@ type SupportGrid = {
   width: number
   height: number
   values_ft: Float64Array
+  required_cell_count: number
+  available_required_cell_count: number
 }
 
 function decodeU8(value: string) {
@@ -237,6 +239,51 @@ async function sampleTargetGrid(
   return values
 }
 
+function requiredDemSupportMask(
+  target: DecodedTerrainGrid,
+  support: { bbox: BBox; cell_meters: number; width: number; height: number },
+) {
+  const p = FARM_WATCH_SOLAR_TERRAIN_PRODUCT
+  const required = new Uint8Array(support.width * support.height)
+
+  const mark = (x: number, y: number) => {
+    const index = pointIndex(support, x, y)
+    if (index >= 0) required[index] = 1
+  }
+
+  const sectorAzimuths = Array.from(
+    { length: p.horizonSectorCount },
+    (_, index) => index * 360 / p.horizonSectorCount,
+  )
+
+  for (let index = 0; index < target.domain.length; index += 1) {
+    if (!target.domain[index] || !Number.isFinite(target.elevation_ft[index])) continue
+    const center = cellCenter(target, index)
+
+    // Boundary slope/aspect derivatives may require one unmasked neighbor.
+    mark(center.x - target.cell_meters, center.y)
+    mark(center.x + target.cell_meters, center.y)
+    mark(center.x, center.y - target.cell_meters)
+    mark(center.x, center.y + target.cell_meters)
+
+    for (const azimuthDeg of sectorAzimuths) {
+      const azimuth = azimuthDeg * Math.PI / 180
+      for (
+        let distance = p.horizonRayStepMeters;
+        distance <= p.horizonSearchRadiusMeters;
+        distance += p.horizonRayStepMeters
+      ) {
+        mark(
+          center.x + Math.sin(azimuth) * distance,
+          center.y + Math.cos(azimuth) * distance,
+        )
+      }
+    }
+  }
+
+  return required
+}
+
 async function buildDemSupport(
   target: DecodedTerrainGrid,
   fetchImpl: typeof fetch,
@@ -254,22 +301,39 @@ async function buildDemSupport(
   const height = Math.ceil((bbox.north - bbox.south) / cell)
   const count = width * height
   if (count <= 0 || count > 180_000) throw new Error('solar DEM support grid exceeds bounded cell budget')
-  const valid = new Uint8Array(count).fill(1)
+
+  const supportShape = { bbox, cell_meters: cell, width, height }
+  const required = requiredDemSupportMask(target, supportShape)
+  const requiredCount = required.reduce((sum, value) => sum + (value ? 1 : 0), 0)
+  if (!requiredCount) throw new Error('solar DEM support requirement mask is empty')
+
   const values = await sampleTargetGrid(
-    { bbox, cell_meters: cell, width, height },
-    valid,
+    supportShape,
+    required,
     p.demSourceUrl,
     {},
     fetchImpl,
   )
-  const available = [...values].reduce(
-    (sum, value) => sum + (Number.isFinite(value) ? 1 : 0),
+  const availableRequired = required.reduce(
+    (sum, needed, index) =>
+      sum + (needed && Number.isFinite(values[index]) ? 1 : 0),
     0,
   )
-  if (available / count < 0.995) {
-    throw new Error('solar DEM horizon support coverage is incomplete: ' + available + '/' + count)
+  if (availableRequired !== requiredCount) {
+    throw new Error(
+      'solar DEM required horizon support coverage is incomplete: ' +
+      availableRequired + '/' + requiredCount,
+    )
   }
-  return { bbox, cell_meters: cell, width, height, values_ft: values }
+  return {
+    bbox,
+    cell_meters: cell,
+    width,
+    height,
+    values_ft: values,
+    required_cell_count: requiredCount,
+    available_required_cell_count: availableRequired,
+  }
 }
 
 function mapExistingCanopy(
@@ -581,13 +645,15 @@ export async function buildSolarTerrainArtifact(args: {
       landscape_mean_canopy_percent: average(landscapeCanopy.percent, landscapeCanopy.valid),
       local_mean_horizon_deg: average(localHorizons.mean, local.domain, 0.5),
       landscape_mean_horizon_deg: average(landscapeHorizons.mean, landscape.domain, 0.5),
-      support_dem_cell_count: support.values_ft.length,
+      support_dem_grid_cell_count: support.values_ft.length,
+      support_dem_required_cell_count: support.required_cell_count,
+      support_dem_available_required_cell_count: support.available_required_cell_count,
     },
     source_provenance: {
       terrain_target_reuse:
         'canonical terrain-form-permeability elevation grids; no target DEM resampling',
       terrain_horizon_support:
-        'KyFromAbove Phase 3 DEM unmasked support sampled centrally for off-domain line-of-sight physics',
+        'KyFromAbove Phase 3 DEM unmasked support sampled only at cells required by target orientation neighbors and 24-sector horizon rays; required support must be complete',
       dem_source_url: p.demSourceUrl,
       canopy_source_url: p.canopySourceUrl,
       analysis_crs: EPSG_32616,
