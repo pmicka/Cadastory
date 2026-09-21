@@ -53,9 +53,12 @@ Deno.test('landscape structure artifact validator requires reusable fine structu
     leaf_off_2024: {
       sourceId: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.leafSourceId,
       grid: {
-        encoding: 'base64-u8-v1',
+        encoding: 'landscape-leaf-highres-v1',
+        score_encoding: 'base64-u8-v1',
+        validity_encoding: 'base64-bitset-lsb-v1',
         score_base64: 'AA==',
-        valid_base64: 'AQ==',
+        valid_bitset_base64: 'AQ==',
+        valid_cell_count: 1,
       },
     },
     combined_grid: {
