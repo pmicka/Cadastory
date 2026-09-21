@@ -1051,7 +1051,96 @@ async function buildSpatialPatternMaterialization(slug: string, workerId: string
   }
 }
 
-async function buildMaterialization(slug: string, key: ProductKey, workerId: string) {
+async function buildSolarTerrainMaterialization(slug: string, workerId: string) {
+  const deps = await solarTerrainDependencies(slug, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') return readSolarTerrainState(slug)
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const built = await buildSolarTerrainArtifact({
+      terrainArtifact: deps.terrainArtifact,
+      terrainMaterializationIdentitySha256: deps.terrainIdentity!,
+      terrainArtifactSha256: deps.terrainArtifactSha256!,
+      spatialPatternArtifact: deps.spatialArtifact,
+      spatialPatternMaterializationIdentitySha256: deps.spatialIdentity!,
+      spatialPatternArtifactSha256: deps.spatialArtifactSha256!,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact: built.artifact,
+      sampledSourceSha256: built.sampledSourceSha256,
+      key: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
+      sourceSignature: deps.sourceSignature,
+      limitations: FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS,
+      refreshDays: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.refreshDays,
+      artifactPath: solarTerrainArtifactPath,
+    })
+    return readSolarTerrainState(slug)
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
+async function buildSolarExposureMaterialization(
+  slug: string,
+  solarDate: string,
+  workerId: string,
+) {
+  const deps = await solarExposureDependencies(slug, solarDate, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') return readSolarExposureState(slug, deps.solarDate)
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const built = await buildSolarExposureArtifact({
+      solarDate: deps.solarDate,
+      solarTerrainArtifact: deps.solarTerrainArtifact,
+      solarTerrainMaterializationIdentitySha256: deps.solarTerrainIdentity!,
+      solarTerrainArtifactSha256: deps.solarTerrainArtifactSha256!,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact: built.artifact,
+      sampledSourceSha256: built.sampledSourceSha256,
+      key: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key,
+      sourceSignature: deps.sourceSignature,
+      limitations: FARM_WATCH_SOLAR_EXPOSURE_LIMITATIONS,
+      refreshDays: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.refreshDays,
+      artifactPath: solarExposureArtifactPath,
+    })
+    return readSolarExposureState(slug, deps.solarDate)
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
+async function buildMaterialization(
+  slug: string,
+  key: ProductKey,
+  workerId: string,
+  solarDate: string | null = null,
+) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) {
     throw new Error('LiDAR physical materialization uses the dedicated GitHub OIDC worker')
   }
@@ -1069,6 +1158,13 @@ async function buildMaterialization(slug: string, key: ProductKey, workerId: str
   }
   if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) {
     return buildSpatialPatternMaterialization(slug, workerId)
+  }
+  if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) {
+    return buildSolarTerrainMaterialization(slug, workerId)
+  }
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
+    if (!solarDate) throw new Error('solar exposure date is required')
+    return buildSolarExposureMaterialization(slug, solarDate, workerId)
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
