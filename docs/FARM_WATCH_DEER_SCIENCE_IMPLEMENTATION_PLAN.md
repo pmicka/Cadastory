@@ -133,7 +133,7 @@ The first production deer output should be a vector of evidence-backed module re
 | Product | Type | Primary evidence | Status |
 | --- | --- | --- | --- |
 | `meteorological-forcing-v1` | dated/hourly state | NOAA HRRR + historical Daymet fallback where appropriate | production |
-| `solar-exposure-context-v1` | gridded physical | DEM + solar geometry + horizon + canopy | build |
+| `solar-exposure-context-v1` | gridded physical | canonical terrain + solar geometry + horizon + canopy | implementation candidate |
 | `thermal-exposure-context-v1` | dated gridded physical/proxy | solar exposure + meteorological forcing | build |
 | `field-phenology-context-v1` | dated field state | CDL + NASA HLS VI + NASS regional context | build |
 | `mast-resource-context-v1` | annual/seasonal resource proxy | USFS TreeMap/BIGMAP + Kentucky mast survey | build |
@@ -258,13 +258,14 @@ Depends on: Batch 1 + existing DEM/canopy/terrain.
 
 ## 2A — `solar-exposure-context-v1`
 
-Build a deterministic physical solar-exposure product independent of deer.
+Implementation is split into a reusable static `solar-terrain-context-v1` materialization plus date-keyed `solar-exposure-context-v1`. Build a deterministic physical solar-exposure product independent of deer.
 
 ### Inputs
 
-- DEM;
-- slope/aspect;
-- property/domain geometry;
+- canonical terrain-form-permeability elevation grids;
+- deterministic slope/aspect;
+- unmasked KyFromAbove DEM support for terrain horizon only;
+- property/domain target geometry;
 - date/time;
 - sun position;
 - terrain horizon/self-shading;
@@ -275,7 +276,7 @@ Build a deterministic physical solar-exposure product independent of deer.
 
 - 10 m over barrier-aware local 500 m;
 - 30 m over barrier-aware 1.5 km;
-- coarser summary only at 3 km unless later science shows value.
+- no 3 km raster in v1; add only a coarse summary later if a downstream scientific requirement shows value.
 
 ### Outputs
 
