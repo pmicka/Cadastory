@@ -71,6 +71,17 @@ import {
   buildSolarTerrainArtifact,
 } from '../_shared/farm-watch-solar-exposure.ts'
 import {
+  FARM_WATCH_THERMAL_EXPOSURE_LIMITATIONS,
+  FARM_WATCH_THERMAL_EXPOSURE_PRODUCT,
+  requireThermalValidAt,
+  thermalExposureArtifactPath,
+  thermalExposureSourceSignature,
+  validateThermalExposureArtifact,
+} from '../_shared/farm-watch-thermal-exposure-contract.ts'
+import {
+  buildThermalExposureArtifact,
+} from '../_shared/farm-watch-thermal-exposure.ts'
+import {
   FARM_WATCH_GITHUB_OIDC_AUDIENCE,
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
@@ -101,7 +112,7 @@ const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 const NEUTRAL_PRIMITIVES_WORKFLOW_REF =
   'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main'
 
-type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context' | 'solar-terrain-context' | 'solar-exposure-context'
+type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context' | 'solar-terrain-context' | 'solar-exposure-context' | 'thermal-exposure-context'
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -148,6 +159,15 @@ function boundedSolarDate(value: unknown) {
   }
 }
 
+function boundedThermalAt(value: unknown) {
+  if (value == null || value === '') return null
+  try {
+    return requireThermalValidAt(String(value))
+  } catch {
+    return null
+  }
+}
+
 function productKey(value: unknown): ProductKey | null {
   const key = String(value || '')
   return key === FARM_WATCH_TERRAIN_PRODUCT.key ||
@@ -159,7 +179,8 @@ function productKey(value: unknown): ProductKey | null {
       key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key ||
       key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key ||
       key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key ||
-      key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key
+      key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key ||
+      key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key
     ? key as ProductKey
     : null
 }
@@ -246,6 +267,15 @@ function productSpec(key: ProductKey) {
       sourceSignature: null,
     }
   }
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
   return {
     key,
     productKind: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.productKind,
@@ -301,6 +331,7 @@ function validateArtifact(key: ProductKey, value: any) {
   if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) return validateSpatialPatternArtifact(value)
   if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) return validateSolarTerrainArtifact(value)
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) return validateSolarExposureArtifact(value)
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) return validateThermalExposureArtifact(value)
   return validateStructureSynthesisArtifact(value)
 }
 
@@ -639,7 +670,109 @@ async function readSolarExposureState(slug: string, solarDate: string) {
   return readDynamicState(slug, FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key, deps.sourceSignature)
 }
 
-async function readState(slug: string, key: ProductKey, solarDate: string | null = null) {
+async function thermalExposureDependencies(
+  slug: string,
+  requestedAt: string,
+  includeArtifact = false,
+) {
+  const targetAt = requireThermalValidAt(requestedAt)
+  const solarTerrainState = await readSolarTerrainState(slug)
+  const solarTerrainIdentity = validSha256(
+    String(solarTerrainState?.materialization?.identity_sha256 || ''),
+  )
+  const solarTerrainArtifactSha256 = validSha256(
+    String(solarTerrainState?.materialization?.artifact_sha256 || ''),
+  )
+  if (
+    solarTerrainState?.status !== 'available' ||
+    !solarTerrainIdentity ||
+    !solarTerrainArtifactSha256
+  ) throw new Error('current solar terrain materialization is unavailable')
+
+  const { data: forcingResponse, error: forcingError } = await admin.rpc(
+    'farm_watch_get_meteorological_forcing_v1_internal',
+    {
+      p_slug: slug,
+      p_valid_at: targetAt,
+      p_max_age_minutes: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.forcingMaxAgeMinutes,
+      p_source_state: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.forcingSourceState,
+    },
+  )
+  if (forcingError) {
+    throw new Error('meteorological forcing dependency failed: ' + forcingError.message)
+  }
+  if (forcingResponse?.status !== 'available' || !forcingResponse?.context) {
+    throw new Error(
+      'meteorological forcing dependency is ' + String(forcingResponse?.status || 'missing'),
+    )
+  }
+
+  const forcingIdentity = validSha256(
+    String(forcingResponse?.identity?.identity_sha256 || ''),
+  )
+  const sourceIndexSha256 = validSha256(
+    String(forcingResponse?.identity?.source_index_sha256 || ''),
+  )
+  const sourceRecordsSha256 = validSha256(
+    String(forcingResponse?.identity?.source_records_sha256 || ''),
+  )
+  const forcingValidAt = requireThermalValidAt(
+    String(forcingResponse?.valid_at || forcingResponse?.context?.valid_at || ''),
+  )
+  if (!forcingIdentity || !sourceIndexSha256 || !sourceRecordsSha256) {
+    throw new Error('meteorological forcing identity is unavailable')
+  }
+
+  const sourceSignature = thermalExposureSourceSignature({
+    solarTerrainMaterializationIdentitySha256: solarTerrainIdentity,
+    solarTerrainArtifactSha256,
+    meteorologicalForcingIdentitySha256: forcingIdentity,
+    meteorologicalForcingValidAt: forcingValidAt,
+    sourceIndexSha256,
+    sourceRecordsSha256,
+  })
+
+  let solarTerrainArtifact: any = null
+  if (includeArtifact) {
+    const payload = await readPayload(
+      slug,
+      FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
+      solarTerrainState,
+    )
+    solarTerrainArtifact = payload?.artifact
+    if (!solarTerrainArtifact) throw new Error('solar terrain artifact payload is unavailable')
+  }
+
+  return {
+    requestedAt: targetAt,
+    solarTerrainState,
+    solarTerrainIdentity,
+    solarTerrainArtifactSha256,
+    solarTerrainArtifact,
+    forcingResponse,
+    forcingIdentity,
+    forcingValidAt,
+    sourceIndexSha256,
+    sourceRecordsSha256,
+    sourceSignature,
+  }
+}
+
+async function readThermalExposureState(slug: string, requestedAt: string) {
+  const deps = await thermalExposureDependencies(slug, requestedAt, false)
+  return readDynamicState(
+    slug,
+    FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+    deps.sourceSignature,
+  )
+}
+
+async function readState(
+  slug: string,
+  key: ProductKey,
+  solarDate: string | null = null,
+  thermalAt: string | null = null,
+) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) return readLidarPhysicalState(slug)
   if (key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key) return readStructureSynthesisState(slug)
   if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return readLandscapeStructureState(slug)
@@ -649,6 +782,10 @@ async function readState(slug: string, key: ProductKey, solarDate: string | null
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
     if (!solarDate) throw new Error('solar exposure date is required')
     return readSolarExposureState(slug, solarDate)
+  }
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) {
+    if (!thermalAt) throw new Error('thermal exposure timestamp is required')
+    return readThermalExposureState(slug, thermalAt)
   }
   return readStaticState(slug, key)
 }
@@ -1144,11 +1281,65 @@ async function buildSolarExposureMaterialization(
   }
 }
 
+async function buildThermalExposureMaterialization(
+  slug: string,
+  requestedAt: string,
+  workerId: string,
+) {
+  const deps = await thermalExposureDependencies(slug, requestedAt, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') {
+    return readDynamicState(
+      slug,
+      FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+      deps.sourceSignature,
+    )
+  }
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const built = await buildThermalExposureArtifact({
+      solarTerrainArtifact: deps.solarTerrainArtifact,
+      solarTerrainMaterializationIdentitySha256: deps.solarTerrainIdentity!,
+      solarTerrainArtifactSha256: deps.solarTerrainArtifactSha256!,
+      meteorologicalForcingResponse: deps.forcingResponse,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact: built.artifact,
+      sampledSourceSha256: built.sampledSourceSha256,
+      key: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+      sourceSignature: deps.sourceSignature,
+      limitations: FARM_WATCH_THERMAL_EXPOSURE_LIMITATIONS,
+      refreshDays: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.refreshDays,
+      artifactPath: thermalExposureArtifactPath,
+    })
+    return readDynamicState(
+      slug,
+      FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
+      deps.sourceSignature,
+    )
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
 async function buildMaterialization(
   slug: string,
   key: ProductKey,
   workerId: string,
   solarDate: string | null = null,
+  thermalAt: string | null = null,
 ) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) {
     throw new Error('LiDAR physical materialization uses the dedicated GitHub OIDC worker')
@@ -1174,6 +1365,10 @@ async function buildMaterialization(
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
     if (!solarDate) throw new Error('solar exposure date is required')
     return buildSolarExposureMaterialization(slug, solarDate, workerId)
+  }
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) {
+    if (!thermalAt) throw new Error('thermal exposure timestamp is required')
+    return buildThermalExposureMaterialization(slug, thermalAt, workerId)
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
@@ -1312,18 +1507,27 @@ Deno.serve(async (req: Request) => {
     const slug = boundedSlug(typeof body?.property === 'string' ? body.property : null)
     const key = productKey(body?.product)
     const solarDate = boundedSolarDate(body?.date)
+    const thermalAt = key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key
+      ? boundedThermalAt(body?.at || new Date().toISOString())
+      : boundedThermalAt(body?.at)
     if (!slug || !key) return json({ error: 'invalid request' }, 400, origin)
     if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key && !solarDate) {
       return json({ error: 'solar exposure date is required' }, 400, origin)
     }
+    if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key && !thermalAt) {
+      return json({ error: 'thermal exposure timestamp is invalid' }, 400, origin)
+    }
     if (body?.date != null && !solarDate) {
       return json({ error: 'invalid solar date' }, 400, origin)
+    }
+    if (body?.at != null && !thermalAt) {
+      return json({ error: 'invalid thermal timestamp' }, 400, origin)
     }
 
     try {
       const operation = body?.operation === 'read' ? 'read' : 'build'
       const state = operation === 'read'
-        ? await readState(slug, key, solarDate)
+        ? await readState(slug, key, solarDate, thermalAt)
         : await buildMaterialization(
           slug,
           key,
@@ -1335,6 +1539,7 @@ Deno.serve(async (req: Request) => {
               ].join(':')
             : 'farm-watch-materialization-edge-v2',
           solarDate,
+          thermalAt,
         )
       const knownSha256 = validSha256(
         typeof body?.known_artifact_sha256 === 'string'
@@ -1380,14 +1585,22 @@ Deno.serve(async (req: Request) => {
   const key = productKey(url.searchParams.get('product') || FARM_WATCH_TERRAIN_PRODUCT.key)
   const dateParam = url.searchParams.get('date')
   const solarDate = boundedSolarDate(dateParam)
+  const atParam = url.searchParams.get('at')
+  const thermalAt = key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key
+    ? boundedThermalAt(atParam || new Date().toISOString())
+    : boundedThermalAt(atParam)
   if (!slug || !key) return json({ error: 'invalid request' }, 400, origin)
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key && !solarDate) {
     return json({ error: 'solar exposure date is required' }, 400, origin)
   }
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key && !thermalAt) {
+    return json({ error: 'thermal exposure timestamp is invalid' }, 400, origin)
+  }
   if (dateParam && !solarDate) return json({ error: 'invalid solar date' }, 400, origin)
+  if (atParam && !thermalAt) return json({ error: 'invalid thermal timestamp' }, 400, origin)
 
   try {
-    const state = await readState(slug, key, solarDate)
+    const state = await readState(slug, key, solarDate, thermalAt)
     const knownSha256 = validSha256(url.searchParams.get('known_artifact_sha256'))
     const presentationMode = materializationPresentationMode(accountRole, key)
     return json(

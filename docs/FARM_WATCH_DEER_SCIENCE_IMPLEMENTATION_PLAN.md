@@ -52,6 +52,7 @@ Already operational:
 - leaf-off woody-pattern context;
 - mapped agricultural field / field-edge context;
 - Seasonal State v1;
+- property-grade NOAA HRRR meteorological forcing v1 with hourly pilot refresh;
 - historical Daymet environmental context;
 - QPE precipitation, drought, USGS stream, Crop-CASMA root-zone moisture, NASS crop progress/stage;
 - roads, trails, buildings, and other access geometry.
@@ -68,6 +69,7 @@ Examples:
 
 - `meteorological-forcing`
 - `solar-exposure-context`
+- `thermal-exposure-context`
 - `horizontal-visibility-context`
 - `field-phenology-context`
 - `mast-resource-context`
@@ -133,8 +135,8 @@ The first production deer output should be a vector of evidence-backed module re
 | Product | Type | Primary evidence | Status |
 | --- | --- | --- | --- |
 | `meteorological-forcing-v1` | dated/hourly state | NOAA HRRR + historical Daymet fallback where appropriate | production |
-| `solar-exposure-context-v1` | gridded physical | canonical terrain + solar geometry + horizon + canopy | implementation candidate |
-| `thermal-exposure-context-v1` | dated gridded physical/proxy | solar exposure + meteorological forcing | build |
+| `solar-exposure-context-v1` | gridded physical | canonical terrain + solar geometry + horizon + canopy | implementation complete; awaiting production deployment |
+| `thermal-exposure-context-v1` | dated gridded physical/proxy | static solar terrain + exact HRRR analysis | implementation candidate |
 | `field-phenology-context-v1` | dated field state | CDL + NASA HLS VI + NASS regional context | build |
 | `mast-resource-context-v1` | annual/seasonal resource proxy | USFS TreeMap/BIGMAP + Kentucky mast survey | build |
 | `horizontal-visibility-context-v1` | gridded physical | LiDAR + terrain | build |
@@ -253,6 +255,7 @@ Fields:
 
 # Batch 2 — Solar and thermal physical context
 
+Status: Batch 2A implementation complete; Batch 2B implementation candidate  
 Priority: P0  
 Depends on: Batch 1 + existing DEM/canopy/terrain.
 
@@ -294,21 +297,31 @@ Do not call this operative temperature.
 
 ## 2B — `thermal-exposure-context-v1`
 
-Add current meteorological forcing.
+Co-register the exact current HRRR analysis with static solar-terrain context while preserving each physical component independently.
 
 ### Initial v1 output
 
-Prefer a physically interpretable **relative thermal exposure/refuge proxy** over a falsely precise animal body temperature.
+v1 intentionally does **not** collapse unlike physical variables into a weighted thermal score.
 
-Potential components:
+It retains:
 
-- forced shortwave radiation;
-- canopy/terrain attenuation;
-- ambient temperature;
-- wind exposure;
-- humidity/dew point if required by selected formulation.
+- ambient air temperature;
+- dew point;
+- relative humidity;
+- true 10 m wind speed/direction;
+- downward shortwave;
+- downward longwave;
+- cloud cover;
+- precipitation rate;
+- exact solar elevation/azimuth;
+- terrain direct-beam incidence/shadow factor;
+- explicit linear TCC-open screening proxy.
 
-If a later biophysical review supports a defensible operative-temperature equation for deer, introduce that as a new version.
+HRRR shortwave/longwave and wind remain scalar modeled forcing components in v1. They are not spatially redistributed using unsupported direct/diffuse radiation or aerodynamic-shelter assumptions.
+
+The artifact explicitly records that operative temperature and composite thermal index are not calculated.
+
+If a later biophysical review supports a defensible operative-temperature or animal heat-balance formulation for deer, introduce that as a new version with its own validation contract.
 
 ## Scientific acceptance checks
 
