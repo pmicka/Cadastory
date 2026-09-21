@@ -112,9 +112,12 @@ export function validateLandscapeStructureArtifact(value: any) {
   ) return false
   if (
     value?.leaf_off_2024?.sourceId !== FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.leafSourceId ||
-    value?.leaf_off_2024?.grid?.encoding !== 'base64-u8-v1' ||
+    value?.leaf_off_2024?.grid?.encoding !== 'landscape-leaf-highres-v1' ||
+    value?.leaf_off_2024?.grid?.score_encoding !== 'base64-u8-v1' ||
+    value?.leaf_off_2024?.grid?.validity_encoding !== 'base64-bitset-lsb-v1' ||
     typeof value?.leaf_off_2024?.grid?.score_base64 !== 'string' ||
-    typeof value?.leaf_off_2024?.grid?.valid_base64 !== 'string'
+    typeof value?.leaf_off_2024?.grid?.valid_bitset_base64 !== 'string' ||
+    Number(value?.leaf_off_2024?.grid?.valid_cell_count) <= 0
   ) return false
 
   return Boolean(
