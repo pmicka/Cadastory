@@ -177,6 +177,7 @@ declare
   v_crop_stage_state text;
   v_crop_stage jsonb;
 
+  v_resource_payload jsonb;
   v_resource_identity text;
   v_resource_retrieved_at timestamptz;
   v_resource_context jsonb;
@@ -397,7 +398,7 @@ begin
       v_stream_qualifier
     from hydrology.stream_observations o
     where o.gauge_id=v_stream_gauge_id
-      and o.observed_at < (p_as_of_date + 1)::timestamptz
+      and o.observed_at < ((p_as_of_date + 1)::timestamp at time zone 'UTC')
       and (
         o.parameter_code='00060'
         or lower(coalesce(o.parameter_name,'')) like '%discharge%'
@@ -665,34 +666,45 @@ begin
     )
   end;
 
-  select
-    r.identity_sha256,
-    r.retrieved_at,
-    r.context
-  into
-    v_resource_identity,
-    v_resource_retrieved_at,
-    v_resource_context
-  from farm_watch.property_resource_edge_context_v1 r
-  where r.property_id=v_property_id
-    and r.status='available'
-  limit 1;
+  v_resource_payload := farm_watch.farm_watch_get_resource_edge_context_v1_internal(
+    p_slug,
+    false
+  );
 
-  if v_resource_context is not null then
-    select max((row->>'year')::integer)
+  if v_resource_payload->>'status'='available' then
+    v_resource_identity := nullif(
+      v_resource_payload->'identity'->>'identity_sha256',
+      ''
+    );
+    v_resource_retrieved_at := nullif(
+      v_resource_payload->>'retrieved_at',
+      ''
+    )::timestamptz;
+    v_resource_context := v_resource_payload->'context';
+
+    select max((x.value->>'year')::integer)
     into v_crop_year
     from jsonb_array_elements(
       coalesce(v_resource_context->'latest_crop_composition_3000m','[]'::jsonb)
-    ) row;
+    ) as x(value);
   end if;
 
   v_crop_state := case
+    when v_resource_payload->>'status'='stale' then 'stale'
     when v_resource_context is null or v_crop_year is null then 'unavailable'
     when v_crop_year > extract(year from p_as_of_date)::integer then 'unavailable'
     when v_crop_year < extract(year from p_as_of_date)::integer then 'stale'
     else 'known'
   end;
   v_crop_context := case
+    when v_resource_payload->>'status'='stale' then jsonb_build_object(
+      'state','stale',
+      'scope','barrier_aware_latest_cdl_mapped_fields',
+      'reason','the persisted resource-edge context is stale relative to its current dependency identity',
+      'invalidation_reason',v_resource_payload->>'invalidation_reason',
+      'stored_identity_sha256',v_resource_payload->>'stored_identity_sha256',
+      'expected_identity_sha256',v_resource_payload->>'expected_identity_sha256'
+    )
     when v_crop_state='unavailable' then jsonb_build_object(
       'state','unavailable',
       'scope','barrier_aware_latest_cdl_mapped_fields',
