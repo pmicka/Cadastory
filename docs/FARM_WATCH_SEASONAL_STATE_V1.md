@@ -194,6 +194,24 @@ The first read-only integration test initially assumed precipitation was unavail
 
 These are verification expectations, not a persisted canonical result. Production state should be recorded only after deployment and successful materialization.
 
+## Pre-deployment integration validation — 2026-09-21
+
+The migration was executed against the live production schema inside a single PostgreSQL transaction and explicitly rolled back.
+
+The test exercised:
+
+- migration DDL and function creation;
+- the real `validation-property-01` resolver path for 2026-09-21;
+- all eight component-state classifications;
+- aggregate `partial` status;
+- snapshot refresh/upsert;
+- stored identity generation;
+- read-back through the guarded seasonal-state reader.
+
+The expected live classification passed with six current `known`/`proxy` components and two `stale` components.
+
+A post-test catalog check confirmed that the rollback left no seasonal-state table or function in production.
+
 ## Evidence boundary
 
 Seasonal State v1 sets:
