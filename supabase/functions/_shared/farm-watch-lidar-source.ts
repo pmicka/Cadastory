@@ -293,11 +293,27 @@ export function lidarSourceArtifactPath(propertyId: string, inputSignature: stri
   ].join('/')
 }
 
-export async function buildLidarSourceArtifact(boundary: any, fetchImpl: typeof fetch = fetch) {
+export async function buildLidarSourceArtifact(
+  boundary: any,
+  fetchImpl: typeof fetch = fetch,
+  collectionIds: string[] | null = null,
+) {
   const bbox = geometryBbox(boundary)
   if (!bbox) throw new Error('Property boundary bbox unavailable')
+  const requestedCollections = collectionIds == null
+    ? FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections
+    : FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections.filter((collection) =>
+      collectionIds.includes(collection.id)
+    )
+  if (!requestedCollections.length) throw new Error('No supported LiDAR collections requested')
+  if (
+    collectionIds != null &&
+    requestedCollections.length !== new Set(collectionIds).size
+  ) {
+    throw new Error('One or more requested LiDAR collections are unsupported')
+  }
   const collections = []
-  for (const collection of FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections) {
+  for (const collection of requestedCollections) {
     const features = await searchCollection(collection.id, bbox, fetchImpl)
     const items = features.map(itemSummary)
     const coverage = coveragePlan(boundary, items)
