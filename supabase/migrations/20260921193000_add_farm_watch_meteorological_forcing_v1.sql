@@ -260,12 +260,75 @@ begin
        or v_forcing->>'method' is distinct from v_algorithm
        or v_forcing->>'evidence_class' is distinct from (v_contract->>'evidence_class')
        or v_forcing->>'source_state' is distinct from v_source_state
+       or nullif(v_forcing->>'valid_at','')::timestamptz is distinct from v_valid_at
+       or v_forcing->'source'->>'model_slug' is distinct from v_source_model
+       or nullif(v_forcing->'source'->>'reference_time','')::timestamptz is distinct from v_reference_time
+       or nullif(v_forcing->'source'->>'forecast_lead_hours','')::integer is distinct from v_lead
        or coalesce((v_forcing->>'scoring_performed')::boolean,true) is not false
        or coalesce((v_forcing->>'behavioral_inference_performed')::boolean,true) is not false then
       raise exception 'meteorological forcing context violates contract';
     end if;
-    if (v_row->>'grid_distance_m')::numeric > (v_contract->>'max_grid_distance_m')::numeric then
-      raise exception 'HRRR grid point exceeds configured distance';
+
+    if jsonb_typeof(v_forcing->'fields')<>'object'
+       or not ((v_forcing->'fields') ?& array[
+         'air_temperature_2m_c',
+         'dew_point_2m_c',
+         'relative_humidity_2m_pct',
+         'wind_grid_u_10m_mps',
+         'wind_grid_v_10m_mps',
+         'wind_east_10m_mps',
+         'wind_north_10m_mps',
+         'wind_speed_10m_mps',
+         'wind_direction_from_deg',
+         'downward_shortwave_wm2',
+         'downward_longwave_wm2',
+         'total_cloud_cover_pct',
+         'precipitation_rate_mm_hr'
+       ]) then
+      raise exception 'meteorological forcing fields are incomplete';
+    end if;
+
+    if exists (
+      select 1
+      from jsonb_each(v_forcing->'fields') f
+      where f.key = any(array[
+        'air_temperature_2m_c',
+        'dew_point_2m_c',
+        'relative_humidity_2m_pct',
+        'wind_grid_u_10m_mps',
+        'wind_grid_v_10m_mps',
+        'wind_east_10m_mps',
+        'wind_north_10m_mps',
+        'wind_speed_10m_mps',
+        'wind_direction_from_deg',
+        'downward_shortwave_wm2',
+        'downward_longwave_wm2',
+        'total_cloud_cover_pct',
+        'precipitation_rate_mm_hr'
+      ])
+      and jsonb_typeof(f.value)<>'number'
+    ) then
+      raise exception 'meteorological forcing fields must be numeric';
+    end if;
+
+    if (v_forcing->'fields'->>'relative_humidity_2m_pct')::numeric not between 0 and 100
+       or (v_forcing->'fields'->>'total_cloud_cover_pct')::numeric not between 0 and 100
+       or (v_forcing->'fields'->>'wind_speed_10m_mps')::numeric < 0
+       or (v_forcing->'fields'->>'wind_direction_from_deg')::numeric < 0
+       or (v_forcing->'fields'->>'wind_direction_from_deg')::numeric >= 360
+       or (v_forcing->'fields'->>'downward_shortwave_wm2')::numeric < 0
+       or (v_forcing->'fields'->>'downward_longwave_wm2')::numeric < 0
+       or (v_forcing->'fields'->>'precipitation_rate_mm_hr')::numeric < 0 then
+      raise exception 'meteorological forcing fields violate physical range checks';
+    end if;
+
+    if (v_row->>'grid_distance_m')::numeric > (v_contract->>'max_grid_distance_m')::numeric
+       or (v_forcing->'grid'->>'distance_m')::numeric is distinct from (v_row->>'grid_distance_m')::numeric
+       or (v_forcing->'grid'->>'target_latitude')::numeric is distinct from (v_row->>'target_latitude')::numeric
+       or (v_forcing->'grid'->>'target_longitude')::numeric is distinct from (v_row->>'target_longitude')::numeric
+       or (v_forcing->'grid'->>'sampled_latitude')::numeric is distinct from (v_row->>'grid_latitude')::numeric
+       or (v_forcing->'grid'->>'sampled_longitude')::numeric is distinct from (v_row->>'grid_longitude')::numeric then
+      raise exception 'HRRR grid metadata violates forcing contract';
     end if;
 
     v_identity := encode(
