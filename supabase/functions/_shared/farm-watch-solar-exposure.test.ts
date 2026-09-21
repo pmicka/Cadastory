@@ -108,6 +108,23 @@ async function rasterFetch(input: string | URL | Request, init?: RequestInit) {
   })
 }
 
+async function rasterFetchWithPhase3Gaps(input: string | URL | Request, init?: RequestInit) {
+  const url = String(input)
+  const params = new URLSearchParams(String(init?.body || ''))
+  const geometry = JSON.parse(params.get('geometry') || '{}')
+  const points = Array.isArray(geometry.points) ? geometry.points : []
+  const canopy = url.includes('/Vegetation/')
+  const phase3 = url.includes('Phase3')
+  const samples = points.map((_point: number[], index: number) => ({
+    locationId: index,
+    value: canopy ? 50 : phase3 && index % 200 === 0 ? 'NoData' : 500,
+  }))
+  return new Response(JSON.stringify({ samples }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
 Deno.test('solar noon is nearly overhead at equator near March equinox', () => {
   const day = geometricSolarDay('2026-03-20', 0, 0)
   const sun = solarPositionUtc(day.solarNoon, 0, 0)
@@ -151,6 +168,7 @@ Deno.test('solar source signatures bind dependencies, date, and physical contrac
   assert(staticSig.includes('horizon_sector_count=24'))
   assert(staticSig.includes('dem_support_sampling=required_orientation_and_horizon_ray_union_v2'))
   assert(staticSig.includes('dem_required_coverage=100pct'))
+  assert(staticSig.includes('dem_support_source_policy=phase3_then_phase2_required_nodata_only_v1'))
   const day1 = solarExposureSourceSignature({
     solarTerrainMaterializationIdentitySha256: 'e'.repeat(64),
     solarTerrainArtifactSha256: 'f'.repeat(64),
@@ -173,7 +191,7 @@ Deno.test('static solar terrain artifact reuses target elevations and keeps neut
   assert(built.artifact.local_grid.width === 5)
   assert(built.artifact.landscape_grid.width === 3)
   assert(built.artifact.horizon_contract.sector_count === 24)
-  assert(built.artifact.method === 'terrain-horizon-canopy-context-v2')
+  assert(built.artifact.method === 'terrain-horizon-canopy-context-v3')
   assert(built.artifact.summary.support_dem_required_cell_count > 0)
   assert(
     built.artifact.summary.support_dem_available_required_cell_count ===
@@ -188,6 +206,24 @@ Deno.test('static solar terrain artifact reuses target elevations and keeps neut
   for (const forbidden of ['deer_score','habitat_score','bedding_score','stand_score']) {
     assert(!encoded.includes(forbidden))
   }
+})
+
+Deno.test('required Phase 3 NoData support is filled only from Phase 2 fallback', async () => {
+  const built = await buildSolarTerrainArtifact({
+    ...dependencies(),
+    fetchImpl: rasterFetchWithPhase3Gaps as typeof fetch,
+  })
+  assert(validateSolarTerrainArtifact(built.artifact))
+  assert(built.artifact.summary.support_dem_phase2_fallback_filled_cell_count > 0)
+  assert(
+    built.artifact.summary.support_dem_available_required_cell_count ===
+      built.artifact.summary.support_dem_required_cell_count,
+  )
+  assert(
+    built.artifact.summary.support_dem_phase3_available_required_cell_count +
+      built.artifact.summary.support_dem_phase2_fallback_filled_cell_count ===
+      built.artifact.summary.support_dem_required_cell_count,
+  )
 })
 
 Deno.test('date solar exposure artifact integrates windows and canopy proxy stays bounded', async () => {
