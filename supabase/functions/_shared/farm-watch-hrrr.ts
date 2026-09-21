@@ -172,17 +172,23 @@ export type HrrrSample = {
   source_records_sha256: string
 }
 
-export async function sampleHrrrAnalysis(
+export async function sampleHrrrAnalysisTargets(
   fetchImpl: typeof fetch,
   fileUrl: string,
   selectedRecords: Record<HrrrFieldKey, IdxRecord>,
-  target: FarmWatchMeteorologyTarget,
-): Promise<HrrrSample> {
-  const sampled: Partial<Record<HrrrFieldKey, number>> = {}
+  targets: readonly FarmWatchMeteorologyTarget[],
+): Promise<Record<string, HrrrSample>> {
+  if (!targets.length) return {}
+
+  const states = new Map<string, {
+    fields: Partial<Record<HrrrFieldKey, number>>
+    grid: { latitude: number; longitude: number; distance_m: number } | null
+  }>()
+  for (const target of targets) {
+    states.set(target.slug, { fields: {}, grid: null })
+  }
+
   const recordDescriptors: HrrrSample['records'] = []
-  let gridLatitude: number | null = null
-  let gridLongitude: number | null = null
-  let gridDistanceM: number | null = null
 
   for (const spec of HRRR_REQUIRED_FIELDS) {
     const record = selectedRecords[spec.key]
@@ -191,27 +197,40 @@ export async function sampleHrrrAnalysis(
     if (!field) throw new Error(`HRRR record ${spec.variable} contained no decodable GRIB field`)
 
     const grid = parseGrid(field.section3)
-    const point = nearestGridpoint(grid, target.latitude, target.longitude)
-    if (point.distanceKm > HRRR_MAX_GRID_DISTANCE_KM) {
-      throw new Error(
-        `HRRR nearest grid point is ${point.distanceKm.toFixed(3)} km away; max is ${HRRR_MAX_GRID_DISTANCE_KM} km`,
-      )
+    const points = new Map<string, ReturnType<typeof nearestGridpoint>>()
+    for (const target of targets) {
+      const point = nearestGridpoint(grid, target.latitude, target.longitude)
+      if (point.distanceKm > HRRR_MAX_GRID_DISTANCE_KM) {
+        throw new Error(
+          `HRRR nearest grid point for ${target.slug} is ${point.distanceKm.toFixed(3)} km away; max is ${HRRR_MAX_GRID_DISTANCE_KM} km`,
+        )
+      }
+      points.set(target.slug, point)
     }
-    const decoded = decodeFieldValues(field, { missingValue: ECCODES_MISSING_VALUE })
-    const missing = decoded.missingMask !== undefined && decoded.missingMask[point.index] === 1
-    if (missing) throw new Error(`HRRR field ${spec.variable} is missing at target grid point`)
-    const raw = finite(decoded.values[point.index], spec.variable)
-    sampled[spec.key] = rounded(spec.convert(raw))
 
-    if (gridLatitude === null) {
-      gridLatitude = point.latitude
-      gridLongitude = point.longitude
-      gridDistanceM = point.distanceKm * 1000
-    } else if (
-      Math.abs(point.latitude - gridLatitude) > 1e-8 ||
-      Math.abs(point.longitude - gridLongitude!) > 1e-8
-    ) {
-      throw new Error('HRRR required fields resolved to inconsistent grid points')
+    const decoded = decodeFieldValues(field, { missingValue: ECCODES_MISSING_VALUE })
+
+    for (const target of targets) {
+      const point = points.get(target.slug)!
+      const missing = decoded.missingMask !== undefined && decoded.missingMask[point.index] === 1
+      if (missing) throw new Error(`HRRR field ${spec.variable} is missing at target ${target.slug}`)
+      const raw = finite(decoded.values[point.index], spec.variable)
+      const state = states.get(target.slug)!
+      state.fields[spec.key] = rounded(spec.convert(raw))
+
+      const nextGrid = {
+        latitude: rounded(point.latitude, 8),
+        longitude: rounded(point.longitude, 8),
+        distance_m: rounded(point.distanceKm * 1000, 1),
+      }
+      if (state.grid === null) {
+        state.grid = nextGrid
+      } else if (
+        Math.abs(nextGrid.latitude - state.grid.latitude) > 1e-8 ||
+        Math.abs(nextGrid.longitude - state.grid.longitude) > 1e-8
+      ) {
+        throw new Error(`HRRR required fields resolved to inconsistent grid points for ${target.slug}`)
+      }
     }
 
     recordDescriptors.push({
@@ -224,35 +243,42 @@ export async function sampleHrrrAnalysis(
     })
   }
 
-  const gridU = finite(sampled.wind_grid_u_10m_mps, '10 m grid U wind')
-  const gridV = finite(sampled.wind_grid_v_10m_mps, '10 m grid V wind')
-  const [uEast, vNorth] = lambertEarthWind(
-    gridU,
-    gridV,
-    gridLongitude!,
-    HRRR_LAMBERT_ORIENTATION_DEG,
-    HRRR_LAMBERT_CONE,
-  )
-  const wind = windFromEarthUv(uEast, vNorth)
+  const output: Record<string, HrrrSample> = {}
+  for (const target of targets) {
+    const state = states.get(target.slug)!
+    const grid = state.grid
+    if (!grid) throw new Error(`HRRR grid metadata is unavailable for ${target.slug}`)
 
-  const fields: Record<string, number> = {
-    ...sampled as Record<string, number>,
-    wind_east_10m_mps: rounded(uEast),
-    wind_north_10m_mps: rounded(vNorth),
-    wind_speed_10m_mps: rounded(wind.speed),
-    wind_direction_from_deg: rounded(wind.directionFrom, 3),
-  }
+    const gridU = finite(state.fields.wind_grid_u_10m_mps, '10 m grid U wind')
+    const gridV = finite(state.fields.wind_grid_v_10m_mps, '10 m grid V wind')
+    const [uEast, vNorth] = lambertEarthWind(
+      gridU,
+      gridV,
+      grid.longitude,
+      HRRR_LAMBERT_ORIENTATION_DEG,
+      HRRR_LAMBERT_CONE,
+    )
+    const wind = windFromEarthUv(uEast, vNorth)
+    const fields: Record<string, number> = {
+      ...state.fields as Record<string, number>,
+      wind_east_10m_mps: rounded(uEast),
+      wind_north_10m_mps: rounded(vNorth),
+      wind_speed_10m_mps: rounded(wind.speed),
+      wind_direction_from_deg: rounded(wind.directionFrom, 3),
+    }
 
-  return {
-    fields,
-    grid: {
-      latitude: rounded(gridLatitude!, 8),
-      longitude: rounded(gridLongitude!, 8),
-      distance_m: rounded(gridDistanceM!, 1),
-    },
-    records: recordDescriptors,
-    source_records_sha256: await sha256Hex(JSON.stringify({ records: recordDescriptors, fields })),
+    output[target.slug] = {
+      fields,
+      grid,
+      records: recordDescriptors,
+      source_records_sha256: await sha256Hex(JSON.stringify({
+        records: recordDescriptors,
+        grid,
+        fields,
+      })),
+    }
   }
+  return output
 }
 
 export async function hashHrrrIndex(indexText: string) {
