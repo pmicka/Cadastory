@@ -6,6 +6,7 @@ on:
       - 'docs/FARM_WATCH_LANDSCAPE_STRUCTURE_CONTEXT_V1.md'
       - 'docs/FARM_WATCH_STRUCTURE_EVIDENCE_LEDGER.md'
       - 'supabase/functions/_shared/farm-watch-landscape-structure-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-lidar-source.ts'
       - 'supabase/functions/_shared/farm-watch-landscape-structure-contract.test.ts'
       - 'supabase/functions/farm-watch-landscape-structure-worker/**'
       - 'supabase/functions/farm-watch-materialization/index.ts'
@@ -31,6 +32,8 @@ jobs:
           deno-version: v2.x
       - name: Check landscape structure contract
         run: deno check supabase/functions/_shared/farm-watch-landscape-structure-contract.ts
+      - name: Check reusable LiDAR source planner
+        run: deno check supabase/functions/_shared/farm-watch-lidar-source.ts
       - name: Run landscape structure contract tests
         run: deno test supabase/functions/_shared/farm-watch-landscape-structure-contract.test.ts
       - name: Check reusable LiDAR processor
