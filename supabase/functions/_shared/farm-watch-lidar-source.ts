@@ -281,7 +281,9 @@ async function searchCollection(collectionId: string, bbox: number[], fetchImpl:
 
 export async function sha256Hex(value: string | Uint8Array) {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const owned = new Uint8Array(bytes.byteLength)
+  owned.set(bytes)
+  const digest = await crypto.subtle.digest('SHA-256', owned.buffer)
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
