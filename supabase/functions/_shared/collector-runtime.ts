@@ -14,8 +14,8 @@ function serviceKey(): string {
   return key
 }
 
-let client: ReturnType<typeof createClient> | undefined
-function admin() {
+let client: any
+function admin(): any {
   if (!client) client = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey(), {
     auth: { persistSession: false, autoRefreshToken: false },
   })
@@ -81,7 +81,7 @@ export function withCollectorRun(
     const key = req.headers.get('x-scout-key') || ''
     if (!key) return Response.json({ error: 'unauthorized' }, { status: 401 })
 
-    let db: ReturnType<typeof createClient>
+    let db: any
     try {
       db = admin()
     } catch {
