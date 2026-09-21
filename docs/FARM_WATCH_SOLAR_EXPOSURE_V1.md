@@ -74,9 +74,10 @@ For that reason, Solar Terrain v1 samples one bounded **unmasked** DEM support g
 - horizon search radius: 3,000 m from each target;
 - ray step: 90 m;
 - azimuth sectors: 24, at 15° spacing;
-- CRS: EPSG:32616.
+- CRS: EPSG:32616;
+- required DEM support coverage: at least 99.5%, otherwise the build fails closed.
 
-This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
+Missing horizon-support DEM cells are never treated as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
 
 ### Canopy
 
