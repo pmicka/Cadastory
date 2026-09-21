@@ -798,7 +798,7 @@ function exposureGrid(
       midpoint < day.windows.midday[1] ? 'midday' : 'evening'
     for (let index = 0; index < grid.domain.length; index += 1) {
       if (!grid.domain[index] || !grid.orientationValid[index]) continue
-      const horizonValues = grid.horizons.map((values) => values[index])
+      const horizonValues = grid.horizons.map((values: Uint8Array) => values[index])
       const horizon = interpolatedHorizonDeg(horizonValues, sun.azimuth_deg)
       if (sun.elevation_deg <= horizon) shadowed[index] += 1
       const incidence = directTerrainIncidence(
