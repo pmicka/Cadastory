@@ -5,6 +5,10 @@ Validation property: `validation-property-01`
 
 ## Purpose
 
+> Deer-specific biological interpretation is governed separately by `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`. This structure ledger remains the source of truth for neutral LiDAR/imagery/terrain evidence and must not be used as a substitute for published deer-science support.
+
+
+
 This document is the durable index for Farm Watch structural-science work involving LiDAR, leaf-off aerial imagery, and their cross-layer diagnostics.
 
 Its primary purpose is to prevent repeated analysis from being proposed as new work.
