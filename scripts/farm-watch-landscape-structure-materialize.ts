@@ -470,7 +470,10 @@ async function main() {
     const phase3 = sourcePlan.collections?.find(
       (row: any) => row?.id === phase3CollectionId,
     )
-    const coveragePercent = Number(phase3?.coverage?.sampled_parcel_coverage_percent)
+    const coveragePercent = Number(
+      phase3?.coverage?.sampled_analysis_coverage_percent ??
+      phase3?.coverage?.sampled_parcel_coverage_percent
+    )
     if (
       phase3?.coverage?.coverage_status !== 'complete_sampled' ||
       !Number.isFinite(coveragePercent) ||
