@@ -57,7 +57,7 @@ function responseHeaders(origin = ''): Record<string, string> {
     headers['access-control-allow-origin'] = origin
     headers.vary = 'Origin'
     headers['access-control-allow-headers'] = 'authorization, content-type, apikey'
-    headers['access-control-allow-methods'] = 'GET, OPTIONS'
+    headers['access-control-allow-methods'] = 'GET, POST, OPTIONS'
   }
   return headers
 }
@@ -1037,13 +1037,10 @@ async function refreshLandscapePhysical(slug: string, parcelContext: Json) {
   )
   if (domainError) throw new Error('farm_watch_get_landscape_raster_domains_v1_internal failed: ' + domainError.message)
   if (domains?.status !== 'available' || !domains?.zones) {
-    return {
-      status: 'unavailable',
-      context: {},
-      retrieved_at: null,
-      cache: 'miss',
-      error: domains?.reason || 'barrier-aware landscape raster domains unavailable',
-    }
+    return persistLandscapePhysicalFailure(
+      slug,
+      domains?.reason || 'barrier-aware landscape raster domains unavailable',
+    )
   }
 
   const slopeRule = {
@@ -1154,6 +1151,88 @@ async function refreshLandscapePhysical(slug: string, parcelContext: Json) {
   if (upsertError) throw new Error('farm_watch_upsert_landscape_physical_context_v1_internal failed: ' + upsertError.message)
 
   return { status, context, retrieved_at: retrievedAt, cache: 'miss' }
+}
+
+async function persistLandscapePhysicalFailure(slug: string, error: unknown) {
+  const retrievedAt = new Date().toISOString()
+  const message = error instanceof Error ? error.message : String(error)
+  const context = {
+    context_version: 1,
+    method: 'barrier_aware_landscape_raster_context_v1',
+    evidence_class: 'deterministic_derived',
+    scoring_performed: false,
+    behavioral_inference_performed: false,
+    zones: {},
+    gradients: [],
+    retrieved_at: retrievedAt,
+  }
+  const { error: upsertError } = await admin.rpc(
+    'farm_watch_upsert_landscape_physical_context_v1_internal',
+    {
+      p_slug: slug,
+      p_status: 'unavailable',
+      p_context: context,
+      p_retrieved_at: retrievedAt,
+      p_last_error: message,
+    },
+  )
+  if (upsertError) {
+    throw new Error(
+      'farm_watch_upsert_landscape_physical_context_v1_internal failed while recording error: ' +
+      upsertError.message,
+    )
+  }
+  return {
+    status: 'unavailable',
+    context,
+    retrieved_at: retrievedAt,
+    cache: 'miss',
+    error: message,
+  }
+}
+
+async function ensureLandscapePhysical(slug: string, parcelContext: Json) {
+  const { data: cached, error: cacheError } = await admin.rpc(
+    'farm_watch_get_landscape_physical_context_v1_internal',
+    { p_slug: slug },
+  )
+  const cachedAt = Date.parse(cached?.retrieved_at || '')
+  const cacheTtlMs = cached?.status === 'available'
+    ? LANDSCAPE_CACHE_TTL_MS
+    : OPTIONAL_SOURCE_RETRY_TTL_MS
+  const cacheUsable =
+    !cacheError &&
+    cached?.status !== 'stale' &&
+    cached?.status !== 'missing' &&
+    cached?.context?.method === 'barrier_aware_landscape_raster_context_v1' &&
+    Number.isFinite(cachedAt) &&
+    Date.now() - cachedAt < cacheTtlMs
+
+  if (cacheUsable) {
+    return {
+      status: cached.status,
+      context: cached.context,
+      retrieved_at: cached.retrieved_at,
+      cache: 'hit',
+      last_error: cached.last_error || null,
+    }
+  }
+
+  try {
+    return await refreshLandscapePhysical(slug, parcelContext)
+  } catch (error) {
+    if (cacheError || cached?.status === 'missing' || cached?.status === 'stale' || !cached?.context) {
+      return persistLandscapePhysicalFailure(slug, error)
+    }
+    return {
+      status: cached.status || 'unavailable',
+      context: cached.context,
+      retrieved_at: cached.retrieved_at || null,
+      cache: 'stale',
+      error: error instanceof Error ? error.message : String(error),
+      last_error: cached.last_error || null,
+    }
+  }
 }
 
 function normalizeSinkholes(payload: Json) {
@@ -1456,6 +1535,53 @@ Deno.serve(async (req: Request) => {
   const origin = req.headers.get('origin') || ''
   if (origin && !ALLOWED_ORIGINS.has(origin)) return json({ error: 'not found' }, 404)
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: responseHeaders(origin) })
+
+  if (req.method === 'POST') {
+    let body: any = null
+    try { body = await req.json() } catch { return json({ error: 'invalid request' }, 400, origin) }
+
+    const workerToken = typeof body?.worker_token === 'string' ? body.worker_token : null
+    const { data: workerAllowed, error: workerError } = await admin.rpc(
+      'farm_watch_validate_materialization_worker_v1_internal',
+      { p_token: workerToken },
+    )
+    if (workerError || workerAllowed !== true) return json({ error: 'not found' }, 404, origin)
+
+    const slug = boundedSlug(typeof body?.property === 'string' ? body.property : null)
+    if (!slug) return json({ error: 'invalid request' }, 400, origin)
+
+    const { data: parcelCached, error: parcelError } = await admin.rpc(
+      'farm_watch_get_land_context_v1_internal',
+      { p_slug: slug },
+    )
+    if (
+      parcelError ||
+      !parcelCached?.context ||
+      parcelCached?.status === 'stale' ||
+      parcelCached?.status === 'missing'
+    ) {
+      try {
+        const landscapePhysical = await persistLandscapePhysicalFailure(
+          slug,
+          parcelError?.message || 'current parcel land context unavailable',
+        )
+        return json({ property: { slug }, landscape_physical: landscapePhysical }, 503, origin)
+      } catch (error) {
+        console.error('Farm Watch landscape physical prerequisite failure could not be persisted', error)
+        return json({ error: 'landscape physical unavailable' }, 503, origin)
+      }
+    }
+
+    try {
+      const landscapePhysical = await ensureLandscapePhysical(slug, parcelCached.context)
+      const status = landscapePhysical?.status === 'unavailable' ? 503 : 200
+      return json({ property: { slug }, landscape_physical: landscapePhysical }, status, origin)
+    } catch (error) {
+      console.error('Farm Watch landscape physical worker failed', error)
+      return json({ error: 'landscape physical unavailable' }, 503, origin)
+    }
+  }
+
   if (req.method !== 'GET') return json({ error: 'not found' }, 404, origin)
 
   const token = bearer(req)
@@ -1536,42 +1662,13 @@ Deno.serve(async (req: Request) => {
   }
 
   let landscapePhysical: any
-  const { data: landscapeCached, error: landscapeCacheError } = await admin.rpc(
-    'farm_watch_get_landscape_physical_context_v1_internal',
-    { p_slug: slug },
-  )
-  const landscapeCachedAt = Date.parse(landscapeCached?.retrieved_at || '')
-  const landscapeCacheTtlMs = landscapeCached?.status === 'available'
-    ? LANDSCAPE_CACHE_TTL_MS
-    : OPTIONAL_SOURCE_RETRY_TTL_MS
-  const landscapeCacheUsable =
-    !landscapeCacheError &&
-    landscapeCached?.status !== 'stale' &&
-    landscapeCached?.status !== 'missing' &&
-    landscapeCached?.context?.method === 'barrier_aware_landscape_raster_context_v1' &&
-    Number.isFinite(landscapeCachedAt) &&
-    Date.now() - landscapeCachedAt < landscapeCacheTtlMs
-
-  if (landscapeCacheUsable) {
-    landscapePhysical = {
-      status: landscapeCached.status,
-      context: landscapeCached.context,
-      retrieved_at: landscapeCached.retrieved_at,
-      cache: 'hit',
-    }
-  } else if (result?.context && result?.cache !== 'stale') {
-    try {
-      landscapePhysical = await refreshLandscapePhysical(slug, result.context)
-    } catch (error) {
-      landscapePhysical = {
-        status: 'unavailable',
-        context: {},
-        retrieved_at: null,
-        cache: 'miss',
-        error: error instanceof Error ? error.message : String(error),
-      }
-    }
+  if (result?.context && result?.cache !== 'stale') {
+    landscapePhysical = await ensureLandscapePhysical(slug, result.context)
   } else {
+    const { data: landscapeCached, error: landscapeCacheError } = await admin.rpc(
+      'farm_watch_get_landscape_physical_context_v1_internal',
+      { p_slug: slug },
+    )
     landscapePhysical = {
       status: landscapeCached?.status || 'unavailable',
       context: landscapeCached?.context || {},
