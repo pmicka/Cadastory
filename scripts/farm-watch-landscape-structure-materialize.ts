@@ -73,6 +73,14 @@ function encodeU16(values: Uint16Array) {
   ).toString('base64')
 }
 
+function encodeBitset(values: Uint8Array) {
+  const packed = new Uint8Array(Math.ceil(values.length / 8))
+  for (let index = 0; index < values.length; index += 1) {
+    if (values[index]) packed[index >> 3] |= 1 << (index & 7)
+  }
+  return Buffer.from(packed).toString('base64')
+}
+
 function quantile(sorted: number[], q: number) {
   if (!sorted.length) return null
   const position = (sorted.length - 1) * q
@@ -391,11 +399,15 @@ function compactLeafOffForLandscape(built: any) {
       source_pixel_m: compact.grid.source_pixel_m,
       terrain_pixel_m: compact.grid.terrain_pixel_m,
       target_neighborhood_m: compact.grid.target_neighborhood_m,
-      encoding: compact.grid.encoding,
+      encoding: 'landscape-leaf-highres-v1',
+      score_encoding: 'base64-u8-v1',
+      validity_encoding: 'base64-bitset-lsb-v1',
       score_base64: compact.grid.score_base64,
-      confidence_base64: compact.grid.confidence_base64,
-      spectral_support_base64: compact.grid.spectral_support_base64,
-      valid_base64: compact.grid.valid_base64,
+      valid_bitset_base64: encodeBitset(built.product.valid),
+      valid_cell_count: built.product.valid.reduce(
+        (sum: number, value: number) => sum + (value ? 1 : 0),
+        0,
+      ),
     },
   }
 }
