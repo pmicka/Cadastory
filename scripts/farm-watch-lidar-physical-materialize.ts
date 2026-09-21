@@ -449,6 +449,230 @@ async function loadLazPerf() {
   })
 }
 
+export async function buildLidarPhysicalArtifactForGeometry(args: {
+  analysisGeometry: any
+  sourceItems: any[]
+  contract: any
+  sourcePlanArtifactSha256: string
+  interpretationBoundary?: string
+}) {
+  const contract = args.contract
+  const sourceItems = Array.isArray(args.sourceItems)
+    ? args.sourceItems.slice().sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)))
+    : []
+  if (!sourceItems.length) throw new Error('Phase 3 processing item list is empty')
+  
+  const lazPerf = await loadLazPerf()
+  const opened = []
+  for (const item of sourceItems) {
+    const assetUrl = String(item.primary_asset_href || '')
+    if (!assetUrl) throw new Error('Phase 3 asset URL unavailable for ' + item.id)
+    const get = nativeHttpRangeGetter(assetUrl)
+    const copc = await Copc.create(get)
+    const nativeCrs = detectNativeCrs(copc.wkt)
+    if (!nativeCrs) throw new Error('native CRS unresolved for ' + item.id)
+    if (nativeCrs !== contract.native_crs) {
+      throw new Error('unexpected native CRS ' + nativeCrs + ' for ' + item.id)
+    }
+    opened.push({
+      id: String(item.id),
+      asset_url: assetUrl,
+      get,
+      asset_identity: String(item.primary_asset_identity || item.primary_asset_href || ''),
+      item,
+      copc,
+      native_crs: nativeCrs,
+      projected_geometry: projectGeometry(item.geometry, nativeCrs),
+      nodes: new Map<string, any>(),
+      candidate_point_count: 0,
+    })
+  }
+  
+  const nativeCrs = String(contract.native_crs)
+  const propertyGeometry = projectGeometry(args.analysisGeometry, nativeCrs)
+  const queryBbox = geometryBbox(propertyGeometry)
+  if (!queryBbox) throw new Error('projected property bbox unavailable')
+  const groundCellNative = Number(contract.ground_cell_meters) * US_SURVEY_FEET_PER_METER
+  const groundRadiusNative = Number(contract.ground_support_radius_meters) * US_SURVEY_FEET_PER_METER
+  const structureCellNative = Number(contract.structure_cell_meters) * US_SURVEY_FEET_PER_METER
+  const supportBbox = expandBbox(queryBbox, groundRadiusNative)
+  const groundGrid = createGroundGrid(supportBbox, groundCellNative)
+  const bandGrid = createBandGrid(queryBbox, structureCellNative, contract.thresholds_ft)
+  
+  for (const source of opened) {
+    source.nodes = await collectIntersectingNodes(source.get, source.copc, supportBbox)
+    source.candidate_point_count = [...source.nodes.values()]
+      .reduce((sum: number, node: any) => sum + Number(node.pointCount || 0), 0)
+  }
+  
+  let supportGroundPointCount = 0
+  for (const source of opened) {
+    for (const node of source.nodes.values()) {
+      const view = await Copc.loadPointDataView(source.get, source.copc, node, {
+        lazPerf,
+        include: ['X', 'Y', 'Z', 'Classification', 'Overlap', 'Withheld'],
+      })
+      const getX = view.getter('X')
+      const getY = view.getter('Y')
+      const getZ = view.getter('Z')
+      const getClassification = view.getter('Classification')
+      const getOverlap = view.getter('Overlap')
+      const getWithheld = view.getter('Withheld')
+      for (let index = 0; index < view.pointCount; index += 1) {
+        const x = Number(getX(index))
+        const y = Number(getY(index))
+        if (
+          !bboxContains(supportBbox, x, y) ||
+          ownerItemId(x, y, opened) !== source.id
+        ) continue
+        const classification = Number(getClassification(index))
+        const overlap = Number(getOverlap(index))
+        const withheld = Number(getWithheld(index))
+        const z = Number(getZ(index))
+        if (
+          classification === 2 &&
+          !withheld &&
+          !overlap &&
+          addGroundSample(groundGrid, x, y, z)
+        ) supportGroundPointCount += 1
+      }
+    }
+  }
+  
+  const groundSurface = finalizeGroundSurface(groundGrid, groundRadiusNative)
+  const groundCoverage = parcelSurfaceCoverage(groundSurface, propertyGeometry)
+  
+  let primaryStructurePointCount = 0
+  let normalizedStructurePointCount = 0
+  let normalizationUnavailableCount = 0
+  let negativeHeightCount = 0
+  let belowMinusOneFootCount = 0
+  
+  for (const source of opened) {
+    for (const node of source.nodes.values()) {
+      const view = await Copc.loadPointDataView(source.get, source.copc, node, {
+        lazPerf,
+        include: ['X', 'Y', 'Z', 'Classification', 'Overlap', 'Withheld'],
+      })
+      const getX = view.getter('X')
+      const getY = view.getter('Y')
+      const getZ = view.getter('Z')
+      const getClassification = view.getter('Classification')
+      const getOverlap = view.getter('Overlap')
+      const getWithheld = view.getter('Withheld')
+  
+      for (let index = 0; index < view.pointCount; index += 1) {
+        const x = Number(getX(index))
+        const y = Number(getY(index))
+        if (
+          !pointInGeometry(x, y, propertyGeometry) ||
+          ownerItemId(x, y, opened) !== source.id
+        ) continue
+        const z = Number(getZ(index))
+        const classification = Number(getClassification(index))
+        const overlap = Number(getOverlap(index))
+        const withheld = Number(getWithheld(index))
+        const primaryStructure =
+          classification !== 2 &&
+          !NOISE_CLASSIFICATIONS.has(classification) &&
+          !withheld &&
+          !overlap &&
+          Number.isFinite(z)
+        if (!primaryStructure) continue
+  
+        primaryStructurePointCount += 1
+        const groundZ = surfaceValueAt(groundSurface, x, y)
+        if (!Number.isFinite(groundZ)) {
+          normalizationUnavailableCount += 1
+          continue
+        }
+        const height = z - Number(groundZ)
+        normalizedStructurePointCount += 1
+        if (height < 0) negativeHeightCount += 1
+        if (height < -1) belowMinusOneFootCount += 1
+        if (height >= 0) addBandSample(bandGrid, x, y, height)
+      }
+    }
+  }
+  
+  const currentSummary = summarizeBandGrid(
+    bandGrid,
+    propertyGeometry,
+    Number(contract.minimum_cell_returns),
+  )
+  const itemDatetimes = sourceItems
+    .map((item: any) => Date.parse(String(item.datetime || '')))
+    .filter(Number.isFinite)
+    .sort((a: number, b: number) => a - b)
+  const acquisitionUtcRange = itemDatetimes.length
+    ? [
+        new Date(itemDatetimes[0]).toISOString(),
+        new Date(itemDatetimes[itemDatetimes.length - 1]).toISOString(),
+      ]
+    : null
+  
+  const processingFingerprint = {
+    method: 'multiasset_copc_header_and_node_selection_v1',
+    source_plan_artifact_sha256: args.sourcePlanArtifactSha256,
+    items: opened.map((source) => ({
+      id: source.id,
+      asset_identity: source.asset_identity,
+      native_crs: source.native_crs,
+      copc_header_point_count: Number(source.copc.header.pointCount),
+      candidate_node_count: source.nodes.size,
+      candidate_point_count: source.candidate_point_count,
+    })),
+  }
+  
+  const supportedPercent = groundCoverage.parcelCells
+    ? groundCoverage.supportedCells / groundCoverage.parcelCells * 100
+    : null
+  const artifact = {
+    schema: contract.schema,
+    method: contract.method,
+    source_collection: contract.source_collection,
+    source_plan_artifact_sha256: args.sourcePlanArtifactSha256,
+    processing_item_ids: opened.map((source) => source.id),
+    native_crs: nativeCrs,
+    height_unit: 'US survey ft',
+    cell_meters: Number(contract.structure_cell_meters),
+    minimum_cell_returns: Number(contract.minimum_cell_returns),
+    acquisition_utc_range: acquisitionUtcRange,
+    acquisition_time_basis: 'central STAC item datetime metadata',
+    grid: {
+      bbox: bandGrid.bbox,
+      cellSize: bandGrid.cellSize,
+      width: bandGrid.width,
+      height: bandGrid.height,
+      thresholds: bandGrid.thresholds,
+      bandCount: bandGrid.bandCount,
+      total: Array.from(bandGrid.total),
+      counts: Array.from(bandGrid.counts),
+    },
+    current_summary: currentSummary,
+    processing_summary: {
+      support_ground_point_count: supportGroundPointCount,
+      parcel_ground_cell_count: groundCoverage.parcelCells,
+      parcel_direct_ground_cell_count: groundCoverage.directCells,
+      parcel_supported_ground_cell_count: groundCoverage.supportedCells,
+      ground_supported_parcel_percent: supportedPercent,
+      primary_structure_point_count: primaryStructurePointCount,
+      normalized_structure_point_count: normalizedStructurePointCount,
+      normalization_unavailable_count: normalizationUnavailableCount,
+      negative_height_count: negativeHeightCount,
+      below_minus_one_foot_count: belowMinusOneFootCount,
+      overlap_policy:
+        'For overlapping selected item footprints, each source point is counted only by the lexicographically first selected item footprint containing that XY location.',
+    },
+    processing_source_fingerprint: processingFingerprint,
+    interpretation_boundary:
+      args.interpretationBoundary ||
+        'Current Phase 3 physical height-above-ground evidence only. Height bands are neutral physical strata, not species, understory, habitat, bedding, mast, or animal-use classes. Historical comparison and aerial imagery are not fused into this product.',
+  }
+  
+    return artifact
+}
+
 async function main() {
   const claim = await workerRequest({ operation: 'claim' })
   if (claim?.action === 'reuse') {
@@ -463,218 +687,12 @@ async function main() {
   const buildId = String(claim.build_id)
   const leaseToken = String(claim.lease_token)
   try {
-    const contract = claim.contract
-    const sourceItems = Array.isArray(claim?.phase3?.processing_items)
-      ? claim.phase3.processing_items.slice().sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)))
-      : []
-    if (!sourceItems.length) throw new Error('Phase 3 processing item list is empty')
-
-    const lazPerf = await loadLazPerf()
-    const opened = []
-    for (const item of sourceItems) {
-      const assetUrl = String(item.primary_asset_href || '')
-      if (!assetUrl) throw new Error('Phase 3 asset URL unavailable for ' + item.id)
-      const get = nativeHttpRangeGetter(assetUrl)
-      const copc = await Copc.create(get)
-      const nativeCrs = detectNativeCrs(copc.wkt)
-      if (!nativeCrs) throw new Error('native CRS unresolved for ' + item.id)
-      if (nativeCrs !== contract.native_crs) {
-        throw new Error('unexpected native CRS ' + nativeCrs + ' for ' + item.id)
-      }
-      opened.push({
-        id: String(item.id),
-        asset_url: assetUrl,
-        get,
-        asset_identity: String(item.primary_asset_identity || item.primary_asset_href || ''),
-        item,
-        copc,
-        native_crs: nativeCrs,
-        projected_geometry: projectGeometry(item.geometry, nativeCrs),
-        nodes: new Map<string, any>(),
-        candidate_point_count: 0,
-      })
-    }
-
-    const nativeCrs = String(contract.native_crs)
-    const propertyGeometry = projectGeometry(claim.boundary_geojson, nativeCrs)
-    const queryBbox = geometryBbox(propertyGeometry)
-    if (!queryBbox) throw new Error('projected property bbox unavailable')
-    const groundCellNative = Number(contract.ground_cell_meters) * US_SURVEY_FEET_PER_METER
-    const groundRadiusNative = Number(contract.ground_support_radius_meters) * US_SURVEY_FEET_PER_METER
-    const structureCellNative = Number(contract.structure_cell_meters) * US_SURVEY_FEET_PER_METER
-    const supportBbox = expandBbox(queryBbox, groundRadiusNative)
-    const groundGrid = createGroundGrid(supportBbox, groundCellNative)
-    const bandGrid = createBandGrid(queryBbox, structureCellNative, contract.thresholds_ft)
-
-    for (const source of opened) {
-      source.nodes = await collectIntersectingNodes(source.get, source.copc, supportBbox)
-      source.candidate_point_count = [...source.nodes.values()]
-        .reduce((sum: number, node: any) => sum + Number(node.pointCount || 0), 0)
-    }
-
-    let supportGroundPointCount = 0
-    for (const source of opened) {
-      for (const node of source.nodes.values()) {
-        const view = await Copc.loadPointDataView(source.get, source.copc, node, {
-          lazPerf,
-          include: ['X', 'Y', 'Z', 'Classification', 'Overlap', 'Withheld'],
-        })
-        const getX = view.getter('X')
-        const getY = view.getter('Y')
-        const getZ = view.getter('Z')
-        const getClassification = view.getter('Classification')
-        const getOverlap = view.getter('Overlap')
-        const getWithheld = view.getter('Withheld')
-        for (let index = 0; index < view.pointCount; index += 1) {
-          const x = Number(getX(index))
-          const y = Number(getY(index))
-          if (
-            !bboxContains(supportBbox, x, y) ||
-            ownerItemId(x, y, opened) !== source.id
-          ) continue
-          const classification = Number(getClassification(index))
-          const overlap = Number(getOverlap(index))
-          const withheld = Number(getWithheld(index))
-          const z = Number(getZ(index))
-          if (
-            classification === 2 &&
-            !withheld &&
-            !overlap &&
-            addGroundSample(groundGrid, x, y, z)
-          ) supportGroundPointCount += 1
-        }
-      }
-    }
-
-    const groundSurface = finalizeGroundSurface(groundGrid, groundRadiusNative)
-    const groundCoverage = parcelSurfaceCoverage(groundSurface, propertyGeometry)
-
-    let primaryStructurePointCount = 0
-    let normalizedStructurePointCount = 0
-    let normalizationUnavailableCount = 0
-    let negativeHeightCount = 0
-    let belowMinusOneFootCount = 0
-
-    for (const source of opened) {
-      for (const node of source.nodes.values()) {
-        const view = await Copc.loadPointDataView(source.get, source.copc, node, {
-          lazPerf,
-          include: ['X', 'Y', 'Z', 'Classification', 'Overlap', 'Withheld'],
-        })
-        const getX = view.getter('X')
-        const getY = view.getter('Y')
-        const getZ = view.getter('Z')
-        const getClassification = view.getter('Classification')
-        const getOverlap = view.getter('Overlap')
-        const getWithheld = view.getter('Withheld')
-
-        for (let index = 0; index < view.pointCount; index += 1) {
-          const x = Number(getX(index))
-          const y = Number(getY(index))
-          if (
-            !pointInGeometry(x, y, propertyGeometry) ||
-            ownerItemId(x, y, opened) !== source.id
-          ) continue
-          const z = Number(getZ(index))
-          const classification = Number(getClassification(index))
-          const overlap = Number(getOverlap(index))
-          const withheld = Number(getWithheld(index))
-          const primaryStructure =
-            classification !== 2 &&
-            !NOISE_CLASSIFICATIONS.has(classification) &&
-            !withheld &&
-            !overlap &&
-            Number.isFinite(z)
-          if (!primaryStructure) continue
-
-          primaryStructurePointCount += 1
-          const groundZ = surfaceValueAt(groundSurface, x, y)
-          if (!Number.isFinite(groundZ)) {
-            normalizationUnavailableCount += 1
-            continue
-          }
-          const height = z - Number(groundZ)
-          normalizedStructurePointCount += 1
-          if (height < 0) negativeHeightCount += 1
-          if (height < -1) belowMinusOneFootCount += 1
-          if (height >= 0) addBandSample(bandGrid, x, y, height)
-        }
-      }
-    }
-
-    const currentSummary = summarizeBandGrid(
-      bandGrid,
-      propertyGeometry,
-      Number(contract.minimum_cell_returns),
-    )
-    const itemDatetimes = sourceItems
-      .map((item: any) => Date.parse(String(item.datetime || '')))
-      .filter(Number.isFinite)
-      .sort((a: number, b: number) => a - b)
-    const acquisitionUtcRange = itemDatetimes.length
-      ? [
-          new Date(itemDatetimes[0]).toISOString(),
-          new Date(itemDatetimes[itemDatetimes.length - 1]).toISOString(),
-        ]
-      : null
-
-    const processingFingerprint = {
-      method: 'multiasset_copc_header_and_node_selection_v1',
-      source_plan_artifact_sha256: claim.source_plan_artifact_sha256,
-      items: opened.map((source) => ({
-        id: source.id,
-        asset_identity: source.asset_identity,
-        native_crs: source.native_crs,
-        copc_header_point_count: Number(source.copc.header.pointCount),
-        candidate_node_count: source.nodes.size,
-        candidate_point_count: source.candidate_point_count,
-      })),
-    }
-
-    const supportedPercent = groundCoverage.parcelCells
-      ? groundCoverage.supportedCells / groundCoverage.parcelCells * 100
-      : null
-    const artifact = {
-      schema: contract.schema,
-      method: contract.method,
-      source_collection: contract.source_collection,
-      source_plan_artifact_sha256: claim.source_plan_artifact_sha256,
-      processing_item_ids: opened.map((source) => source.id),
-      native_crs: nativeCrs,
-      height_unit: 'US survey ft',
-      cell_meters: Number(contract.structure_cell_meters),
-      minimum_cell_returns: Number(contract.minimum_cell_returns),
-      acquisition_utc_range: acquisitionUtcRange,
-      acquisition_time_basis: 'central STAC item datetime metadata',
-      grid: {
-        bbox: bandGrid.bbox,
-        cellSize: bandGrid.cellSize,
-        width: bandGrid.width,
-        height: bandGrid.height,
-        thresholds: bandGrid.thresholds,
-        bandCount: bandGrid.bandCount,
-        total: Array.from(bandGrid.total),
-        counts: Array.from(bandGrid.counts),
-      },
-      current_summary: currentSummary,
-      processing_summary: {
-        support_ground_point_count: supportGroundPointCount,
-        parcel_ground_cell_count: groundCoverage.parcelCells,
-        parcel_direct_ground_cell_count: groundCoverage.directCells,
-        parcel_supported_ground_cell_count: groundCoverage.supportedCells,
-        ground_supported_parcel_percent: supportedPercent,
-        primary_structure_point_count: primaryStructurePointCount,
-        normalized_structure_point_count: normalizedStructurePointCount,
-        normalization_unavailable_count: normalizationUnavailableCount,
-        negative_height_count: negativeHeightCount,
-        below_minus_one_foot_count: belowMinusOneFootCount,
-        overlap_policy:
-          'For overlapping selected item footprints, each source point is counted only by the lexicographically first selected item footprint containing that XY location.',
-      },
-      processing_source_fingerprint: processingFingerprint,
-      interpretation_boundary:
-        'Current Phase 3 physical height-above-ground evidence only. Height bands are neutral physical strata, not species, understory, habitat, bedding, mast, or animal-use classes. Historical comparison and aerial imagery are not fused into this product.',
-    }
+    const artifact = await buildLidarPhysicalArtifactForGeometry({
+      analysisGeometry: claim.boundary_geojson,
+      sourceItems: claim?.phase3?.processing_items || [],
+      contract: claim.contract,
+      sourcePlanArtifactSha256: claim.source_plan_artifact_sha256,
+    })
 
     const completed = await workerRequest({
       operation: 'complete',
@@ -709,4 +727,4 @@ async function main() {
   }
 }
 
-await main()
+if (import.meta.main) await main()

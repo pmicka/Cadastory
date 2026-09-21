@@ -1,0 +1,48 @@
+name: Farm Watch landscape structure CI
+
+on:
+  pull_request:
+    paths:
+      - 'docs/FARM_WATCH_LANDSCAPE_STRUCTURE_CONTEXT_V1.md'
+      - 'docs/FARM_WATCH_STRUCTURE_EVIDENCE_LEDGER.md'
+      - 'supabase/functions/_shared/farm-watch-landscape-structure-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-lidar-source.ts'
+      - 'supabase/functions/_shared/farm-watch-landscape-structure-contract.test.ts'
+      - 'supabase/functions/farm-watch-landscape-structure-worker/**'
+      - 'supabase/functions/farm-watch-materialization/index.ts'
+      - 'scripts/farm-watch-lidar-physical-materialize.ts'
+      - 'scripts/farm-watch-leaf-off-materialize.ts'
+      - 'scripts/farm-watch-landscape-structure-materialize.ts'
+      - 'supabase/migrations/*farm_watch_operator_field_observations*'
+      - '.github/workflows/farm-watch-landscape-structure-ci.yml'
+      - '.github/workflows/farm-watch-landscape-structure.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  landscape-structure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check landscape structure contract
+        run: deno check supabase/functions/_shared/farm-watch-landscape-structure-contract.ts
+      - name: Check reusable LiDAR source planner
+        run: deno check supabase/functions/_shared/farm-watch-lidar-source.ts
+      - name: Run landscape structure contract tests
+        run: deno test supabase/functions/_shared/farm-watch-landscape-structure-contract.test.ts
+      - name: Check reusable LiDAR processor
+        run: deno check scripts/farm-watch-lidar-physical-materialize.ts
+      - name: Check reusable leaf-off processor
+        run: deno check scripts/farm-watch-leaf-off-materialize.ts
+      - name: Check landscape structure materializer
+        run: deno check scripts/farm-watch-landscape-structure-materialize.ts
+      - name: Check landscape structure worker
+        run: deno check supabase/functions/farm-watch-landscape-structure-worker/index.ts
+      - name: Check materialization reader
+        run: deno check supabase/functions/farm-watch-materialization/index.ts

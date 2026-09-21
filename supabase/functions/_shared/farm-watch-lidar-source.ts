@@ -223,10 +223,12 @@ function sampledCoverage(boundary: any, items: any[]) {
       if (items.some((item) => pointInGeometry(lon, lat, item.geometry))) coveredCount += 1
     }
   }
+  const coveragePercent = sampleCount ? coveredCount / sampleCount * 100 : null
   return {
     sample_count: sampleCount,
     covered_sample_count: coveredCount,
-    sampled_parcel_coverage_percent: sampleCount ? coveredCount / sampleCount * 100 : null,
+    sampled_parcel_coverage_percent: coveragePercent,
+    sampled_analysis_coverage_percent: coveragePercent,
   }
 }
 
@@ -279,7 +281,9 @@ async function searchCollection(collectionId: string, bbox: number[], fetchImpl:
 
 export async function sha256Hex(value: string | Uint8Array) {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  const owned = new Uint8Array(bytes.byteLength)
+  owned.set(bytes)
+  const digest = await crypto.subtle.digest('SHA-256', owned.buffer)
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
@@ -293,11 +297,27 @@ export function lidarSourceArtifactPath(propertyId: string, inputSignature: stri
   ].join('/')
 }
 
-export async function buildLidarSourceArtifact(boundary: any, fetchImpl: typeof fetch = fetch) {
+export async function buildLidarSourceArtifact(
+  boundary: any,
+  fetchImpl: typeof fetch = fetch,
+  collectionIds: string[] | null = null,
+) {
   const bbox = geometryBbox(boundary)
-  if (!bbox) throw new Error('Property boundary bbox unavailable')
+  if (!bbox) throw new Error('Analysis boundary bbox unavailable')
+  const requestedCollections = collectionIds == null
+    ? FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections
+    : FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections.filter((collection) =>
+      collectionIds.includes(collection.id)
+    )
+  if (!requestedCollections.length) throw new Error('No supported LiDAR collections requested')
+  if (
+    collectionIds != null &&
+    requestedCollections.length !== new Set(collectionIds).size
+  ) {
+    throw new Error('One or more requested LiDAR collections are unsupported')
+  }
   const collections = []
-  for (const collection of FARM_WATCH_LIDAR_SOURCE_PRODUCT.collections) {
+  for (const collection of requestedCollections) {
     const features = await searchCollection(collection.id, bbox, fetchImpl)
     const items = features.map(itemSummary)
     const coverage = coveragePlan(boundary, items)

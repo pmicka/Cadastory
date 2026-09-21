@@ -304,6 +304,22 @@ Best tested method: quadratic/interactions ridge. About 97.3% of held-out mean-b
 
 **Status:** protocol-ready. Do not describe the second-round morphology result as completed unless its frozen annotations/reveal artifact are recovered.
 
+### FW-S18 — Barrier-aware local-500 m structural continuity
+
+**Question:** Does fine structural evidence on the selected property continue into the immediate surrounding landscape, transition at the ownership boundary, or meet a larger structural contrast?
+
+**Method:** Planned `landscape-structure-context-v1` product over the exact barrier-aware `local_500m` domain. Reuses the frozen Phase 3 LiDAR physical method from FW-S02/FW-S04 and the frozen 2024 leaf-off estimator from FW-S06 without retuning. LiDAR source coverage is resolved against the full local domain rather than reusing the parcel source plan. LiDAR and leaf-off evidence are synthesized on a common 5 m grid with property/domain masks and descriptive cross-boundary adjacency contrasts.
+
+**New uncertainty resolved:** Existing canonical products stop at the parcel boundary and therefore cannot distinguish a real structural termination from an ownership-boundary processing artifact. This product extends spatial support only; it does not repeat the prior complementarity experiments.
+
+**Implementation contract:** `supabase/functions/_shared/farm-watch-landscape-structure-contract.ts`; `docs/FARM_WATCH_LANDSCAPE_STRUCTURE_CONTEXT_V1.md`.
+
+**Boundary:** No security-cover label, corridor/funnel inference, deer movement, bedding, habitat quality, or hunting recommendation. The 2024 leaf-off surface is normalized within the local domain and must not replace the canonical parcel-normalized artifact.
+
+**Status:** protocol-ready. Contract and evidence boundaries are durable; central materialization has not yet been implemented or run.
+
+---
+
 ## Provenance discrepancies that must remain explicit
 
 ### LiDAR acquisition-time basis
@@ -359,6 +375,8 @@ Cadastory:
 - `supabase/functions/farm-watch-structure-synthesis-worker/index.ts`
 - `docs/FARM_WATCH_LANDSCAPE_CONTEXT_V1.md`
 - `docs/FARM_WATCH_LANDSCAPE_PHYSICAL_CONTEXT_V1.md`
+- `docs/FARM_WATCH_LANDSCAPE_STRUCTURE_CONTEXT_V1.md`
+- `supabase/functions/_shared/farm-watch-landscape-structure-contract.ts`
 
 External preserved artifact located during consolidation:
 - `farm-watch-blind-morphology-reveal-v1.json` — 24-pair first-follow-up reveal metadata only; morphology labels were not located.
