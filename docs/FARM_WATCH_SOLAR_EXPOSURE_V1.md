@@ -23,7 +23,7 @@ Date-independent physical context.
 
 Algorithm:
 
-`terrain-horizon-canopy-context-v1`
+`terrain-horizon-canopy-context-v2`
 
 Product key:
 
@@ -75,9 +75,10 @@ For that reason, Solar Terrain v1 samples one bounded **unmasked** DEM support g
 - ray step: 90 m;
 - azimuth sectors: 24, at 15° spacing;
 - CRS: EPSG:32616;
-- required DEM support coverage: at least 99.5%, otherwise the build fails closed.
+- sampling mask: only cells actually required by target-boundary orientation neighbors and the configured 24-sector horizon rays;
+- required-set DEM support coverage: exactly 100%, otherwise the build fails closed.
 
-Missing horizon-support DEM cells are never treated as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
+The surrounding rectangular support extent is only an indexing envelope; irrelevant cells that no derivative or horizon ray can touch are not part of the coverage gate. Missing **required** horizon-support DEM cells are never treated as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
 
 ### Canopy
 
@@ -282,6 +283,7 @@ The Solar Terrain identity binds:
 - current spatial-pattern materialization identity and artifact SHA;
 - KyFromAbove source;
 - DEM support resolution;
+- required-cell sampling contract and 100% required coverage rule;
 - horizon sector count;
 - horizon search radius;
 - ray step;
