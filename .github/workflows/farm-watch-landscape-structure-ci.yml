@@ -6,11 +6,14 @@ on:
       - 'docs/FARM_WATCH_LANDSCAPE_STRUCTURE_CONTEXT_V1.md'
       - 'docs/FARM_WATCH_STRUCTURE_EVIDENCE_LEDGER.md'
       - 'supabase/functions/_shared/farm-watch-landscape-structure-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-presentation-policy.ts'
+      - 'supabase/functions/_shared/farm-watch-presentation-policy.test.ts'
       - 'supabase/functions/_shared/github-actions-oidc.ts'
       - 'supabase/functions/_shared/farm-watch-lidar-source.ts'
       - 'supabase/functions/_shared/farm-watch-landscape-structure-contract.test.ts'
       - 'supabase/functions/farm-watch-landscape-structure-worker/**'
       - 'supabase/functions/farm-watch-materialization/index.ts'
+      - 'supabase/functions/farm-watch-private/index.ts'
       - 'scripts/farm-watch-lidar-physical-materialize.ts'
       - 'scripts/farm-watch-leaf-off-materialize.ts'
       - 'scripts/farm-watch-landscape-structure-materialize.ts'
@@ -33,6 +36,10 @@ jobs:
           deno-version: v2.x
       - name: Check landscape structure contract
         run: deno check supabase/functions/_shared/farm-watch-landscape-structure-contract.ts
+      - name: Check Farm Watch presentation policy
+        run: deno check supabase/functions/_shared/farm-watch-presentation-policy.ts
+      - name: Test Farm Watch presentation policy
+        run: deno test supabase/functions/_shared/farm-watch-presentation-policy.test.ts
       - name: Check GitHub OIDC trust module
         run: deno check supabase/functions/_shared/github-actions-oidc.ts
       - name: Check reusable LiDAR source planner
@@ -49,3 +56,5 @@ jobs:
         run: deno check supabase/functions/farm-watch-landscape-structure-worker/index.ts
       - name: Check materialization reader
         run: deno check supabase/functions/farm-watch-materialization/index.ts
+      - name: Check Farm Watch private viewer
+        run: deno check supabase/functions/farm-watch-private/index.ts
