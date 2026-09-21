@@ -7,6 +7,7 @@ export const FARM_WATCH_PRESENTATION_POLICY = Object.freeze({
     'spatial-edge-patch-context',
     'solar-terrain-context',
     'solar-exposure-context',
+    'thermal-exposure-context',
   ]),
 })
 
