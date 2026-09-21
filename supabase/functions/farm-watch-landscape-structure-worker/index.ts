@@ -4,6 +4,9 @@ import {
   FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
 } from '../_shared/farm-watch-lidar-source.ts'
 import {
+  FARM_WATCH_LIDAR_PHYSICAL_PRODUCT,
+} from '../_shared/farm-watch-lidar-physical-contract.ts'
+import {
   FARM_WATCH_LANDSCAPE_STRUCTURE_LIMITATIONS,
   FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT,
   landscapeStructureArtifactPath,
@@ -142,8 +145,10 @@ async function claimLandscapeStructure(slug: string, identity: any) {
       method: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.algorithmVersion,
       domain_meters: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.domainMeters,
       lidar: {
-        source_collection: 'laz-phase3',
-        native_crs: 'EPSG:6473',
+        schema: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.outputSchemaVersion,
+        method: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.algorithmVersion,
+        source_collection: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.sourceCollection,
+        native_crs: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.nativeCrs,
         ground_cell_meters: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.lidarGroundCellMeters,
         ground_support_radius_meters:
           FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.lidarGroundSupportRadiusMeters,
