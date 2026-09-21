@@ -551,8 +551,20 @@ async function main() {
         minimum_cell_returns: lidar.minimum_cell_returns,
         acquisition_utc_range: lidar.acquisition_utc_range,
         acquisition_time_basis: lidar.acquisition_time_basis,
-        current_summary: lidar.current_summary,
-        processing_summary: lidar.processing_summary,
+        processing_summary: {
+          support_ground_point_count: lidar.processing_summary.support_ground_point_count,
+          analysis_ground_cell_count: lidar.processing_summary.parcel_ground_cell_count,
+          analysis_direct_ground_cell_count: lidar.processing_summary.parcel_direct_ground_cell_count,
+          analysis_supported_ground_cell_count: lidar.processing_summary.parcel_supported_ground_cell_count,
+          ground_supported_analysis_percent:
+            lidar.processing_summary.ground_supported_parcel_percent,
+          primary_structure_point_count: lidar.processing_summary.primary_structure_point_count,
+          normalized_structure_point_count: lidar.processing_summary.normalized_structure_point_count,
+          normalization_unavailable_count: lidar.processing_summary.normalization_unavailable_count,
+          negative_height_count: lidar.processing_summary.negative_height_count,
+          below_minus_one_foot_count: lidar.processing_summary.below_minus_one_foot_count,
+          overlap_policy: lidar.processing_summary.overlap_policy,
+        },
         processing_source_fingerprint: lidar.processing_source_fingerprint,
         interpretation_boundary: lidar.interpretation_boundary,
         grid_storage_note:
