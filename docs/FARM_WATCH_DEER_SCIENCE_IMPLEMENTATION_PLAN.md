@@ -135,14 +135,14 @@ The first production deer output should be a vector of evidence-backed module re
 | Product | Type | Primary evidence | Status |
 | --- | --- | --- | --- |
 | `meteorological-forcing-v1` | dated/hourly state | NOAA HRRR + historical Daymet fallback where appropriate | production |
-| `solar-exposure-context-v1` | gridded physical | canonical terrain + solar geometry + horizon + canopy | implementation complete; awaiting production deployment |
-| `thermal-exposure-context-v1` | dated gridded physical/proxy | static solar terrain + exact HRRR analysis | implementation candidate |
+| `solar-exposure-context-v1` | gridded physical | canonical terrain + solar geometry + horizon + canopy | production |
+| `thermal-exposure-context-v1` | dated gridded physical/proxy | static solar terrain + exact HRRR analysis | production |
 | `field-phenology-context-v1` | dated field state | CDL + NASA HLS VI + NASS regional context | build |
 | `mast-resource-context-v1` | annual/seasonal resource proxy | USFS TreeMap/BIGMAP + Kentucky mast survey | build |
 | `horizontal-visibility-context-v1` | gridded physical | LiDAR + terrain | build |
 | `surface-water-state-v1` | dated physical/proxy | 3DHP/NWI + DEM + QPE/soil moisture + observations | build |
 | `human-activity-context-v1` | event/state | explicit owner/operator observations | build |
-| `diel-photoperiod-context-v1` | deterministic state | date/time/location solar geometry | build |
+| `diel-photoperiod-context-v1` | deterministic state | date/time/location solar geometry | Batch 3 implementation candidate |
 
 ## Deer-specific products
 
@@ -255,7 +255,7 @@ Fields:
 
 # Batch 2 — Solar and thermal physical context
 
-Status: Batch 2A implementation complete; Batch 2B implementation candidate  
+Status: production; Batch 2A and Batch 2B deployed and validated  
 Priority: P0  
 Depends on: Batch 1 + existing DEM/canopy/terrain.
 
@@ -340,6 +340,7 @@ A dated physical thermal surface can be produced with no deer label and with all
 
 # Batch 3 — Diel and biological-state contracts
 
+Status: implementation candidate — not deployed  
 Priority: P0  
 Depends on: deterministic solar time; regional phenology review.
 
@@ -358,13 +359,16 @@ The exact deer-module use of these periods must cite the ledger.
 
 ## 3B — regional breeding/reproductive-state evidence review
 
-Before coding a Kentucky rut state:
+The targeted Kentucky / lower Ohio Valley review is complete for the v1 state contract.
 
-- complete a targeted Kentucky / lower Ohio Valley literature search;
-- distinguish breeding conception dates from observed movement/harvest timing;
-- preserve uncertainty and year-to-year variation.
+Evidence disposition:
 
-Do not import Wisconsin's FW-D06 dates.
+- FW-D21: Kentucky statewide qualitative breeding context — October through January with peak activity usually in mid-November; suitable for a regional timing gate only;
+- FW-D22: Illinois female conception timing varies materially by maternal age; age-effect form is reusable, but Illinois dates are not Kentucky coefficients;
+- FW-D23: Ohio mature-doe physiological onset in early November is regional corroboration only and does not fire a Kentucky relationship;
+- FW-D06: Wisconsin male age × breeding-season movement form remains available only after a locally appropriate Kentucky breeding gate is active; Wisconsin dates are not imported.
+
+Exact annual Kentucky physiographic-region conception-date values remain deferred until the authoritative KDFWR product is captured in structured, source-controlled form.
 
 ## 3C — `deer-biological-state-v1`
 
@@ -381,7 +385,9 @@ Explicit scenario object:
 - confidence;
 - applicable relationship IDs.
 
-If sex or age is unknown, the engine may return parallel scenarios rather than averaging them.
+If sex or age is unknown, the state remains unknown; later evaluation may return parallel scenarios rather than averaging them.
+
+Regional population timing is stored separately from `individual_reproductive_state`. A date inside Kentucky's documented breeding season must never auto-set estrus, conception, pregnancy, or mate-searching state for an individual deer.
 
 ## Exit gate
 
@@ -1051,10 +1057,13 @@ The chain remains neutral: no operative temperature, composite thermal score, de
 
 # Recommended next implementation batch
 
-Proceed to **Batch 3 — diel and biological-state contracts**:
+First deploy and validate **Batch 3** when explicitly authorized.
 
-1. implement deterministic diel/photoperiod context from the existing solar geometry;
-2. complete the targeted Kentucky/lower-Ohio-Valley breeding/reproductive phenology review;
-3. implement `deer-biological-state-v1` with explicit sex/age/reproductive/movement-state scenarios and abstention when state is unknown.
+After Batch 3 is production-operational, proceed to **Batch 4 — dynamic agricultural resource state**:
 
-Batch 3 should remain separate from the science-relationship registry and deer-specific evaluation modules; those follow once biological state is explicit.
+1. establish current field-level crop identity/state rather than relying on stale annual CDL;
+2. add HLS vegetation time-series support with explicit cloud/observation quality;
+3. distinguish standing/active crop, probable harvest transition, post-harvest/residual, and unknown;
+4. keep NASS/state crop-progress products as regional context rather than field truth.
+
+The machine-readable deer relationship registry remains downstream of explicit biological state and the neutral resource-state inputs required by its first modules.

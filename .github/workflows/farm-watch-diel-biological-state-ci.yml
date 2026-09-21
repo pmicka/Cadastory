@@ -1,0 +1,36 @@
+name: Farm Watch diel biological state CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*farm_watch_diel_biological_state*.sql'
+      - 'supabase/functions/_shared/farm-watch-diel-biological-state-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-diel-biological-state.ts'
+      - 'supabase/functions/_shared/farm-watch-diel-biological-state.test.ts'
+      - 'scripts/check-farm-watch-diel-biological-state-migration.ts'
+      - 'docs/FARM_WATCH_DIEL_BIOLOGICAL_STATE_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
+      - '.github/workflows/farm-watch-diel-biological-state-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diel-biological-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check Batch 3 contract
+        run: deno check supabase/functions/_shared/farm-watch-diel-biological-state-contract.ts
+      - name: Check Batch 3 helpers
+        run: deno check supabase/functions/_shared/farm-watch-diel-biological-state.ts
+      - name: Test Batch 3 contracts
+        run: deno test supabase/functions/_shared/farm-watch-diel-biological-state.test.ts
+      - name: Check migration invariants
+        run: deno run --allow-read scripts/check-farm-watch-diel-biological-state-migration.ts
