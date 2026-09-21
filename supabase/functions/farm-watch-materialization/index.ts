@@ -219,6 +219,24 @@ function productSpec(key: ProductKey) {
       sourceSignature: null,
     }
   }
+  if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
   return {
     key,
     productKind: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.productKind,
@@ -272,6 +290,8 @@ function validateArtifact(key: ProductKey, value: any) {
   if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return validateLandscapeStructureArtifact(value)
   if (key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key) return validateTerrainFormArtifact(value)
   if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) return validateSpatialPatternArtifact(value)
+  if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) return validateSolarTerrainArtifact(value)
+  if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) return validateSolarExposureArtifact(value)
   return validateStructureSynthesisArtifact(value)
 }
 
