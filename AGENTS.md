@@ -12,6 +12,18 @@ Treat that ledger as the durable index of already-run science. A new experiment 
 
 Keep experimental interpretation boundaries intact. Structural evidence does not silently become understory, species, habitat quality, bedding, animal-use, causation, or vegetation-change evidence.
 
+## Farm Watch deer-science transfer ledger
+
+Before proposing, implementing, tuning, or promoting any Farm Watch deer-specific biological or behavioral model term, read:
+
+- `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+
+The deer ledger is normative for biological interpretation. Neutral physical/environmental products may remain species-agnostic, but a deer-specific term must cite an existing ledger entry or add a new evidence entry first.
+
+Do not silently convert hunting folklore, generic habitat heuristics, or neutral geometry into deer behavior. Preserve the ledger's population, season, sex/age, diel period, movement-state, interaction, null-result, and transferability constraints. Relationship-form transfer does not authorize copying published numeric coefficients into a different population.
+
+Local observations are for validation/calibration of transferred relationships unless a genuinely unresolved scientific question is explicitly being studied.
+
 ## Scout MCP architecture doctrine
 
 Before changing any Scout MCP tool, public/model-visible capability, routing contract, privacy/exposure rule, presentation contract, external-capability handoff, persistent agent state, or specialized Scout surface, read and follow:
