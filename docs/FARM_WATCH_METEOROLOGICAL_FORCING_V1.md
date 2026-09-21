@@ -1,6 +1,6 @@
 # Farm Watch Meteorological Forcing v1
 
-Status: implementation candidate — not deployed  
+Status: production — deployed 2026-09-21  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -245,9 +245,40 @@ A post-rollback catalog check confirmed that production retained:
 - no public meteorological-forcing wrappers;
 - no `noaa-hrrr-conus-3km` source row.
 
-Therefore Batch 1 remains **not deployed**.
+That rollback validation preceded deployment. Batch 1 is now deployed and operational in production.
 
-The pre-deployment test validates persistence, security, identity, and read semantics. It does **not** claim that the live collector has decoded a current HRRR grid point for the private validation property. That requires the collector and migration to be deployed and is an explicit deployment-verification gate.
+The pre-deployment test validated persistence, security, identity, and read semantics before release.
+
+## Production deployment verification — 2026-09-21
+
+Production components:
+
+- migration `add_farm_watch_meteorological_forcing_v1` applied successfully;
+- Edge Function `collect-farm-watch-meteorology` deployed ACTIVE, version 1;
+- `verify_jwt=false` preserved because the function uses Scout's established custom collector-key authentication;
+- collector route enabled and dispatchable through `ingest.invoke_edge_collector`;
+- hourly pilot refresh scheduled as cron job 77, `farm-watch-meteorological-forcing-hourly-v1`, at minute 50 of every hour.
+
+Real HRRR validation for `validation-property-01`:
+
+- selected source: HRRR CONUS f00 analysis at `2026-09-21T17:00:00Z`;
+- nearest sampled model grid point: 1,024.1 m from the property target;
+- source index SHA-256: `63f1049caa4589947bc4015144b1e8f1a6a7ee38b2a35a695ed15171785e0dc9`;
+- selected-record/value SHA-256: `a78f534ace4f6a25626d4c7bd860ae52d4e7e793dd152a395c010726898ea08a`;
+- final forcing identity SHA-256: `dcf4e228603989e79e81e8078bb010ddf31a1a385299a0f0399245649da8cb41`.
+
+Validated forcing values at that analysis time:
+
+- air temperature: 27.988489 °C;
+- dew point: 20.121164 °C;
+- relative humidity: 67.5%;
+- true 10 m wind: 1.182671 m/s from 146.577°;
+- downward shortwave: 771.4 W/m²;
+- downward longwave: 385.7 W/m²;
+- total cloud cover: 13%;
+- precipitation rate: 0 mm/hr.
+
+The standard dispatcher was exercised successfully after route registration. Anonymous and authenticated table access remain denied; `service_role` access is present. Both Scout architecture assertions passed after deployment.
 
 ## Next dependency
 
