@@ -23,7 +23,7 @@ Date-independent physical context.
 
 Algorithm:
 
-`terrain-horizon-canopy-context-v2`
+`terrain-horizon-canopy-context-v3`
 
 Product key:
 
@@ -77,9 +77,13 @@ For that reason, Solar Terrain v1 samples one bounded **unmasked** DEM support g
 - CRS: EPSG:32616;
 - sampling mask: only cells actually required by target-boundary orientation neighbors and the configured 24-sector horizon rays;
 - required-set DEM support coverage: exactly 100%, otherwise the build fails closed;
-- acquisition retry policy: initial 900-point batches at concurrency 4, then omitted points only at 250×2 and 50×1.
+- acquisition retry policy: initial 900-point batches at concurrency 4, then omitted points only at 250×2 and 50×1;
+- primary elevation source: KyFromAbove Phase 3 DEM;
+- fallback elevation source: USGS 3DEP Dynamic Elevation, used only for required cells still unresolved after the KyFromAbove retry policy;
+- 3DEP fallback values are converted from meters to feet before entering the common support grid;
+- combined required-set DEM support coverage: exactly 100%, otherwise the build fails closed.
 
-The surrounding rectangular support extent is only an indexing envelope; irrelevant cells that no derivative or horizon ray can touch are not part of the coverage gate. ArcGIS sample omissions are retried only for the missing required points; the retry path does not interpolate, substitute, or alter returned elevation values. Missing **required** horizon-support DEM cells after all retries are never treated as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
+The surrounding rectangular support extent is only an indexing envelope; irrelevant cells that no derivative or horizon ray can touch are not part of the coverage gate. ArcGIS sample omissions are retried only for missing required points. The fallback does not interpolate between neighboring cells and does not replace a valid KyFromAbove value. Missing **required** horizon-support DEM cells after both authoritative sources are exhausted are never treated as open sky. This support is build input only. The final materialization stores horizon angles, not a duplicate source DEM raster.
 
 ### Canopy
 
@@ -282,16 +286,18 @@ The Solar Terrain identity binds:
 
 - current terrain materialization identity and artifact SHA;
 - current spatial-pattern materialization identity and artifact SHA;
-- KyFromAbove source;
+- KyFromAbove primary source;
+- USGS 3DEP Dynamic Elevation fallback source;
+- fallback meters-to-feet conversion and required-primary-missing-only policy;
 - DEM support resolution;
-- required-cell sampling contract and 100% required coverage rule;
+- required-cell sampling/retry contract and 100% combined required coverage rule;
 - horizon sector count;
 - horizon search radius;
 - ray step;
 - TCC year/version;
 - target grid resolutions.
 
-A changed terrain or canopy dependency therefore creates a new Solar Terrain input identity.
+The sampled-source identity also binds the per-support-cell source mask, so changing which required cells came from KyFromAbove versus USGS 3DEP changes the materialization identity. A changed terrain or canopy dependency therefore also creates a new Solar Terrain input identity.
 
 ### Date source signature
 

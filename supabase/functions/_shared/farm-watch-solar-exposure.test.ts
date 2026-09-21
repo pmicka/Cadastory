@@ -152,6 +152,8 @@ Deno.test('solar source signatures bind dependencies, date, and physical contrac
   assert(staticSig.includes('horizon_sector_count=24'))
   assert(staticSig.includes('dem_support_sampling=required_orientation_and_horizon_ray_union_v2'))
   assert(staticSig.includes('raster_sampling_retry=900x4_then_250x2_then_50x1_v1'))
+  assert(staticSig.includes('dem_fallback_source=usgs-3dep-dynamic'))
+  assert(staticSig.includes('dem_fallback_policy=required_primary_missing_only_v1'))
   assert(staticSig.includes('dem_required_coverage=100pct'))
   const day1 = solarExposureSourceSignature({
     solarTerrainMaterializationIdentitySha256: 'e'.repeat(64),
@@ -175,7 +177,7 @@ Deno.test('static solar terrain artifact reuses target elevations and keeps neut
   assert(built.artifact.local_grid.width === 5)
   assert(built.artifact.landscape_grid.width === 3)
   assert(built.artifact.horizon_contract.sector_count === 24)
-  assert(built.artifact.method === 'terrain-horizon-canopy-context-v2')
+  assert(built.artifact.method === 'terrain-horizon-canopy-context-v3')
   assert(built.artifact.summary.support_dem_required_cell_count > 0)
   assert(
     built.artifact.summary.support_dem_available_required_cell_count ===
@@ -190,6 +192,72 @@ Deno.test('static solar terrain artifact reuses target elevations and keeps neut
   for (const forbidden of ['deer_score','habitat_score','bedding_score','stand_score']) {
     assert(!encoded.includes(forbidden))
   }
+})
+
+
+
+Deno.test('solar terrain fills only unresolved required Phase 3 support from USGS 3DEP', async () => {
+  let primaryCalls = 0
+  let fallbackCalls = 0
+  const fetchImpl = async (input: string | URL | Request, init?: RequestInit) => {
+    const url = String(input)
+    const params = new URLSearchParams(String(init?.body || ''))
+    const geometry = JSON.parse(params.get('geometry') || '{}')
+    const points = Array.isArray(geometry.points) ? geometry.points : []
+    const canopy = url.includes('/Vegetation/')
+    const fallback = url.includes('/3DEPElevation/')
+
+    if (canopy) {
+      return new Response(JSON.stringify({
+        samples: points.map((_point: number[], index: number) => ({
+          locationId: index,
+          value: 50,
+        })),
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+
+    if (fallback) {
+      fallbackCalls += 1
+      return new Response(JSON.stringify({
+        samples: points.map((_point: number[], index: number) => ({
+          locationId: index,
+          value: 152.4,
+        })),
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    }
+
+    primaryCalls += 1
+    const samples = points.flatMap((_point: number[], index: number) =>
+      index === 0 ? [] : [{ locationId: index, value: 500 }]
+    )
+    return new Response(JSON.stringify({ samples }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  const built = await buildSolarTerrainArtifact({
+    ...dependencies(),
+    fetchImpl: fetchImpl as typeof fetch,
+  })
+
+  assert(validateSolarTerrainArtifact(built.artifact))
+  assert(primaryCalls > 0)
+  assert(fallbackCalls > 0)
+  assert(built.artifact.summary.support_dem_fallback_required_cell_count > 0)
+  assert(
+    built.artifact.summary.support_dem_primary_required_cell_count +
+      built.artifact.summary.support_dem_fallback_required_cell_count ===
+      built.artifact.summary.support_dem_required_cell_count,
+  )
+  assert(
+    built.artifact.source_provenance.dem_fallback_source_url.includes('3DEPElevation'),
+  )
+  assert(
+    /^[0-9a-f]{64}$/.test(
+      built.artifact.source_provenance.dem_support_source_mask_sha256,
+    ),
+  )
 })
 
 Deno.test('date solar exposure artifact integrates windows and canopy proxy stays bounded', async () => {

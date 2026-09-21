@@ -42,8 +42,11 @@ type SupportGrid = {
   width: number
   height: number
   values_ft: Float64Array
+  source_mask: Uint8Array
   required_cell_count: number
   available_required_cell_count: number
+  primary_required_cell_count: number
+  fallback_required_cell_count: number
 }
 
 function decodeU8(value: string) {
@@ -204,6 +207,7 @@ export async function sampleTargetGrid(
   sourceUrl: string,
   extra: Record<string, string>,
   fetchImpl: typeof fetch,
+  minimumCoverage = 0.97,
 ) {
   const work = targetPoints(grid, valid)
   const values = new Float64Array(valid.length)
@@ -213,6 +217,7 @@ export async function sampleTargetGrid(
     rows: typeof work,
     batchSize: number,
     concurrency: number,
+    tolerateBatchErrors = false,
   ) => {
     const batches: Array<typeof work> = []
     for (let offset = 0; offset < rows.length; offset += batchSize) {
@@ -220,15 +225,22 @@ export async function sampleTargetGrid(
     }
     for (let cursor = 0; cursor < batches.length; cursor += concurrency) {
       const group = batches.slice(cursor, cursor + concurrency)
-      const results = await Promise.all(group.map(async (batch) => ({
-        batch,
-        samples: await rasterSamples(
-          sourceUrl,
-          batch.map((row) => [row.lon, row.lat]),
-          extra,
-          fetchImpl,
-        ),
-      })))
+      const results = await Promise.all(group.map(async (batch) => {
+        try {
+          return {
+            batch,
+            samples: await rasterSamples(
+              sourceUrl,
+              batch.map((row) => [row.lon, row.lat]),
+              extra,
+              fetchImpl,
+            ),
+          }
+        } catch (error) {
+          if (!tolerateBatchErrors) throw error
+          return { batch, samples: [] as any[] }
+        }
+      }))
       for (const result of results) {
         for (const sample of result.samples) {
           const local = Number(sample.locationId)
@@ -240,7 +252,7 @@ export async function sampleTargetGrid(
     }
   }
 
-  await sampleRows(work, 900, 4)
+  await sampleRows(work, 900, 4, false)
 
   for (const retry of [
     { batchSize: 250, concurrency: 2 },
@@ -248,14 +260,17 @@ export async function sampleTargetGrid(
   ]) {
     const missing = work.filter((row) => !Number.isFinite(values[row.index]))
     if (!missing.length) break
-    await sampleRows(missing, retry.batchSize, retry.concurrency)
+    await sampleRows(missing, retry.batchSize, retry.concurrency, true)
   }
 
   const available = work.reduce(
     (sum, row) => sum + (Number.isFinite(values[row.index]) ? 1 : 0),
     0,
   )
-  if (!work.length || available / work.length < 0.97) {
+  if (
+    !work.length ||
+    (minimumCoverage > 0 && available / work.length < minimumCoverage)
+  ) {
     throw new Error('solar raster target coverage incomplete: ' + available + '/' + work.length)
   }
   return values
@@ -335,26 +350,64 @@ async function buildDemSupport(
     p.demSourceUrl,
     {},
     fetchImpl,
-  )
-  const availableRequired = required.reduce(
-    (sum, needed, index) =>
-      sum + (needed && Number.isFinite(values[index]) ? 1 : 0),
     0,
   )
+  const sourceMask = new Uint8Array(count)
+  const fallbackRequired = new Uint8Array(count)
+  let primaryRequiredCount = 0
+
+  for (let index = 0; index < count; index += 1) {
+    if (!required[index]) continue
+    if (Number.isFinite(values[index])) {
+      sourceMask[index] = 1
+      primaryRequiredCount += 1
+    } else {
+      fallbackRequired[index] = 1
+    }
+  }
+
+  const fallbackNeededCount = fallbackRequired.reduce(
+    (sum, value) => sum + (value ? 1 : 0),
+    0,
+  )
+
+  let fallbackRequiredCount = 0
+  if (fallbackNeededCount > 0) {
+    const fallbackMeters = await sampleTargetGrid(
+      supportShape,
+      fallbackRequired,
+      p.demFallbackSourceUrl,
+      {},
+      fetchImpl,
+      0,
+    )
+    for (let index = 0; index < count; index += 1) {
+      if (!fallbackRequired[index] || !Number.isFinite(fallbackMeters[index])) continue
+      values[index] = fallbackMeters[index] * p.demFallbackMetersToFeet
+      sourceMask[index] = 2
+      fallbackRequiredCount += 1
+    }
+  }
+
+  const availableRequired = primaryRequiredCount + fallbackRequiredCount
   if (availableRequired !== requiredCount) {
     throw new Error(
-      'solar DEM required horizon support coverage is incomplete: ' +
+      'solar DEM required horizon support coverage is incomplete after authoritative fallback: ' +
       availableRequired + '/' + requiredCount,
     )
   }
+
   return {
     bbox,
     cell_meters: cell,
     width,
     height,
     values_ft: values,
+    source_mask: sourceMask,
     required_cell_count: requiredCount,
     available_required_cell_count: availableRequired,
+    primary_required_cell_count: primaryRequiredCount,
+    fallback_required_cell_count: fallbackRequiredCount,
   }
 }
 
@@ -610,8 +663,10 @@ export async function buildSolarTerrainArtifact(args: {
     (local.bbox.south + local.bbox.north) / 2,
   ])
 
+  const supportSourceMaskSha256 = await sha256Hex(support.source_mask)
   const sampledSourceSha256 = await sha256Hex(JSON.stringify({
     dem_support: [...support.values_ft],
+    dem_support_source_mask: [...support.source_mask],
     landscape_canopy: [...landscapeCanopy.sampled],
     terrain_artifact_sha256: args.terrainArtifactSha256,
     spatial_pattern_artifact_sha256: args.spatialPatternArtifactSha256,
@@ -670,13 +725,23 @@ export async function buildSolarTerrainArtifact(args: {
       support_dem_grid_cell_count: support.values_ft.length,
       support_dem_required_cell_count: support.required_cell_count,
       support_dem_available_required_cell_count: support.available_required_cell_count,
+      support_dem_primary_required_cell_count: support.primary_required_cell_count,
+      support_dem_fallback_required_cell_count: support.fallback_required_cell_count,
     },
     source_provenance: {
       terrain_target_reuse:
         'canonical terrain-form-permeability elevation grids; no target DEM resampling',
       terrain_horizon_support:
-        'KyFromAbove Phase 3 DEM unmasked support sampled only at cells required by target orientation neighbors and 24-sector horizon rays; required support must be complete',
-      dem_source_url: p.demSourceUrl,
+        'KyFromAbove Phase 3 DEM is primary for required orientation/horizon support. Required cells unresolved after the documented retry policy use USGS 3DEP Dynamic Elevation; combined required support must be complete.',
+      dem_primary_source_url: p.demSourceUrl,
+      dem_fallback_source_url: p.demFallbackSourceUrl,
+      dem_fallback_meters_to_feet: p.demFallbackMetersToFeet,
+      dem_support_source_mask_semantics: {
+        '0': 'not required or unresolved',
+        '1': 'KyFromAbove Phase 3 DEM',
+        '2': 'USGS 3DEP Dynamic Elevation converted meters to feet',
+      },
+      dem_support_source_mask_sha256: supportSourceMaskSha256,
       canopy_source_url: p.canopySourceUrl,
       analysis_crs: EPSG_32616,
       sampled_source_sha256: sampledSourceSha256,
