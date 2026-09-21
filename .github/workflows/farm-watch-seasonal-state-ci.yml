@@ -1,0 +1,30 @@
+name: Farm Watch seasonal state CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*farm_watch_seasonal_state*.sql'
+      - 'supabase/functions/_shared/farm-watch-seasonal-state-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-seasonal-state-contract.test.ts'
+      - 'scripts/check-farm-watch-seasonal-state-migration.ts'
+      - 'docs/FARM_WATCH_SEASONAL_STATE_V1.md'
+      - '.github/workflows/farm-watch-seasonal-state-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seasonal-state:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check seasonal state contract
+        run: deno check supabase/functions/_shared/farm-watch-seasonal-state-contract.ts
+      - name: Test seasonal state contract
+        run: deno test supabase/functions/_shared/farm-watch-seasonal-state-contract.test.ts
+      - name: Check migration invariants
+        run: deno run --allow-read scripts/check-farm-watch-seasonal-state-migration.ts
