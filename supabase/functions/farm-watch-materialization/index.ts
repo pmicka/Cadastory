@@ -54,6 +54,23 @@ import {
   buildTerrainFormArtifact,
 } from '../_shared/farm-watch-neutral-primitives.ts'
 import {
+  FARM_WATCH_SOLAR_EXPOSURE_LIMITATIONS,
+  FARM_WATCH_SOLAR_EXPOSURE_PRODUCT,
+  FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS,
+  FARM_WATCH_SOLAR_TERRAIN_PRODUCT,
+  requireSolarDate,
+  solarExposureArtifactPath,
+  solarExposureSourceSignature,
+  solarTerrainArtifactPath,
+  solarTerrainSourceSignature,
+  validateSolarExposureArtifact,
+  validateSolarTerrainArtifact,
+} from '../_shared/farm-watch-solar-exposure-contract.ts'
+import {
+  buildSolarExposureArtifact,
+  buildSolarTerrainArtifact,
+} from '../_shared/farm-watch-solar-exposure.ts'
+import {
   FARM_WATCH_GITHUB_OIDC_AUDIENCE,
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
