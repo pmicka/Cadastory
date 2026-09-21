@@ -1,6 +1,6 @@
 # Farm Watch Seasonal State v1
 
-Status: production deployment in progress  
+Status: production operational  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -224,6 +224,43 @@ The validation property is refreshed once daily through `pg_cron` using the data
 The schedule is intentionally after the daily QPE snapshot at 12:30 UTC and both Crop-CASMA root-zone collector passes at 13:20 and 13:32 UTC. It also follows the 13:42 UTC hourly stream-collector invocation closely enough to consume the morning hydrologic state without turning the seasonal snapshot into an hourly identity churn surface.
 
 Weekly fieldwork, crop-stage, crop-progress, and drought sources may update later in the day; those changes enter the next morning's snapshot. Their own freshness and observation dates remain explicit in the stored context.
+
+## Production validation — 2026-09-21
+
+Seasonal State v1 is live for `validation-property-01`.
+
+Current persisted snapshot:
+
+- as-of date: `2026-09-21`;
+- aggregate status: `partial`;
+- identity SHA-256: `3a18a57521082af098a4cf4a8ecc5c7b8f316698e27f81ea743b148ebf87b209`;
+- source-signature SHA-256: `e6c0ca86703c5f9883c39e60373ae4a31d40f614be9e1e2ac1a38782c9e65f89`;
+- component counts: 6 current `known`/`proxy`, 2 `stale`, 0 `unavailable`;
+- `scoring_performed=false`;
+- `behavioral_inference_performed=false`.
+
+Current component states:
+
+- precipitation: `proxy`;
+- drought: `known`;
+- stream: `proxy`;
+- root-zone soil moisture: `proxy`;
+- state fieldwork: `stale`;
+- regional crop progress: `proxy`;
+- state crop stage: `proxy`;
+- mapped crop context: `stale`.
+
+The production refresh consumed a same-day provisional USGS stream observation and a 2026-09-18 Crop-CASMA/SMAP root-zone observation; freshness classification remained consistent with the contract.
+
+Operational controls:
+
+- cron job `farm-watch-seasonal-state-pilot-v1` is active as job 76;
+- schedule: `5 14 * * *`;
+- anonymous and authenticated roles have no execute privilege on either seasonal-state public RPC;
+- `service_role` retains execute privilege;
+- both Scout architecture assertions pass.
+
+Supabase's security advisor reports an INFO-level `rls_enabled_no_policy` notice for the seasonal-state table. This is expected: RLS is enabled and no end-user policy exists because direct table access is intentionally restricted to `service_role`.
 
 ## Evidence boundary
 
