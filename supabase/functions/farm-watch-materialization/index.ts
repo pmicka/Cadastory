@@ -1507,18 +1507,27 @@ Deno.serve(async (req: Request) => {
     const slug = boundedSlug(typeof body?.property === 'string' ? body.property : null)
     const key = productKey(body?.product)
     const solarDate = boundedSolarDate(body?.date)
+    const thermalAt = key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key
+      ? boundedThermalAt(body?.at || new Date().toISOString())
+      : boundedThermalAt(body?.at)
     if (!slug || !key) return json({ error: 'invalid request' }, 400, origin)
     if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key && !solarDate) {
       return json({ error: 'solar exposure date is required' }, 400, origin)
     }
+    if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key && !thermalAt) {
+      return json({ error: 'thermal exposure timestamp is invalid' }, 400, origin)
+    }
     if (body?.date != null && !solarDate) {
       return json({ error: 'invalid solar date' }, 400, origin)
+    }
+    if (body?.at != null && !thermalAt) {
+      return json({ error: 'invalid thermal timestamp' }, 400, origin)
     }
 
     try {
       const operation = body?.operation === 'read' ? 'read' : 'build'
       const state = operation === 'read'
-        ? await readState(slug, key, solarDate)
+        ? await readState(slug, key, solarDate, thermalAt)
         : await buildMaterialization(
           slug,
           key,
@@ -1530,6 +1539,7 @@ Deno.serve(async (req: Request) => {
               ].join(':')
             : 'farm-watch-materialization-edge-v2',
           solarDate,
+          thermalAt,
         )
       const knownSha256 = validSha256(
         typeof body?.known_artifact_sha256 === 'string'
@@ -1575,14 +1585,22 @@ Deno.serve(async (req: Request) => {
   const key = productKey(url.searchParams.get('product') || FARM_WATCH_TERRAIN_PRODUCT.key)
   const dateParam = url.searchParams.get('date')
   const solarDate = boundedSolarDate(dateParam)
+  const atParam = url.searchParams.get('at')
+  const thermalAt = key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key
+    ? boundedThermalAt(atParam || new Date().toISOString())
+    : boundedThermalAt(atParam)
   if (!slug || !key) return json({ error: 'invalid request' }, 400, origin)
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key && !solarDate) {
     return json({ error: 'solar exposure date is required' }, 400, origin)
   }
+  if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key && !thermalAt) {
+    return json({ error: 'thermal exposure timestamp is invalid' }, 400, origin)
+  }
   if (dateParam && !solarDate) return json({ error: 'invalid solar date' }, 400, origin)
+  if (atParam && !thermalAt) return json({ error: 'invalid thermal timestamp' }, 400, origin)
 
   try {
-    const state = await readState(slug, key, solarDate)
+    const state = await readState(slug, key, solarDate, thermalAt)
     const knownSha256 = validSha256(url.searchParams.get('known_artifact_sha256'))
     const presentationMode = materializationPresentationMode(accountRole, key)
     return json(
