@@ -116,7 +116,7 @@ The v1 metric is deliberately descriptive. It does not classify a pair as a corr
 
 ### Structural-break preparation
 
-The v1 artifact should retain enough combined-grid information to support a later named edge/break product without re-downloading raw source data.
+The v1 artifact retains enough combined-grid information to support a later named edge/break product without re-downloading raw source data. At 5 m it stores the neutral LiDAR band shares as byte-scaled fractions plus uint16 return counts, along with the leaf-off score/support fields used for synthesis. The duplicate LiDAR JSON count arrays are intentionally omitted so the artifact remains inside the existing 10 MB private-storage object limit. The higher-resolution 2024 leaf-off score, confidence, spectral-support, and validity grids are retained because they add spatial information not present in the 5 m synthesis.
 
 A thresholded "major structural break" distance is **not** frozen in this contract. It should be introduced only after its contrast definition and scale are specified and validated. Until then, use the continuous adjacency contrasts above.
 
