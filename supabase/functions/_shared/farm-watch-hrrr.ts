@@ -119,7 +119,8 @@ export function byteRange(record: IdxRecord): string {
 
 async function sha256Hex(value: string | Uint8Array): Promise<string> {
   const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
-  const payload = Uint8Array.from(bytes).buffer\n  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
+  const payload = Uint8Array.from(bytes).buffer
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', payload))
   return [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
