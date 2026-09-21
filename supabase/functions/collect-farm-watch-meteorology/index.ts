@@ -25,7 +25,7 @@ function serviceKey(): string {
   return key
 }
 
-const admin = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey(), {
+const admin: any = createClient(Deno.env.get('SUPABASE_URL')!, serviceKey(), {
   auth: { persistSession: false, autoRefreshToken: false },
 })
 
