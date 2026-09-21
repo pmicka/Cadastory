@@ -262,6 +262,13 @@ async function buildDemSupport(
     {},
     fetchImpl,
   )
+  const available = [...values].reduce(
+    (sum, value) => sum + (Number.isFinite(value) ? 1 : 0),
+    0,
+  )
+  if (available / count < 0.995) {
+    throw new Error('solar DEM horizon support coverage is incomplete: ' + available + '/' + count)
+  }
   return { bbox, cell_meters: cell, width, height, values_ft: values }
 }
 
