@@ -7,6 +7,10 @@ Validation property: `validation-property-01`
 
 ## Purpose
 
+Implementation sequencing and product contracts are defined in `docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md`.
+
+
+
 This document is the durable scientific-transfer ledger for deer-specific Farm Watch modeling.
 
 Farm Watch should not invent generic deer rules and then ask a single property to rediscover established ecology. The intended sequence is:
