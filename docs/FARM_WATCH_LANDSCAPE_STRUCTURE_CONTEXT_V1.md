@@ -153,6 +153,20 @@ It may later support explicitly named deer-relevant hypotheses, but v1 performs:
 - no security-cover label;
 - no route recommendation.
 
+## Presentation and access boundary
+
+The central `landscape-structure-context` artifact is an analytical product, not a default viewer map layer.
+
+For authenticated Farm Watch account roles:
+
+- `owner`: the materialization endpoint may return the full artifact, and owner-facing tooling may render or inspect the fine structure when explicitly implemented.
+- `viewer`: the materialization endpoint may return materialization status, summary statistics, provenance metadata, limitations, checksums, and lifecycle metadata, but must not return the fine structure artifact. The response must identify the product as `summary_only` with `map_rendering_allowed: false`.
+- internal materialization/worker paths: retain full artifact access for deterministic processing, model development, validation, and derived-product generation.
+
+This restriction is enforced at the server materialization boundary before private Storage download. Hiding a browser layer or toggle is not sufficient authorization.
+
+The restriction applies specifically to the fine `landscape-structure-context` product. It does not by itself change the existing viewer behavior of unrelated Farm Watch materialization products.
+
 ## Scale boundary
 
 Fine structure intentionally stops at 500 m.

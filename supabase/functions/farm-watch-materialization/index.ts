@@ -37,6 +37,10 @@ import {
   landscapeStructureSourceSignature,
   validateLandscapeStructureArtifact,
 } from '../_shared/farm-watch-landscape-structure-contract.ts'
+import {
+  materializationPresentationMode,
+  normalizeFarmWatchAccountRole,
+} from '../_shared/farm-watch-presentation-policy.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -594,6 +598,7 @@ async function readPayload(
   key: ProductKey,
   state: any,
   knownSha256: string | null = null,
+  presentationMode: 'full_artifact' | 'summary_only' = 'full_artifact',
 ) {
   const status = String(state?.status || 'missing')
   const materialization = state?.materialization || null
@@ -623,6 +628,21 @@ async function readPayload(
       ...safeState,
       artifact: null,
       not_modified: false,
+    }
+  }
+
+  if (presentationMode === 'summary_only') {
+    return {
+      property: { slug },
+      product: key,
+      ...safeState,
+      artifact: null,
+      not_modified: false,
+      presentation: {
+        mode: 'summary_only',
+        artifact_withheld: true,
+        map_rendering_allowed: false,
+      },
     }
   }
 
@@ -717,6 +737,19 @@ Deno.serve(async (req: Request) => {
   })
   if (accessError || allowed !== true) return json({ error: 'not found' }, 404, origin)
 
+  const { data: accountRoleValue, error: accountRoleError } = await admin.rpc(
+    'farm_watch_get_account_role_v1_internal',
+    { p_user_id: user.id },
+  )
+  const accountRole = normalizeFarmWatchAccountRole(accountRoleValue)
+  if (accountRoleError || !accountRole) {
+    console.error(
+      'farm_watch_get_account_role_v1_internal failed',
+      accountRoleError?.message || 'role unavailable',
+    )
+    return json({ error: 'not found' }, 404, origin)
+  }
+
   const url = new URL(req.url)
   const slug = boundedSlug(url.searchParams.get('property'))
   const key = productKey(url.searchParams.get('product') || FARM_WATCH_TERRAIN_PRODUCT.key)
@@ -725,7 +758,12 @@ Deno.serve(async (req: Request) => {
   try {
     const state = await readState(slug, key)
     const knownSha256 = validSha256(url.searchParams.get('known_artifact_sha256'))
-    return json(await readPayload(slug, key, state, knownSha256), 200, origin)
+    const presentationMode = materializationPresentationMode(accountRole, key)
+    return json(
+      await readPayload(slug, key, state, knownSha256, presentationMode),
+      200,
+      origin,
+    )
   } catch (error) {
     console.error('Farm Watch materialization read failed', key, error)
     return json({ error: 'materialization unavailable' }, 503, origin)

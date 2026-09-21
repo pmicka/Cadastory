@@ -1,5 +1,9 @@
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
+import {
+  farmWatchPresentationCapabilities,
+  normalizeFarmWatchAccountRole,
+} from '../_shared/farm-watch-presentation-policy.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -386,7 +390,8 @@ Deno.serve(async (req: Request) => {
   const { data: accountRole, error: accountRoleError } = await admin.rpc('farm_watch_get_account_role_v1_internal', {
     p_user_id: user.id,
   })
-  if (accountRoleError || typeof accountRole !== 'string') {
+  const normalizedAccountRole = normalizeFarmWatchAccountRole(accountRole)
+  if (accountRoleError || !normalizedAccountRole) {
     console.error('farm_watch_get_account_role_v1_internal failed', accountRoleError?.message || 'role unavailable')
     return json({ error: 'not found' }, 404, origin)
   }
@@ -558,10 +563,8 @@ Deno.serve(async (req: Request) => {
     },
     access: {
       scope: 'private',
-      account_role: accountRole,
-      capabilities: {
-        qa_controls: accountRole === 'owner',
-      },
+      account_role: normalizedAccountRole,
+      capabilities: farmWatchPresentationCapabilities(normalizedAccountRole),
     },
   }, 200, origin)
 })
