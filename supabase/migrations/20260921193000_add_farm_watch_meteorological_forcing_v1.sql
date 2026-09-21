@@ -13,7 +13,7 @@ values (
   'CONUS',
   'NOAA Open Data HRRR GRIB2 index + HTTP byte-range records',
   'hourly',
-  'federal_operational_authoritative',
+  'federal_authoritative',
   'active_reference',
   'https://rapidrefresh.noaa.gov/hrrr/',
   'Public U.S. government operational weather-model data; retain NOAA/NCEP attribution and modeled-data caveat.',
