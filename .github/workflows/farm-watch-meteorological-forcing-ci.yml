@@ -1,0 +1,43 @@
+name: Farm Watch meteorological forcing CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*farm_watch_meteorological_forcing*.sql'
+      - 'supabase/functions/collect-farm-watch-meteorology/**'
+      - 'supabase/functions/_shared/collector-runtime.ts'
+      - 'supabase/functions/_shared/farm-watch-hrrr.ts'
+      - 'supabase/functions/_shared/farm-watch-hrrr.test.ts'
+      - 'supabase/functions/_shared/farm-watch-meteorological-forcing-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-meteorological-forcing-contract.test.ts'
+      - 'scripts/check-farm-watch-meteorological-forcing-migration.ts'
+      - 'docs/FARM_WATCH_METEOROLOGICAL_FORCING_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
+      - '.github/workflows/farm-watch-meteorological-forcing-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  meteorological-forcing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check shared HRRR helper
+        run: deno check supabase/functions/_shared/farm-watch-hrrr.ts
+      - name: Test HRRR helper
+        run: deno test supabase/functions/_shared/farm-watch-hrrr.test.ts
+      - name: Check meteorological forcing contract
+        run: deno check supabase/functions/_shared/farm-watch-meteorological-forcing-contract.ts
+      - name: Test meteorological forcing contract
+        run: deno test supabase/functions/_shared/farm-watch-meteorological-forcing-contract.test.ts
+      - name: Check collector runtime
+        run: deno check supabase/functions/_shared/collector-runtime.ts
+      - name: Check HRRR collector
+        run: deno check supabase/functions/collect-farm-watch-meteorology/index.ts
+      - name: Check migration invariants
+        run: deno run --allow-read scripts/check-farm-watch-meteorological-forcing-migration.ts
