@@ -38,6 +38,22 @@ import {
   validateLandscapeStructureArtifact,
 } from '../_shared/farm-watch-landscape-structure-contract.ts'
 import {
+  FARM_WATCH_SPATIAL_PATTERN_LIMITATIONS,
+  FARM_WATCH_SPATIAL_PATTERN_PRODUCT,
+  FARM_WATCH_TERRAIN_FORM_LIMITATIONS,
+  FARM_WATCH_TERRAIN_FORM_PRODUCT,
+  spatialPatternArtifactPath,
+  spatialPatternSourceSignature,
+  terrainFormArtifactPath,
+  terrainFormSourceSignature,
+  validateSpatialPatternArtifact,
+  validateTerrainFormArtifact,
+} from '../_shared/farm-watch-neutral-primitives-contract.ts'
+import {
+  buildSpatialPatternArtifact,
+  buildTerrainFormArtifact,
+} from '../_shared/farm-watch-neutral-primitives.ts'
+import {
   materializationPresentationMode,
   normalizeFarmWatchAccountRole,
 } from '../_shared/farm-watch-presentation-policy.ts'
@@ -62,7 +78,7 @@ const ALLOWED_ORIGINS = new Set([
 ])
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 
-type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context'
+type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context'
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -107,7 +123,9 @@ function productKey(value: unknown): ProductKey | null {
       key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key ||
       key === FARM_WATCH_LEAF_OFF_PRODUCT.key ||
       key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key ||
-      key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key
+      key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key ||
+      key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key ||
+      key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key
     ? key as ProductKey
     : null
 }
@@ -155,6 +173,24 @@ function productSpec(key: ProductKey) {
       productKind: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.productKind,
       algorithmVersion: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.algorithmVersion,
       outputSchemaVersion: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
+  if (key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_TERRAIN_FORM_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_TERRAIN_FORM_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_TERRAIN_FORM_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
+  if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.outputSchemaVersion,
       sourceSignature: null,
     }
   }
@@ -209,12 +245,14 @@ function validateArtifact(key: ProductKey, value: any) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) return validateLidarPhysicalArtifact(value)
   if (key === FARM_WATCH_LEAF_OFF_PRODUCT.key) return validateLeafOffArtifact(value)
   if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return validateLandscapeStructureArtifact(value)
+  if (key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key) return validateTerrainFormArtifact(value)
+  if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) return validateSpatialPatternArtifact(value)
   return validateStructureSynthesisArtifact(value)
 }
 
 async function readStaticState(
   slug: string,
-  key: Exclude<ProductKey, 'lidar-physical-structure' | 'structure-complementarity' | 'landscape-structure-context'>,
+  key: ProductKey,
 ) {
   const spec = productSpec(key)
   const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
@@ -337,10 +375,110 @@ async function readLandscapeStructureState(slug: string) {
   return data
 }
 
+async function neutralPrimitiveBaseDependencies(slug: string) {
+  const [{ data: domain, error: domainError }, { data: physical, error: physicalError }] =
+    await Promise.all([
+      admin.rpc('farm_watch_get_landscape_domain_v1_internal', { p_slug: slug }),
+      admin.rpc('farm_watch_get_landscape_physical_context_v1_internal', { p_slug: slug }),
+    ])
+  if (domainError) throw new Error('landscape domain dependency failed: ' + domainError.message)
+  if (physicalError) throw new Error('landscape physical dependency failed: ' + physicalError.message)
+
+  const domainIdentity = validSha256(String(domain?.identity?.identity_sha256 || ''))
+  const physicalIdentity = validSha256(String(physical?.identity?.identity_sha256 || ''))
+  if (
+    domain?.status !== 'available' ||
+    !domain?.zones?.local_500m ||
+    !domain?.zones?.landscape_1500m ||
+    !domainIdentity
+  ) throw new Error('current barrier-aware landscape domain is unavailable')
+  if (physical?.status !== 'available' || !physicalIdentity) {
+    throw new Error('current landscape physical context is unavailable')
+  }
+  return { domain, physical, domainIdentity, physicalIdentity }
+}
+
+async function resourceEdgeDependency(slug: string, includeGeometry = false) {
+  const { data, error } = await admin.rpc(
+    'farm_watch_get_resource_edge_context_v1_internal',
+    { p_slug: slug, p_include_geometry: includeGeometry },
+  )
+  if (error) throw new Error('resource edge dependency failed: ' + error.message)
+  const identity = validSha256(String(data?.identity?.identity_sha256 || ''))
+  if (data?.status !== 'available' || !identity) {
+    throw new Error('current resource edge context is unavailable')
+  }
+  return { data, identity }
+}
+
+async function readDynamicState(slug: string, key: ProductKey, sourceSignature: string) {
+  const spec = productSpec(key)
+  const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
+    p_slug: slug,
+    p_product_kind: spec.productKind,
+    p_algorithm_version: spec.algorithmVersion,
+    p_output_schema_version: spec.outputSchemaVersion,
+    p_source_signature: sourceSignature,
+  })
+  if (error) throw new Error('dynamic materialization state read failed: ' + error.message)
+  return data
+}
+
+async function readTerrainFormState(slug: string) {
+  const deps = await neutralPrimitiveBaseDependencies(slug)
+  const sourceSignature = terrainFormSourceSignature({
+    landscapeDomainIdentitySha256: deps.domainIdentity!,
+    landscapePhysicalIdentitySha256: deps.physicalIdentity!,
+  })
+  return readDynamicState(slug, FARM_WATCH_TERRAIN_FORM_PRODUCT.key, sourceSignature)
+}
+
+async function spatialPatternDependencies(slug: string, includeResourceGeometry = false) {
+  const [base, resource, structureState] = await Promise.all([
+    neutralPrimitiveBaseDependencies(slug),
+    resourceEdgeDependency(slug, includeResourceGeometry),
+    readLandscapeStructureState(slug),
+  ])
+  const structureIdentity = validSha256(
+    String(structureState?.materialization?.identity_sha256 || ''),
+  )
+  const structureArtifactSha256 = validSha256(
+    String(structureState?.materialization?.artifact_sha256 || ''),
+  )
+  if (
+    String(structureState?.status || '') !== 'available' ||
+    !structureIdentity ||
+    !structureArtifactSha256
+  ) throw new Error('current local landscape structure materialization is unavailable')
+
+  const sourceSignature = spatialPatternSourceSignature({
+    landscapeDomainIdentitySha256: base.domainIdentity!,
+    landscapePhysicalIdentitySha256: base.physicalIdentity!,
+    resourceEdgeIdentitySha256: resource.identity!,
+    landscapeStructureIdentitySha256: structureIdentity,
+    landscapeStructureArtifactSha256: structureArtifactSha256,
+  })
+  return {
+    ...base,
+    resource,
+    structureState,
+    structureIdentity,
+    structureArtifactSha256,
+    sourceSignature,
+  }
+}
+
+async function readSpatialPatternState(slug: string) {
+  const deps = await spatialPatternDependencies(slug, false)
+  return readDynamicState(slug, FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key, deps.sourceSignature)
+}
+
 async function readState(slug: string, key: ProductKey) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) return readLidarPhysicalState(slug)
   if (key === FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.key) return readStructureSynthesisState(slug)
   if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) return readLandscapeStructureState(slug)
+  if (key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key) return readTerrainFormState(slug)
+  if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) return readSpatialPatternState(slug)
   return readStaticState(slug, key)
 }
 
@@ -360,6 +498,26 @@ async function claimBuild(
     p_lease_seconds: 900,
   })
   if (error) throw new Error(`materialization claim failed: ${error.message}`)
+  return data
+}
+
+async function claimDynamicBuild(
+  slug: string,
+  key: ProductKey,
+  sourceSignature: string,
+  workerId: string,
+) {
+  const spec = productSpec(key)
+  const { data, error } = await admin.rpc('farm_watch_claim_materialization_build_v1_internal', {
+    p_slug: slug,
+    p_product_kind: spec.productKind,
+    p_algorithm_version: spec.algorithmVersion,
+    p_output_schema_version: spec.outputSchemaVersion,
+    p_source_signature: sourceSignature,
+    p_worker_id: workerId,
+    p_lease_seconds: 1800,
+  })
+  if (error) throw new Error('dynamic materialization claim failed: ' + error.message)
   return data
 }
 
@@ -575,6 +733,162 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
   }
 }
 
+async function uploadNeutralPrimitive(args: {
+  claim: any
+  artifact: any
+  sampledSourceSha256: string
+  key: ProductKey
+  sourceSignature: string
+  limitations: readonly string[]
+  refreshDays: number
+  artifactPath: (propertyId: string, inputSignature: string, artifactSha256: string) => string
+}) {
+  const spec = productSpec(args.key)
+  const bytes = new TextEncoder().encode(JSON.stringify(args.artifact))
+  if (bytes.byteLength <= 0 || bytes.byteLength > 10 * 1024 * 1024) {
+    throw new Error('neutral primitive artifact size is invalid')
+  }
+  const artifactSha256 = await sha256Hex(bytes)
+  const path = args.artifactPath(
+    String(args.claim.property_id),
+    String(args.claim.input_signature_sha256),
+    artifactSha256,
+  )
+  const { error: uploadError } = await admin.storage
+    .from('farm-watch-derived')
+    .upload(path, bytes, {
+      contentType: 'application/json',
+      cacheControl: '31536000',
+      upsert: true,
+    })
+  if (uploadError) throw new Error('neutral primitive artifact upload failed: ' + uploadError.message)
+
+  const completedAt = new Date()
+  const expiresAt = new Date(
+    completedAt.getTime() + args.refreshDays * 24 * 60 * 60 * 1000,
+  )
+  await completeBuild({
+    buildId: String(args.claim.build_id),
+    leaseToken: String(args.claim.lease_token),
+    sampledSourceSha256: args.sampledSourceSha256,
+    evidenceClass: 'deterministic_derived',
+    summary: {
+      ...(args.artifact.summary || {}),
+      artifact_size_bytes: bytes.byteLength,
+    },
+    sourceProvenance: {
+      ...(args.artifact.source_provenance || {}),
+      source_signature: args.sourceSignature,
+      source_signature_sha256: args.claim.source_signature_sha256,
+      completed_at: completedAt.toISOString(),
+    },
+    limitations: args.limitations,
+    bucket: 'farm-watch-derived',
+    path,
+    format: spec.outputSchemaVersion,
+    mimeType: 'application/json',
+    bytes,
+    artifactSha256,
+    expiresAt: expiresAt.toISOString(),
+  })
+}
+
+async function buildTerrainFormMaterialization(slug: string, workerId: string) {
+  const deps = await neutralPrimitiveBaseDependencies(slug)
+  const sourceSignature = terrainFormSourceSignature({
+    landscapeDomainIdentitySha256: deps.domainIdentity!,
+    landscapePhysicalIdentitySha256: deps.physicalIdentity!,
+  })
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_TERRAIN_FORM_PRODUCT.key,
+    sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') return readTerrainFormState(slug)
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const { artifact, sampledSourceSha256 } = await buildTerrainFormArtifact({
+      localGeometry: deps.domain.zones.local_500m,
+      landscapeGeometry: deps.domain.zones.landscape_1500m,
+      domainIdentitySha256: deps.domainIdentity!,
+      domainAlgorithmVersion: String(deps.domain.identity.algorithm_version || ''),
+      landscapePhysicalIdentitySha256: deps.physicalIdentity!,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact,
+      sampledSourceSha256,
+      key: FARM_WATCH_TERRAIN_FORM_PRODUCT.key,
+      sourceSignature,
+      limitations: FARM_WATCH_TERRAIN_FORM_LIMITATIONS,
+      refreshDays: FARM_WATCH_TERRAIN_FORM_PRODUCT.refreshDays,
+      artifactPath: terrainFormArtifactPath,
+    })
+    return readTerrainFormState(slug)
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
+async function buildSpatialPatternMaterialization(slug: string, workerId: string) {
+  const deps = await spatialPatternDependencies(slug, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') return readSpatialPatternState(slug)
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const structurePayload = await readPayload(
+      slug,
+      FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key,
+      deps.structureState,
+    )
+    if (!structurePayload?.artifact) {
+      throw new Error('landscape structure artifact payload is unavailable')
+    }
+    const { artifact, sampledSourceSha256 } = await buildSpatialPatternArtifact({
+      localGeometry: deps.domain.zones.local_500m,
+      domainIdentitySha256: deps.domainIdentity!,
+      domainAlgorithmVersion: String(deps.domain.identity.algorithm_version || ''),
+      landscapePhysicalIdentitySha256: deps.physicalIdentity!,
+      resourceEdgeIdentitySha256: deps.resource.identity!,
+      resourceEdgeContext: deps.resource.data,
+      landscapeStructureIdentitySha256: deps.structureIdentity!,
+      landscapeStructureArtifactSha256: deps.structureArtifactSha256!,
+      landscapeStructureArtifact: structurePayload.artifact,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact,
+      sampledSourceSha256,
+      key: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key,
+      sourceSignature: deps.sourceSignature,
+      limitations: FARM_WATCH_SPATIAL_PATTERN_LIMITATIONS,
+      refreshDays: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.refreshDays,
+      artifactPath: spatialPatternArtifactPath,
+    })
+    return readSpatialPatternState(slug)
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
 async function buildMaterialization(slug: string, key: ProductKey, workerId: string) {
   if (key === FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key) {
     throw new Error('LiDAR physical materialization uses the dedicated GitHub OIDC worker')
@@ -587,6 +901,12 @@ async function buildMaterialization(slug: string, key: ProductKey, workerId: str
   }
   if (key === FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key) {
     throw new Error('Landscape structure materialization uses the dedicated GitHub OIDC worker')
+  }
+  if (key === FARM_WATCH_TERRAIN_FORM_PRODUCT.key) {
+    return buildTerrainFormMaterialization(slug, workerId)
+  }
+  if (key === FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key) {
+    return buildSpatialPatternMaterialization(slug, workerId)
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
