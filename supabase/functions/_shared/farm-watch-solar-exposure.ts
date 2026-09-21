@@ -198,7 +198,7 @@ async function rasterSamples(
   }
 }
 
-async function sampleTargetGrid(
+export async function sampleTargetGrid(
   grid: { bbox: BBox; cell_meters: number; width: number; height: number },
   valid: Uint8Array,
   sourceUrl: string,
@@ -208,31 +208,53 @@ async function sampleTargetGrid(
   const work = targetPoints(grid, valid)
   const values = new Float64Array(valid.length)
   values.fill(Number.NaN)
-  const batches: Array<typeof work> = []
-  for (let offset = 0; offset < work.length; offset += 900) {
-    batches.push(work.slice(offset, offset + 900))
-  }
-  for (let cursor = 0; cursor < batches.length; cursor += 4) {
-    const group = batches.slice(cursor, cursor + 4)
-    const results = await Promise.all(group.map(async (batch) => ({
-      batch,
-      samples: await rasterSamples(
-        sourceUrl,
-        batch.map((row) => [row.lon, row.lat]),
-        extra,
-        fetchImpl,
-      ),
-    })))
-    for (const result of results) {
-      for (const sample of result.samples) {
-        const local = Number(sample.locationId)
-        const target = result.batch[local]
-        const value = finite(sample.value)
-        if (target && value !== null) values[target.index] = value
+
+  const sampleRows = async (
+    rows: typeof work,
+    batchSize: number,
+    concurrency: number,
+  ) => {
+    const batches: Array<typeof work> = []
+    for (let offset = 0; offset < rows.length; offset += batchSize) {
+      batches.push(rows.slice(offset, offset + batchSize))
+    }
+    for (let cursor = 0; cursor < batches.length; cursor += concurrency) {
+      const group = batches.slice(cursor, cursor + concurrency)
+      const results = await Promise.all(group.map(async (batch) => ({
+        batch,
+        samples: await rasterSamples(
+          sourceUrl,
+          batch.map((row) => [row.lon, row.lat]),
+          extra,
+          fetchImpl,
+        ),
+      })))
+      for (const result of results) {
+        for (const sample of result.samples) {
+          const local = Number(sample.locationId)
+          const target = result.batch[local]
+          const value = finite(sample.value)
+          if (target && value !== null) values[target.index] = value
+        }
       }
     }
   }
-  const available = work.reduce((sum, row) => sum + (Number.isFinite(values[row.index]) ? 1 : 0), 0)
+
+  await sampleRows(work, 900, 4)
+
+  for (const retry of [
+    { batchSize: 250, concurrency: 2 },
+    { batchSize: 50, concurrency: 1 },
+  ]) {
+    const missing = work.filter((row) => !Number.isFinite(values[row.index]))
+    if (!missing.length) break
+    await sampleRows(missing, retry.batchSize, retry.concurrency)
+  }
+
+  const available = work.reduce(
+    (sum, row) => sum + (Number.isFinite(values[row.index]) ? 1 : 0),
+    0,
+  )
   if (!work.length || available / work.length < 0.97) {
     throw new Error('solar raster target coverage incomplete: ' + available + '/' + work.length)
   }

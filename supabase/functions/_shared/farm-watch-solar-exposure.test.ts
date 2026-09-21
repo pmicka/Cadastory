@@ -4,6 +4,7 @@ import {
   directTerrainIncidence,
   geometricSolarDay,
   interpolatedHorizonDeg,
+  sampleTargetGrid,
   solarPositionUtc,
 } from './farm-watch-solar-exposure.ts'
 import {
@@ -150,6 +151,7 @@ Deno.test('solar source signatures bind dependencies, date, and physical contrac
   })
   assert(staticSig.includes('horizon_sector_count=24'))
   assert(staticSig.includes('dem_support_sampling=required_orientation_and_horizon_ray_union_v2'))
+  assert(staticSig.includes('raster_sampling_retry=900x4_then_250x2_then_50x1_v1'))
   assert(staticSig.includes('dem_required_coverage=100pct'))
   const day1 = solarExposureSourceSignature({
     solarTerrainMaterializationIdentitySha256: 'e'.repeat(64),
@@ -227,4 +229,46 @@ Deno.test('solar product contracts retain fixed grains and neutral evidence clas
   assert(FARM_WATCH_SOLAR_TERRAIN_PRODUCT.landscapeCellMeters === 30)
   assert(FARM_WATCH_SOLAR_TERRAIN_PRODUCT.evidenceClass === 'deterministic_derived')
   assert(FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.evidenceClass === 'deterministic_derived')
+})
+
+
+Deno.test('raster sampler retries omitted points in smaller batches', async () => {
+  const width = 400
+  const valid = new Uint8Array(width).fill(1)
+  let calls = 0
+  const fetchImpl = async (_input: string | URL | Request, init?: RequestInit) => {
+    calls += 1
+    const params = new URLSearchParams(String(init?.body || ''))
+    const geometry = JSON.parse(params.get('geometry') || '{}')
+    const points = Array.isArray(geometry.points) ? geometry.points : []
+    const omit = points.length > 250
+    const samples = points.flatMap((_point: number[], index: number) =>
+      omit && index % 10 === 0 ? [] : [{ locationId: index, value: 500 + index / 1000 }]
+    )
+    return new Response(JSON.stringify({ samples }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })
+  }
+
+  const values = await sampleTargetGrid(
+    {
+      bbox: {
+        west: 684000,
+        east: 684000 + width * 30,
+        south: 4242000,
+        north: 4242030,
+      },
+      cell_meters: 30,
+      width,
+      height: 1,
+    },
+    valid,
+    'https://example.invalid/ImageServer',
+    {},
+    fetchImpl as typeof fetch,
+  )
+
+  assert(calls >= 2)
+  assert([...values].every(Number.isFinite))
 })
