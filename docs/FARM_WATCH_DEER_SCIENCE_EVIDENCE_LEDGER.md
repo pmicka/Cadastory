@@ -83,23 +83,21 @@ Current neutral products that may feed future science-backed deer terms:
 - leaf-off woody-pattern context;
 - resource-edge context: mapped fields, field edges, CDL composition and nearest field;
 - Seasonal State v1: precipitation, drought, stream discharge proxy, root-zone soil-moisture proxy, state fieldwork, regional crop progress, state crop stage, mapped crop vintage;
+- property-grade NOAA HRRR meteorological forcing v1: current modeled temperature, dew point/RH, true wind, shortwave, longwave, cloud and precipitation-rate forcing with exact grid/model provenance;
 - historical environment context: Daymet temperature/precipitation on historical context dates;
 - roads/trails/buildings and other access geometry already available elsewhere in Farm Watch/Scout.
 
 Important current gaps include:
 
-- current property-grade air temperature forcing;
-- current humidity/dew point;
-- current wind speed/direction;
-- current cloud/radiation forcing;
-- terrain/canopy-resolved solar exposure or operative-temperature product;
+- production deployment/materialization of the implemented neutral solar/thermal context chain;
+- a validated operative-temperature or animal heat-balance formulation, if later science requires one;
 - current field-level crop phenology/harvest state;
 - mast abundance/species/vintage;
 - measured localized hunting pressure or human-use intensity;
 - calibrated concealment/visibility metric from the existing neutral 3-D structure;
 - parcel-scale usable water persistence / ephemeral water state.
 
-The generic Scout weather snapshot table is not currently a defensible substitute for a Farm Watch property-grade meteorological source for the validation property.
+The generic Scout weather snapshot table remains out of scope for deer thermal work; Farm Watch now has its own property-targeted HRRR forcing contract.
 
 ---
 
@@ -505,7 +503,7 @@ A future Farm Watch `thermal-exposure-context` should remain physical and could 
 
 The deer layer should consume that product; it should not bake deer semantics into the physical thermal raster.
 
-**Current readiness:** terrain + canopy ready; current property-grade meteorological forcing not ready.
+**Current readiness:** terrain + canopy + property-targeted HRRR forcing are ready; neutral Solar/Thermal v1 implementation is awaiting production deployment/materialization.
 
 ---
 
@@ -619,7 +617,7 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 
 | Scientific term family | Evidence status | Farm Watch input readiness | Next neutral work |
 | --- | --- | --- | --- |
-| Thermal exposure / refuge | strong mechanism + conditional field evidence | partial | property-grade current meteorology + terrain/canopy solar/thermal derivative |
+| Thermal exposure / refuge | strong mechanism + conditional field evidence | near-ready neutral substrate | deploy/materialize Solar/Thermal v1; deer interpretation still requires explicit state/resource gates |
 | Diel state | strong | ready | compute solar time/photoperiod deterministically |
 | Rut / reproductive timing | strong, region-dependent | partial | formal regional phenology/state contract; do not copy Wisconsin dates |
 | Terrain/topography | strong evidence of context dependence | neutral inputs ready | no new physical data required before conditional model; movement-state gate required |
