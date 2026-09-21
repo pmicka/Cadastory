@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
+import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 
 type Outcome = 'succeeded' | 'partial' | 'failed' | 'no_work'
 type Counts = { attempted: number | null; succeeded: number | null; failed: number }
