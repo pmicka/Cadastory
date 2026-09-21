@@ -1,7 +1,7 @@
 export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
   key: 'solar-terrain-context',
   productKind: 'solar-terrain-context',
-  algorithmVersion: 'terrain-horizon-canopy-context-v1',
+  algorithmVersion: 'terrain-horizon-canopy-context-v2',
   outputSchemaVersion: 'solar-terrain-context-v1',
   evidenceClass: 'deterministic_derived',
   artifactBucket: 'farm-watch-derived',
@@ -36,7 +36,7 @@ export const FARM_WATCH_SOLAR_EXPOSURE_PRODUCT = Object.freeze({
 
 export const FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS = Object.freeze([
   'Terrain horizon is a deterministic line-of-sight estimate from the KyFromAbove DEM using the stated azimuth sectors, ray step, support resolution, and search radius. Features outside the search radius cannot contribute to the horizon.',
-  'Horizon support is intentionally not clipped by Farm Watch hydrologic/barrier domains because off-domain terrain can still obstruct sunlight.',
+  'Horizon support is intentionally not clipped by Farm Watch hydrologic/barrier domains because off-domain terrain can still obstruct sunlight. Only support cells actually required by target-orientation neighbors and configured horizon rays are sampled, and that required set must be complete.',
   'Slope and aspect are deterministic finite-difference terrain derivatives and are resolution dependent.',
   'NLCD Tree Canopy Cover is modeled percent tree-canopy cover at the stated year and grain. It is not leaf area index, gap fraction, crown transmissivity, species, or measured optical attenuation.',
   'The local canopy grid reuses the current canonical spatial-edge-patch-context artifact. Landscape canopy is sampled from the same authoritative TCC product only where the canonical local artifact does not provide coverage.',
@@ -86,6 +86,8 @@ export function solarTerrainSourceSignature(args: {
       requireSha(args.spatialPatternArtifactSha256, 'spatial pattern artifact'),
     'dem_source=kyfromabove-phase3-dem',
     'dem_support_cell_m=' + p.supportCellMeters,
+    'dem_support_sampling=required_orientation_and_horizon_ray_union_v2',
+    'dem_required_coverage=100pct',
     'horizon_sector_count=' + p.horizonSectorCount,
     'horizon_search_radius_m=' + p.horizonSearchRadiusMeters,
     'horizon_ray_step_m=' + p.horizonRayStepMeters,
