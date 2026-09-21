@@ -1,0 +1,45 @@
+name: Farm Watch thermal exposure CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-thermal-exposure-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-thermal-exposure.ts'
+      - 'supabase/functions/_shared/farm-watch-thermal-exposure.test.ts'
+      - 'supabase/functions/_shared/farm-watch-solar-exposure.ts'
+      - 'supabase/functions/_shared/farm-watch-presentation-policy.ts'
+      - 'supabase/functions/_shared/farm-watch-presentation-policy.test.ts'
+      - 'supabase/functions/farm-watch-materialization/index.ts'
+      - 'scripts/farm-watch-thermal-exposure-materialize.ts'
+      - '.github/workflows/farm-watch-neutral-primitives.yml'
+      - '.github/workflows/farm-watch-thermal-exposure-ci.yml'
+      - 'docs/FARM_WATCH_THERMAL_EXPOSURE_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  thermal-exposure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check thermal contract
+        run: deno check supabase/functions/_shared/farm-watch-thermal-exposure-contract.ts
+      - name: Check thermal context module
+        run: deno check supabase/functions/_shared/farm-watch-thermal-exposure.ts
+      - name: Test thermal context
+        run: deno test supabase/functions/_shared/farm-watch-thermal-exposure.test.ts
+      - name: Check solar context dependency
+        run: deno check supabase/functions/_shared/farm-watch-solar-exposure.ts
+      - name: Test presentation policy
+        run: deno test supabase/functions/_shared/farm-watch-presentation-policy.test.ts
+      - name: Check materialization edge
+        run: deno check supabase/functions/farm-watch-materialization/index.ts
+      - name: Check thermal materializer
+        run: deno check scripts/farm-watch-thermal-exposure-materialize.ts
