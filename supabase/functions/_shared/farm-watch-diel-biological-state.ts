@@ -73,7 +73,6 @@ export function applicableDeerRelationshipIds(args: {
   const ids = new Set<string>(['FW-D05'])
   if (String(args.stateCode).toUpperCase() === 'KY') {
     ids.add('FW-D21')
-    ids.add('FW-D23')
   }
   if (args.sex === 'female' && args.ageClass !== 'unknown') ids.add('FW-D22')
   if (
