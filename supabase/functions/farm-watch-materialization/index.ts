@@ -1570,7 +1570,11 @@ async function completeHorizontalVisibilityMaterialization(slug: string, body: a
   ) throw new Error('horizontal visibility artifact dependency identity is stale')
 
   await uploadNeutralPrimitive({
-    claim: build,
+    claim: {
+      ...build,
+      build_id: build.build_id || build.id || buildId,
+      lease_token: build.lease_token || leaseToken,
+    },
     artifact,
     sampledSourceSha256,
     key: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key,
