@@ -1,0 +1,38 @@
+name: Farm Watch mast capacity CI
+
+on:
+  pull_request:
+    paths:
+      - 'docs/FARM_WATCH_MAST_CAPACITY_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
+      - 'supabase/functions/_shared/farm-watch-mast-capacity-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-mast-capacity-contract.test.ts'
+      - 'supabase/functions/_shared/github-actions-oidc.ts'
+      - 'supabase/functions/farm-watch-mast-capacity-worker/**'
+      - 'scripts/farm-watch-mast-capacity-materialize.ts'
+      - '.github/workflows/farm-watch-mast-capacity-ci.yml'
+      - '.github/workflows/farm-watch-mast-capacity.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mast-capacity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check mast capacity contract
+        run: deno check supabase/functions/_shared/farm-watch-mast-capacity-contract.ts
+      - name: Test mast capacity contract
+        run: deno test supabase/functions/_shared/farm-watch-mast-capacity-contract.test.ts
+      - name: Check GitHub OIDC trust module
+        run: deno check supabase/functions/_shared/github-actions-oidc.ts
+      - name: Check mast capacity materializer
+        run: deno check scripts/farm-watch-mast-capacity-materialize.ts
+      - name: Check mast capacity worker
+        run: deno check supabase/functions/farm-watch-mast-capacity-worker/index.ts
