@@ -453,6 +453,7 @@ The deer layer can distinguish standing/active crop, probable harvest transition
 
 # Batch 5 — Mast capacity and annual mast state
 
+Status: Batch 5A mast-capacity implementation candidate; Batch 5B annual-production layer not started  
 Priority: P1  
 Ledger dependency: FW-D07.
 
@@ -469,17 +470,21 @@ These must remain separate.
 
 ### Species-capacity layer
 
-Candidate authoritative/proxy sources:
+Batch 5A operational v1 source:
 
-- USFS TreeMap;
-- FIA BIGMAP species biomass;
+- USDA Forest Service FIA BIGMAP 2018 species aboveground biomass at 30 m, sampled through the public scientific ImageServer over the barrier-aware broad_3000m domain.
+
+Future refinement candidates:
+
+- USFS TreeMap 2023 linked to its FIA tree table;
 - future better local forest inventory if available.
 
 Map oak groups relevant to mast:
 
 - white-oak group;
 - red-oak group;
-- optional hickory/beech context.
+- hickory group;
+- American beech.
 
 TreeMap/BIGMAP are modeled/imputed forest products. They establish probabilistic/species-capacity context, not observed trees at each pixel.
 

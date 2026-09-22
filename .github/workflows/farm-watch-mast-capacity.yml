@@ -1,0 +1,32 @@
+name: Farm Watch mast capacity materialization
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  materialize:
+    if: >-
+      github.actor == 'pmicka' &&
+      github.event.issue.user.login == 'pmicka' &&
+      github.event.issue.title == '[ops] Materialize Farm Watch mast capacity'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check mast capacity materializer
+        run: deno check scripts/farm-watch-mast-capacity-materialize.ts
+      - name: Materialize validation property
+        run: >-
+          deno run
+          --allow-env
+          --allow-net
+          scripts/farm-watch-mast-capacity-materialize.ts
+          --property validation-property-01
