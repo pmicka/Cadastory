@@ -128,7 +128,7 @@ function decodeStructureGrid(value: any): StructureGrid {
   const domain = decodeU8(grid?.domain_valid_base64)
   const property = decodeU8(grid?.property_mask_base64)
   const lidarValid = decodeU8(grid?.lidar_valid_base64)
-  const bandShares = Array.isArray(grid?.lidar_band_shares_base64)
+  const bandShares: Uint8Array[] = Array.isArray(grid?.lidar_band_shares_base64)
     ? grid.lidar_band_shares_base64.map((value: unknown) => decodeU8(value))
     : []
   const bbox = grid?.bbox
