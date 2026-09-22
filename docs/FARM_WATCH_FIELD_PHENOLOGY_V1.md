@@ -1,6 +1,6 @@
 # Farm Watch Field Phenology v1
 
-Status: Batch 4A implementation candidate — not deployed  
+Status: Batch 4A production; Batch 4B implementation candidate — not deployed  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -135,8 +135,93 @@ Validation passed for the real property/domain substrate:
 - no scoring, behavioral inference, or harvest promotion occurred;
 - post-test catalog checks confirmed the rollback left no Batch 4A table/function in production.
 
-## Batch 4B dependency
+## Batch 4A production deployment — 2026-09-21
 
-The next layer is a protected HLS field-observation materializer using the existing owner-only GitHub Actions OIDC → Farm Watch worker pattern. Heavy raster sampling should occur in the worker workflow, not in the browser. The worker should persist field summaries/provenance through the service-only store RPC and then refresh `field-phenology-context-v1`.
+Batch 4A is production-operational. The migration is deployed, the validation-property context is materialized, and production retains the expected fail-closed state:
 
-Long-lived production operation also requires a sustainable Earthdata authentication posture; a short-lived personal token must not become an undocumented permanent dependency.
+- 37 fields in `broad_3000m`;
+- 12 in `landscape_1500m`;
+- 1 in `local_500m`;
+- 0 direct parcel-intersecting fields;
+- 37 field-evidence states `unavailable`;
+- every `phenology_state=unknown`;
+- service-only table/RPC access;
+- tool-registry and architecture-doctrine assertions passing.
+
+The current stored identity is bound to the exact property boundary, landscape-domain identity, dated field set, crop-history provenance, and regional NASS context.
+
+## Batch 4B protected HLS materializer
+
+Batch 4B adds a protected GitHub Actions OIDC → Farm Watch Edge worker path for current HLS field observations.
+
+### Distribution route
+
+NASA LP DAAC remains the scientific source authority. Operational access uses the Microsoft Planetary Computer HLS v2.0 distribution, an official NASA-listed cloud access route for HLS:
+
+- `hls2-l30` → NASA HLSL30 v2.0;
+- `hls2-s30` → NASA HLSS30 v2.0.
+
+This avoids introducing a personal Earthdata token as a permanent production dependency while retaining NASA HLS source provenance.
+
+### Processing boundary
+
+The GitHub worker:
+
+1. requests current Farm Watch field targets through the protected Edge worker;
+2. discovers HLS L30/S30 scenes over the broad landscape domain;
+3. reads only required COG windows for USDA field geometries;
+4. applies HLS Fmask quality exclusions;
+5. computes field-level NDVI, EVI, NIR and quality summaries;
+6. returns only derived observations and provenance to the Edge worker;
+7. persists no raw HLS imagery.
+
+The workflow has `contents:read` and `id-token:write`; it does not receive a Supabase service key.
+
+### HLS quality contract
+
+Batch 4B excludes HLS Fmask cloud, adjacent-cloud/shadow, cloud-shadow, snow/ice, water, and high-aerosol pixels before field summaries are accepted. A field observation retains:
+
+- valid and total pixel counts;
+- valid fraction;
+- cloud fraction;
+- QA counts;
+- source collection/item/assets;
+- observation timestamp;
+- exact method/package provenance.
+
+The existing 0.30 valid-pixel fraction remains a data-support threshold only. It is not a vegetation, phenology, or harvest threshold.
+
+### Operational failure ledger
+
+`farm_watch.property_field_vegetation_collection_runs_v1` keeps acquisition state separate from agricultural evidence. Run outcomes include:
+
+- `available`;
+- `partial`;
+- `no_valid_observation`;
+- `catalog_incomplete`;
+- `download_error`;
+- `processing_error`.
+
+A catalog, signing, COG-download, or processing failure therefore cannot silently become "no vegetation," "no crop," or "post-harvest."
+
+### Pre-deployment Batch 4B database validation — 2026-09-21
+
+The exact Batch 4B database migration was executed against the live production schema inside a transaction and rolled back.
+
+The validation lifecycle successfully:
+
+- created a processing HLS collection run for `validation-property-01`;
+- completed it as `no_valid_observation` with 37 target fields and internally consistent source/item counters;
+- read the completed run back in a subsequent statement;
+- retained NASA LP DAAC as `source_authority` and Microsoft Planetary Computer as `distribution_provider`;
+- denied anonymous/authenticated table and RPC access while permitting the service role;
+- registered the Planetary Computer HLS distribution source inside the transaction;
+- confirmed after rollback that the run table and all Batch 4B run-ledger functions did not remain in production.
+
+This validates the acquisition-state separation before the first real HLS pilot. It does not establish that the external STAC/COG path succeeds in production; that is the post-deployment Batch 4B pilot gate.
+
+### Interpretation boundary
+
+Batch 4B still does **not** enable harvest classification. Current HLS observations can move field evidence from `unavailable/stale` to `known`, but `phenology_state` remains `unknown` until a separately validated time-series method is implemented.
+
+The next gate after materializer deployment is a real HLS pilot over `validation-property-01`, followed by review of observation support and the Kentucky/NHPI method-transfer requirements before any standing/senescent/harvest label is enabled.

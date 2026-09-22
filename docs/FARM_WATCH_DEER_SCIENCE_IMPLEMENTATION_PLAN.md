@@ -397,7 +397,7 @@ Every deer relationship can ask for a named state and fail closed when that stat
 
 # Batch 4 — Dynamic agricultural resource state
 
-Status: Batch 4A implementation candidate — not deployed; Batch 4B HLS materializer pending  
+Status: Batch 4A production; Batch 4B protected HLS materializer implementation candidate  
 Priority: P0/P1  
 Ledger dependencies: FW-D08, D09, D15, D16.
 
@@ -1066,9 +1066,9 @@ The chain remains neutral: no operative temperature, composite thermal score, de
 
 Complete **Batch 4 — dynamic agricultural resource state** in dependency order:
 
-1. merge/deploy **Batch 4A** only after CI and explicit deployment authorization; this creates the service-only HLS field-observation persistence and fail-closed field-state contract but intentionally leaves phenology/harvest unknown;
-2. implement **Batch 4B** using the protected GitHub Actions OIDC → Farm Watch worker pattern for HLS raster sampling, with explicit Earthdata/catalog/download failure states and no browser-side HLS processing;
-3. validate an evidence-backed time-series method for standing/active crop, senescence, probable harvest transition, and post-harvest/residual before enabling those labels;
+1. keep **Batch 4A** as the production fail-closed field-state contract; it intentionally leaves phenology/harvest unknown without current field observations;
+2. deploy and validate **Batch 4B** using the protected GitHub Actions OIDC → Farm Watch worker pattern for NASA HLS v2 raster sampling through the Microsoft Planetary Computer distribution, with explicit catalog/download/processing failure states and no browser-side HLS processing;
+3. review the real HLS pilot time series and validate an evidence-backed method for standing/active crop, senescence, probable harvest transition, and post-harvest/residual before enabling those labels;
 4. keep CDL/CSB as annual identity and NASS/state crop-progress as regional context rather than field truth;
 5. preserve operator observations as separate evidence/override provenance rather than silently mixing them into remote-sensing truth.
 
