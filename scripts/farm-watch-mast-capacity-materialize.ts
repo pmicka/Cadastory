@@ -149,6 +149,112 @@ function scopeSummary(mask: Uint8Array, groups: Record<string, Float32Array>) {
   }
 }
 
+
+async function postArcgis(path: string, params: URLSearchParams) {
+  const response = await fetch(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService + path, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'user-agent': 'Cadastory-Farm-Watch/1.0 (+https://pmicka.com)',
+    },
+    body: params.toString(),
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(
+      'BIGMAP request failed: ' + response.status +
+      (detail ? ' ' + detail.slice(0, 500) : ''),
+    )
+  }
+  const payload = await response.json()
+  if (payload?.error) throw new Error('BIGMAP service error: ' + JSON.stringify(payload.error))
+  return payload
+}
+
+async function querySpeciesCatalog() {
+  const allCodes = FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder.flatMap((group) =>
+    FARM_WATCH_MAST_CAPACITY_GROUPS[group].map((row) => row.spcd)
+  )
+  const params = new URLSearchParams()
+  params.set('f', 'json')
+  params.set('where', 'category=1 AND spcd IN (' + allCodes.join(',') + ')')
+  params.set('outFields', 'objectid,spcd,common_name,genus,species,name')
+  params.set('returnGeometry', 'false')
+  params.set('orderByFields', 'spcd')
+  const body = await postArcgis('/query', params)
+  const records = (body?.features || []).map((feature: any) => feature?.attributes || {})
+  const byCode = new Map<number, any>()
+  for (const record of records) {
+    const code = Number(record.spcd)
+    if (!Number.isInteger(code)) continue
+    if (byCode.has(code)) throw new Error('BIGMAP catalog returned duplicate primary species code ' + code)
+    byCode.set(code, record)
+  }
+  for (const code of allCodes) {
+    if (!byCode.has(code)) throw new Error('BIGMAP catalog is missing expected species code ' + code)
+  }
+  return byCode
+}
+
+async function exportSpecies(
+  record: any,
+  requestBbox: number[],
+  width: number,
+  height: number,
+) {
+  const params = new URLSearchParams()
+  params.set('f', 'json')
+  params.set('bbox', requestBbox.join(','))
+  params.set('bboxSR', String(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeWkid))
+  params.set('imageSR', String(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeWkid))
+  params.set('size', width + ',' + height)
+  params.set('format', 'tiff')
+  params.set('pixelType', 'F32')
+  params.set('interpolation', 'RSP_NearestNeighbor')
+  params.set('mosaicRule', JSON.stringify({
+    mosaicMethod: 'esriMosaicLockRaster',
+    lockRasterIds: [Number(record.objectid)],
+  }))
+  const exported = await postArcgis('/exportImage', params)
+  const href = String(exported?.href || '')
+  if (!href.startsWith('https://')) {
+    throw new Error('BIGMAP export did not return a secure TIFF URL for SPCD ' + record.spcd)
+  }
+  const response = await fetch(href, {
+    headers: { 'user-agent': 'Cadastory-Farm-Watch/1.0 (+https://pmicka.com)' },
+  })
+  if (!response.ok) throw new Error('BIGMAP TIFF download failed: ' + response.status)
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (bytes.byteLength <= 0 || bytes.byteLength > 5 * 1024 * 1024) {
+    throw new Error('BIGMAP TIFF size is invalid for SPCD ' + record.spcd)
+  }
+  const sourceSha256 = await sha256Hex(bytes)
+  const tiff = await fromArrayBuffer(bytes.buffer)
+  const image = await tiff.getImage()
+  const rasterWidth = image.getWidth()
+  const rasterHeight = image.getHeight()
+  if (rasterWidth !== width || rasterHeight !== height) {
+    throw new Error(
+      'BIGMAP TIFF dimensions changed for SPCD ' + record.spcd +
+      ': ' + rasterWidth + 'x' + rasterHeight,
+    )
+  }
+  const raster = await image.readRasters({ interleave: true })
+  const values = new Float32Array(width * height)
+  for (let i = 0; i < values.length; i += 1) {
+    const value = Number((raster as any)[i])
+    values[i] = Number.isFinite(value) && value > 0 && value < 100000 ? value : 0
+  }
+  return {
+    values,
+    bbox: image.getBoundingBox().map(Number),
+    sourceSha256,
+    sourceBytes: bytes.byteLength,
+    sourceHrefHost: new URL(href).host,
+  }
+}
+
 async function freshOidcToken() {
   const requestUrl = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_URL') || ''
   const requestToken = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_TOKEN') || ''
@@ -212,20 +318,8 @@ async function main() {
     const height = Math.max(1, Math.round((requestBbox[3] - requestBbox[1]) / cell))
     if (width * height > 250000) throw new Error('mast capacity bounded grid is unexpectedly large')
 
-    console.log('Querying BIGMAP 2018 species catalog through protected backend transport')
-    const catalogPayload = await workerRequest({ operation: 'source_catalog' })
-    const catalog = new Map<number, any>()
-    for (const record of catalogPayload?.records || []) {
-      const code = Number(record?.spcd)
-      if (Number.isInteger(code)) catalog.set(code, record)
-    }
-    for (const group of FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder) {
-      for (const expected of FARM_WATCH_MAST_CAPACITY_GROUPS[group]) {
-        if (!catalog.has(expected.spcd)) {
-          throw new Error('protected BIGMAP catalog is missing expected species code ' + expected.spcd)
-        }
-      }
-    }
+    console.log('Querying BIGMAP 2018 species catalog from official public ArcGIS service')
+    const catalog = await querySpeciesCatalog()
     const groupValues: Record<string, Float32Array> = Object.fromEntries(
       FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder.map((group) => [
         group,
@@ -242,37 +336,7 @@ async function main() {
       for (const expected of FARM_WATCH_MAST_CAPACITY_GROUPS[group]) {
         const record = catalog.get(expected.spcd)
         console.log(`Sampling BIGMAP SPCD ${expected.spcd} ${expected.common_name}`)
-        const source = await workerRequest({
-          operation: 'source_export',
-          spcd: expected.spcd,
-          bbox: requestBbox,
-          width,
-          height,
-        })
-        const bytes = new Uint8Array(Buffer.from(String(source?.source_tiff_base64 || ''), 'base64'))
-        if (!bytes.byteLength) throw new Error('protected BIGMAP TIFF payload is empty for SPCD ' + expected.spcd)
-        const sourceSha256 = await sha256Hex(bytes)
-        if (sourceSha256 !== String(source?.source_tiff_sha256 || '')) {
-          throw new Error('protected BIGMAP TIFF checksum mismatch for SPCD ' + expected.spcd)
-        }
-        const tiff = await fromArrayBuffer(bytes.buffer)
-        const image = await tiff.getImage()
-        const rasterWidth = image.getWidth()
-        const rasterHeight = image.getHeight()
-        if (rasterWidth !== width || rasterHeight !== height) {
-          throw new Error(`BIGMAP TIFF dimensions changed for SPCD ${expected.spcd}: ${rasterWidth}x${rasterHeight}`)
-        }
-        const exported = {
-          bbox: image.getBoundingBox().map(Number),
-          values: new Float32Array(width * height),
-          sourceSha256,
-          sourceBytes: bytes.byteLength,
-        }
-        const raster = await image.readRasters({ interleave: true })
-        for (let i = 0; i < exported.values.length; i += 1) {
-          const value = Number((raster as any)[i])
-          exported.values[i] = Number.isFinite(value) && value > 0 && value < 100000 ? value : 0
-        }
+        const exported = await exportSpecies(record, requestBbox, width, height)
         if (!rasterBbox) rasterBbox = exported.bbox
         else if (exported.bbox.some((value, i) => Math.abs(value - rasterBbox![i]) > 0.01)) {
           throw new Error('BIGMAP export grids are not co-registered')
@@ -334,7 +398,7 @@ async function main() {
         width,
         height,
         interpolation: 'RSP_NearestNeighbor',
-        transport: 'protected_supabase_worker',
+        transport: 'github_actions_public_usfs_arcgis',
       },
       landscape_domain_identity_sha256: claim.landscape_domain_identity.identity_sha256,
       source_items: sourceItems,
