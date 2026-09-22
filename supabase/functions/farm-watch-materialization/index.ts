@@ -147,6 +147,16 @@ function json(body: unknown, status = 200, origin = '') {
   return new Response(JSON.stringify(body), { status, headers: headers(origin) })
 }
 
+async function gzipBytes(bytes: Uint8Array) {
+  const stream = new Response(bytes).body!.pipeThrough(new CompressionStream('gzip'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
+}
+
+async function gunzipBytes(bytes: Uint8Array) {
+  const stream = new Response(bytes).body!.pipeThrough(new DecompressionStream('gzip'))
+  return new Uint8Array(await new Response(stream).arrayBuffer())
+}
+
 function bearer(req: Request) {
   const match = /^Bearer\s+(.+)$/i.exec(req.headers.get('authorization') || '')
   return match?.[1]?.trim() || null
@@ -1157,9 +1167,11 @@ async function uploadNeutralPrimitive(args: {
   refreshDays: number
   artifactPath: (propertyId: string, inputSignature: string, artifactSha256: string) => string
   maxArtifactBytes?: number
+  storageEncoding?: 'identity' | 'gzip'
 }) {
   const spec = productSpec(args.key)
-  const bytes = new TextEncoder().encode(JSON.stringify(args.artifact))
+  const jsonBytes = new TextEncoder().encode(JSON.stringify(args.artifact))
+  const bytes = args.storageEncoding === 'gzip' ? await gzipBytes(jsonBytes) : jsonBytes
   const maxArtifactBytes = args.maxArtifactBytes ?? 10 * 1024 * 1024
   if (bytes.byteLength <= 0 || bytes.byteLength > maxArtifactBytes) {
     throw new Error('neutral primitive artifact size is invalid')
@@ -1173,7 +1185,9 @@ async function uploadNeutralPrimitive(args: {
   const { error: uploadError } = await admin.storage
     .from('farm-watch-derived')
     .upload(path, bytes, {
-      contentType: 'application/json',
+      contentType: args.storageEncoding === 'gzip'
+        ? FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.artifactMimeType
+        : 'application/json',
       cacheControl: '31536000',
       upsert: true,
     })
@@ -1196,13 +1210,18 @@ async function uploadNeutralPrimitive(args: {
       ...(args.artifact.source_provenance || {}),
       source_signature: args.sourceSignature,
       source_signature_sha256: args.claim.source_signature_sha256,
+      storage_encoding: args.storageEncoding || 'identity',
       completed_at: completedAt.toISOString(),
     },
     limitations: args.limitations,
     bucket: 'farm-watch-derived',
     path,
-    format: spec.outputSchemaVersion,
-    mimeType: 'application/json',
+    format: args.storageEncoding === 'gzip'
+      ? FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.artifactFormat
+      : spec.outputSchemaVersion,
+    mimeType: args.storageEncoding === 'gzip'
+      ? FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.artifactMimeType
+      : 'application/json',
     bytes,
     artifactSha256,
     expiresAt: expiresAt.toISOString(),
@@ -1556,6 +1575,7 @@ async function completeHorizontalVisibilityMaterialization(slug: string, body: a
     refreshDays: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.refreshDays,
     artifactPath: horizontalVisibilityArtifactPath,
     maxArtifactBytes: 25 * 1024 * 1024,
+    storageEncoding: 'gzip',
   })
   return readHorizontalVisibilityState(slug)
 }
@@ -1690,9 +1710,12 @@ async function readPayload(
     throw new Error(`materialization artifact download failed: ${downloadError?.message || 'empty artifact'}`)
   }
 
-  const bytes = new Uint8Array(await blob.arrayBuffer())
-  const downloadedSha256 = await sha256Hex(bytes)
+  const storedBytes = new Uint8Array(await blob.arrayBuffer())
+  const downloadedSha256 = await sha256Hex(storedBytes)
   if (downloadedSha256 !== artifactSha256) throw new Error('materialization artifact checksum mismatch')
+  const bytes = materialization.artifact_format === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.artifactFormat
+    ? await gunzipBytes(storedBytes)
+    : storedBytes
 
   let artifact: any
   try {
