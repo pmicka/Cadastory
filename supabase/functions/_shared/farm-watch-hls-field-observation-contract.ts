@@ -6,7 +6,7 @@ export const FARM_WATCH_HLS_FIELD_PRODUCT = Object.freeze({
   distributionProvider: 'Microsoft Planetary Computer',
   distributionEndpoint: 'https://planetarycomputer.microsoft.com/api/stac/v1/',
   sourceAuthority: 'NASA LP DAAC',
-  lookbackDays: 45,
+  lookbackDays: 180,
   freshnessDays: 10,
   minimumValidFraction: 0.30,
   collections: Object.freeze({
@@ -47,7 +47,7 @@ export const FARM_WATCH_HLS_FIELD_LIMITATIONS = Object.freeze([
   'Cloud, adjacent-cloud/shadow, cloud-shadow, snow, water, and high-aerosol QA conditions are screened before vegetation-index summaries are calculated.',
   'A quality-qualified HLS observation does not by itself establish standing crop, harvest, forage value, deer use, attraction, or habitat quality.',
   'Catalog, download, and processing failures are persisted as collection outcomes and must not be translated into a no-vegetation or no-harvest state.',
-  'Batch 4B stores NDVI, EVI, and NIR trajectories only. Harvest classification remains disabled until a separately validated evidence-backed method is implemented.',
+  'Batch 4B stores NDVI, EVI, and NIR trajectories only. The operational collection window is 180 days so a late-September run reaches before the published Kentucky corn/soy planting windows and can preserve a full growing-season trajectory. Harvest classification remains disabled until a separately validated evidence-backed method is implemented.',
 ])
 
 function isSha(value: unknown) {
