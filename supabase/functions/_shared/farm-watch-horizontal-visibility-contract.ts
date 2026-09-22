@@ -74,6 +74,7 @@ export function horizontalVisibilitySourceSignature(args: {
     'domain_edge_policy=unsupported-not-open-v1',
     'artifact_storage_encoding=gzip-v1',
     'artifact_storage_mime=application/json',
+    'protected_completion_claim_normalization=v1',
   ].join('|')
 }
 
