@@ -453,7 +453,7 @@ The deer layer can distinguish standing/active crop, probable harvest transition
 
 # Batch 5 — Mast capacity and annual mast state
 
-Status: Batch 5A mast-capacity implementation candidate; Batch 5B annual-production layer not started  
+Status: Batch 5A implementation merged/deployed but production source-transport blocked; Batch 5B annual-production layer not started  
 Priority: P1  
 Ledger dependency: FW-D07.
 
@@ -1136,3 +1136,11 @@ The exact public Zenodo record was reviewed. It exposes the model file and descr
 Contract state is now `blocked_no_record_license`.
 
 **Next Batch 4 unit:** obtain explicit trained-model permission/license clarification. Until that clears, do not download, vendor, redistribute, or execute the model artifact. If permission is obtained, the next implementation unit remains the non-persistent field-scoped inference prototype with candidate-only output and no harvest promotion.
+
+## Batch 5A production stopping point — 2026-09-22
+
+The neutral mast-capacity implementation is merged and deployed, but production validation is blocked by authoritative source transport rather than by the Farm Watch contract or materialization architecture.
+
+The intended bounded BIGMAP analytical routes were tested from both available cloud execution environments. The legacy Geoplatform ImageServer returns HTTP 403 to GitHub-hosted Actions; the official Forest Service ArcGIS Online BIGMAP ImageServer cannot currently be DNS-resolved from Supabase Edge; and a direct GitHub Actions fetch to that host fails before an ArcGIS response. The official Raster Data Gateway exposes whole-CONUS per-species archives, but pulling 28 complete national rasters for a 3 km property context is not accepted as the production architecture.
+
+Batch 5A therefore stops at **implementation complete / production data unavailable**. The next 5A action, if resumed, is source-access engineering only: identify a bounded authoritative Forest Service delivery path that is reachable from the production worker environment, or deliberately redesign around centrally cached national source artifacts. Do not begin Batch 5B as part of that repair.
