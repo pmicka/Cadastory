@@ -1,6 +1,7 @@
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import {
+  FARM_WATCH_MAST_CAPACITY_GROUPS,
   FARM_WATCH_MAST_CAPACITY_LIMITATIONS,
   FARM_WATCH_MAST_CAPACITY_PRODUCT,
   mastCapacityArtifactPath,
@@ -24,6 +25,139 @@ if (!SERVICE_KEY) throw new Error('Farm Watch service credential is unavailable'
 const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
+
+const EXPECTED_SPECIES_CODES = new Set(
+  FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder.flatMap((group) =>
+    FARM_WATCH_MAST_CAPACITY_GROUPS[group].map((row) => row.spcd)
+  ),
+)
+
+function bytesToBase64(bytes: Uint8Array) {
+  let binary = ''
+  const chunk = 0x8000
+  for (let offset = 0; offset < bytes.length; offset += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(bytes.length, offset + chunk)))
+  }
+  return btoa(binary)
+}
+
+async function bigmapJson(path: string, params: URLSearchParams) {
+  const response = await fetch(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService + path, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'user-agent': 'Cadastory-Farm-Watch/1.0 (+https://pmicka.com)',
+    },
+    body: params.toString(),
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(
+      'BIGMAP source request failed: ' + response.status +
+      (detail ? ' ' + detail.slice(0, 500) : ''),
+    )
+  }
+  const payload = await response.json()
+  if (payload?.error) throw new Error('BIGMAP source error: ' + JSON.stringify(payload.error))
+  return payload
+}
+
+async function bigmapCatalog(codes?: number[]) {
+  const requested = (codes?.length ? codes : Array.from(EXPECTED_SPECIES_CODES))
+    .map(Number)
+    .filter((value) => Number.isInteger(value) && EXPECTED_SPECIES_CODES.has(value))
+  if (!requested.length) throw new Error('BIGMAP species request is empty')
+  const params = new URLSearchParams()
+  params.set('f', 'json')
+  params.set('where', 'category=1 AND spcd IN (' + requested.join(',') + ')')
+  params.set('outFields', 'objectid,spcd,common_name,genus,species,name')
+  params.set('returnGeometry', 'false')
+  params.set('orderByFields', 'spcd')
+  const payload = await bigmapJson('/query', params)
+  const records = (payload?.features || []).map((feature: any) => feature?.attributes || {})
+  for (const code of requested) {
+    const matches = records.filter((row: any) => Number(row?.spcd) === code)
+    if (matches.length !== 1) throw new Error('BIGMAP primary species catalog mismatch for SPCD ' + code)
+  }
+  return records
+}
+
+async function sourceCatalog() {
+  return {
+    status: 'available',
+    source_service: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
+    source_data_year: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceDataYear,
+    source_native_crs: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeCrs,
+    source_native_wkid: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeWkid,
+    source_pixel_meters: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourcePixelMeters,
+    records: await bigmapCatalog(),
+  }
+}
+
+async function sourceExport(body: any) {
+  const spcd = Number(body?.spcd)
+  if (!Number.isInteger(spcd) || !EXPECTED_SPECIES_CODES.has(spcd)) {
+    throw new Error('BIGMAP species code is not authorized')
+  }
+  const bbox = Array.isArray(body?.bbox) ? body.bbox.map(Number) : []
+  const width = Number(body?.width)
+  const height = Number(body?.height)
+  if (
+    bbox.length !== 4 || bbox.some((value: number) => !Number.isFinite(value)) ||
+    !Number.isInteger(width) || width <= 0 || width > 400 ||
+    !Number.isInteger(height) || height <= 0 || height > 400
+  ) throw new Error('BIGMAP export bounds are invalid')
+
+  const cell = FARM_WATCH_MAST_CAPACITY_PRODUCT.sourcePixelMeters
+  const expectedWidth = (bbox[2] - bbox[0]) / cell
+  const expectedHeight = (bbox[3] - bbox[1]) / cell
+  if (
+    Math.abs(expectedWidth - width) > 1e-6 ||
+    Math.abs(expectedHeight - height) > 1e-6
+  ) throw new Error('BIGMAP export grid is not native 30 m')
+
+  const record = (await bigmapCatalog([spcd]))[0]
+  const params = new URLSearchParams()
+  params.set('f', 'json')
+  params.set('bbox', bbox.join(','))
+  params.set('bboxSR', String(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeWkid))
+  params.set('imageSR', String(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeWkid))
+  params.set('size', width + ',' + height)
+  params.set('format', 'tiff')
+  params.set('pixelType', 'F32')
+  params.set('interpolation', 'RSP_NearestNeighbor')
+  params.set('mosaicRule', JSON.stringify({
+    mosaicMethod: 'esriMosaicLockRaster',
+    lockRasterIds: [Number(record.objectid)],
+  }))
+  const exported = await bigmapJson('/exportImage', params)
+  const href = String(exported?.href || '')
+  if (!href.startsWith('https://imagery.geoplatform.gov/iipp/rest/directories/system/arcgisoutput/')) {
+    throw new Error('BIGMAP export URL is invalid')
+  }
+
+  const response = await fetch(href, {
+    headers: { 'user-agent': 'Cadastory-Farm-Watch/1.0 (+https://pmicka.com)' },
+  })
+  if (!response.ok) throw new Error('BIGMAP TIFF fetch failed: ' + response.status)
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (bytes.byteLength <= 0 || bytes.byteLength > 5 * 1024 * 1024) {
+    throw new Error('BIGMAP TIFF size is invalid')
+  }
+  return {
+    status: 'available',
+    spcd,
+    record,
+    width: Number(exported?.width || width),
+    height: Number(exported?.height || height),
+    extent: exported?.extent || null,
+    source_tiff_size_bytes: bytes.byteLength,
+    source_tiff_sha256: await sha256Hex(bytes),
+    source_tiff_base64: bytesToBase64(bytes),
+  }
+}
+
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -282,6 +416,8 @@ Deno.serve(async (req: Request) => {
         ...(await claim(slug, identity)),
       })
     }
+    if (operation === 'source_catalog') return json(await sourceCatalog())
+    if (operation === 'source_export') return json(await sourceExport(body))
     if (operation === 'complete') return json(await complete(slug, body, identity))
     if (operation === 'fail') return json(await fail(body))
     return json({ error: 'invalid request' }, 400)
