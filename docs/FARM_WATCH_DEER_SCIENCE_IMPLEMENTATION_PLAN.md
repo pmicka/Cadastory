@@ -472,7 +472,7 @@ These must remain separate.
 
 Batch 5A operational v1 source:
 
-- USDA Forest Service FIA BIGMAP 2018 species aboveground biomass at 30 m, sampled through the public scientific ImageServer over the barrier-aware broad_3000m domain.
+- USDA Forest Service FIA BIGMAP 2018 species aboveground biomass at 30 m, sampled through the official Forest Service ArcGIS Online BIGMAP ImageServer over the barrier-aware broad_3000m domain.
 
 Future refinement candidates:
 
