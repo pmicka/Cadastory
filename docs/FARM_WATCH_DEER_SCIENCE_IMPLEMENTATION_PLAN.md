@@ -137,7 +137,7 @@ The first production deer output should be a vector of evidence-backed module re
 | `meteorological-forcing-v1` | dated/hourly state | NOAA HRRR + historical Daymet fallback where appropriate | production |
 | `solar-exposure-context-v1` | gridded physical | canonical terrain + solar geometry + horizon + canopy | production |
 | `thermal-exposure-context-v1` | dated gridded physical/proxy | static solar terrain + exact HRRR analysis | production |
-| `field-phenology-context-v1` | dated field state | CDL + NASA HLS VI + NASS regional context | build |
+| `field-phenology-context-v1` | dated field state | CDL/CSB + NASA HLS L30/S30 + NASS regional context | production observation substrate; classifier pending |
 | `mast-resource-context-v1` | annual/seasonal resource proxy | USFS TreeMap/BIGMAP + Kentucky mast survey | build |
 | `horizontal-visibility-context-v1` | gridded physical | LiDAR + terrain | build |
 | `surface-water-state-v1` | dated physical/proxy | 3DHP/NWI + DEM + QPE/soil moisture + observations | build |
@@ -397,7 +397,7 @@ Every deer relationship can ask for a named state and fail closed when that stat
 
 # Batch 4 — Dynamic agricultural resource state
 
-Status: Batch 4A production; Batch 4B protected HLS materializer implementation candidate  
+Status: Batch 4A + Batch 4B production; evidence-backed phenology/harvest classification pending  
 Priority: P0/P1  
 Ledger dependencies: FW-D08, D09, D15, D16.
 
@@ -1064,12 +1064,14 @@ The chain remains neutral: no operative temperature, composite thermal score, de
 
 # Recommended next implementation batch
 
-Complete **Batch 4 — dynamic agricultural resource state** in dependency order:
+Complete the remaining **Batch 4 phenology/harvest classification gate** on top of the now-production HLS observation substrate:
 
-1. keep **Batch 4A** as the production fail-closed field-state contract; it intentionally leaves phenology/harvest unknown without current field observations;
-2. deploy and validate **Batch 4B** using the protected GitHub Actions OIDC → Farm Watch worker pattern for NASA HLS v2 raster sampling through the Microsoft Planetary Computer distribution, with explicit catalog/download/processing failure states and no browser-side HLS processing;
-3. review the real HLS pilot time series and validate an evidence-backed method for standing/active crop, senescence, probable harvest transition, and post-harvest/residual before enabling those labels;
-4. keep CDL/CSB as annual identity and NASS/state crop-progress as regional context rather than field truth;
-5. preserve operator observations as separate evidence/override provenance rather than silently mixing them into remote-sensing truth.
+1. use the 17-scene / 629-row production HLS time series to characterize observation spacing, cloud/QA support, and field-specific trajectories without assigning biological or harvest meaning;
+2. formalize the transfer review for the Kentucky curve-change method and the NIR+NDVI NHPI method, explicitly separating reusable method form from non-transferable study coefficients/thresholds;
+3. define minimum time-series support and ambiguity/abstention rules for `green_up`, `vegetative`, `mature_senescing`, `probable_harvest_transition`, `post_harvest_residual`, and `unknown`;
+4. implement classification only where the evidence contract supports it; regional NASS progress remains proxy context and stale CDL/CSB remains annual identity rather than current field truth;
+5. preserve operator observations as separate provenance and never silently overwrite remote-sensing evidence.
+
+The production HLS pilot currently has 37/37 fields with current evidence but deliberately retains `phenology_state=unknown` for all 37. That is the correct starting point for the classifier review, not a missing-data problem.
 
 The machine-readable deer relationship registry remains downstream of explicit biological state and the neutral resource-state inputs required by its first modules.

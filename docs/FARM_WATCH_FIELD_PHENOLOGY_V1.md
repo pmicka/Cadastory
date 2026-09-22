@@ -1,6 +1,6 @@
 # Farm Watch Field Phenology v1
 
-Status: Batch 4A production; Batch 4B implementation candidate — not deployed  
+Status: Batch 4A + Batch 4B production; field-level phenology/harvest classifier not yet enabled  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -220,8 +220,56 @@ The validation lifecycle successfully:
 
 This validates the acquisition-state separation before the first real HLS pilot. It does not establish that the external STAC/COG path succeeds in production; that is the post-deployment Batch 4B pilot gate.
 
+### Production deployment and HLS pilot — 2026-09-21
+
+Batch 4B is production-operational.
+
+Deployment state:
+
+- PR #198 merged at `c9a91f802e313b9b85b1aa8594b2347b3f245ab8`;
+- database migration `20260922031000_add_farm_watch_hls_field_materializer_v1.sql` applied successfully;
+- protected Edge Function `farm-watch-field-phenology-worker` deployed as version 1 with the established in-function GitHub OIDC authentication and `verify_jwt=false`;
+- owner-triggered GitHub workflow successfully exercised the production STAC/COG path;
+- PR #200 merged the scene-dataset reuse hotfix at `aa54ac7e8ed15aff89084bcbaa5e6676737c207a`.
+
+The first real pilot and the post-hotfix idempotence rerun both resolved the same source set and field context:
+
+- 37 target fields;
+- 17 complete HLS scenes discovered and sampled;
+- 5 HLSL30 scenes and 12 HLSS30 scenes;
+- 629 canonical field/scene observation rows;
+- 252 rows met the `valid_fraction >= 0.30` quality-support threshold;
+- all 37 target fields had a quality-qualified observation within the 10-day freshness window;
+- newest stored observation: 2026-09-19;
+- oldest stored observation in the 45-day window: 2026-08-08;
+- zero incomplete catalog items;
+- zero COG/download failures;
+- no raw HLS imagery persisted.
+
+The refreshed `field-phenology-context-v1` is now `available` with:
+
+- `known=37`;
+- `stale=0`;
+- `unavailable=0`;
+- `phenology_state=unknown` for all 37 fields;
+- `scoring_performed=false`;
+- `behavioral_inference_performed=false`;
+- identity `cd9cadafaced8dca3df60410263782e147622de293f39529a8c33193cb161e47`.
+
+The post-hotfix rerun produced the same context identity and the same 17-scene / 629-row / 37-current-field result. Reusing open scene datasets therefore preserved data semantics exactly. It did not materially reduce observed wall-clock runtime; remote COG window reads remain the dominant cost.
+
+Production numeric sanity checks found:
+
+- NDVI means within [0.4712, 0.9187], with no values outside the physical [-1,1] range;
+- EVI means within [0.2638, 0.7967], with no extreme/nonfinite values under the validation rule;
+- mean NIR reflectance within [0.1913, 0.5053], with no extreme values under the validation rule.
+
+The median valid fraction across all retained field/scene rows is 0 because many cloudy/invalid scene-field combinations are deliberately persisted with explicit QA instead of being hidden. Downstream dated state uses only quality-qualified observations.
+
+Both `agent_contract.assert_tool_registry_integrity_v1()` and `agent_contract.assert_architecture_doctrine_v1()` pass after deployment. Supabase advisors report only the expected INFO-level RLS-without-policy notices on the service-only Farm Watch tables.
+
 ### Interpretation boundary
 
-Batch 4B still does **not** enable harvest classification. Current HLS observations can move field evidence from `unavailable/stale` to `known`, but `phenology_state` remains `unknown` until a separately validated time-series method is implemented.
+Batch 4B does **not** enable harvest classification. Current HLS observations now establish a usable dated field-observation time series, but every field remains `phenology_state=unknown` until a separately validated classification method is authorized.
 
-The next gate after materializer deployment is a real HLS pilot over `validation-property-01`, followed by review of observation support and the Kentucky/NHPI method-transfer requirements before any standing/senescent/harvest label is enabled.
+The next dependency-correct gate is the Batch 4 phenology/harvest method-transfer pass: evaluate the current HLS time series against the Kentucky curve-change and NHPI evidence, define the minimum observation/quality requirements, and only then implement standing/active crop, senescence, probable-harvest-transition, post-harvest/residual, or explicit abstention semantics.
