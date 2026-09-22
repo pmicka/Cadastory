@@ -1088,3 +1088,13 @@ The short-trajectory prerequisite is therefore closed. The remaining Batch 4 pre
 Published current-season crop-mapping routes now include the 10 m ICDL product (Li et al. 2026, DOI `10.1038/s41597-026-07099-1`) and the HLS Transformer mapper (Zhang et al. 2025, DOI `10.1016/j.rse.2025.114950`). Operational Kentucky ingestion must be verified before either is production evidence.
 
 No generic NDVI drop, stale crop identity, regional NASS progress, truncated NHPI future window, or copied study threshold may close the gate.
+
+## Batch 4 current-season crop identity gate — 2026-09-22
+
+Direct current-year ICDL ingestion was investigated first because it would avoid operating a local crop classifier. The published 2026 ICDL method is scientifically suitable, but a consumable 2026 Kentucky layer could not be operationally verified: the public iCrop catalog discoverable on 2026-09-22 exposes layers only through 2025-August, and no 2026 June/July/August layer was discoverable through the public service surface.
+
+Accordingly, 2025 CDL/CSB remains stale historical crop identity and cannot gate crop-specific harvest logic.
+
+The preferred fallback is the published Zhang et al. (2025) HLS Transformer (`10.1016/j.rse.2025.114950`). Its Apache-2.0 application code and public ~69.9 MB trained model are operationally plausible for the 37-field validation domain, but the model requires two years of richer HLS spectra than the current Farm Watch NDVI/EVI/NIR sampler. If adopted, implement it as a protected field-scoped spectral/inference path rather than reproducing the released whole-tile architecture.
+
+**Next Batch 4 unit:** perform the bounded Transformer integration spike: confirm model reuse terms, enumerate exact HLS band/time inputs and normalization contract, estimate field-scoped IO/inference cost, and define a neutral `current_crop_identity` evidence contract with confidence/abstention. Do not enable harvest classification in the same unit.
