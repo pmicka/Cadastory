@@ -397,7 +397,7 @@ Every deer relationship can ask for a named state and fail closed when that stat
 
 # Batch 4 — Dynamic agricultural resource state
 
-Status: Batch 4A + Batch 4B production; full-growing-season HLS trajectory expansion underway; evidence-backed phenology/harvest classification pending  
+Status: Batch 4A + Batch 4B production; 180-day growing-season HLS substrate validated; live phenology/harvest classification blocked on current-season crop identity + near-real-time method transfer  
 Priority: P0/P1  
 Ledger dependencies: FW-D08, D09, D15, D16.
 
@@ -1075,3 +1075,16 @@ Complete the remaining **Batch 4 phenology/harvest classification gate** on top 
 The production HLS pilot currently has 37/37 fields with current evidence but deliberately retains `phenology_state=unknown` for all 37. The first classifier transfer review found the original 45-day HLS collection window too short for the retained published harvest methods, so the HLS acquisition contract is being expanded to 180 days to preserve the full growing-season trajectory before any classifier is authorized. That is a prerequisite-data problem, not permission to substitute a generic NDVI-drop rule.
 
 The machine-readable deer relationship registry remains downstream of explicit biological state and the neutral resource-state inputs required by its first modules.
+
+## Batch 4 transfer-gate update — 2026-09-22
+
+The protected HLS acquisition window is now 180 days in production. Validation-property run `35691287320` sampled 82 scenes and persisted 3,034 canonical field/scene rows, including 1,136 quality-qualified rows from 2026-03-29 through 2026-09-19. All 37 fields remain current while all 37 correctly retain `phenology_state=unknown`.
+
+The short-trajectory prerequisite is therefore closed. The remaining Batch 4 prerequisites are:
+
+1. verify and ingest a defensible current-season 2026 crop-identity source rather than promoting stale 2025 CDL/CSB identity;
+2. select a near-real-time harvest method appropriate to current-state inference. Yang et al. remains Kentucky-specific curve-form evidence; NHPI remains strong retrospective harvest-date evidence but depends on a middle-of-senescence-to-plus-two-month normalization window and a study-calibrated threshold; Tang et al. (2026, DOI `10.1016/j.jag.2026.105510`) is a newer near-real-time Reaped Index candidate but requires additional spectral inputs and a current crop mask.
+
+Published current-season crop-mapping routes now include the 10 m ICDL product (Li et al. 2026, DOI `10.1038/s41597-026-07099-1`) and the HLS Transformer mapper (Zhang et al. 2025, DOI `10.1016/j.rse.2025.114950`). Operational Kentucky ingestion must be verified before either is production evidence.
+
+No generic NDVI drop, stale crop identity, regional NASS progress, truncated NHPI future window, or copied study threshold may close the gate.
