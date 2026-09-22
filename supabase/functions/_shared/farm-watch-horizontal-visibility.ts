@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer'
 import proj4 from 'npm:proj4@2.12.1'
 import {
+  FARM_WATCH_HORIZONTAL_VISIBILITY_LIMITATIONS,
   FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT as P,
 } from './farm-watch-horizontal-visibility-contract.ts'
 import { sha256Hex } from './farm-watch-terrain.ts'
@@ -21,7 +22,7 @@ type TerrainGrid = {
   width: number
   height: number
   domain: Uint8Array
-  elevation_ft: Float64Array
+  elevation: Float64Array
 }
 
 type StructureGrid = {
@@ -128,7 +129,7 @@ function decodeStructureGrid(value: any): StructureGrid {
   const property = decodeU8(grid?.property_mask_base64)
   const lidarValid = decodeU8(grid?.lidar_valid_base64)
   const bandShares = Array.isArray(grid?.lidar_band_shares_base64)
-    ? grid.lidar_band_shares_base64.map(decodeU8)
+    ? grid.lidar_band_shares_base64.map((value: unknown) => decodeU8(value))
     : []
   const bbox = grid?.bbox
   const cellSizeNative = Number(grid?.cell_size_native)
@@ -141,7 +142,16 @@ function decodeStructureGrid(value: any): StructureGrid {
     domain.length !== count || property.length !== count || lidarValid.length !== count ||
     bandShares.length !== 5 || bandShares.some((band) => band.length !== count)
   ) throw new Error('horizontal visibility structure dependency is invalid')
-  return { bbox, cell_size_native: cellSizeNative, width, height, domain, property, lidarValid, bandShares }
+  return {
+    bbox: bbox as [number, number, number, number],
+    cell_size_native: cellSizeNative,
+    width,
+    height,
+    domain,
+    property,
+    lidarValid,
+    bandShares,
+  }
 }
 
 function buildAffine(): AffineTransform {
