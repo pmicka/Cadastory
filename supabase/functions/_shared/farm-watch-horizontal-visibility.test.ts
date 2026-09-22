@@ -126,8 +126,11 @@ Deno.test('adding supported vertical returns monotonically reduces combined visi
   const blocked = await build(true)
   const openMedian = open.artifact.summary.height_scenarios[0].combined_visible_distance_m_p50_at_100m
   const blockedMedian = blocked.artifact.summary.height_scenarios[0].combined_visible_distance_m_p50_at_100m
+  if (openMedian === null || blockedMedian === null) throw new Error('synthetic visibility medians are missing')
+  const blockedFraction = blocked.artifact.summary.height_scenarios[0].combined_obstruction_fraction_by_band[0]
+  if (blockedFraction === null) throw new Error('synthetic obstruction fraction is missing')
   assert(blockedMedian < openMedian)
-  assert(blocked.artifact.summary.height_scenarios[0].combined_obstruction_fraction_by_band[0] > 0)
+  assert(blockedFraction > 0)
 })
 
 Deno.test('artifact validator rejects wrong array support and preserves explicit height scenarios', async () => {
