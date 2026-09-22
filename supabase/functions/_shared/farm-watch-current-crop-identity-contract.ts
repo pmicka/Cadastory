@@ -11,7 +11,15 @@ export const FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT = Object.freeze({
   codeCommit: '8c6f24465829542e822fde98655fedd57770ae3b',
   codeLicense: 'Apache-2.0',
   paperLicense: 'CC-BY-4.0',
-  modelArtifactReuseStatus: 'blocked_pending_explicit_rights_verification',
+  modelArtifactReuseStatus: 'blocked_no_record_license',
+  modelArtifactRightsEvidence: Object.freeze({
+    zenodoRecord: '10.5281/zenodo.14715402',
+    checkedAt: '2026-09-22',
+    rightsSectionPresent: false,
+    explicitArtifactLicenseVerified: false,
+    repositoryCodeLicenseAppliesToModelArtifact: false,
+    publicAvailabilityIsPermission: false,
+  }),
   years: 2,
   fillValue: -9999,
   modelClasses: 50,
@@ -84,7 +92,7 @@ export const FARM_WATCH_CURRENT_CROP_IDENTITY_LIMITATIONS = Object.freeze([
   'Field vote fraction, top-two vote margin, class entropy, and input-support counts are neutral diagnostics only until an acceptance/abstention rule is validated.',
   'The training pipeline discarded records with fewer than four HLS observations across two years. That is a training-data filter, not a Farm Watch sufficiency threshold.',
   'The published application QA excludes fill, cloud, adjacent cloud/shadow, cloud shadow, and snow/ice. It does not explicitly exclude water or high aerosol, so the crop-identity spectral collector must remain separate from the existing vegetation-index sampler unless model-equivalence is validated.',
-  'The model artifact is publicly downloadable, but its exact Zenodo record-level reuse license was not verified during this spike. Do not vendor, redistribute, or operationally execute the model artifact until that rights gate is resolved.',
+  'The Zenodo model artifact is publicly downloadable, but the exact record exposes no Rights/License section. Zenodo states that reuse permission depends on the license shown in the record Rights section. Do not vendor, redistribute, or operationally execute the model artifact unless an explicit artifact license or direct permission is obtained.',
   'Current crop identity is neutral agricultural evidence. It does not establish harvest, forage value, deer use, attraction, habitat quality, or management action.',
 ])
 
