@@ -204,6 +204,22 @@ The existing 0.30 valid-pixel fraction remains a data-support threshold only. It
 
 A catalog, signing, COG-download, or processing failure therefore cannot silently become "no vegetation," "no crop," or "post-harvest."
 
+### Pre-deployment Batch 4B database validation — 2026-09-21
+
+The exact Batch 4B database migration was executed against the live production schema inside a transaction and rolled back.
+
+The validation lifecycle successfully:
+
+- created a processing HLS collection run for `validation-property-01`;
+- completed it as `no_valid_observation` with 37 target fields and internally consistent source/item counters;
+- read the completed run back in a subsequent statement;
+- retained NASA LP DAAC as `source_authority` and Microsoft Planetary Computer as `distribution_provider`;
+- denied anonymous/authenticated table and RPC access while permitting the service role;
+- registered the Planetary Computer HLS distribution source inside the transaction;
+- confirmed after rollback that the run table and all Batch 4B run-ledger functions did not remain in production.
+
+This validates the acquisition-state separation before the first real HLS pilot. It does not establish that the external STAC/COG path succeeds in production; that is the post-deployment Batch 4B pilot gate.
+
 ### Interpretation boundary
 
 Batch 4B still does **not** enable harvest classification. Current HLS observations can move field evidence from `unavailable/stale` to `known`, but `phenology_state` remains `unknown` until a separately validated time-series method is implemented.
