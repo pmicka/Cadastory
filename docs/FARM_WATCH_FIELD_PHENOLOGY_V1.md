@@ -106,7 +106,7 @@ Registered source families:
 
 HLS supplies harmonized 30 m surface reflectance and quality masks with repeated observations suitable for field-scale trajectories. HLS-VI can supply precomputed NDVI/EVI, but methods such as NHPI require NIR reflectance as well, so the surface-reflectance products remain part of the source contract.
 
-The HLS materializer must preserve catalog/download failure separately from valid no-observation/cloud states. NASA documented 2026 cases where CMR-STAC exposed metadata without the expected science assets even though underlying granules remained available. STAC asset absence therefore must not be translated into a false field observation or a false cloud/no-data classification.
+The HLS materializer must preserve catalog/download failure separately from valid no-observation/cloud states. NASA's Earthdata Forum documented an August 2026 CMR-STAC defect in which some HLS items exposed metadata without expected science assets even though the underlying granules remained available. LP DAAC reported on September 2, 2026 that it believed the defect resolved. The collector should still validate required assets so a future catalog regression cannot silently become a false field observation or false cloud/no-data classification.
 
 ## Production expectation before HLS materialization
 
@@ -121,6 +121,19 @@ With Batch 4A schema present but no HLS observations stored, `validation-propert
 - no harvest inference.
 
 This is the correct fail-closed state, not an incomplete implementation result.
+
+## Pre-deployment rollback validation — 2026-09-21
+
+The exact source-controlled migration was executed against the live production schema inside a transaction and rolled back.
+
+Validation passed for the real property/domain substrate:
+
+- target selection: 37 fields in `broad_3000m`, 12 in `landscape_1500m`, 1 in `local_500m`, and 0 parcel-intersecting;
+- no-observation resolver: `status=unavailable`, 37 unavailable fields, all `phenology_state=unknown`;
+- service-only ACLs: anonymous/authenticated table and RPC access denied; service role allowed;
+- synthetic current HLS observation: context became `partial` with 1 known / 36 unavailable while the observed field remained `phenology_state=unknown`, `trajectory_state=insufficient_observations`, and `harvest_method.status=not_evaluated_batch4a`;
+- no scoring, behavioral inference, or harvest promotion occurred;
+- post-test catalog checks confirmed the rollback left no Batch 4A table/function in production.
 
 ## Batch 4B dependency
 
