@@ -1,6 +1,6 @@
 # Farm Watch Structure Evidence Ledger
 
-Status: current as of 2026-09-21  
+Status: current as of 2026-09-22
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -32,7 +32,7 @@ Before adding another structural analysis, check this ledger and the cited imple
 | Structural complementarity | `current-leaf-off-lidar-complementarity-v4` | canonical-central | 6,662 shared 5 m cells; current artifact SHA `01dc786d4f258bc1b5b78f43e935ff397f931293d298b9548da48ef1d600c074`. |
 | Terrain form / reference permeability | `barrier-aware-phase3-dem-terrain-form-permeability-v1` | canonical-central | 10 m local terrain-form candidates + 30 m 1.5 km reference slope-friction; identity `a4d02fa0738ea005efd0456027b0940a66b1155f7cd1a6c24a1287312e1f102f`; artifact SHA `b69a778cb91aa0d87e92fedfe9213d07b72caadf551ba6dfb2b95f4b45af45ee`. |
 | Spatial edge / patch context | `local500m-canopy-field-structure-pattern-v1` | canonical-central | 30 m canopy/field pattern + reused 5 m structural transitions; identity `9cdb6dd495a1e6e6de158e2686485b95ef94e83394b9121171f6455012f9ee4c`; artifact SHA `99edf000a5c5ad846b25be8d61c36b352ecb5fb25f30db1468499ea3ddc532e0`. |
-| Horizontal visibility / obstruction | `barrier-aware-local500m-horizontal-visibility-v1` | implementation-QA | Bounded 5 m physical ray summaries over the exact `local_500m` domain; consumes current central landscape structure and terrain-form artifacts; no deer semantics. |
+| Horizontal visibility / obstruction | `barrier-aware-local500m-horizontal-visibility-v1` | canonical-central | Bounded 5 m physical ray summaries over the exact `local_500m` domain; consumes current central landscape structure and terrain-form artifacts; no deer semantics. Validation-property materialization identity `1c1c4375f4dc7b4aa905e1978ebcadf2dd1304ed480c0fac6b311650fba76c10`; artifact SHA `c2e2ac940def006d7232fe4be817211c92495f703a15e6f4f3bed3e8dc7818a0`. |
 
 Current central materializations are stored in `farm_watch.property_materializations_v1`. The structural complementarity source signature binds to the exact current LiDAR and leaf-off artifact SHA-256 values.
 
@@ -447,6 +447,10 @@ A proposed experiment must identify which ledger item it extends and state exact
 
 **Boundary:** Heights are generic physical scenarios, not deer eye/body heights. Unsupported directions are abstentions, never open directions. The product produces no security-cover, concealment, bedding, escape-cover, travel-cover, habitat-quality, deer-visibility, deer-use, movement, hunting-quality, stand-suitability, or score output.
 
-**Validation:** Synthetic flat/open, added-obstruction monotonicity, directional/ray, packed-artifact, observer-height, distance-band, and unsupported-support checks are source-controlled in `supabase/functions/_shared/farm-watch-horizontal-visibility.test.ts`. Production validation is pending until the central worker is merged, deployed, and run once for `validation-property-01`.
+**Validation:** Synthetic flat/open, added-obstruction monotonicity, directional/ray, packed-artifact, observer-height, distance-band, and unsupported-support checks are source-controlled in `supabase/functions/_shared/farm-watch-horizontal-visibility.test.ts`. The protected GitHub worker was merged through PRs #223, #225, #226, #228, #229, #230, #231, and #232; the materialization Edge Function is active with custom in-function authentication and `verify_jwt:false`.
 
-**Status:** implementation-QA; production validation pending.
+**Production validation — 2026-09-22 (`validation-property-01`):** Materialization `13ae60ab-3972-4ad3-9d60-35504367cc8f` is `available`, identity `1c1c4375f4dc7b4aa905e1978ebcadf2dd1304ed480c0fac6b311650fba76c10`, artifact SHA `c2e2ac940def006d7232fe4be817211c92495f703a15e6f4f3bed3e8dc7818a0`, stored size `1,267,296` bytes, input signature `860dafcd3fc40cd47935f15728ce38bdbec74b2d25c8475da4b017a7ec07738c`, and source-signature SHA `8d13cbc54c2151f0579b7e9530fdfcb077b6e6ea9b01f26860740b7ee5b1f60e`. The private `farm-watch-derived` Storage metadata reports the same size and artifact SHA-addressed path; storage encoding is deterministic `gzip-v1` with no raw LiDAR/COPC persistence.
+
+The artifact covers 68,472 exact local-domain cells, including 6,941 property cells and 58,669 structurally valid cells, on the 5 m output grid. It contains three generic equal observer/target height scenarios (1.5 m, 3 m, 6 m), 16 directions, and 10/25/50/100 m bands. The physical summary varies by scenario: combined obstruction fraction at 10/25/50/100 m is approximately 0.960/0.994/0.998/0.999 at 1.5 m, 0.960/0.990/0.996/0.998 at 3 m, and 0.794/0.914/0.962/0.986 at 6 m; terrain-only median visible distance at 100 m is 100 m while combined median is 5 m. Valid and unsupported direction totals are retained per band, and unsupported support is not treated as open.
+
+**Status:** canonical-central for `validation-property-01`; deterministic physical QA passed. No deer-use inference or score was produced.
