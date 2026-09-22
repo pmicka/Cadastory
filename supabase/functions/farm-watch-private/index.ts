@@ -349,11 +349,11 @@ async function readDeerContext(slug: string) {
   const at = now.toISOString()
 
   const [seasonal, diel, biological, fields] = await Promise.all([
-    admin.rpc('farm_watch_get_seasonal_state_v1_internal', {
+    admin.rpc('farm_watch_resolve_seasonal_state_v1_internal', {
       p_slug: slug,
       p_as_of_date: asOfDate,
     }),
-    admin.rpc('farm_watch_get_diel_photoperiod_v1_internal', {
+    admin.rpc('farm_watch_resolve_diel_photoperiod_v1_internal', {
       p_slug: slug,
       p_solar_date: asOfDate,
     }),
@@ -365,7 +365,7 @@ async function readDeerContext(slug: string) {
       p_movement_state: 'unknown',
       p_individual_reproductive_state: 'unknown',
     }),
-    admin.rpc('farm_watch_get_field_phenology_v1_internal', {
+    admin.rpc('farm_watch_resolve_field_phenology_v1_internal', {
       p_slug: slug,
       p_as_of_date: asOfDate,
     }),
