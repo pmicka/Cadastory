@@ -146,9 +146,23 @@ function scopeSummary(mask: Uint8Array, groups: Record<string, Float32Array>) {
   }
 }
 
-async function fetchJson(url: URL) {
-  const response = await fetch(url, { headers: { accept: 'application/json' } })
-  if (!response.ok) throw new Error('BIGMAP request failed: ' + response.status)
+async function postArcgis(path: string, params: URLSearchParams) {
+  const response = await fetch(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService + path, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      'user-agent': 'Cadastory-Farm-Watch/1.0 (+https://pmicka.com)',
+    },
+    body: params.toString(),
+  })
+  if (!response.ok) {
+    const detail = await response.text().catch(() => '')
+    throw new Error(
+      'BIGMAP request failed: ' + response.status +
+      (detail ? ' ' + detail.slice(0, 500) : ''),
+    )
+  }
   const body = await response.json()
   if (body?.error) throw new Error('BIGMAP service error: ' + JSON.stringify(body.error))
   return body
@@ -158,13 +172,13 @@ async function querySpeciesCatalog() {
   const allCodes = FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder.flatMap((group) =>
     FARM_WATCH_MAST_CAPACITY_GROUPS[group].map((row) => row.spcd)
   )
-  const url = new URL(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService + '/query')
-  url.searchParams.set('f', 'json')
-  url.searchParams.set('where', `category=1 AND spcd IN (${allCodes.join(',')})`)
-  url.searchParams.set('outFields', 'objectid,spcd,common_name,genus,species,name')
-  url.searchParams.set('returnGeometry', 'false')
-  url.searchParams.set('orderByFields', 'spcd')
-  const body = await fetchJson(url)
+  const params = new URLSearchParams()
+  params.set('f', 'json')
+  params.set('where', `category=1 AND spcd IN (${allCodes.join(',')})`)
+  params.set('outFields', 'objectid,spcd,common_name,genus,species,name')
+  params.set('returnGeometry', 'false')
+  params.set('orderByFields', 'spcd')
+  const body = await postArcgis('/query', params)
   const records = (body?.features || []).map((feature: any) => feature?.attributes || {})
   const byCode = new Map<number, any>()
   for (const record of records) {
@@ -185,25 +199,27 @@ async function exportSpecies(
   width: number,
   height: number,
 ) {
-  const url = new URL(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService + '/exportImage')
-  url.searchParams.set('f', 'json')
-  url.searchParams.set('bbox', requestBbox.join(','))
-  url.searchParams.set('bboxSR', '3857')
-  url.searchParams.set('imageSR', '3857')
-  url.searchParams.set('size', width + ',' + height)
-  url.searchParams.set('format', 'tiff')
-  url.searchParams.set('pixelType', 'F32')
-  url.searchParams.set('interpolation', 'RSP_BilinearInterpolation')
-  url.searchParams.set('mosaicRule', JSON.stringify({
+  const params = new URLSearchParams()
+  params.set('f', 'json')
+  params.set('bbox', requestBbox.join(','))
+  params.set('bboxSR', '3857')
+  params.set('imageSR', '3857')
+  params.set('size', width + ',' + height)
+  params.set('format', 'tiff')
+  params.set('pixelType', 'F32')
+  params.set('interpolation', 'RSP_BilinearInterpolation')
+  params.set('mosaicRule', JSON.stringify({
     mosaicMethod: 'esriMosaicLockRaster',
     lockRasterIds: [Number(record.objectid)],
   }))
-  const exported = await fetchJson(url)
+  const exported = await postArcgis('/exportImage', params)
   if (typeof exported?.href !== 'string' || !exported.href.startsWith('http')) {
     throw new Error('BIGMAP export did not return a TIFF URL for SPCD ' + record.spcd)
   }
 
-  const response = await fetch(exported.href)
+  const response = await fetch(exported.href, {
+    headers: { 'user-agent': 'Cadastory-Farm-Watch/1.0 (+https://pmicka.com)' },
+  })
   if (!response.ok) throw new Error('BIGMAP TIFF download failed: ' + response.status)
   const bytes = new Uint8Array(await response.arrayBuffer())
   const sourceSha256 = await sha256Hex(bytes)
