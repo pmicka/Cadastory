@@ -10,6 +10,7 @@ on:
       - 'supabase/functions/_shared/farm-watch-horizontal-visibility.test.ts'
       - 'supabase/functions/_shared/farm-watch-presentation-policy.ts'
       - 'supabase/functions/_shared/farm-watch-presentation-policy.test.ts'
+      - 'supabase/functions/_shared/github-actions-oidc.ts'
       - 'supabase/functions/farm-watch-materialization/index.ts'
       - 'scripts/farm-watch-horizontal-visibility-materialize.ts'
       - '.github/workflows/farm-watch-horizontal-visibility-ci.yml'

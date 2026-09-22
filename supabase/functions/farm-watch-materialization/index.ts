@@ -162,6 +162,13 @@ function validSha256(value: string | null) {
   return value && /^[0-9a-f]{64}$/.test(value) ? value : null
 }
 
+function validUuid(value: unknown) {
+  const text = String(value || '')
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text)
+    ? text
+    : null
+}
+
 function boundedSolarDate(value: unknown) {
   if (value == null || value === '') return null
   try {
@@ -962,6 +969,17 @@ async function completeBuild(args: {
   if (error) throw new Error(`materialization completion failed: ${error.message}`)
 }
 
+async function readMaterializationBuild(buildId: string) {
+  const { data, error } = await admin.rpc(
+    'farm_watch_get_materialization_build_v1_internal',
+    { p_build_id: buildId },
+  )
+  if (error || !data) {
+    throw new Error('materialization build unavailable' + (error?.message ? ': ' + error.message : ''))
+  }
+  return data
+}
+
 async function buildTerrainMaterialization(slug: string, workerId: string) {
   const claim = await claimBuild(slug, FARM_WATCH_TERRAIN_PRODUCT.key, workerId)
   if (claim?.action === 'reuse') return await readState(slug, FARM_WATCH_TERRAIN_PRODUCT.key)
@@ -1465,6 +1483,94 @@ async function buildHorizontalVisibilityMaterialization(slug: string, workerId: 
   }
 }
 
+async function prepareHorizontalVisibilityMaterialization(slug: string, workerId: string) {
+  const deps = await horizontalVisibilityDependencies(slug, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') {
+    return { action: 'reuse', materialization: await readHorizontalVisibilityState(slug) }
+  }
+  if (claim?.action !== 'build') return claim || { action: 'not_claimed' }
+  return {
+    action: 'build',
+    build_id: claim.build_id,
+    lease_token: claim.lease_token,
+    input_signature_sha256: claim.input_signature_sha256,
+    source_signature_sha256: claim.source_signature_sha256,
+    source_signature: deps.sourceSignature,
+    dependencies: {
+      landscape_structure_artifact: deps.landscapeStructureArtifact,
+      terrain_form_artifact: deps.terrainFormArtifact,
+      landscape_domain_identity_sha256: deps.domainIdentity,
+      landscape_structure_identity_sha256: deps.structureIdentity,
+      landscape_structure_artifact_sha256: deps.structureArtifactSha256,
+      terrain_form_identity_sha256: deps.terrainIdentity,
+      terrain_form_artifact_sha256: deps.terrainArtifactSha256,
+    },
+  }
+}
+
+async function completeHorizontalVisibilityMaterialization(slug: string, body: any) {
+  const buildId = validUuid(body?.build_id)
+  const leaseToken = validUuid(body?.lease_token)
+  const sampledSourceSha256 = validSha256(body?.sampled_source_sha256 || null)
+  if (!buildId || !leaseToken || !sampledSourceSha256) throw new Error('invalid visibility completion identity')
+
+  const build = await readMaterializationBuild(buildId)
+  const deps = await horizontalVisibilityDependencies(slug, false)
+  if (
+    build.product_kind !== FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.productKind ||
+    build.algorithm_version !== FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.algorithmVersion ||
+    build.output_schema_version !== FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.outputSchemaVersion ||
+    build.source_signature !== deps.sourceSignature ||
+    build.status !== 'processing' ||
+    String(build.lease_token) !== leaseToken
+  ) throw new Error('horizontal visibility build lease is incompatible')
+
+  const artifact = body?.artifact
+  if (!validateHorizontalVisibilityArtifact(artifact)) {
+    throw new Error('horizontal visibility artifact failed contract validation')
+  }
+  if (
+    artifact?.domain?.identity_sha256 !== deps.domainIdentity ||
+    artifact?.dependencies?.landscape_structure_identity_sha256 !== deps.structureIdentity ||
+    artifact?.dependencies?.landscape_structure_artifact_sha256 !== deps.structureArtifactSha256 ||
+    artifact?.dependencies?.terrain_form_identity_sha256 !== deps.terrainIdentity ||
+    artifact?.dependencies?.terrain_form_artifact_sha256 !== deps.terrainArtifactSha256 ||
+    artifact?.source_provenance?.source_signature !== deps.sourceSignature
+  ) throw new Error('horizontal visibility artifact dependency identity is stale')
+
+  await uploadNeutralPrimitive({
+    claim: build,
+    artifact,
+    sampledSourceSha256,
+    key: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key,
+    sourceSignature: deps.sourceSignature,
+    limitations: FARM_WATCH_HORIZONTAL_VISIBILITY_LIMITATIONS,
+    refreshDays: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.refreshDays,
+    artifactPath: horizontalVisibilityArtifactPath,
+  })
+  return readHorizontalVisibilityState(slug)
+}
+
+async function failHorizontalVisibilityMaterialization(body: any) {
+  const buildId = validUuid(body?.build_id)
+  const leaseToken = validUuid(body?.lease_token)
+  if (!buildId || !leaseToken) throw new Error('invalid visibility failure identity')
+  const build = await readMaterializationBuild(buildId)
+  if (
+    build.product_kind !== FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.productKind ||
+    String(build.lease_token) !== leaseToken ||
+    build.status !== 'processing'
+  ) throw new Error('horizontal visibility failure lease is incompatible')
+  await failBuild(buildId, leaseToken, String(body?.error || 'horizontal visibility worker failed'))
+  return { status: 'failed', build_id: buildId }
+}
+
 async function buildMaterialization(
   slug: string,
   key: ProductKey,
@@ -1502,7 +1608,7 @@ async function buildMaterialization(
     return buildThermalExposureMaterialization(slug, thermalAt, workerId)
   }
   if (key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key) {
-    return buildHorizontalVisibilityMaterialization(slug, workerId)
+    throw new Error('horizontal visibility materialization uses the protected GitHub worker')
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
@@ -1659,19 +1765,29 @@ Deno.serve(async (req: Request) => {
     }
 
     try {
+      const workerId = oidcIdentity
+        ? [
+            'github-actions-neutral-primitives',
+            oidcIdentity.run_id || 'run',
+            oidcIdentity.run_attempt || 'attempt',
+          ].join(':')
+        : 'farm-watch-materialization-edge-v2'
+      if (key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key && body?.operation === 'prepare') {
+        return json(await prepareHorizontalVisibilityMaterialization(slug, workerId), 200, origin)
+      }
+      if (key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key && body?.operation === 'complete') {
+        return json(await completeHorizontalVisibilityMaterialization(slug, body), 200, origin)
+      }
+      if (key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key && body?.operation === 'fail') {
+        return json(await failHorizontalVisibilityMaterialization(body), 200, origin)
+      }
       const operation = body?.operation === 'read' ? 'read' : 'build'
       const state = operation === 'read'
         ? await readState(slug, key, solarDate, thermalAt)
         : await buildMaterialization(
           slug,
           key,
-          oidcIdentity
-            ? [
-                'github-actions-neutral-primitives',
-                oidcIdentity.run_id || 'run',
-                oidcIdentity.run_attempt || 'attempt',
-              ].join(':')
-            : 'farm-watch-materialization-edge-v2',
+          workerId,
           solarDate,
           thermalAt,
         )
