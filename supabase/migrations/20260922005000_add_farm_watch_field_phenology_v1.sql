@@ -443,7 +443,7 @@ begin
         else 'stale'
       end as crop_identity_state,
       regional.week_ending as regional_week_ending,
-      regional.pilot_mean as regional_progress_mean
+      regional.rows as regional_progress_rows
     from agriculture.field_boundaries f
     left join lateral (
       select h.crop_year,h.crop_code,h.crop_name,h.observation_kind,h.confidence
@@ -473,16 +473,38 @@ begin
       limit 1
     ) prior on true
     left join lateral (
-      select l.week_ending,l.pilot_mean
-      from agriculture.crop_progress_layers l
-      where l.week_ending <= p_as_of_date
-        and l.metric='progress'
-        and (
-          (lower(coalesce(ch.crop_name,''))='corn' and lower(l.crop)='corn')
-          or (lower(coalesce(ch.crop_name,'')) in ('soybean','soybeans') and lower(l.crop)='soybean')
-        )
-      order by l.week_ending desc,l.retrieved_at desc
-      limit 1
+      with latest_week as (
+        select max(l0.week_ending) as week_ending
+        from agriculture.crop_progress_layers l0
+        where l0.week_ending <= p_as_of_date
+          and l0.metric='progress'
+          and (
+            (lower(coalesce(ch.crop_name,''))='corn' and lower(l0.crop)='corn')
+            or (lower(coalesce(ch.crop_name,'')) in ('soybean','soybeans') and lower(l0.crop)='soybean')
+          )
+      )
+      select
+        w.week_ending,
+        jsonb_agg(
+          jsonb_build_object(
+            'stage',l.stage,
+            'pilot_mean',l.pilot_mean,
+            'pilot_min',l.pilot_min,
+            'pilot_max',l.pilot_max,
+            'metadata',l.metadata
+          )
+          order by coalesce(l.stage,''),l.raster_name,l.id::text
+        ) as rows
+      from latest_week w
+      join agriculture.crop_progress_layers l
+        on l.week_ending=w.week_ending
+       and l.metric='progress'
+       and (
+         (lower(coalesce(ch.crop_name,''))='corn' and lower(l.crop)='corn')
+         or (lower(coalesce(ch.crop_name,'')) in ('soybean','soybeans') and lower(l.crop)='soybean')
+       )
+      where w.week_ending is not null
+      group by w.week_ending
     ) regional on true
     where extensions.st_intersects(f.geometry,v_domain.broad_3000m)
   ),
@@ -533,7 +555,7 @@ begin
         when regional_week_ending is null then null
         else jsonb_build_object(
           'week_ending',regional_week_ending,
-          'progress_mean',regional_progress_mean,
+          'stage_rows',coalesce(regional_progress_rows,'[]'::jsonb),
           'state','proxy',
           'interpretation_boundary','Regional synthetic crop progress cannot promote a field-level state.'
         )
