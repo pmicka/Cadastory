@@ -32,6 +32,7 @@ Before adding another structural analysis, check this ledger and the cited imple
 | Structural complementarity | `current-leaf-off-lidar-complementarity-v4` | canonical-central | 6,662 shared 5 m cells; current artifact SHA `01dc786d4f258bc1b5b78f43e935ff397f931293d298b9548da48ef1d600c074`. |
 | Terrain form / reference permeability | `barrier-aware-phase3-dem-terrain-form-permeability-v1` | canonical-central | 10 m local terrain-form candidates + 30 m 1.5 km reference slope-friction; identity `a4d02fa0738ea005efd0456027b0940a66b1155f7cd1a6c24a1287312e1f102f`; artifact SHA `b69a778cb91aa0d87e92fedfe9213d07b72caadf551ba6dfb2b95f4b45af45ee`. |
 | Spatial edge / patch context | `local500m-canopy-field-structure-pattern-v1` | canonical-central | 30 m canopy/field pattern + reused 5 m structural transitions; identity `9cdb6dd495a1e6e6de158e2686485b95ef94e83394b9121171f6455012f9ee4c`; artifact SHA `99edf000a5c5ad846b25be8d61c36b352ecb5fb25f30db1468499ea3ddc532e0`. |
+| Horizontal visibility / obstruction | `barrier-aware-local500m-horizontal-visibility-v1` | implementation-QA | Bounded 5 m physical ray summaries over the exact `local_500m` domain; consumes current central landscape structure and terrain-form artifacts; no deer semantics. |
 
 Current central materializations are stored in `farm_watch.property_materializations_v1`. The structural complementarity source signature binds to the exact current LiDAR and leaf-off artifact SHA-256 values.
 
@@ -433,3 +434,19 @@ A proposed experiment must identify which ledger item it extends and state exact
 - Storage metadata sizes match materialization-record sizes exactly. Both builds completed on attempt 1 with no persisted error, and the production edge read path revalidated each artifact after upload.
 
 **Status:** canonical-central for `validation-property-01`.
+
+### FW-S20 — Neutral horizontal visibility / obstruction
+
+**Question:** Can physical horizontal line-of-sight and obstruction geometry be represented on the current barrier-aware structural domain without reopening raw COPC/LAZ processing or assigning deer-use semantics?
+
+**Relationship to prior work:** Extends FW-S18's canonical local-500 m / 5 m structural continuity grid and FW-S19's neutral terrain and spatial-pattern primitives. It resolves a new uncertainty: existing vertical-profile, edge/patch, and terrain-form products do not represent horizontal ray occlusion. This is not another LiDAR-versus-leaf-off experiment.
+
+**Contract:** `horizontal-visibility-context-v1`, algorithm `barrier-aware-local500m-horizontal-visibility-v1`, source-controlled in `supabase/functions/_shared/farm-watch-horizontal-visibility-contract.ts`. The source signature binds the current landscape-domain identity, landscape-structure identity and artifact SHA, terrain-form identity and artifact SHA, grid definitions, three observer/target height scenarios (1.5 m, 3 m, 6 m), 16 north-origin clockwise azimuths, 5 m ray step, 10/25/50/100 m bands, maximum 100 m, support threshold, complete-four-cell terrain resampling, and unsupported-not-open edge handling.
+
+**Inputs and method:** The central materialization consumes the current private `landscape-structure-context-v1` compact 5 m neutral LiDAR band-share grid and current private `terrain-form-permeability-v1` local 10 m elevation grid. Terrain rays use complete-support bilinear interpolation. Structural obstruction is the maximum neutral LiDAR return-share support at the ray height along each sampled path; this is an explicit physical support proxy, not exact continuous vegetation volume or within-cell horizontal point geometry. Terrain-only and combined obstruction, angular openness, visible-distance summaries, valid-direction counts, and unsupported-direction counts remain separate continuous/diagnostic fields.
+
+**Boundary:** Heights are generic physical scenarios, not deer eye/body heights. Unsupported directions are abstentions, never open directions. The product produces no security-cover, concealment, bedding, escape-cover, travel-cover, habitat-quality, deer-visibility, deer-use, movement, hunting-quality, stand-suitability, or score output.
+
+**Validation:** Synthetic flat/open, added-obstruction monotonicity, directional/ray, packed-artifact, observer-height, distance-band, and unsupported-support checks are source-controlled in `supabase/functions/_shared/farm-watch-horizontal-visibility.test.ts`. Production validation is pending until the central worker is merged, deployed, and run once for `validation-property-01`.
+
+**Status:** implementation-QA; production validation pending.
