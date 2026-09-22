@@ -162,6 +162,13 @@ function validSha256(value: string | null) {
   return value && /^[0-9a-f]{64}$/.test(value) ? value : null
 }
 
+function validUuid(value: unknown) {
+  const text = String(value || '')
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text)
+    ? text
+    : null
+}
+
 function boundedSolarDate(value: unknown) {
   if (value == null || value === '') return null
   try {
