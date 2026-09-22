@@ -1098,3 +1098,25 @@ Accordingly, 2025 CDL/CSB remains stale historical crop identity and cannot gate
 The preferred fallback is the published Zhang et al. (2025) HLS Transformer (`10.1016/j.rse.2025.114950`). Its Apache-2.0 application code and public ~69.9 MB trained model are operationally plausible for the 37-field validation domain, but the model requires two years of richer HLS spectra than the current Farm Watch NDVI/EVI/NIR sampler. If adopted, implement it as a protected field-scoped spectral/inference path rather than reproducing the released whole-tile architecture.
 
 **Next Batch 4 unit:** perform the bounded Transformer integration spike: confirm model reuse terms, enumerate exact HLS band/time inputs and normalization contract, estimate field-scoped IO/inference cost, and define a neutral `current_crop_identity` evidence contract with confidence/abstention. Do not enable harvest classification in the same unit.
+
+
+## Batch 4 Transformer integration spike — 2026-09-22
+
+The bounded Zhang et al. HLS Transformer spike is complete at the contract/design level.
+
+Findings:
+
+- the model consumes two-year per-pixel HLS time series, not the existing Farm Watch NDVI/EVI/NIR field summaries;
+- Landsat inference uses seven reflective bands + DOY; Sentinel-2 uses eleven reflective bands + DOY;
+- Landsat thermal bands are read by the released loader but are not crop-model predictors;
+- the published QA mask differs from the current Farm Watch vegetation sampler, so model-faithful spectral collection must remain a separate protected path;
+- the released model returns raw 50-class logits and does not provide calibrated per-pixel prediction probabilities;
+- the paper does not publish a validated field-level consensus threshold for converting pixel labels into one accepted field crop identity;
+- the validation-property footprint is ~1,135 30 m pixel areas across 37 fields, about 1/11,800 of a full HLS tile, making field-scoped inference architecturally plausible;
+- a fully padded field-pixel inference tensor is ~36.6 MiB, compared with ~869 MiB for the full 3 km-domain bounding rectangle;
+- the current 2026 scene set implies ~912 required COG band-window reads for current-year model inputs; a conservative two-year upper bound using the released model's maximum per-sensor periods is ~4,432 reads;
+- model execution was not benchmarked because the exact Zenodo model-artifact rights/license was not independently verified. Code is Apache-2.0 and the paper is CC BY 4.0, but public download availability is not treated as permission to vendor/run the trained artifact.
+
+A neutral `current-crop-identity-v1` contract is now source-controlled. It supports candidate predictions, uncalibrated field-support diagnostics, explicit abstention, and blocks crop predictions from becoming harvest or deer inference.
+
+**Next Batch 4 unit:** resolve the trained-model rights gate and, if authorized, implement a non-persistent field-scoped spectral/inference prototype for the validation property. That prototype should emit candidate pixel/field class distributions only; field acceptance and harvest classification remain separate gates.
