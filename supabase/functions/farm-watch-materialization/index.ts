@@ -1156,10 +1156,12 @@ async function uploadNeutralPrimitive(args: {
   limitations: readonly string[]
   refreshDays: number
   artifactPath: (propertyId: string, inputSignature: string, artifactSha256: string) => string
+  maxArtifactBytes?: number
 }) {
   const spec = productSpec(args.key)
   const bytes = new TextEncoder().encode(JSON.stringify(args.artifact))
-  if (bytes.byteLength <= 0 || bytes.byteLength > 10 * 1024 * 1024) {
+  const maxArtifactBytes = args.maxArtifactBytes ?? 10 * 1024 * 1024
+  if (bytes.byteLength <= 0 || bytes.byteLength > maxArtifactBytes) {
     throw new Error('neutral primitive artifact size is invalid')
   }
   const artifactSha256 = await sha256Hex(bytes)
@@ -1553,6 +1555,7 @@ async function completeHorizontalVisibilityMaterialization(slug: string, body: a
     limitations: FARM_WATCH_HORIZONTAL_VISIBILITY_LIMITATIONS,
     refreshDays: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.refreshDays,
     artifactPath: horizontalVisibilityArtifactPath,
+    maxArtifactBytes: 25 * 1024 * 1024,
   })
   return readHorizontalVisibilityState(slug)
 }
@@ -1799,7 +1802,13 @@ Deno.serve(async (req: Request) => {
       return json(await readPayload(slug, key, state, knownSha256), 200, origin)
     } catch (error) {
       console.error('Farm Watch materialization worker failed', key, error)
-      return json({ error: 'materialization build failed' }, 503, origin)
+      const detail = oidcIdentity && error instanceof Error
+        ? error.message.slice(0, 300)
+        : null
+      return json({
+        error: 'materialization build failed',
+        ...(detail ? { detail } : {}),
+      }, 503, origin)
     }
   }
 
