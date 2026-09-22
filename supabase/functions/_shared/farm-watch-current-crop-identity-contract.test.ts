@@ -7,7 +7,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
   if (!condition) throw new Error(message)
 }
 
-function candidate() {
+function candidate(): any {
   return {
     schema_version: 'current-crop-identity-v1',
     field_id: '5407d61e-cd63-4889-aae3-8ebcd30446e3',
