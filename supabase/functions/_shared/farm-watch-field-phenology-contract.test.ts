@@ -61,3 +61,16 @@ Deno.test('response requires landscape-domain identity', () => {
   }
   assert(!validateFarmWatchFieldPhenologyResponse(missingDomainIdentity))
 })
+
+
+Deno.test('dependency-unavailable response accepts explicit reason with null context', () => {
+  assert(validateFarmWatchFieldPhenologyResponse({
+    status: 'unavailable',
+    context: null,
+    unavailable_reason: 'landscape_domain_unavailable',
+  }))
+  assert(!validateFarmWatchFieldPhenologyResponse({
+    status: 'unavailable',
+    context: null,
+  }))
+})
