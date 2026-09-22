@@ -10,6 +10,9 @@ const EPSG_32616 = 'EPSG:32616'
 const EPSG_6473 = 'EPSG:6473'
 const EPSG_6473_DEF =
   '+proj=lcc +lat_0=36.3333333333333 +lon_0=-85.75 +lat_1=37.0833333333333 +lat_2=38.6666666667 +x_0=1500000 +y_0=999999.9998984 +ellps=GRS80 +units=us-ft +no_defs +type=crs'
+const EPSG_32616_DEF =
+  '+proj=utm +zone=16 +datum=WGS84 +units=m +no_defs +type=crs'
+proj4.defs(EPSG_32616, EPSG_32616_DEF)
 proj4.defs(EPSG_6473, EPSG_6473_DEF)
 
 const US_SURVEY_FOOT_M = 0.3048006096012192
