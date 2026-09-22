@@ -142,7 +142,7 @@ The first production deer output should be a vector of evidence-backed module re
 | `horizontal-visibility-context-v1` | gridded physical | LiDAR + terrain | build |
 | `surface-water-state-v1` | dated physical/proxy | 3DHP/NWI + DEM + QPE/soil moisture + observations | build |
 | `human-activity-context-v1` | event/state | explicit owner/operator observations | build |
-| `diel-photoperiod-context-v1` | deterministic state | date/time/location solar geometry | Batch 3 implementation candidate |
+| `diel-photoperiod-context-v1` | deterministic state | date/time/location solar geometry | production |
 
 ## Deer-specific products
 
@@ -340,7 +340,7 @@ A dated physical thermal surface can be produced with no deer label and with all
 
 # Batch 3 — Diel and biological-state contracts
 
-Status: implementation candidate — not deployed  
+Status: production; deployed and validated 2026-09-21  
 Priority: P0  
 Depends on: deterministic solar time; regional phenology review.
 
@@ -397,6 +397,7 @@ Every deer relationship can ask for a named state and fail closed when that stat
 
 # Batch 4 — Dynamic agricultural resource state
 
+Status: Batch 4A implementation candidate — not deployed; Batch 4B HLS materializer pending  
 Priority: P0/P1  
 Ledger dependencies: FW-D08, D09, D15, D16.
 
@@ -404,7 +405,12 @@ Ledger dependencies: FW-D08, D09, D15, D16.
 
 Replace “mapped crop class = current food” with current field state.
 
-## Proposed `field-phenology-context-v1`
+## `field-phenology-context-v1`
+
+Batch 4 is split into two dependency-correct layers. **Batch 4A** establishes the service-only field-observation store, landscape-aware field target selection, dated field-state resolver, provenance/identity contracts, and fail-closed unknown phenology semantics. **Batch 4B** adds the protected HLS time-series materializer and only then may enable evidence-backed phenology/harvest classification.
+
+The validation property itself intersects no current USDA CSB field polygon, while its existing Farm Watch landscape domains contain 1 field in `local_500m`, 12 in `landscape_1500m`, and 37 in `broad_3000m`. Field state is therefore modeled by explicit multiscale domain membership rather than assuming agricultural fields and the watched parcel are coextensive.
+
 
 ### Inputs
 
@@ -1044,26 +1050,26 @@ That is already materially more scientifically defensible than a conventional ha
 
 ---
 
-# Current production milestone — Batches 1–2 complete
+# Current production milestone — Batches 1–3 complete
 
 The neutral meteorological/solar/thermal chain is now production-operational for `validation-property-01`:
 
 1. property-grade HRRR meteorological forcing;
 2. static Solar Terrain v3 with complete authoritative elevation support;
 3. date-specific Solar Exposure v1;
-4. HRRR-bound Thermal Exposure v1.
+4. HRRR-bound Thermal Exposure v1;
+5. Diel/Photoperiod Context v1 and Deer Biological State v1 with Kentucky regional breeding context kept separate from individual reproductive state.
 
 The chain remains neutral: no operative temperature, composite thermal score, deer-use inference, or habitat label is produced.
 
 # Recommended next implementation batch
 
-First deploy and validate **Batch 3** when explicitly authorized.
+Complete **Batch 4 — dynamic agricultural resource state** in dependency order:
 
-After Batch 3 is production-operational, proceed to **Batch 4 — dynamic agricultural resource state**:
-
-1. establish current field-level crop identity/state rather than relying on stale annual CDL;
-2. add HLS vegetation time-series support with explicit cloud/observation quality;
-3. distinguish standing/active crop, probable harvest transition, post-harvest/residual, and unknown;
-4. keep NASS/state crop-progress products as regional context rather than field truth.
+1. merge/deploy **Batch 4A** only after CI and explicit deployment authorization; this creates the service-only HLS field-observation persistence and fail-closed field-state contract but intentionally leaves phenology/harvest unknown;
+2. implement **Batch 4B** using the protected GitHub Actions OIDC → Farm Watch worker pattern for HLS raster sampling, with explicit Earthdata/catalog/download failure states and no browser-side HLS processing;
+3. validate an evidence-backed time-series method for standing/active crop, senescence, probable harvest transition, and post-harvest/residual before enabling those labels;
+4. keep CDL/CSB as annual identity and NASS/state crop-progress as regional context rather than field truth;
+5. preserve operator observations as separate evidence/override provenance rather than silently mixing them into remote-sensing truth.
 
 The machine-readable deer relationship registry remains downstream of explicit biological state and the neutral resource-state inputs required by its first modules.
