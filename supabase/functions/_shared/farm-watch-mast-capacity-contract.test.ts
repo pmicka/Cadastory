@@ -41,3 +41,10 @@ Deno.test('Batch 5A is capacity only', () => {
   assert(FARM_WATCH_MAST_CAPACITY_PRODUCT.semanticEvidenceClass === 'modeled_species_capacity')
   assert(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceValueUnit === 'tons_per_acre_live_tree_aboveground_biomass')
 })
+
+
+Deno.test('native BIGMAP grid is preserved', () => {
+  assert(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeCrs === 'ESRI:102039')
+  assert(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeWkid === 102039)
+  assert(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourcePixelMeters === 30)
+})
