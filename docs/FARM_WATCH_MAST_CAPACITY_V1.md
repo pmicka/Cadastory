@@ -8,7 +8,7 @@ Status: Batch 5A implementation contract
 
 ## Operational v1 source
 
-Batch 5A uses USDA Forest Service FIA **BIGMAP 2018 Tree Species Aboveground Biomass**, a 30 m modeled/imputed species biomass product expressed in tons/acre. The public Forest Service ImageServer is used for bounded analytical reads; raw CONUS rasters are not copied into Farm Watch.
+Batch 5A uses USDA Forest Service FIA **BIGMAP 2018 Tree Species Aboveground Biomass**, a 30 m modeled/imputed species biomass product expressed in tons/acre. The public Forest Service ImageServer is used for bounded analytical reads; raw CONUS rasters are not copied into Farm Watch. Because `imagery.geoplatform.gov` rejects GitHub-hosted runner egress, those bounded source reads are transported through the existing OIDC-protected Supabase worker. The worker is restricted to the source-controlled mast species and bounded 30 m export windows; it is not a general HTTP proxy.
 
 TreeMap 2023 remains a fresher future refinement candidate because its plot-ID raster can be linked to the accompanying FIA tree table. Batch 5A does not block on that bulk-delivery path.
 
@@ -29,7 +29,7 @@ The product uses the current `broad_3000m` geometry from `farm_watch_get_landsca
 
 ## Output semantics
 
-Per 30 m cell, the artifact preserves modeled live-tree aboveground biomass in tons/acre for each mast group.
+Per 30 m cell, the artifact preserves modeled live-tree aboveground biomass in tons/acre for each mast group. The grid remains in BIGMAP's native USA Contiguous Albers projection (`ESRI:102039`) and uses nearest-neighbor export on an aligned 30 m grid so the materializer does not introduce a Web Mercator resampling step.
 
 Neutral summaries include:
 
