@@ -364,3 +364,112 @@ Current-season crop identity remains unresolved in production. No 2025 crop clas
 
 1. a current 2026 ICDL layer is directly consumable and provenance-stable for the target fields; or
 2. the published HLS Transformer is integrated through a bounded field-scoped pipeline with explicit model/source identity and uncertainty.
+
+
+## HLS Transformer bounded integration spike — 2026-09-22
+
+This spike defines the integration boundary for Zhang et al. (2025), DOI `10.1016/j.rse.2025.114950`, without enabling crop classification.
+
+### Reuse-rights gate
+
+The application code in `hankui/In-season-crop-type-mapper` is Apache-2.0 and the paper is CC BY 4.0. The trained model is publicly downloadable from Zenodo record `10.5281/zenodo.14715402` and the record publishes the model MD5 `75b13ac5743d1d3449ffe5e2425e6ece`.
+
+The exact record-level rights/license attached to the Zenodo model artifact could not be independently verified from the accessible record metadata during this spike. Public availability is not treated as sufficient permission to vendor, redistribute, or operationally execute the model artifact. Farm Watch therefore records `modelArtifactReuseStatus=blocked_pending_explicit_rights_verification`.
+
+### Exact model input contract
+
+The released application classifies a current-year 30 m pixel from **two years** of HLS: the complete previous year plus current-year observations through the requested date.
+
+The inference tensor is aligned as:
+
+1. previous-year Landsat;
+2. previous-year Sentinel-2;
+3. current-year Landsat;
+4. current-year Sentinel-2.
+
+The released implementation reserves up to 176 acquisition dates per sensor per year and pads missing positions with `-9999`. It dynamically shortens the sequence to the maximum union of good-quality acquisition dates in the processing block.
+
+The model-input features are:
+
+- Landsat HLSL30: DOY + `B01 B02 B03 B04 B05 B06 B07`;
+- Sentinel-2 HLSS30: DOY + `B01 B02 B03 B04 B8A B11 B12 B05 B06 B07 B08`.
+
+The released HLS loader reads Landsat B10/B11 thermal bands, but the crop classification model **does not feed them into inference**. Prior Farm Watch notes that described thermal bands as model inputs were therefore too broad.
+
+HLS reflectance is first scaled by `0.0001`. Reflectance is then standardized with the released mean/std file. DOY is encoded as:
+
+`year_offset + (doy - 1) / 366`
+
+so the previous/current two-year sequence spans approximately 0–2.
+
+Published-application QA excludes:
+
+- fill;
+- cloud;
+- adjacent cloud/shadow;
+- cloud shadow;
+- snow/ice.
+
+The published application does not explicitly exclude water or high aerosol. That differs from the existing Farm Watch HLS vegetation sampler, which excludes both. The crop-model spectral collector must therefore remain a separate evidence path unless equivalence is established.
+
+The source-controlled normalization constants and exact band order are recorded in `farm-watch-current-crop-identity-contract.ts`.
+
+### Output / confidence semantics
+
+The released model outputs **50 raw class logits** and the application assigns the class with `argmax`. It does not publish a calibrated per-pixel probability contract.
+
+Farm Watch therefore MUST NOT call any of the following a calibrated crop probability without a separate calibration study:
+
+- softmax(logits);
+- top logit magnitude;
+- top-two logit margin.
+
+For field review, neutral diagnostics may include:
+
+- count of field pixels classified;
+- distribution of pixel class votes;
+- modal-class vote fraction;
+- top-two vote margin;
+- class entropy;
+- previous/current-year temporal support.
+
+These are support diagnostics, not scientific confidence coefficients.
+
+The source paper is a pixel-mapping study and does not publish a validated rule for promoting pixel predictions to one accepted USDA-field crop identity. No arbitrary majority threshold is introduced here. The neutral contract therefore distinguishes a `candidate_only` crop from an `accepted` crop and requires explicit abstention until a field-level acceptance rule has been validated.
+
+### Field-scoped cost estimate
+
+The validation domain contains 37 fields totaling approximately **252.38 acres**, equivalent to about **1,135 30 m pixel areas**. The current broad-domain bounding box is approximately 4.78 × 5.08 km, or about 26,969 30 m pixels.
+
+For comparison, one HLS tile is 3660 × 3660 = 13,395,600 pixels. The validation fields therefore contain roughly **1/11,800** as many 30 m pixel areas as a full HLS tile.
+
+At the published maximum shape, a float32 model tensor for ~1,135 field pixels, 704 time slots, and 12 inference features is approximately **36.6 MiB**. Reading the whole 3 km-domain bounding rectangle instead would raise that padded tensor to roughly **869 MiB**, so the preferred architecture is polygon/pixel scoped rather than bounding-box inference.
+
+The already-materialized March–September 2026 window contains 18 HLSL30 and 64 HLSS30 scenes. Reading the published model bands plus Fmask once per granule would require approximately **912 band-window reads** for that known partial-current-year segment. The Transformer, however, requires the complete previous year plus all current-year observations from January 1 through the target date. At the released model's maximum 176 dates per sensor per year, the conservative absolute two-year planning bound is **7,040 band-window reads** (2 × [176 Landsat × 8 assets + 176 Sentinel-2 × 12 assets]). Actual scene counts should be lower and must be measured by the prototype.
+
+The paper reports approximately three hours per full HLS tile on a dual-A100 server and notes that image loading accounts for about half of classification time. Because the Farm Watch field footprint is orders of magnitude smaller than a tile, the spike concludes that model arithmetic is unlikely to be the dominant cost; remote COG access, TensorFlow/model startup, and two-year scene discovery are the more likely fixed costs. This is a scaling estimate, not an empirical benchmark, because the model-artifact rights gate intentionally prevented executing the model in this unit.
+
+### Neutral `current_crop_identity` contract
+
+`farm-watch-current-crop-identity-contract.ts` reserves a neutral evidence product with:
+
+- field ID and as-of date;
+- method/model/source provenance;
+- candidate crop and optional accepted crop;
+- explicit state: `candidate_only | accepted | abstained | unavailable | blocked`;
+- uncalibrated support diagnostics;
+- abstention reasons;
+- `scoring_performed=false`;
+- `behavioral_inference_performed=false`;
+- `harvest_inference_performed=false`.
+
+A candidate prediction cannot masquerade as accepted crop identity, and no calibrated probability is allowed under the current contract.
+
+### Spike exit
+
+The bounded integration is technically feasible and small enough at the 37-field scale, but production execution remains blocked by two explicit gates:
+
+1. verify the Zenodo trained-model artifact's reuse rights;
+2. validate a field-level pixel-consensus / abstention rule before model predictions can become accepted current crop identity.
+
+Harvest classification remains separately disabled.

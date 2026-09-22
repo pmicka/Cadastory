@@ -6,6 +6,8 @@ on:
       - 'supabase/migrations/*farm_watch_field_phenology*.sql'
       - 'supabase/functions/_shared/farm-watch-field-phenology-contract.ts'
       - 'supabase/functions/_shared/farm-watch-field-phenology-contract.test.ts'
+      - 'supabase/functions/_shared/farm-watch-current-crop-identity-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-current-crop-identity-contract.test.ts'
       - 'scripts/check-farm-watch-field-phenology-migration.ts'
       - 'docs/FARM_WATCH_FIELD_PHENOLOGY_V1.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
@@ -28,5 +30,9 @@ jobs:
         run: deno check supabase/functions/_shared/farm-watch-field-phenology-contract.ts
       - name: Test Batch 4A contract
         run: deno test supabase/functions/_shared/farm-watch-field-phenology-contract.test.ts
+      - name: Check current crop identity contract
+        run: deno check supabase/functions/_shared/farm-watch-current-crop-identity-contract.ts
+      - name: Test current crop identity contract
+        run: deno test supabase/functions/_shared/farm-watch-current-crop-identity-contract.test.ts
       - name: Check migration invariants
         run: deno run --allow-read scripts/check-farm-watch-field-phenology-migration.ts
