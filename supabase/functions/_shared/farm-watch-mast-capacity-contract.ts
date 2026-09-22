@@ -40,7 +40,7 @@ export const FARM_WATCH_MAST_CAPACITY_GROUPS = Object.freeze({
 export const FARM_WATCH_MAST_CAPACITY_PRODUCT = Object.freeze({
   key: 'mast-capacity',
   productKind: 'mast-capacity',
-  algorithmVersion: 'bigmap2018-species-biomass-broad3000-v1',
+  algorithmVersion: 'bigmap2018-species-biomass-broad3000-v2',
   outputSchemaVersion: 'mast-capacity-v1',
   evidenceClass: 'deterministic_derived',
   semanticEvidenceClass: 'modeled_species_capacity',
@@ -53,6 +53,8 @@ export const FARM_WATCH_MAST_CAPACITY_PRODUCT = Object.freeze({
   sourceService:
     'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_FIA_BIGMAP_AboveGroundBiomass/ImageServer',
   sourcePixelMeters: 30,
+  sourceNativeCrs: 'ESRI:102039',
+  sourceNativeWkid: 102039,
   sourceValueUnit: 'tons_per_acre_live_tree_aboveground_biomass',
   domainScope: 'broad_3000m',
   refreshDays: 365,
@@ -87,6 +89,7 @@ export function mastCapacitySourceSignature(args: {
     'source_service=' + FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
     'source_year=' + FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceDataYear,
     'source_pixel_m=' + FARM_WATCH_MAST_CAPACITY_PRODUCT.sourcePixelMeters,
+    'source_wkid=' + FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeWkid,
     'source_unit=' + FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceValueUnit,
     'species=' + species.join(','),
     'grouping=kentucky-central-hardwood-mast-groups-v1',
@@ -124,7 +127,7 @@ export function validateMastCapacityArtifact(value: any) {
     !Number.isInteger(width) || width <= 0 ||
     !Number.isInteger(height) || height <= 0 ||
     Number(grid?.cell_meters) !== FARM_WATCH_MAST_CAPACITY_PRODUCT.sourcePixelMeters ||
-    grid?.crs !== 'EPSG:3857' ||
+    grid?.crs !== FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeCrs ||
     grid?.encoding !== 'base64-f32le-v1' ||
     typeof grid?.domain_mask_base64 !== 'string' || !grid.domain_mask_base64
   ) return false
