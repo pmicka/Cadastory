@@ -1114,7 +1114,7 @@ Findings:
 - the paper does not publish a validated field-level consensus threshold for converting pixel labels into one accepted field crop identity;
 - the validation-property footprint is ~1,135 30 m pixel areas across 37 fields, about 1/11,800 of a full HLS tile, making field-scoped inference architecturally plausible;
 - a fully padded field-pixel inference tensor is ~36.6 MiB, compared with ~869 MiB for the full 3 km-domain bounding rectangle;
-- the current 2026 scene set implies ~912 required COG band-window reads for current-year model inputs; a conservative two-year upper bound using the released model's maximum per-sensor periods is ~4,432 reads;
+- the known March–September 2026 scene set accounts for ~912 required COG band-window reads; because the model needs a full previous year plus current year from January 1, the conservative absolute two-year upper bound at the released 176-period-per-sensor capacity is ~7,040 reads;
 - model execution was not benchmarked because the exact Zenodo model-artifact rights/license was not independently verified. Code is Apache-2.0 and the paper is CC BY 4.0, but public download availability is not treated as permission to vendor/run the trained artifact.
 
 A neutral `current-crop-identity-v1` contract is now source-controlled. It supports candidate predictions, uncalibrated field-support diagnostics, explicit abstention, and blocks crop predictions from becoming harvest or deer inference.
