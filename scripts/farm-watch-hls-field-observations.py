@@ -516,6 +516,7 @@ def main() -> int:
                 },
                 "error": str(error),
             })
+            run_id = None
             raise
 
         counters.complete_asset_items = len(items)
