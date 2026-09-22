@@ -55,6 +55,9 @@ Deno.test('response requires landscape-domain identity', () => {
     },
   }
   assert(validateFarmWatchFieldPhenologyResponse(value))
-  delete value.identity.landscape_domain_identity_sha256
-  assert(!validateFarmWatchFieldPhenologyResponse(value))
+  const missingDomainIdentity = {
+    ...value,
+    identity: { ...value.identity, landscape_domain_identity_sha256: undefined },
+  }
+  assert(!validateFarmWatchFieldPhenologyResponse(missingDomainIdentity))
 })
