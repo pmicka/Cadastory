@@ -1,6 +1,6 @@
 # Farm Watch Field Phenology v1
 
-Status: Batch 4A + Batch 4B production; field-level phenology/harvest classifier not yet enabled  
+Status: Batch 4A + Batch 4B production; 180-day growing-season HLS substrate validated; live phenology/harvest classifier not yet authorized  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -290,3 +290,36 @@ The HLS acquisition contract is therefore extended from 45 to **180 days**. On a
 A published open-source CONUS in-season HLS crop-type mapper was also reviewed as a possible current-year crop-identity proxy. Its released implementation requires two years of raw HLS, a TensorFlow model, and substantially broader spectral inputs than the current Farm Watch field sampler. It is retained as a transfer candidate rather than introduced as an operational dependency in this Batch 4 unit.
 
 Classifier state remains fail-closed until the expanded trajectory has been materialized and reviewed.
+
+### Expanded production trajectory validation — 2026-09-22
+
+PR #206 expanded the protected HLS acquisition contract from 45 to 180 days and deployed `farm-watch-field-phenology-worker` version 2 with the existing GitHub OIDC/custom-auth posture unchanged.
+
+Production workflow run `35691287320` completed successfully for `validation-property-01`:
+
+- lookback start: 2026-03-26;
+- 37 target fields;
+- 82 complete HLS scenes discovered and sampled;
+- 3,034 canonical field/scene rows;
+- 1,136 rows meeting the `valid_fraction >= 0.30` support gate;
+- 37 current-quality fields;
+- quality-qualified observations span 2026-03-29 through 2026-09-19;
+- the 2025-corn field has 32 distinct quality dates;
+- the 2025-soybean fields have 28–31 distinct quality dates;
+- the 2025-grass/pasture fields have 23–32 distinct quality dates;
+- zero catalog-incomplete items;
+- zero download errors;
+- no raw imagery persisted.
+
+This closes the short-trajectory blocker. The dated field context remains intentionally fail-closed: 37/37 fields are current, 37/37 retain `phenology_state=unknown`, and `scoring_performed=false` / `behavioral_inference_performed=false`.
+
+### Live-classifier transfer disposition
+
+1. **Yang et al. (2021), Kentucky curve-change phenology** remains method-form evidence for corn/soybean planting and harvest timing. Its published implementation uses a smoothed seasonal MODIS NDVI curve and crop-specific phenological windows. Farm Watch cannot apply crop-specific harvest logic while the only field crop identity is the stale 2025 CDL/CSB identity for a 2026 request.
+2. **Liu et al. (2025), NHPI** remains strong harvest-transition evidence for corn/soybean, but its published method normalizes HPI within a field-specific window beginning at middle-of-senescence and extending two months afterward; the published 0.6 threshold was calibrated against study-region field truth. Using a truncated future window or copying that threshold into Kentucky would be an unvalidated modification.
+3. **Tang et al. (2026), Reaped Index (RI)**, DOI `10.1016/j.jag.2026.105510`, is a newer near-real-time, unsupervised harvest method using Sentinel-2 and adaptive thresholding. It is operationally better aligned with Farm Watch's current-state objective and was validated for grain crops including maize at a U.S. Iowa site. It remains a candidate method form, not a production classifier. RI requires spectral inputs beyond the current NDVI/EVI/NIR summaries, notably red and SWIR1 behavior, and still requires a defensible current-season crop mask.
+4. A 2026 peer-reviewed 10 m In-season Crop-type Data Layer (ICDL) product (Li et al. 2026, DOI `10.1038/s41597-026-07099-1`) and a published HLS Transformer crop mapper (Zhang et al. 2025, DOI `10.1016/j.rse.2025.114950`) establish defensible current-year crop-mapping routes. Operational availability/ingestion for the current 2026 Kentucky fields has not yet been verified, so neither is silently substituted for crop identity.
+
+**Gate result:** the seasonal observation substrate is now adequate. The remaining classifier blockers are (a) defensible current-season crop identity and (b) selection/implementation of a genuinely near-real-time harvest method whose required spectral inputs and threshold/segmentation semantics transfer to the target fields.
+
+Until those conditions are satisfied, `probable_harvest_transition` and `post_harvest_residual` remain unauthorized and `unknown` is the correct production result.
