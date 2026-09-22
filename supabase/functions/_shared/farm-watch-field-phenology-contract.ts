@@ -54,6 +54,9 @@ export function validateFarmWatchFieldPhenologyContext(value: any) {
 export function validateFarmWatchFieldPhenologyResponse(value: any) {
   if (!['available','partial','unavailable','missing','stale'].includes(String(value?.status || ''))) return false
   if (value?.status === 'missing' || value?.status === 'stale') return value?.context == null
+  if (value?.status === 'unavailable' && value?.context == null) {
+    return typeof value?.unavailable_reason === 'string' && value.unavailable_reason.length > 0
+  }
   if (!validateFarmWatchFieldPhenologyContext(value?.context)) return false
   const identity = value?.identity
   return Boolean(
