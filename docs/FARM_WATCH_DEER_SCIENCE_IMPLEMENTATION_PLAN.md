@@ -543,6 +543,14 @@ Use multiple observer-height scenarios so the neutral product is not hard-coded 
 
 Prefer existing central LiDAR artifacts where sufficient. If full 3-D point geometry is required, use the protected central worker path; do not restore browser COPC processing.
 
+### v1 bounded physics contract
+
+The first implementation consumes the exact barrier-aware `local_500m` domain and current common 5 m structural grid from `landscape-structure-context-v1`, together with the current local 10 m elevation grid from `terrain-form-permeability-v1`. It does not reopen raw COPC/LAZ processing. Rays use 16 equally spaced azimuths (north = 0 degrees, clockwise), a 5 m step, and a 100 m maximum with 10/25/50/100 m summaries. Observer and target heights are equal generic physical scenarios of 1.5 m, 3 m, and 6 m; these are not deer-height assumptions.
+
+Terrain-only, structural-support, and combined obstruction remain separate. Terrain uses complete-four-cell bilinear support; structural obstruction uses the current neutral LiDAR height-band return-share representation at the ray height. Directions leaving the exact domain or lacking required support are explicitly unsupported and excluded from summaries rather than treated as open. The source signature includes all structural, terrain, domain, grid, ray, height, band, threshold, resampling, and edge-policy dependencies so any relevant change invalidates the materialization.
+
+The artifact remains a private checksum-addressed derived product with no browser recomputation and no deer interpretation. Its physical limitations are recorded in the source-controlled contract and artifact provenance.
+
 ## Physical validation
 
 Validate against:

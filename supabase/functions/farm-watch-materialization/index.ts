@@ -82,6 +82,16 @@ import {
   buildThermalExposureArtifact,
 } from '../_shared/farm-watch-thermal-exposure.ts'
 import {
+  FARM_WATCH_HORIZONTAL_VISIBILITY_LIMITATIONS,
+  FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT,
+  horizontalVisibilityArtifactPath,
+  horizontalVisibilitySourceSignature,
+  validateHorizontalVisibilityArtifact,
+} from '../_shared/farm-watch-horizontal-visibility-contract.ts'
+import {
+  buildHorizontalVisibilityArtifact,
+} from '../_shared/farm-watch-horizontal-visibility.ts'
+import {
   FARM_WATCH_GITHUB_OIDC_AUDIENCE,
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
@@ -109,10 +119,12 @@ const ALLOWED_ORIGINS = new Set([
   'http://localhost:8000',
 ])
 const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
-const NEUTRAL_PRIMITIVES_WORKFLOW_REF =
-  'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main'
+const ALLOWED_MATERIALIZATION_WORKFLOW_REFS = new Set([
+  'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main',
+  'pmicka/Cadastory/.github/workflows/farm-watch-horizontal-visibility.yml@refs/heads/main',
+])
 
-type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context' | 'solar-terrain-context' | 'solar-exposure-context' | 'thermal-exposure-context'
+type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context' | 'solar-terrain-context' | 'solar-exposure-context' | 'thermal-exposure-context' | 'horizontal-visibility-context'
 
 function headers(origin = ''): Record<string, string> {
   const out: Record<string, string> = {
@@ -181,6 +193,7 @@ function productKey(value: unknown): ProductKey | null {
       key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key ||
       key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key ||
       key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key
+      || key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key
     ? key as ProductKey
     : null
 }
@@ -276,6 +289,15 @@ function productSpec(key: ProductKey) {
       sourceSignature: null,
     }
   }
+  if (key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key) {
+    return {
+      key,
+      productKind: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.productKind,
+      algorithmVersion: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.algorithmVersion,
+      outputSchemaVersion: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.outputSchemaVersion,
+      sourceSignature: null,
+    }
+  }
   return {
     key,
     productKind: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.productKind,
@@ -332,6 +354,9 @@ function validateArtifact(key: ProductKey, value: any) {
   if (key === FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key) return validateSolarTerrainArtifact(value)
   if (key === FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key) return validateSolarExposureArtifact(value)
   if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) return validateThermalExposureArtifact(value)
+  if (key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key) {
+    return validateHorizontalVisibilityArtifact(value)
+  }
   return validateStructureSynthesisArtifact(value)
 }
 
@@ -556,6 +581,68 @@ async function spatialPatternDependencies(slug: string, includeResourceGeometry 
 async function readSpatialPatternState(slug: string) {
   const deps = await spatialPatternDependencies(slug, false)
   return readDynamicState(slug, FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key, deps.sourceSignature)
+}
+
+async function horizontalVisibilityDependencies(slug: string, includeArtifacts = false) {
+  const [{ data: domain, error: domainError }, structureState, terrainState] = await Promise.all([
+    admin.rpc('farm_watch_get_landscape_domain_v1_internal', { p_slug: slug }),
+    readLandscapeStructureState(slug),
+    readTerrainFormState(slug),
+  ])
+  if (domainError) throw new Error('horizontal visibility landscape domain failed: ' + domainError.message)
+  const domainIdentity = validSha256(String(domain?.identity?.identity_sha256 || ''))
+  const structureIdentity = validSha256(String(structureState?.materialization?.identity_sha256 || ''))
+  const structureArtifactSha256 = validSha256(String(structureState?.materialization?.artifact_sha256 || ''))
+  const terrainIdentity = validSha256(String(terrainState?.materialization?.identity_sha256 || ''))
+  const terrainArtifactSha256 = validSha256(String(terrainState?.materialization?.artifact_sha256 || ''))
+  if (
+    domain?.status !== 'available' ||
+    structureState?.status !== 'available' ||
+    terrainState?.status !== 'available' ||
+    !domain?.zones?.local_500m ||
+    !domainIdentity || !structureIdentity || !structureArtifactSha256 ||
+    !terrainIdentity || !terrainArtifactSha256
+  ) throw new Error('current horizontal visibility dependencies are unavailable')
+
+  const sourceSignature = horizontalVisibilitySourceSignature({
+    landscapeDomainIdentitySha256: domainIdentity,
+    landscapeStructureIdentitySha256: structureIdentity,
+    landscapeStructureArtifactSha256: structureArtifactSha256,
+    terrainFormIdentitySha256: terrainIdentity,
+    terrainFormArtifactSha256: terrainArtifactSha256,
+  })
+
+  let landscapeStructureArtifact: any = null
+  let terrainFormArtifact: any = null
+  if (includeArtifacts) {
+    const [structurePayload, terrainPayload] = await Promise.all([
+      readPayload(slug, FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key, structureState),
+      readPayload(slug, FARM_WATCH_TERRAIN_FORM_PRODUCT.key, terrainState),
+    ])
+    landscapeStructureArtifact = structurePayload?.artifact
+    terrainFormArtifact = terrainPayload?.artifact
+    if (!landscapeStructureArtifact || !terrainFormArtifact) {
+      throw new Error('horizontal visibility dependency artifacts are unavailable')
+    }
+  }
+  return {
+    domainIdentity,
+    domain,
+    structureState,
+    terrainState,
+    structureIdentity,
+    structureArtifactSha256,
+    terrainIdentity,
+    terrainArtifactSha256,
+    landscapeStructureArtifact,
+    terrainFormArtifact,
+    sourceSignature,
+  }
+}
+
+async function readHorizontalVisibilityState(slug: string) {
+  const deps = await horizontalVisibilityDependencies(slug, false)
+  return readDynamicState(slug, FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key, deps.sourceSignature)
 }
 
 async function solarTerrainDependencies(slug: string, includeArtifacts = false) {
@@ -787,6 +874,7 @@ async function readState(
     if (!thermalAt) throw new Error('thermal exposure timestamp is required')
     return readThermalExposureState(slug, thermalAt)
   }
+  if (key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key) return readHorizontalVisibilityState(slug)
   return readStaticState(slug, key)
 }
 
@@ -1334,6 +1422,49 @@ async function buildThermalExposureMaterialization(
   }
 }
 
+async function buildHorizontalVisibilityMaterialization(slug: string, workerId: string) {
+  const deps = await horizontalVisibilityDependencies(slug, true)
+  const claim = await claimDynamicBuild(
+    slug,
+    FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key,
+    deps.sourceSignature,
+    workerId,
+  )
+  if (claim?.action === 'reuse') return readHorizontalVisibilityState(slug)
+  if (claim?.action !== 'build') {
+    return { status: claim?.action || 'not_claimed', build: claim || null, materialization: null }
+  }
+
+  const buildId = String(claim.build_id)
+  const leaseToken = String(claim.lease_token)
+  try {
+    const built = await buildHorizontalVisibilityArtifact({
+      landscapeStructureArtifact: deps.landscapeStructureArtifact,
+      terrainFormArtifact: deps.terrainFormArtifact,
+      landscapeDomainIdentitySha256: deps.domainIdentity,
+      landscapeStructureIdentitySha256: deps.structureIdentity,
+      landscapeStructureArtifactSha256: deps.structureArtifactSha256,
+      terrainFormIdentitySha256: deps.terrainIdentity,
+      terrainFormArtifactSha256: deps.terrainArtifactSha256,
+      sourceSignature: deps.sourceSignature,
+    })
+    await uploadNeutralPrimitive({
+      claim,
+      artifact: built.artifact,
+      sampledSourceSha256: built.sampledSourceSha256,
+      key: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key,
+      sourceSignature: deps.sourceSignature,
+      limitations: FARM_WATCH_HORIZONTAL_VISIBILITY_LIMITATIONS,
+      refreshDays: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.refreshDays,
+      artifactPath: horizontalVisibilityArtifactPath,
+    })
+    return readHorizontalVisibilityState(slug)
+  } catch (error) {
+    await failBuild(buildId, leaseToken, error)
+    throw error
+  }
+}
+
 async function buildMaterialization(
   slug: string,
   key: ProductKey,
@@ -1369,6 +1500,9 @@ async function buildMaterialization(
   if (key === FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key) {
     if (!thermalAt) throw new Error('thermal exposure timestamp is required')
     return buildThermalExposureMaterialization(slug, thermalAt, workerId)
+  }
+  if (key === FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key) {
+    return buildHorizontalVisibilityMaterialization(slug, workerId)
   }
   return key === FARM_WATCH_TERRAIN_PRODUCT.key
     ? buildTerrainMaterialization(slug, workerId)
@@ -1494,7 +1628,7 @@ Deno.serve(async (req: Request) => {
       if (token) {
         try {
           const identity = await verifyFarmWatchGitHubActionsOidc(token)
-          if (identity?.workflow_ref === NEUTRAL_PRIMITIVES_WORKFLOW_REF) {
+          if (ALLOWED_MATERIALIZATION_WORKFLOW_REFS.has(identity?.workflow_ref)) {
             oidcIdentity = identity
           }
         } catch (error) {
