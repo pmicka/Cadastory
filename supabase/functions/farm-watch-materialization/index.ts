@@ -148,12 +148,16 @@ function json(body: unknown, status = 200, origin = '') {
 }
 
 async function gzipBytes(bytes: Uint8Array) {
-  const stream = new Response(bytes).body!.pipeThrough(new CompressionStream('gzip'))
+  const stream = new Response(bytes as unknown as BodyInit).body!.pipeThrough(
+    new CompressionStream('gzip'),
+  )
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
 async function gunzipBytes(bytes: Uint8Array) {
-  const stream = new Response(bytes).body!.pipeThrough(new DecompressionStream('gzip'))
+  const stream = new Response(bytes as unknown as BodyInit).body!.pipeThrough(
+    new DecompressionStream('gzip'),
+  )
   return new Uint8Array(await new Response(stream).arrayBuffer())
 }
 
