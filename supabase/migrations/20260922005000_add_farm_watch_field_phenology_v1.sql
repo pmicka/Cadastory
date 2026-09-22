@@ -72,7 +72,7 @@ values
   'scene driven',
   'federal_primary',
   'active_reference',
-  'https://lpdaac.usgs.gov/products/hlsl30v002/',
+  'https://doi.org/10.5067/HLS/HLSL30.002',
   'NASA Earthdata public science product; access conditions follow Earthdata distribution terms.',
   'public_government',
   'Batch 4 source family for field-level current vegetation state. Surface reflectance remains required for NIR-dependent harvest methods.'
@@ -87,7 +87,7 @@ values
   'scene driven',
   'federal_primary',
   'active_reference',
-  'https://lpdaac.usgs.gov/products/hlss30v002/',
+  'https://doi.org/10.5067/HLS/HLSS30.002',
   'NASA Earthdata public science product; access conditions follow Earthdata distribution terms.',
   'public_government',
   'Batch 4 source family for field-level current vegetation state. Surface reflectance remains required for NIR-dependent harvest methods.'
@@ -102,7 +102,7 @@ values
   'scene driven',
   'federal_primary',
   'active_reference',
-  'https://lpdaac.usgs.gov/products/hlsl30_viv002/',
+  'https://doi.org/10.5067/HLS/HLSL30_VI.002',
   'NASA Earthdata public science product; access conditions follow Earthdata distribution terms.',
   'public_government',
   'Candidate source for precomputed field NDVI/EVI observations; catalog availability must be distinguished from valid no-observation state.'
@@ -117,7 +117,7 @@ values
   'scene driven',
   'federal_primary',
   'active_reference',
-  'https://lpdaac.usgs.gov/products/hlss30_viv002/',
+  'https://doi.org/10.5067/HLS/HLSS30_VI.002',
   'NASA Earthdata public science product; access conditions follow Earthdata distribution terms.',
   'public_government',
   'Candidate source for precomputed field NDVI/EVI observations; catalog availability must be distinguished from valid no-observation state.'
