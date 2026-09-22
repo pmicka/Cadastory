@@ -13,6 +13,9 @@ import { sha256Hex } from '../supabase/functions/_shared/farm-watch-terrain.ts'
 const EDGE_URL =
   'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/farm-watch-mast-capacity-worker'
 const propertySlug = arg('--property', 'validation-property-01')!
+const ESRI_102039 =
+  '+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +type=crs'
+proj4.defs('ESRI:102039', ESRI_102039)
 
 function arg(name: string, fallback: string | null = null) {
   const index = Deno.args.indexOf(name)
@@ -68,12 +71,12 @@ function coordinates(geometry: any) {
   return out
 }
 
-function webMercatorBounds(geometry: any) {
+function nativeBigmapBounds(geometry: any) {
   const points = coordinates(geometry)
   if (!points.length) throw new Error('mast capacity analysis geometry is empty')
   let xmin = Infinity, ymin = Infinity, xmax = -Infinity, ymax = -Infinity
   for (const [lon, lat] of points) {
-    const [x, y] = proj4('EPSG:4326', 'EPSG:3857', [lon, lat])
+    const [x, y] = proj4('EPSG:4326', 'ESRI:102039', [lon, lat])
     xmin = Math.min(xmin, x)
     ymin = Math.min(ymin, y)
     xmax = Math.max(xmax, x)
@@ -146,100 +149,6 @@ function scopeSummary(mask: Uint8Array, groups: Record<string, Float32Array>) {
   }
 }
 
-async function postArcgis(path: string, params: URLSearchParams) {
-  const response = await fetch(FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService + path, {
-    method: 'POST',
-    headers: {
-      accept: 'application/json',
-      'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
-      'user-agent': 'Cadastory-Farm-Watch/1.0 (+https://pmicka.com)',
-    },
-    body: params.toString(),
-  })
-  if (!response.ok) {
-    const detail = await response.text().catch(() => '')
-    throw new Error(
-      'BIGMAP request failed: ' + response.status +
-      (detail ? ' ' + detail.slice(0, 500) : ''),
-    )
-  }
-  const body = await response.json()
-  if (body?.error) throw new Error('BIGMAP service error: ' + JSON.stringify(body.error))
-  return body
-}
-
-async function querySpeciesCatalog() {
-  const allCodes = FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder.flatMap((group) =>
-    FARM_WATCH_MAST_CAPACITY_GROUPS[group].map((row) => row.spcd)
-  )
-  const params = new URLSearchParams()
-  params.set('f', 'json')
-  params.set('where', `category=1 AND spcd IN (${allCodes.join(',')})`)
-  params.set('outFields', 'objectid,spcd,common_name,genus,species,name')
-  params.set('returnGeometry', 'false')
-  params.set('orderByFields', 'spcd')
-  const body = await postArcgis('/query', params)
-  const records = (body?.features || []).map((feature: any) => feature?.attributes || {})
-  const byCode = new Map<number, any>()
-  for (const record of records) {
-    const code = Number(record.spcd)
-    if (!Number.isInteger(code)) continue
-    if (byCode.has(code)) throw new Error('BIGMAP catalog returned duplicate primary species code ' + code)
-    byCode.set(code, record)
-  }
-  for (const code of allCodes) {
-    if (!byCode.has(code)) throw new Error('BIGMAP catalog is missing expected species code ' + code)
-  }
-  return byCode
-}
-
-async function exportSpecies(
-  record: any,
-  requestBbox: number[],
-  width: number,
-  height: number,
-) {
-  const params = new URLSearchParams()
-  params.set('f', 'json')
-  params.set('bbox', requestBbox.join(','))
-  params.set('bboxSR', '3857')
-  params.set('imageSR', '3857')
-  params.set('size', width + ',' + height)
-  params.set('format', 'tiff')
-  params.set('pixelType', 'F32')
-  params.set('interpolation', 'RSP_BilinearInterpolation')
-  params.set('mosaicRule', JSON.stringify({
-    mosaicMethod: 'esriMosaicLockRaster',
-    lockRasterIds: [Number(record.objectid)],
-  }))
-  const exported = await postArcgis('/exportImage', params)
-  if (typeof exported?.href !== 'string' || !exported.href.startsWith('http')) {
-    throw new Error('BIGMAP export did not return a TIFF URL for SPCD ' + record.spcd)
-  }
-
-  const response = await fetch(exported.href, {
-    headers: { 'user-agent': 'Cadastory-Farm-Watch/1.0 (+https://pmicka.com)' },
-  })
-  if (!response.ok) throw new Error('BIGMAP TIFF download failed: ' + response.status)
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  const sourceSha256 = await sha256Hex(bytes)
-  const tiff = await fromArrayBuffer(bytes.buffer)
-  const image = await tiff.getImage()
-  const rasterWidth = image.getWidth()
-  const rasterHeight = image.getHeight()
-  if (rasterWidth !== width || rasterHeight !== height) {
-    throw new Error(`BIGMAP TIFF dimensions changed for SPCD ${record.spcd}: ${rasterWidth}x${rasterHeight}`)
-  }
-  const bbox = image.getBoundingBox().map(Number)
-  const raster = await image.readRasters({ interleave: true })
-  const values = new Float32Array(width * height)
-  for (let i = 0; i < values.length; i += 1) {
-    const value = Number((raster as any)[i])
-    values[i] = Number.isFinite(value) && value > 0 && value < 100000 ? value : 0
-  }
-  return { values, bbox, sourceSha256, sourceBytes: bytes.byteLength }
-}
-
 async function freshOidcToken() {
   const requestUrl = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_URL') || ''
   const requestToken = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_TOKEN') || ''
@@ -297,14 +206,26 @@ async function main() {
     const property = claim?.property_boundary_geojson
     if (!broad || !local || !landscape || !property) throw new Error('mast capacity analysis zones unavailable')
 
-    const requestBbox = webMercatorBounds(broad)
+    const requestBbox = nativeBigmapBounds(broad)
     const cell = FARM_WATCH_MAST_CAPACITY_PRODUCT.sourcePixelMeters
     const width = Math.max(1, Math.round((requestBbox[2] - requestBbox[0]) / cell))
     const height = Math.max(1, Math.round((requestBbox[3] - requestBbox[1]) / cell))
     if (width * height > 250000) throw new Error('mast capacity bounded grid is unexpectedly large')
 
-    console.log('Querying BIGMAP 2018 species catalog')
-    const catalog = await querySpeciesCatalog()
+    console.log('Querying BIGMAP 2018 species catalog through protected backend transport')
+    const catalogPayload = await workerRequest({ operation: 'source_catalog' })
+    const catalog = new Map<number, any>()
+    for (const record of catalogPayload?.records || []) {
+      const code = Number(record?.spcd)
+      if (Number.isInteger(code)) catalog.set(code, record)
+    }
+    for (const group of FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder) {
+      for (const expected of FARM_WATCH_MAST_CAPACITY_GROUPS[group]) {
+        if (!catalog.has(expected.spcd)) {
+          throw new Error('protected BIGMAP catalog is missing expected species code ' + expected.spcd)
+        }
+      }
+    }
     const groupValues: Record<string, Float32Array> = Object.fromEntries(
       FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder.map((group) => [
         group,
@@ -321,7 +242,37 @@ async function main() {
       for (const expected of FARM_WATCH_MAST_CAPACITY_GROUPS[group]) {
         const record = catalog.get(expected.spcd)
         console.log(`Sampling BIGMAP SPCD ${expected.spcd} ${expected.common_name}`)
-        const exported = await exportSpecies(record, requestBbox, width, height)
+        const source = await workerRequest({
+          operation: 'source_export',
+          spcd: expected.spcd,
+          bbox: requestBbox,
+          width,
+          height,
+        })
+        const bytes = new Uint8Array(Buffer.from(String(source?.source_tiff_base64 || ''), 'base64'))
+        if (!bytes.byteLength) throw new Error('protected BIGMAP TIFF payload is empty for SPCD ' + expected.spcd)
+        const sourceSha256 = await sha256Hex(bytes)
+        if (sourceSha256 !== String(source?.source_tiff_sha256 || '')) {
+          throw new Error('protected BIGMAP TIFF checksum mismatch for SPCD ' + expected.spcd)
+        }
+        const tiff = await fromArrayBuffer(bytes.buffer)
+        const image = await tiff.getImage()
+        const rasterWidth = image.getWidth()
+        const rasterHeight = image.getHeight()
+        if (rasterWidth !== width || rasterHeight !== height) {
+          throw new Error(`BIGMAP TIFF dimensions changed for SPCD ${expected.spcd}: ${rasterWidth}x${rasterHeight}`)
+        }
+        const exported = {
+          bbox: image.getBoundingBox().map(Number),
+          values: new Float32Array(width * height),
+          sourceSha256,
+          sourceBytes: bytes.byteLength,
+        }
+        const raster = await image.readRasters({ interleave: true })
+        for (let i = 0; i < exported.values.length; i += 1) {
+          const value = Number((raster as any)[i])
+          exported.values[i] = Number.isFinite(value) && value > 0 && value < 100000 ? value : 0
+        }
         if (!rasterBbox) rasterBbox = exported.bbox
         else if (exported.bbox.some((value, i) => Math.abs(value - rasterBbox![i]) > 0.01)) {
           throw new Error('BIGMAP export grids are not co-registered')
@@ -357,7 +308,7 @@ async function main() {
       for (let col = 0; col < width; col += 1) {
         const index = row * width + col
         const x = rasterBbox[0] + (col + 0.5) * xStep
-        const [lon, lat] = proj4('EPSG:3857', 'EPSG:4326', [x, y])
+        const [lon, lat] = proj4('ESRI:102039', 'EPSG:4326', [x, y])
         if (!pointInGeometry(lon, lat, broad)) continue
         domainMask[index] = 1
         if (pointInGeometry(lon, lat, landscape)) landscapeMask[index] = 1
@@ -378,11 +329,12 @@ async function main() {
       source_data_year: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceDataYear,
       source_value_unit: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceValueUnit,
       export_request: {
-        bbox_epsg_3857: requestBbox,
-        raster_bbox_epsg_3857: rasterBbox,
+        bbox_esri_102039: requestBbox,
+        raster_bbox_esri_102039: rasterBbox,
         width,
         height,
-        interpolation: 'RSP_BilinearInterpolation',
+        interpolation: 'RSP_NearestNeighbor',
+        transport: 'protected_supabase_worker',
       },
       landscape_domain_identity_sha256: claim.landscape_domain_identity.identity_sha256,
       source_items: sourceItems,
@@ -411,7 +363,7 @@ async function main() {
         groups: sourceGroups,
       },
       grid: {
-        crs: 'EPSG:3857',
+        crs: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceNativeCrs,
         bbox: rasterBbox,
         width,
         height,
