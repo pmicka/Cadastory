@@ -1,4 +1,5 @@
 import {
+  FARM_WATCH_HLS_FIELD_PRODUCT,
   validateFarmWatchHlsCompletion,
   validateFarmWatchHlsObservationRow,
 } from './farm-watch-hls-field-observation-contract.ts'
@@ -69,4 +70,12 @@ Deno.test('HLS completion rejects behavioral inference', () => {
     scoring_performed: false,
     behavioral_inference_performed: true,
   }))
+})
+
+
+Deno.test('HLS collection preserves a growing-season trajectory window', () => {
+  assert(
+    FARM_WATCH_HLS_FIELD_PRODUCT.lookbackDays === 180,
+    'HLS collection must reach before the Kentucky corn/soy planting window for a late-September classifier review',
+  )
 })

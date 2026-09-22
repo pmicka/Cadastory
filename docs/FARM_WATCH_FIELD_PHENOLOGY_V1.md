@@ -272,4 +272,21 @@ Both `agent_contract.assert_tool_registry_integrity_v1()` and `agent_contract.as
 
 Batch 4B does **not** enable harvest classification. Current HLS observations now establish a usable dated field-observation time series, but every field remains `phenology_state=unknown` until a separately validated classification method is authorized.
 
-The next dependency-correct gate is the Batch 4 phenology/harvest method-transfer pass: evaluate the current HLS time series against the Kentucky curve-change and NHPI evidence, define the minimum observation/quality requirements, and only then implement standing/active crop, senescence, probable-harvest-transition, post-harvest/residual, or explicit abstention semantics.
+The next dependency-correct gate is the Batch 4 phenology/harvest method-transfer pass: evaluate the HLS time series against the Kentucky curve-change and NHPI evidence, define the minimum observation/quality requirements, and only then implement standing/active crop, senescence, probable-harvest-transition, post-harvest/residual, or explicit abstention semantics.
+
+## Batch 4 classifier transfer review — 2026-09-22
+
+The first classifier review found that the 45-day production collection window is too short to authorize a published harvest method. The quality-qualified production observations currently span 2026-08-09 through 2026-09-19, with only 5–8 usable observation dates per field. That is enough for a recent vegetation trajectory but not enough to establish the full seasonal/post-peak trajectory required by the retained harvest methods.
+
+Scientific disposition:
+
+- Yang et al. (2021) is Kentucky-specific and supports a curve-change method form, but its implementation identifies crop-season landmarks from a smoothed daily MODIS NDVI trajectory. Its MODIS coefficients/windows are not automatically HLS 30 m coefficients.
+- Liu et al. (2025) supports the NIR + NDVI NHPI harvest-transition form, but NHPI requires locating the post-peak senescence trajectory before evaluating the harvest transition. The published threshold remains study-calibrated and is not authorized as a Kentucky coefficient.
+- A generic latest-versus-prior NDVI drop remains forbidden.
+- The current 2025 CDL/CSB crop identity remains stale for a 2026 request. Crop-specific corn/soy harvest logic must not silently assume the 2026 crop from last year's identity.
+
+The HLS acquisition contract is therefore extended from 45 to **180 days**. On a late-September run this reaches into late March, before the Kentucky study's documented corn and soybean planting windows, while preserving the existing field-clipped COG workflow and remote-sensing evidence boundary. The longer window is an observation-substrate change only; it does not enable classification.
+
+A published open-source CONUS in-season HLS crop-type mapper was also reviewed as a possible current-year crop-identity proxy. Its released implementation requires two years of raw HLS, a TensorFlow model, and substantially broader spectral inputs than the current Farm Watch field sampler. It is retained as a transfer candidate rather than introduced as an operational dependency in this Batch 4 unit.
+
+Classifier state remains fail-closed until the expanded trajectory has been materialized and reviewed.
