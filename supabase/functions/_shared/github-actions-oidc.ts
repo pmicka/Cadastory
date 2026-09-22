@@ -19,6 +19,7 @@ const TRUST = Object.freeze({
     'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-hls-field-observations.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-mast-capacity.yml@refs/heads/main',
+    'pmicka/Cadastory/.github/workflows/farm-watch-mast-capacity.yml@refs/heads/main',
   ],
 })
 
