@@ -473,3 +473,27 @@ The bounded integration is technically feasible and small enough at the 37-field
 2. validate a field-level pixel-consensus / abstention rule before model predictions can become accepted current crop identity.
 
 Harvest classification remains separately disabled.
+
+
+## Trained-model rights gate — 2026-09-22
+
+The rights gate for Zenodo record `10.5281/zenodo.14715402` was rechecked against the exact public record and Zenodo's own licensing guidance.
+
+Verified facts:
+
+- the record explicitly distributes the trained `.h5` model and training/evaluation data;
+- the record is publicly downloadable;
+- the record's rendered metadata does **not** expose a Rights/License section;
+- Zenodo's guidance states that permission to reuse a specific record depends on the license conditions shown in the record's Rights section;
+- the application-code repository is separately licensed Apache-2.0;
+- the published paper is CC BY 4.0 and describes the model/code as publicly available for users;
+- neither the repository's Apache-2.0 license nor the paper's CC BY 4.0 license is treated as automatically attaching to the separately deposited Zenodo model weights.
+
+Disposition: **the trained-model artifact remains blocked for operational execution, vendoring, or redistribution**. Public availability and apparent author intent are useful context but do not substitute for an explicit artifact license.
+
+The rights gate can be cleared by either:
+
+1. an explicit license appearing on the Zenodo model record that covers the trained model artifact; or
+2. direct written permission from the rights holder(s) covering Farm Watch's intended use.
+
+No model download or inference was performed in this unit.
