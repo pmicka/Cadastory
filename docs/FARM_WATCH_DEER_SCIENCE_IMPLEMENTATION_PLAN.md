@@ -397,7 +397,7 @@ Every deer relationship can ask for a named state and fail closed when that stat
 
 # Batch 4 — Dynamic agricultural resource state
 
-Status: Batch 4A + Batch 4B production; evidence-backed phenology/harvest classification pending  
+Status: Batch 4A + Batch 4B production; full-growing-season HLS trajectory expansion underway; evidence-backed phenology/harvest classification pending  
 Priority: P0/P1  
 Ledger dependencies: FW-D08, D09, D15, D16.
 
@@ -1072,6 +1072,6 @@ Complete the remaining **Batch 4 phenology/harvest classification gate** on top 
 4. implement classification only where the evidence contract supports it; regional NASS progress remains proxy context and stale CDL/CSB remains annual identity rather than current field truth;
 5. preserve operator observations as separate provenance and never silently overwrite remote-sensing evidence.
 
-The production HLS pilot currently has 37/37 fields with current evidence but deliberately retains `phenology_state=unknown` for all 37. That is the correct starting point for the classifier review, not a missing-data problem.
+The production HLS pilot currently has 37/37 fields with current evidence but deliberately retains `phenology_state=unknown` for all 37. The first classifier transfer review found the original 45-day HLS collection window too short for the retained published harvest methods, so the HLS acquisition contract is being expanded to 180 days to preserve the full growing-season trajectory before any classifier is authorized. That is a prerequisite-data problem, not permission to substitute a generic NDVI-drop rule.
 
 The machine-readable deer relationship registry remains downstream of explicit biological state and the neutral resource-state inputs required by its first modules.
