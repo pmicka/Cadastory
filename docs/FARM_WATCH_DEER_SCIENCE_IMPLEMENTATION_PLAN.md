@@ -1120,3 +1120,14 @@ Findings:
 A neutral `current-crop-identity-v1` contract is now source-controlled. It supports candidate predictions, uncalibrated field-support diagnostics, explicit abstention, and blocks crop predictions from becoming harvest or deer inference.
 
 **Next Batch 4 unit:** resolve the trained-model rights gate and, if authorized, implement a non-persistent field-scoped spectral/inference prototype for the validation property. That prototype should emit candidate pixel/field class distributions only; field acceptance and harvest classification remain separate gates.
+
+
+## Batch 4 trained-model rights gate — 2026-09-22
+
+The Zhang et al. trained-model artifact on Zenodo record `10.5281/zenodo.14715402` remains blocked for Farm Watch execution.
+
+The exact public Zenodo record was reviewed. It exposes the model file and describes the dataset/model contents, but its rendered metadata does not expose a Rights/License section. Zenodo's own guidance states that permission for reuse is determined by the license conditions shown in that Rights section. The Apache-2.0 license in the GitHub repository applies to the application code; it is not assumed to license the separately deposited `.h5` weights. The CC BY 4.0 paper and the authors' statement that the trained model is publicly available support intended openness but do not replace an explicit model-artifact license.
+
+Contract state is now `blocked_no_record_license`.
+
+**Next Batch 4 unit:** obtain explicit trained-model permission/license clarification. Until that clears, do not download, vendor, redistribute, or execute the model artifact. If permission is obtained, the next implementation unit remains the non-persistent field-scoped inference prototype with candidate-only output and no harvest promotion.
