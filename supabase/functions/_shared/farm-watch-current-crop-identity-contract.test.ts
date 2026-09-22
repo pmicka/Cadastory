@@ -61,3 +61,11 @@ Deno.test('published application contract uses reflective Landsat bands only', (
   assert(FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT.sentinel2.modelBands.length === 11)
   assert(FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT.years === 2)
 })
+
+
+Deno.test('trained model rights gate stays blocked without an explicit record license', () => {
+  assert(FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT.modelArtifactReuseStatus === 'blocked_no_record_license')
+  assert(FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT.modelArtifactRightsEvidence.rightsSectionPresent === false)
+  assert(FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT.modelArtifactRightsEvidence.explicitArtifactLicenseVerified === false)
+  assert(FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT.modelArtifactRightsEvidence.repositoryCodeLicenseAppliesToModelArtifact === false)
+})
