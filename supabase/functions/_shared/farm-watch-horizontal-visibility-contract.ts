@@ -5,8 +5,8 @@ export const FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT = Object.freeze({
   outputSchemaVersion: 'horizontal-visibility-context-v1',
   evidenceClass: 'deterministic_derived',
   artifactBucket: 'farm-watch-derived',
-  artifactFormat: 'farm-watch-horizontal-visibility-context-json-v1',
-  artifactMimeType: 'application/json',
+  artifactFormat: 'farm-watch-horizontal-visibility-context-json-gzip-v1',
+  artifactMimeType: 'application/gzip',
   domainMeters: 500,
   outputCellMeters: 5,
   terrainSourceCellMeters: 10,
@@ -72,6 +72,7 @@ export function horizontalVisibilitySourceSignature(args: {
     'structure_support_method=neutral-lidar-band-share-at-ray-height-v1',
     'terrain_resampling=complete-four-cell-bilinear-v1',
     'domain_edge_policy=unsupported-not-open-v1',
+    'artifact_storage_encoding=gzip-v1',
   ].join('|')
 }
 
