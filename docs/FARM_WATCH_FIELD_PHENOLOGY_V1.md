@@ -1,6 +1,6 @@
 # Farm Watch Field Phenology v1
 
-Status: Batch 4A + Batch 4B production; 180-day growing-season HLS substrate validated; live phenology/harvest classifier not yet authorized  
+Status: Batch 4A + Batch 4B production; 180-day growing-season HLS substrate validated; current-season crop source gate reviewed; live phenology/harvest classifier not yet authorized  
 Validation property: `validation-property-01`
 
 ## Purpose
@@ -323,3 +323,44 @@ This closes the short-trajectory blocker. The dated field context remains intent
 **Gate result:** the seasonal observation substrate is now adequate. The remaining classifier blockers are (a) defensible current-season crop identity and (b) selection/implementation of a genuinely near-real-time harvest method whose required spectral inputs and threshold/segmentation semantics transfer to the target fields.
 
 Until those conditions are satisfied, `probable_harvest_transition` and `post_harvest_residual` remain unauthorized and `unknown` is the correct production result.
+
+## Current-season crop identity source gate — 2026-09-22
+
+Batch 4 requires a current-season field crop identity before any crop-specific harvest rule can be applied. The 2025 CDL/CSB identity remains a historical prior only for a 2026 request.
+
+### 10 m In-season Crop-type Data Layer (ICDL)
+
+Li et al. (2026), DOI `10.1038/s41597-026-07099-1`, describes June/July/August current-year 10 m ICDL maps produced with Sentinel-2 and Landsat 8/9 and states that current-year layers are intended to be public within about five days after month end.
+
+Operational verification on 2026-09-22 did not establish a consumable 2026 Kentucky layer:
+
+- the currently discoverable public iCrop layer catalog tops out at `2025-August`;
+- exact searches for `2026-June`, `2026-July`, and `2026-August` coverage identifiers returned no discoverable public layer;
+- CropSmart's current public site describes the digital-twin platform but does not surface a 2026 ICDL download/service endpoint;
+- the documented iCrop WMS/WCS service endpoints were identifiable from the peer-reviewed iCrop software paper, but direct capability/coverage retrieval could not be completed reliably from the development environment.
+
+Disposition: **do not promote ICDL to production evidence yet**. The scientific product is appropriate, but current 2026 operational availability for the target Kentucky fields is not verified.
+
+### Published HLS Transformer fallback
+
+Zhang et al. (2025), DOI `10.1016/j.rse.2025.114950`, provides a trained within-season CONUS crop-type Transformer, application code, and public model artifact. The published model is explicitly designed to classify on arbitrary current-season dates and reported F1 > 0.8 for corn by May 11 and soybean by May 31 in the 2023 evaluation.
+
+Operational characteristics relevant to Farm Watch:
+
+- application code: `hankui/In-season-crop-type-mapper`, Apache-2.0;
+- trained model artifact: approximately 69.9 MB on Zenodo record `14715402`;
+- model input spans the previous year plus current year HLS time series;
+- the released model consumes substantially richer spectra than Farm Watch's current NDVI/EVI/NIR observation rows;
+- Landsat inputs include coastal/blue/green/red/NIR/SWIR1/SWIR2 plus thermal bands and timing;
+- Sentinel-2 inputs include coastal/blue/green/red/NIR-A/SWIR1/SWIR2 plus red-edge/NIR8 bands and timing.
+
+The released application processes HLS tiles, but that whole-tile/raw-data architecture is not required by Farm Watch. A future integration should adapt the published model to **field-scoped pixel/time-series reads** through the existing protected HLS access pattern, avoiding bulk raw HLS persistence.
+
+Disposition: the Transformer is the preferred fallback candidate if a direct 2026 ICDL service cannot be verified. It is **not yet production evidence**. Before implementation, confirm model-artifact reuse terms, define a field-scoped spectral contract, and benchmark inference/IO cost on the 37-field validation domain.
+
+### Gate result
+
+Current-season crop identity remains unresolved in production. No 2025 crop class may be silently promoted to 2026 truth. Batch 4 remains fail-closed until either:
+
+1. a current 2026 ICDL layer is directly consumable and provenance-stable for the target fields; or
+2. the published HLS Transformer is integrated through a bounded field-scoped pipeline with explicit model/source identity and uncertainty.
