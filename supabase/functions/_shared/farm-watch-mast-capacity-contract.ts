@@ -51,7 +51,7 @@ export const FARM_WATCH_MAST_CAPACITY_PRODUCT = Object.freeze({
   sourceProduct: 'FIA BIGMAP 2018 Tree Species Aboveground Biomass',
   sourceDataYear: 2018,
   sourceService:
-    'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_FIA_BIGMAP_AboveGroundBiomass/ImageServer',
+    'https://di-usfsdata.img.arcgis.com/arcgis/rest/services/FIA_BIGMAP_2018_Tree_Species_Aboveground_Biomass/ImageServer',
   sourcePixelMeters: 30,
   sourceNativeCrs: 'ESRI:102039',
   sourceNativeWkid: 102039,

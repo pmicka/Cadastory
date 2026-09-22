@@ -8,7 +8,7 @@ Status: Batch 5A implementation contract
 
 ## Operational v1 source
 
-Batch 5A uses USDA Forest Service FIA **BIGMAP 2018 Tree Species Aboveground Biomass**, a 30 m modeled/imputed species biomass product expressed in tons/acre. The public Forest Service ImageServer is used for bounded analytical reads; raw CONUS rasters are not copied into Farm Watch. Because `imagery.geoplatform.gov` rejects GitHub-hosted runner egress, those bounded source reads are transported through the existing OIDC-protected Supabase worker. The worker is restricted to the source-controlled mast species and bounded 30 m export windows; it is not a general HTTP proxy.
+Batch 5A uses USDA Forest Service FIA **BIGMAP 2018 Tree Species Aboveground Biomass**, a 30 m modeled/imputed species biomass product expressed in tons/acre. The official Forest Service ArcGIS Online BIGMAP ImageServer (`di-usfsdata.img.arcgis.com`) is used for bounded analytical reads; raw CONUS rasters are not copied into Farm Watch. The earlier `imagery.geoplatform.gov` endpoint was production-tested from GitHub Actions and returned an edge-level HTTP 403 on both GET and POST, so it is not used by the operational worker. Because `imagery.geoplatform.gov` rejects GitHub-hosted runner egress, those bounded source reads are transported through the existing OIDC-protected Supabase worker. The worker is restricted to the source-controlled mast species and bounded 30 m export windows; it is not a general HTTP proxy.
 
 TreeMap 2023 remains a fresher future refinement candidate because its plot-ID raster can be linked to the accompanying FIA tree table. Batch 5A does not block on that bulk-delivery path.
 
