@@ -148,20 +148,17 @@ begin
     raise exception 'invalid collection completion status';
   end if;
 
-  for v_row in
-    select *
-    from farm_watch.property_field_vegetation_collection_runs_v1
-    where id=p_run_id
-    for update
-  loop
-    exit;
-  end loop;
-  if v_row.id is null then raise exception 'collection run unavailable'; end if;
+  select *
+  into v_row
+  from farm_watch.property_field_vegetation_collection_runs_v1
+  where id=p_run_id
+  for update;
+  if not found then raise exception 'collection run unavailable'; end if;
   if v_row.status <> 'processing' then
     raise exception 'collection run is not processing';
   end if;
 
-  if greatest(
+  if least(
     coalesce(p_target_fields,-1),
     coalesce(p_discovered_items,-1),
     coalesce(p_complete_asset_items,-1),
