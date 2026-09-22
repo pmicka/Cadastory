@@ -348,66 +348,33 @@ async function readDeerContext(slug: string) {
   const asOfDate = louisvilleCalendarDate(now)
   const at = now.toISOString()
 
-  const [seasonal, diel, biological, fields] = await Promise.all([
-    admin.rpc('farm_watch_resolve_seasonal_state_v1_internal', {
-      p_slug: slug,
-      p_as_of_date: asOfDate,
-    }),
-    admin.rpc('farm_watch_resolve_diel_photoperiod_v1_internal', {
-      p_slug: slug,
-      p_solar_date: asOfDate,
-    }),
-    admin.rpc('farm_watch_resolve_deer_biological_state_v1_internal', {
-      p_slug: slug,
-      p_at: at,
-      p_sex: 'unknown',
-      p_age_class: 'unknown',
-      p_movement_state: 'unknown',
-      p_individual_reproductive_state: 'unknown',
-    }),
-    admin.rpc('farm_watch_resolve_field_phenology_v1_internal', {
-      p_slug: slug,
-      p_as_of_date: asOfDate,
-    }),
-  ])
+  const { data, error } = await admin.rpc('farm_watch_resolve_deer_context_v1_internal', {
+    p_slug: slug,
+    p_as_of_date: asOfDate,
+    p_at: at,
+  })
 
-  const reads = {
-    seasonal_state: seasonal,
-    diel_photoperiod: diel,
-    deer_biological_state: biological,
-    field_phenology: fields,
-  }
-
-  const componentStatus: Record<string, string> = {}
-  for (const [key, result] of Object.entries(reads)) {
-    const error = result.error
-    if (error) {
-      console.error(`${key} read failed`, error.message)
-      componentStatus[key] = 'unavailable'
-      continue
+  if (error) {
+    console.error('farm_watch_resolve_deer_context_v1_internal failed', error.message)
+    return {
+      status: 'unavailable',
+      as_of_date: asOfDate,
+      at,
+      component_status: {
+        seasonal_state: 'unavailable',
+        diel_photoperiod: 'unavailable',
+        deer_biological_state: 'unavailable',
+        field_phenology: 'unavailable',
+      },
+      seasonal_state: null,
+      diel_photoperiod: null,
+      deer_biological_state: null,
+      field_phenology: null,
+      interpretation_boundary: 'Review-only deer context is temporarily unavailable. No scoring or behavioral inference is performed.',
     }
-    componentStatus[key] = String(result.data?.status || 'unavailable')
   }
 
-  const statuses = Object.values(componentStatus)
-  const usableCount = statuses.filter((status) => ['available', 'partial'].includes(status)).length
-  const status = usableCount === 0
-    ? 'unavailable'
-    : statuses.every((value) => value === 'available')
-      ? 'available'
-      : 'partial'
-
-  return {
-    status,
-    as_of_date: asOfDate,
-    at,
-    component_status: componentStatus,
-    seasonal_state: seasonal.error ? null : seasonal.data,
-    diel_photoperiod: diel.error ? null : diel.data,
-    deer_biological_state: biological.error ? null : biological.data,
-    field_phenology: fields.error ? null : fields.data,
-    interpretation_boundary: 'Review-only deer context assembled from existing Farm Watch evidence. This response performs no deer-use, movement-rate, attraction, bedding, habitat-quality, hunting-pressure, or management scoring.',
-  }
+  return data
 }
 
 async function refreshHydrology(slug: string, boundary: any) {
