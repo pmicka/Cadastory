@@ -211,28 +211,27 @@ def finite_median(values: np.ndarray) -> float | None:
     return value if math.isfinite(value) else None
 
 
-def sample_field(
-    target: dict[str, Any],
+def sample_item_fields(
+    targets: list[dict[str, Any]],
     item: Item,
     collection_id: str,
     spec: dict[str, str],
     as_of: date,
-) -> dict[str, Any] | None:
-    geometry = target.get("field_geometry_geojson")
-    if not isinstance(geometry, dict):
-        return None
-
+) -> list[dict[str, Any]]:
     assets = {
         "blue": item.assets[spec["blue"]].href,
         "red": item.assets[spec["red"]].href,
         "nir": item.assets[spec["nir"]].href,
         "qa": item.assets[spec["qa"]].href,
     }
+    rows: list[dict[str, Any]] = []
 
     with rasterio.Env(
         GDAL_DISABLE_READDIR_ON_OPEN="EMPTY_DIR",
         GDAL_HTTP_MULTIRANGE="YES",
         GDAL_HTTP_MERGE_CONSECUTIVE_RANGES="YES",
+        GDAL_HTTP_MAX_RETRY="3",
+        GDAL_HTTP_RETRY_DELAY="1",
     ):
         with (
             rasterio.open(assets["blue"]) as blue_ds,
@@ -248,70 +247,9 @@ def sample_field(
             ):
                 raise RuntimeError(f"HLS assets are not co-registered for {item.id}")
 
-            projected = transform_geom("EPSG:4326", red_ds.crs, geometry, precision=9)
-            try:
-                window = geometry_window(red_ds, [projected], pad_x=0, pad_y=0)
-            except WindowError:
-                return None
-
-            blue_raw = blue_ds.read(1, window=window, masked=True)
-            red_raw = red_ds.read(1, window=window, masked=True)
-            nir_raw = nir_ds.read(1, window=window, masked=True)
-            qa_raw = qa_ds.read(1, window=window, masked=True)
-
-            inside = geometry_mask(
-                [projected],
-                out_shape=(int(window.height), int(window.width)),
-                transform=red_ds.window_transform(window),
-                invert=True,
-                all_touched=False,
-            )
-            total = int(np.count_nonzero(inside))
-            if total <= 0:
-                return None
-
-            common_mask = (
-                inside
-                & ~np.ma.getmaskarray(blue_raw)
-                & ~np.ma.getmaskarray(red_raw)
-                & ~np.ma.getmaskarray(nir_raw)
-                & ~np.ma.getmaskarray(qa_raw)
-            )
-
-            qa = np.asarray(qa_raw.data, dtype=np.uint8)
-            excluded = (qa & HLS_EXCLUDED_QA_BITS) != 0
-            high_aerosol = ((qa >> 6) & 0b11) == HLS_HIGH_AEROSOL_CODE
-            valid = common_mask & ~excluded & ~high_aerosol
-
             blue_scale, blue_offset = scale_offset(blue_ds)
             red_scale, red_offset = scale_offset(red_ds)
             nir_scale, nir_offset = scale_offset(nir_ds)
-            blue = np.asarray(blue_raw.data, dtype=np.float64) * blue_scale + blue_offset
-            red = np.asarray(red_raw.data, dtype=np.float64) * red_scale + red_offset
-            nir = np.asarray(nir_raw.data, dtype=np.float64) * nir_scale + nir_offset
-
-            spectral_finite = np.isfinite(blue) & np.isfinite(red) & np.isfinite(nir)
-            valid &= spectral_finite
-            valid_count = int(np.count_nonzero(valid))
-            valid_fraction = valid_count / total
-
-            ndvi_values = np.empty(0, dtype=np.float64)
-            evi_values = np.empty(0, dtype=np.float64)
-            nir_values = nir[valid]
-
-            if valid_count:
-                ndvi_den = nir + red
-                ndvi_mask = valid & (np.abs(ndvi_den) > 1e-8)
-                ndvi_values = (nir[ndvi_mask] - red[ndvi_mask]) / ndvi_den[ndvi_mask]
-
-                evi_den = nir + 6.0 * red - 7.5 * blue + 1.0
-                evi_mask = valid & (np.abs(evi_den) > 1e-8)
-                evi_values = 2.5 * (nir[evi_mask] - red[evi_mask]) / evi_den[evi_mask]
-
-            cloudlike = inside & ((qa & HLS_CLOUDLIKE_QA_BITS) != 0)
-            snow = inside & ((qa & (1 << 4)) != 0)
-            water = inside & ((qa & (1 << 5)) != 0)
-            high_aerosol_inside = inside & high_aerosol
             observed_at = item_datetime(item)
             unsigned_assets = {key: stable_url(value) for key, value in assets.items()}
             source_fingerprint = {
@@ -324,67 +262,134 @@ def sample_field(
                 "observed_at": observed_at.isoformat().replace("+00:00", "Z"),
                 "assets": unsigned_assets,
             }
-            stable_item_url = (
-                f"{STAC_URL}collections/{collection_id}/items/{item.id}"
-            )
+            source_sha256 = sha256_json(source_fingerprint)
+            stable_item_url = f"{STAC_URL}collections/{collection_id}/items/{item.id}"
 
-            return {
-                "field_id": str(target["field_id"]),
-                "source_product": spec["source_product"],
-                "source_granule_id": item.id,
-                "observed_at": observed_at.isoformat().replace("+00:00", "Z"),
-                "ndvi_mean": finite_mean(ndvi_values),
-                "ndvi_median": finite_median(ndvi_values),
-                "evi_mean": finite_mean(evi_values),
-                "evi_median": finite_median(evi_values),
-                "nir_mean": finite_mean(nir_values),
-                "valid_pixel_count": valid_count,
-                "total_pixel_count": total,
-                "valid_fraction": valid_fraction,
-                "cloud_fraction": float(np.count_nonzero(cloudlike)) / total,
-                "qa_context": {
-                    "schema": "hls-field-vegetation-observation-v1",
-                    "method": "farm-watch-hls-field-sampler-v1",
-                    "distribution_provider": "Microsoft Planetary Computer",
-                    "source_authority": "NASA LP DAAC",
-                    "stac_collection": collection_id,
-                    "source_doi": spec["doi"],
-                    "asset_keys": {
-                        "blue": spec["blue"],
-                        "red": spec["red"],
-                        "nir": spec["nir"],
-                        "qa": spec["qa"],
-                    },
-                    "geometry_pixel_rule": "pixel_center_inside_field",
-                    "qa_filter": {
-                        "excluded_bits": [1, 2, 3, 4, 5],
-                        "high_aerosol_code_excluded": HLS_HIGH_AEROSOL_CODE,
-                    },
-                    "qa_counts": {
-                        "cloud_or_adjacent_or_shadow": int(np.count_nonzero(cloudlike)),
-                        "snow": int(np.count_nonzero(snow)),
-                        "water": int(np.count_nonzero(water)),
-                        "high_aerosol": int(np.count_nonzero(high_aerosol_inside)),
-                    },
-                    "reflectance_scale": {
-                        "blue": blue_scale,
-                        "red": red_scale,
-                        "nir": nir_scale,
-                    },
-                    "index_formulas": {
-                        "ndvi": "(nir-red)/(nir+red)",
-                        "evi": "2.5*(nir-red)/(nir+6*red-7.5*blue+1)",
-                    },
-                    "source_identity_kind": "stable_collection_item_asset_fingerprint",
-                    "freshness_days": (as_of - observed_at.date()).days,
-                    "scoring_performed": False,
-                    "behavioral_inference_performed": False,
-                },
-                "source_url": stable_item_url,
-                "source_sha256": sha256_json(source_fingerprint),
-                "retrieved_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            }
+            for target in targets:
+                geometry = target.get("field_geometry_geojson")
+                if not isinstance(geometry, dict):
+                    continue
 
+                projected = transform_geom("EPSG:4326", red_ds.crs, geometry, precision=9)
+                try:
+                    window = geometry_window(red_ds, [projected], pad_x=0, pad_y=0)
+                except WindowError:
+                    continue
+
+                blue_raw = blue_ds.read(1, window=window, masked=True)
+                red_raw = red_ds.read(1, window=window, masked=True)
+                nir_raw = nir_ds.read(1, window=window, masked=True)
+                qa_raw = qa_ds.read(1, window=window, masked=True)
+
+                inside = geometry_mask(
+                    [projected],
+                    out_shape=(int(window.height), int(window.width)),
+                    transform=red_ds.window_transform(window),
+                    invert=True,
+                    all_touched=False,
+                )
+                total = int(np.count_nonzero(inside))
+                if total <= 0:
+                    continue
+
+                common_mask = (
+                    inside
+                    & ~np.ma.getmaskarray(blue_raw)
+                    & ~np.ma.getmaskarray(red_raw)
+                    & ~np.ma.getmaskarray(nir_raw)
+                    & ~np.ma.getmaskarray(qa_raw)
+                )
+
+                qa = np.asarray(qa_raw.data, dtype=np.uint8)
+                excluded = (qa & HLS_EXCLUDED_QA_BITS) != 0
+                high_aerosol = ((qa >> 6) & 0b11) == HLS_HIGH_AEROSOL_CODE
+                valid = common_mask & ~excluded & ~high_aerosol
+
+                blue = np.asarray(blue_raw.data, dtype=np.float64) * blue_scale + blue_offset
+                red = np.asarray(red_raw.data, dtype=np.float64) * red_scale + red_offset
+                nir = np.asarray(nir_raw.data, dtype=np.float64) * nir_scale + nir_offset
+
+                spectral_finite = np.isfinite(blue) & np.isfinite(red) & np.isfinite(nir)
+                valid &= spectral_finite
+                valid_count = int(np.count_nonzero(valid))
+                valid_fraction = valid_count / total
+
+                ndvi_values = np.empty(0, dtype=np.float64)
+                evi_values = np.empty(0, dtype=np.float64)
+                nir_values = nir[valid]
+
+                if valid_count:
+                    ndvi_den = nir + red
+                    ndvi_mask = valid & (np.abs(ndvi_den) > 1e-8)
+                    ndvi_values = (nir[ndvi_mask] - red[ndvi_mask]) / ndvi_den[ndvi_mask]
+
+                    evi_den = nir + 6.0 * red - 7.5 * blue + 1.0
+                    evi_mask = valid & (np.abs(evi_den) > 1e-8)
+                    evi_values = 2.5 * (nir[evi_mask] - red[evi_mask]) / evi_den[evi_mask]
+
+                cloudlike = inside & ((qa & HLS_CLOUDLIKE_QA_BITS) != 0)
+                snow = inside & ((qa & (1 << 4)) != 0)
+                water = inside & ((qa & (1 << 5)) != 0)
+                high_aerosol_inside = inside & high_aerosol
+
+                rows.append({
+                    "field_id": str(target["field_id"]),
+                    "source_product": spec["source_product"],
+                    "source_granule_id": item.id,
+                    "observed_at": observed_at.isoformat().replace("+00:00", "Z"),
+                    "ndvi_mean": finite_mean(ndvi_values),
+                    "ndvi_median": finite_median(ndvi_values),
+                    "evi_mean": finite_mean(evi_values),
+                    "evi_median": finite_median(evi_values),
+                    "nir_mean": finite_mean(nir_values),
+                    "valid_pixel_count": valid_count,
+                    "total_pixel_count": total,
+                    "valid_fraction": valid_fraction,
+                    "cloud_fraction": float(np.count_nonzero(cloudlike)) / total,
+                    "qa_context": {
+                        "schema": "hls-field-vegetation-observation-v1",
+                        "method": "farm-watch-hls-field-sampler-v1",
+                        "distribution_provider": "Microsoft Planetary Computer",
+                        "source_authority": "NASA LP DAAC",
+                        "stac_collection": collection_id,
+                        "source_doi": spec["doi"],
+                        "asset_keys": {
+                            "blue": spec["blue"],
+                            "red": spec["red"],
+                            "nir": spec["nir"],
+                            "qa": spec["qa"],
+                        },
+                        "geometry_pixel_rule": "pixel_center_inside_field",
+                        "qa_filter": {
+                            "excluded_bits": [1, 2, 3, 4, 5],
+                            "high_aerosol_code_excluded": HLS_HIGH_AEROSOL_CODE,
+                        },
+                        "qa_counts": {
+                            "cloud_or_adjacent_or_shadow": int(np.count_nonzero(cloudlike)),
+                            "snow": int(np.count_nonzero(snow)),
+                            "water": int(np.count_nonzero(water)),
+                            "high_aerosol": int(np.count_nonzero(high_aerosol_inside)),
+                        },
+                        "reflectance_scale": {
+                            "blue": blue_scale,
+                            "red": red_scale,
+                            "nir": nir_scale,
+                        },
+                        "index_formulas": {
+                            "ndvi": "(nir-red)/(nir+red)",
+                            "evi": "2.5*(nir-red)/(nir+6*red-7.5*blue+1)",
+                        },
+                        "source_identity_kind": "stable_collection_item_asset_fingerprint",
+                        "freshness_days": (as_of - observed_at.date()).days,
+                        "scoring_performed": False,
+                        "behavioral_inference_performed": False,
+                    },
+                    "source_url": stable_item_url,
+                    "source_sha256": source_sha256,
+                    "retrieved_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                })
+
+    return rows
 
 def search_items(
     bbox: list[float],
@@ -525,13 +530,11 @@ def main() -> int:
 
         for collection_id, item in items:
             spec = COLLECTIONS[collection_id]
-            item_rows: list[dict[str, Any]] = []
             try:
-                for target in targets:
-                    row = sample_field(target, item, collection_id, spec, as_of)
-                    if row is None:
-                        continue
-                    item_rows.append(row)
+                item_rows = sample_item_fields(
+                    targets, item, collection_id, spec, as_of
+                )
+                for row in item_rows:
                     observed_date = datetime.fromisoformat(
                         row["observed_at"].replace("Z", "+00:00")
                     ).date()
