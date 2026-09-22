@@ -73,7 +73,7 @@ export const FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT = Object.freeze({
     'blocked',
   ] as const),
   confidenceState: 'uncalibrated',
-}) as const
+})
 
 export type FarmWatchCurrentCropIdentityState =
   typeof FARM_WATCH_CURRENT_CROP_IDENTITY_PRODUCT.fieldIdentityStates[number]
