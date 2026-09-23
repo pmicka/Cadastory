@@ -43,6 +43,53 @@ Every relationship preserves:
 - output kind;
 - transfer limitations.
 
+It also preserves **study-fidelity contracts**:
+
+- study variable / field protocol;
+- the Farm Watch binding that is proposed to represent it;
+- measurement-alignment class;
+- whether alignment is required for activation or context-only;
+- value/subtype constraints that a future evaluator must enforce;
+- explicit limitations where the current Farm Watch product is only adjacent physical context.
+
+## Measurement-alignment discipline
+
+Product-name compatibility is not sufficient to activate a deer relationship.
+
+The v1 measurement-alignment vocabulary is:
+
+- `measurement_equivalent` — Farm Watch represents substantially the same measured variable;
+- `derived_equivalent` — Farm Watch deterministically derives the same semantic quantity from authoritative geometry/state;
+- `calibrated_proxy` — a proxy is permitted only after calibration/validation against a study-aligned measurement;
+- `mechanism_context_only` — physically/biologically related context, but not the variable measured in the source study;
+- `unsupported` — the source-study variable is not currently represented well enough for activation.
+
+A future deer module is rejected when any measurement marked `required` is only `mechanism_context_only` or `unsupported`.
+
+A relationship whose measurements are all context-only may be used only as `mechanism_context`; it cannot silently become an ordinal or quantitative selection effect.
+
+Examples established by the 2026-09-23 fidelity audit:
+
+- current Thermal Exposure is useful physical context but does not calculate the operative temperature used by FW-D01;
+- Batch 6 generalized horizontal visibility is not the FW-D04 Gallina cover-pole concealment measurement;
+- current `juvenile | yearling | adult` age classes cannot reproduce FW-D06's yearling / 2-year-old / 3+ male age contrast;
+- FW-D15 riparian path selection consumes mapped river/stream geometry, not current water-presence evidence;
+- FW-D16's published 1 km² / 9 km² / hunting-unit scale design is not equivalent to generic 500 m / 1.5 km / 3 km context;
+- FW-D17 requires predator-occurrence context in addition to human footprint and natural habitat.
+
+## Value/subtype constraints
+
+Some studies require more than a valid product and scale. The registry therefore stores machine-readable value constraints.
+
+Examples:
+
+- FW-D08 requires **corn**, not merely a known crop, and the relevant tasseling/silking or post-harvest state;
+- FW-D10 requires an actual **hunting** event at a specific stand;
+- FW-D13's null result requires documented **low hunting pressure**;
+- FW-D19 requires an actually available water source rather than mapped hydrography or an off-property gauge.
+
+A future module definition must declare the study-measurement contracts and value constraints it enforces. The registry validator rejects omitted constraints.
+
 ## Output kinds
 
 The v1 vocabulary is:
@@ -110,7 +157,9 @@ A future module definition containing one of these assumptions fails registry va
 
 FW-D04 does **not** consume `horizontal-visibility-context-v1` as if it were the study's low-height concealment measurement.
 
-The registry instead requires the planned `low-height-concealment-context` input for FW-D04 relationships. This preserves the completed Batch 6 general physical visibility product while preventing its generic 1.5 / 3 / 6 m ray scenarios from being silently substituted for the study's sub-meter concealment strata.
+The registry instead requires the planned `low-height-concealment-context` input for FW-D04 relationships. Gallina et al. used a 2 m cover pole, four 50 cm vertical sections, readings from 15 m, and directional concealment. This preserves the completed Batch 6 general physical visibility product while preventing its generic 1.5 / 3 / 6 m equal-height rays from being silently substituted for the field protocol.
+
+The generalized viewshed remains useful for neutral physical visibility and may later help derive a **stand vulnerability-zone** product for FW-D10, whose source study mapped what a hunter could actually see from each stand rather than using a uniform distance buffer. That is a separate measurement-alignment problem and requires validation/calibration before deer-risk interpretation.
 
 ## Ledger coverage
 
