@@ -695,7 +695,11 @@ Implementation:
 - CI: `.github/workflows/farm-watch-deer-relationship-registry-ci.yml`;
 - durable contract: `docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`;
 - Batch 3 `applicable_relationship_ids` now delegates to registry metadata rather than maintaining a separate hard-coded FW-D selector;
-- FW-D04 is explicitly bound to a future research-aligned `low-height-concealment-context` input rather than treating the general Batch 6 horizontal-visibility product as measurement-equivalent.
+- every active biological relationship now carries a study-measurement contract with explicit alignment class and permitted use;
+- value/subtype constraints are machine-readable where a generic product binding is insufficient;
+- a future module is rejected when a required study variable is only mechanism context or unsupported;
+- FW-D04 is explicitly bound to a future research-aligned `low-height-concealment-context` input rather than treating the general Batch 6 horizontal-visibility product as measurement-equivalent;
+- FW-D15 is split into spring dispersal probability, dispersal distance, and path-selection relationships so season/path/riparian findings cannot collapse into one generic agriculture rule.
 
 ## Proposed artifact
 
@@ -737,15 +741,39 @@ Each relationship record:
 CI should reject:
 
 - a relationship without ledger IDs;
+- an active biological relationship without a study-measurement contract;
 - a numeric coefficient when coefficient-transfer status is false;
 - a relationship missing required biological state;
 - a blocked universal assumption;
 - stale/unavailable required input being silently accepted;
-- a module whose scale does not match its input product.
+- a module whose scale does not match its input product;
+- a future module that omits a required study-measurement contract;
+- a future module that omits a study-specific value/subtype constraint;
+- activation when a required study variable is only `mechanism_context_only` or `unsupported`.
 
 ## Exit gate
 
 The science ledger has a testable machine representation; deer logic is no longer hidden in ad hoc code.
+
+### Study-fidelity hardening — 2026-09-23
+
+A read-only study-fidelity audit after Batch 6 visibility review found that relationship provenance/state/scale controls were stronger than measurement-equivalence controls. Batch 9 was therefore hardened before Batch 10.
+
+Key consequences:
+
+- `thermal-exposure-context` cannot be treated as FW-D01 operative temperature because the current product explicitly does not calculate operative temperature;
+- FW-D06 age-dependent male movement remains blocked until age state can distinguish the study's yearling / 2-year-old / 3+ classes;
+- FW-D08 requires current corn identity plus the relevant field-level crop stage/harvest state;
+- FW-D10 requires a dated stand-specific hunt event and a stand-specific visibility/vulnerability zone rather than generic distance-to-stand;
+- FW-D13's negative constraint requires documented low hunting pressure;
+- FW-D14 is explicitly juvenile-male dispersal evidence;
+- FW-D15 now separates spring dispersal probability, dispersal distance, and dispersal path selection, with riparian geometry kept distinct from current water state;
+- FW-D16 is blocked from property evaluation until the published multiscale cover/food design has an aligned representation;
+- FW-D17 now preserves the female-only telemetry sample and requires predator-occurrence context;
+- FW-D18 requires forest/habitat refuge type in addition to elevation/extreme-event state;
+- FW-D19 requires current usable-water-source evidence rather than generic hydrography/product availability.
+
+These are contract blockers, not requests to invent replacement proxies. Batch 10 must abstain until the required alignment is resolved.
 
 ---
 
