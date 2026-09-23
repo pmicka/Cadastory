@@ -787,6 +787,8 @@ Current blocked-measurement disposition counts:
 
 FW-M02 vegetation height is no longer in the blocked queue. The production-validated `study-aligned-vegetation-height-context-v2` is promoted to `derived_equivalent` for FW-R01. FW-D01 nevertheless remains blocked by operative temperature (FW-M01), forage index (FW-M03), woody canopy (FW-M04), and activity-period fidelity (FW-M05).
 
+The private `deer-evidence-stack-v1` inventory now exposes `study-aligned-vegetation-height-context` metadata/summary alongside the other neutral Farm Watch products; this exposure does not alter relationship applicability or coefficient-transfer status.
+
 The remaining highest-value P0 units are source-faithful male age categories; current corn identity/stage; explicit hunting-event/effort evidence; calibrated stand-vulnerability viewshed; and calibrated Gallina concealment.
 
 A resolution decision does not itself unblock a deer relationship. Registry alignment changes only after that measurement product is actually implemented and validated.
