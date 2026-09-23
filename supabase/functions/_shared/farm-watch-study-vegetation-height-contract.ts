@@ -50,6 +50,7 @@ export function studyVegetationHeightSourceSignature(args: {
     'ground=LAS_Class_2',
     'surface=cell_mean_then_local_idw_v1',
     'height=first_return_minus_ground',
+    'qa=negative_raw_height_magnitude_and_output_grid_support_v1',
   ].join('|')
 }
 
