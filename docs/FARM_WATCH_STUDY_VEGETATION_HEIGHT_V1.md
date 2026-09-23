@@ -1,8 +1,8 @@
 # Farm Watch Study-Aligned Vegetation Height v1
 
-Status: implementation contract; production validation pending  
+Status: **production-validated neutral physical product**  
 Primary deer-science measurement: `FW-M02-vegetation-height`  
-Neutral product: `study-aligned-vegetation-height-context-v1`  
+Neutral product: `study-aligned-vegetation-height-context-v2`  
 Algorithm: `wiemers-first-return-minus-ground-local500m-v1`
 
 ## Purpose
@@ -53,7 +53,7 @@ Therefore the product is intended as a **derived-equivalent measurement**, not a
 - ground fill radius: 10 m;
 - first-return fill radius: 2.4 m.
 
-Only the derived height surface and support byte are persisted. Negative raw residuals remain distinguishable through the support flags and aggregate QA. Raw COPC/LAZ data, duplicate ground surfaces, and duplicate first-return elevation surfaces are not stored.
+Only the derived height surface and support byte are persisted. Negative raw residuals remain distinguishable through the support flags and aggregate QA. Cells carrying the negative-clamp flag are **QA-excluded/unavailable height observations** for scientific consumers and must not be interpreted as genuine 0 m vegetation. Raw COPC/LAZ data, duplicate ground surfaces, and duplicate first-return elevation surfaces are not stored.
 
 ## Spatial scope
 
@@ -78,15 +78,23 @@ Each materialization additionally persists a source fingerprint with selected CO
 
 ## Validation gates
 
-Promotion of FW-M02 from blocked to `derived_equivalent` requires:
+The FW-S21 neutral product validation gates have now been satisfied:
 
 1. source coverage is complete across the current `local_500m` domain;
 2. the artifact passes schema/packed-grid validation;
 3. direct and supported first-return/ground coverage are reported;
 4. negative raw heights are quantified rather than silently discarded;
-5. selected raw-point/profile checks confirm the derived raster is physically consistent with first-return and ground elevations;
-6. storage checksum/size matches the materialization record;
-7. Scout architecture assertions remain clean.
+5. selected raw-point/profile checks confirm representative open/low/mid/high cells are physically consistent with source first-return and Class 2 ground points;
+6. the rare large-negative tail was explicitly profiled and is isolated by the v2 negative-clamp support flag;
+7. storage checksum/size matches the materialization record;
+8. the validation property has 100% valid product coverage.
+
+Production QA is preserved in:
+
+- `docs/FARM_WATCH_STUDY_VEGETATION_HEIGHT_QA_2026-09-23.md`
+- GitHub Actions run `35925845150`, job `107400620816`
+
+**Important:** FW-S21 production validation does not itself promote FW-M02 in the deer relationship registry. A future FW-M02 promotion must bind the relationship to this product, require valid support flags, and leave all other FW-D01 blockers intact.
 
 The product may be promoted only for the **vegetation-height measurement**. It does not unblock the other FW-D01 inputs: operative temperature, forage index, woody canopy cover, or movement-defined activity period.
 
