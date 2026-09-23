@@ -346,15 +346,21 @@ Best tested method: quadratic/interactions ridge. About 97.3% of held-out mean-b
 
 **Published measurement:** Wiemers et al. (2014) created separate bare-ground and first-return TINs, rasterized each to 1.2 m DEMs, and calculated vegetation height from their elevation difference.
 
-**Farm Watch method:** `study-aligned-vegetation-height-context-v1`, algorithm `wiemers-first-return-minus-ground-local500m-v1`. Uses LAS `ReturnNumber = 1` for the first-return surface and Classification 2 for ground, excludes withheld/overlap/noise-class points, aggregates at 1.2 m, fills only within bounded local support, and stores vegetation height as uint16 centimetres plus a support byte.
+**Farm Watch method:** `study-aligned-vegetation-height-context-v2`, algorithm `wiemers-first-return-minus-ground-local500m-v1`. Uses LAS `ReturnNumber = 1` for the first-return surface and Classification 2 for ground, excludes withheld/overlap/noise-class points, aggregates at 1.2 m, fills only within bounded local support, and stores vegetation height as uint16 centimetres plus a support-flag byte.
 
 **Interpolation boundary:** The source paper used ArcMap TIN interpolation. Farm Watch uses cell-mean surfaces with deterministic inverse-distance filling. The physical variable and 1.2 m support are aligned, but the original interpolation implementation is not claimed to be numerically identical.
 
-**Boundary:** Neutral vegetation height only. No forage, concealment, canopy-percent, browse, habitat, bedding, deer use, movement, or hunting semantics.
+**Production validation:** Flat Creek v2 materialization `667f1cae-d1a6-43a6-a5e8-ee5aaa56c36c` was deterministically rebuilt to the exact persisted artifact SHA-256 `68f11b6fc11d79a12e679f2c8f932fa51eccb73adba5fda61eeb452917ad144a` and size 6,458,411 bytes. Raw COPC QA profiled three representative property cells in each open/low/mid/high height class plus the ten worst retained negative residual cells. Representative production heights were within about 0.03–0.22 m of independent raw first-return height-above-local-ground-plane means, with representative ground-plane RMSE about 0.075–0.168 m. All ten worst sampled negative residuals occurred outside the validation property and were associated with sparse exact-cell first returns and/or steep/rough sub-cell terrain geometry.
+
+**Negative-residual rule:** v2 preserves the `negative-raw-height-clamped-to-zero` support flag. A flagged cell is a **QA-excluded/unavailable height observation**, not a genuine 0 m vegetation observation, for any scientific/study-aligned consumer.
+
+**QA evidence:** `docs/FARM_WATCH_STUDY_VEGETATION_HEIGHT_QA_2026-09-23.md`; GitHub Actions run `35925845150`, job `107400620816`.
+
+**Boundary:** Neutral vegetation height only. No forage, concealment, canopy-percent, browse, habitat, bedding, deer use, movement, or hunting semantics. Production validation of FW-S21 does not by itself promote FW-M02 in the deer relationship registry.
 
 **Implementation contract:** `supabase/functions/_shared/farm-watch-study-vegetation-height-contract.ts`; `docs/FARM_WATCH_STUDY_VEGETATION_HEIGHT_V1.md`.
 
-**Status:** implementation complete in source; production materialization/validation pending.
+**Status:** **production-validated** on Flat Creek Test Property for the neutral physical first-return-minus-ground vegetation-height product.
 
 ---
 
