@@ -59,7 +59,7 @@ D8 traces are not streams, water presence, persistence, crossings, or wildlife-u
 
 ### Seasonal State v1
 
-Batch 7 reuses the existing dated Seasonal State resolver for:
+Batch 7 reuses the existing persisted dated Seasonal State snapshot for:
 
 - QPE precipitation;
 - drought;
