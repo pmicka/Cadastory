@@ -83,3 +83,4 @@ For FW-R01/FW-D01:
 - FW-M02 is `derived_equivalent`;
 - negative-clamped cells remain unavailable for scientific height use;
 - FW-D01 remains blocked by operative temperature, forage index, woody canopy, and activity-period fidelity.
+<!-- CI verification only: FW-M02 final verification 2026-09-23; do not merge. -->
