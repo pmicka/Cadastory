@@ -77,6 +77,64 @@ function sourceSignatureForDomain(domain: any) {
   })
 }
 
+async function studyVegetationHeightQaContext(slug: string) {
+  const domain = await landscapeDomain(slug)
+  const { data: property, error: propertyError } = await admin
+    .schema('farm_watch')
+    .from('properties')
+    .select('id,slug,stated_acres,boundary')
+    .eq('slug', slug)
+    .maybeSingle()
+  if (propertyError || !property?.id || !property?.boundary) {
+    throw new Error(
+      'study vegetation-height QA property unavailable' +
+        (propertyError?.message ? ': ' + propertyError.message : ''),
+    )
+  }
+
+  const { data: materializations, error: materializationError } = await admin
+    .schema('farm_watch')
+    .from('property_materializations_v1')
+    .select(
+      'id,identity_sha256,product_kind,algorithm_version,output_schema_version,artifact_sha256,artifact_size_bytes,completed_at,expires_at',
+    )
+    .eq('property_id', property.id)
+    .eq('product_kind', FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.productKind)
+    .eq('algorithm_version', FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.algorithmVersion)
+    .eq('output_schema_version', FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.outputSchemaVersion)
+    .order('completed_at', { ascending: false })
+    .limit(1)
+  if (materializationError || !materializations?.length) {
+    throw new Error(
+      'study vegetation-height QA production materialization unavailable' +
+        (materializationError?.message ? ': ' + materializationError.message : ''),
+    )
+  }
+
+  return {
+    status: 'available',
+    property_id: property.id,
+    property_slug: property.slug,
+    stated_acres: property.stated_acres,
+    property_boundary_geojson: property.boundary,
+    analysis_domain_geojson: domain.zones.local_500m,
+    landscape_domain_identity: domain.identity,
+    production_materialization: materializations[0],
+    contract: {
+      schema: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.outputSchemaVersion,
+      method: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.algorithmVersion,
+      source_collection: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.sourceCollection,
+      native_crs: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.nativeCrs,
+      domain_meters: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.domainMeters,
+      cell_meters: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.cellMeters,
+      ground_support_radius_meters:
+        FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.groundSupportRadiusMeters,
+      first_return_support_radius_meters:
+        FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.firstReturnSupportRadiusMeters,
+    },
+  }
+}
+
 async function claimStudyVegetationHeight(slug: string, identity: any) {
   const domain = await landscapeDomain(slug)
   const sourceSignature = sourceSignatureForDomain(domain)
@@ -330,6 +388,13 @@ Deno.serve(async (req: Request) => {
 
   try {
     const operation = String(body?.operation || '')
+    if (operation === 'qa_context') {
+      return json({
+        oidc_audience: FARM_WATCH_GITHUB_OIDC_AUDIENCE,
+        identity,
+        ...(await studyVegetationHeightQaContext(slug)),
+      })
+    }
     if (operation === 'claim') {
       return json({
         oidc_audience: FARM_WATCH_GITHUB_OIDC_AUDIENCE,
