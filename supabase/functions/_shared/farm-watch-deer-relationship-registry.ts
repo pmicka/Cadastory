@@ -1257,6 +1257,7 @@ export function validateDeerRelationshipRecord(row: DeerRelationshipRecord) {
   if (gate.diel_periods && !required.has('diel_period')) return false
   if (gate.regional_reproductive_context && !required.has('regional_reproductive_context')) return false
 
+  const inputKeys = new Set(row.required_inputs.map((requirement) => requirement.key))
   for (const requirement of row.required_inputs) {
     if (!requirement.key || !requirement.product_keys.length || !requirement.allowed_scales.length) return false
     if (!requirement.allowed_evidence_states.length) return false
@@ -1269,6 +1270,36 @@ export function validateDeerRelationshipRecord(row: DeerRelationshipRecord) {
       if (!intersects(requirement.allowed_scales, product.scales as readonly DeerRelationshipScale[])) return false
       if (!intersects(requirement.allowed_evidence_states, product.evidence_states as readonly DeerRelationshipEvidenceState[])) return false
     }
+  }
+
+  if (
+    row.output_kind !== 'negative_constraint' &&
+    row.output_kind !== 'not_applicable' &&
+    row.module_family !== 'architecture_context' &&
+    !row.study_measurements.length
+  ) return false
+
+  const measurementIds = new Set<string>()
+  for (const measurement of row.study_measurements) {
+    if (!/^FW-M\d{2}-[a-z0-9-]+$/.test(measurement.id)) return false
+    if (measurementIds.has(measurement.id)) return false
+    measurementIds.add(measurement.id)
+    if (!FARM_WATCH_DEER_MEASUREMENT_ALIGNMENTS.includes(measurement.alignment)) return false
+    if (!['required','context_only','not_applicable'].includes(measurement.activation_requirement)) return false
+    if (measurement.binding_key != null && !inputKeys.has(measurement.binding_key)) return false
+    if (measurement.activation_requirement === 'required' && measurement.binding_key == null) return false
+    if (!measurement.study_variable.trim() || !measurement.study_protocol.trim() || !measurement.permitted_use.trim()) return false
+  }
+
+  const valueConstraintIds = new Set<string>()
+  for (const constraint of row.value_constraints) {
+    if (!/^FW-C\d{2}-[a-z0-9-]+$/.test(constraint.id)) return false
+    if (valueConstraintIds.has(constraint.id)) return false
+    valueConstraintIds.add(constraint.id)
+    if (!inputKeys.has(constraint.binding_key)) return false
+    if (!constraint.field.trim() || !constraint.rationale.trim()) return false
+    if (!['equals','one_of','known','study_specific'].includes(constraint.operator)) return false
+    if (constraint.operator !== 'known' && !constraint.values.length) return false
   }
 
   if (row.output_kind === 'negative_constraint' && !row.blocked_universal_assumptions.length) return false
@@ -1319,6 +1350,8 @@ export function validateRelationshipModuleDefinition(value: {
   coefficient_transfer_status: 'authorized' | 'not_supported' | 'not_applicable'
   numeric_parameters: number[]
   universal_assumption_ids?: string[]
+  study_measurement_ids?: string[]
+  enforced_value_constraint_ids?: string[]
 }) {
   const relationship = getDeerRelationship(value.relationship_id)
   if (!relationship) return false
@@ -1330,6 +1363,31 @@ export function validateRelationshipModuleDefinition(value: {
   if ((value.universal_assumption_ids || []).some((id) =>
     FARM_WATCH_DEER_BLOCKED_UNIVERSAL_ASSUMPTIONS.includes(id as any)
   )) return false
+
+  const fidelity = deerRelationshipStudyFidelityStatus(relationship)
+  if (fidelity.status === 'blocked_measurement_alignment') return false
+  if (
+    fidelity.status === 'context_only' &&
+    relationship.output_kind !== 'mechanism_context' &&
+    relationship.output_kind !== 'negative_constraint'
+  ) return false
+
+  const declaredMeasurementIds = new Set(value.study_measurement_ids || [])
+  const knownMeasurementIds = new Set(relationship.study_measurements.map((measurement) => measurement.id))
+  if ([...declaredMeasurementIds].some((id) => !knownMeasurementIds.has(id))) return false
+  for (const measurement of relationship.study_measurements) {
+    if (
+      measurement.activation_requirement !== 'not_applicable' &&
+      !declaredMeasurementIds.has(measurement.id)
+    ) return false
+  }
+
+  const enforcedConstraintIds = new Set(value.enforced_value_constraint_ids || [])
+  const knownConstraintIds = new Set(relationship.value_constraints.map((constraint) => constraint.id))
+  if ([...enforcedConstraintIds].some((id) => !knownConstraintIds.has(id))) return false
+  if (relationship.value_constraints.some((constraint) => !enforcedConstraintIds.has(constraint.id))) {
+    return false
+  }
 
   for (const requirement of relationship.required_inputs.filter((row) => row.required)) {
     const matches = value.input_bindings.filter((binding) =>
