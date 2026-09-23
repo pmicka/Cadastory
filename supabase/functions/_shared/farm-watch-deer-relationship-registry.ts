@@ -910,7 +910,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     module_family:'reproductive_movement',
     response_variable:'physiological breeding-season onset',
     required_inputs:[],
-    biological_state_gates:gate({sex:['female'],age_class:['adult']}),
+    biological_state_gates:gate({
+      sex:['female'],age_class:['adult'],
+      required_explicit_dimensions:['sex','age_class'],
+    }),
     spatial_scale:{relationship_scales:['regional'],notes:'Nearby-population corroboration only.'},
     temporal_scale:'autumn breeding onset',
     relationship_form:'regional mechanism/context support',
