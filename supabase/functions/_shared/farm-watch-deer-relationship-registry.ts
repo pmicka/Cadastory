@@ -586,9 +586,9 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     relationship_id:'FW-R08-reproductive-diel-movement-context',
     ledger_ids:['FW-D05'],
     source_citations:['Webb et al. 2010, International Journal of Ecology 2010:459610, DOI:10.1155/2010/459610'],
-    title:'Movement varies by diel and reproductive context',
+    title:'Crepuscular movement context without transferred reproductive magnitude',
     module_family:'reproductive_movement',
-    response_variable:'daily and fine-scale movement',
+    response_variable:'diel movement pattern',
     required_inputs:[
       req('biological_state',['deer-biological-state'],['individual_scenario']),
       req('diel_state',['diel-photoperiod-context'],['property']),
@@ -596,16 +596,19 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     biological_state_gates:gate({required_explicit_dimensions:['diel_period']}),
     spatial_scale:{relationship_scales:['property','regional'],notes:'Context relationship; no transferred movement-rate coefficient.'},
     temporal_scale:'diel and reproductive phases',
-    relationship_form:'crepuscular pattern plus sex/reproductive-state differences',
+    relationship_form:'crepuscular movement pattern only; sex/reproductive movement differences require separate state-specific relationships',
     direction:'conditional',
     supported_nonlinearity:null,
     coefficient_transfer:{status:'not_supported',numeric_parameters:[]},
     parameter_source_version:PARAMETER_SOURCE,
     null_or_blocked_conditions:[],
     blocked_universal_assumptions:[],
-    output_kind:'ordinal_directional',
-    limitations:['Population-specific movement magnitudes are not transferred.'],
+    output_kind:'mechanism_context',
+    limitations:['Population-specific movement magnitudes and the study activity-period windows are not transferred.'],
     biological_state_annotation:{},
+    study_measurements:[
+      measurement('FW-M14-webb-activity-period','diel_state','study-defined diel activity period','Study classified movement into daily, diurnal, nocturnal and crepuscular periods using its own movement/time windows.','mechanism_context_only','context_only','Farm Watch solar phase may provide time-of-day context but is not measurement-equivalent to the study movement windows.'),
+    ],
   }),
   record({
     relationship_id:'FW-R09-male-breeding-age-movement',
@@ -616,7 +619,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     response_variable:'hourly movement rate and daily range',
     required_inputs:[req('biological_state',['deer-biological-state'],['individual_scenario','statewide'])],
     biological_state_gates:gate({
-      sex:['male'], regional_reproductive_context:['within_documented_breeding_season','within_peak_month_context'],
+      sex:['male'], age_class:['yearling','adult'], regional_reproductive_context:['within_documented_breeding_season','within_peak_month_context'],
       required_explicit_dimensions:['sex','age_class','regional_reproductive_context'],
     }),
     spatial_scale:{relationship_scales:['property','regional'],notes:'Relationship form only; Wisconsin timing is not a Kentucky parameter.'},
@@ -634,6 +637,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       sex:['male'],require_known_age:true,
       regional_reproductive_context:['within_documented_breeding_season','within_peak_month_context'],
     },
+    study_measurements:[
+      measurement('FW-M15-hunsaker-male-age','biological_state','male age class','Study distinguished yearlings, 2-year-old males, and males 3 years and older; 2-year-olds had the highest hourly movement and larger daily ranges, while 3+ males had the greatest daily movement variance.','unsupported','required','No age-dependent movement relationship activation until Farm Watch can distinguish the study age classes.',['Current juvenile/yearling/adult vocabulary collapses 2-year-old and 3+ males into adult.']),
+      measurement('FW-M16-hunsaker-breeding-window','biological_state','population breeding-season timing','Study changepoint timing was estimated for southwest Wisconsin and is not a Kentucky date parameter.','mechanism_context_only','context_only','Kentucky regional breeding context may gate season membership only; Wisconsin dates and movement magnitudes are not transferred.'),
+    ],
   }),
   record({
     relationship_id:'FW-R10-firearm-opening-negative-constraint',
@@ -668,7 +675,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       req('annual_mast_state',['annual-mast-state'],['property','regional'],['available','known']),
       req('biological_state',['deer-biological-state'],['individual_scenario']),
     ],
-    biological_state_gates:gate({seasons:['fall'],required_explicit_dimensions:['season']}),
+    biological_state_gates:gate({sex:['female'],seasons:['fall'],required_explicit_dimensions:['sex','season']}),
     spatial_scale:{relationship_scales:['property','local_500m','landscape_1500m'],notes:'Capacity and annual production must remain separate inputs.'},
     temporal_scale:'mast-fall period',
     relationship_form:'space use shifts toward acorn-producing areas when annual mast is available',
@@ -680,6 +687,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:[],
     output_kind:'ordinal_directional',
     limitations:['No current-year mast state means insufficient input; modeled tree capacity is not mast production.'],
+    study_measurements:[
+      measurement('FW-M17-annual-mast-fall','annual_mast_state','annual acorn mast fall / production','Study related female deer space use and foraging to contemporaneous acorn mast fall in the study forest.','unsupported','required','No mast-response activation until annual mast production/state is available at a defensible local or regional transfer scale.'),
+      measurement('FW-M18-mast-producing-area','mast_capacity','acorn-producing area availability','Study deer shifted ranges to include acorn-producing areas during mast fall.','mechanism_context_only','context_only','Modeled mast-producing species capacity is potential resource structure, not observed annual acorn production.'),
+    ],
   }),
   record({
     relationship_id:'FW-R12-crop-phenology-home-range-response',
@@ -706,6 +717,15 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['cdl_identity_equals_current_food'],
     output_kind:'ordinal_directional',
     limitations:['Nebraska/Iowa female study; distances and range-size changes are not Kentucky coefficients.'],
+    study_measurements:[
+      measurement('FW-M19-current-corn-identity','current_crop_identity','current field identity as corn','Study response was explicitly tied to corn development and harvest.','unsupported','required','No relationship activation while current-season crop identity remains unresolved.'),
+      measurement('FW-M20-corn-stage-harvest','field_phenology','corn tasseling/silking and post-harvest state','Study contrasted female home-range response around corn tasseling/silking and after harvest.','unsupported','required','Regional crop progress or raw vegetation-index change cannot substitute for field-level corn stage/harvest state.'),
+      measurement('FW-M21-permanent-cover','cover_context','permanent-cover geometry','Study interpreted post-harvest shifts relative to crop fields and permanent cover.','mechanism_context_only','context_only','Current spatial cover context is related geometry but not a study-calibrated permanent-cover measurement.'),
+    ],
+    value_constraints:[
+      valueConstraint('FW-C01-crop-is-corn','current_crop_identity','crop_name','equals',['Corn'],'FW-D08 is a corn-specific relationship; another known crop cannot satisfy it.'),
+      valueConstraint('FW-C02-corn-stage','field_phenology','phenology_state','one_of',['tasseling_or_silking','harvested'],'The relationship requires the study-relevant corn stage or post-harvest transition, not merely a known vegetation trajectory.'),
+    ],
   }),
   record({
     relationship_id:'FW-R13-winter-food-configuration-activity',
@@ -732,6 +752,11 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:[],
     output_kind:'mechanism_context',
     limitations:['Do not create independent agriculture or browse weights from this interaction study.'],
+    study_measurements:[
+      measurement('FW-M22-winter-agriculture-amount','agriculture_state','landscape amount/configuration of agriculture','Study evaluated winter activity as an interaction with landscape agricultural availability.','mechanism_context_only','context_only','Mapped agricultural context may support mechanism interpretation but does not reproduce the study landscape metric by itself.'),
+      measurement('FW-M23-woody-twig-density','browse_state','woody twig density / browse availability','Study interaction used woody twig density, not generic canopy or vegetation greenness.','unsupported','required','No relationship activation until a browse/twig resource measurement or calibrated proxy exists.'),
+      measurement('FW-M24-building-density','human_footprint','building/development density','Overall activity level in the study also responded to building density.','unsupported','required','No relationship activation until the human-footprint input represents the relevant development context.'),
+    ],
   }),
   record({
     relationship_id:'FW-R14-discrete-hunt-localized-risk',
@@ -742,6 +767,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     response_variable:'use of food and vulnerability zones near hunted stands',
     required_inputs:[
       req('human_activity',['human-activity-context'],['event_local','property','local_500m'],['available','known']),
+      req('vulnerability_zone',['stand-vulnerability-zone-context'],['event_local','local_500m'],['available','known']),
       req('diel_state',['diel-photoperiod-context'],['property']),
     ],
     biological_state_gates:gate({sex:['female'],required_explicit_dimensions:['sex','diel_period']}),
@@ -756,6 +782,14 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['open_hunting_season_equals_current_pressure'],
     output_kind:'ordinal_directional',
     limitations:['Distance to a stand without dated use is not hunting pressure.'],
+    study_measurements:[
+      measurement('FW-M25-discrete-stand-hunt','human_activity','dated hunt event at a specific stand','Study response was conditioned on when a specific stand had actually been hunted and its localized risk history.','unsupported','required','No relationship activation until dated stand-use/hunt events are represented.'),
+      measurement('FW-M26-stand-vulnerability-zone','vulnerability_zone','stand-specific visibility/vulnerability zone','Study mapped the area in which deer were visible to the hunter from each stand using pre-season field observation and laser rangefinding, rather than a uniform distance buffer.','unsupported','required','No localized-risk activation until a stand-specific visibility geometry is available or calibrated.',['Generalized viewshed may become an input to this product, but is not automatically study-equivalent.']),
+      measurement('FW-M27-hunt-diel-period','diel_state','day-hunting, day-nonhunting and night periods','Study periods were defined around actual hunter occupancy and sunrise/sunset.','mechanism_context_only','context_only','Solar phase alone does not encode whether hunters occupy the stand.'),
+    ],
+    value_constraints:[
+      valueConstraint('FW-C03-event-is-hunt','human_activity','event_type','equals',['hunting'],'Access, vehicle, farm or generic human activity cannot satisfy the discrete hunting-event relationship.'),
+    ],
   }),
   record({
     relationship_id:'FW-R15-adult-male-hunter-space-time',
