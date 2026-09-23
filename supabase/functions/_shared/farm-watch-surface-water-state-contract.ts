@@ -17,6 +17,7 @@ export const FARM_WATCH_SURFACE_WATER_STATE_PRODUCT = Object.freeze({
   currentPresenceVocabulary: Object.freeze([
     'observed_present',
     'observed_absent',
+    'observed_uncertain',
     'no_current_observation',
   ] as const),
   demDrainageState: 'geometry_only',
