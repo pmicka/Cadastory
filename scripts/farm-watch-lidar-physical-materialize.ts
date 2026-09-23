@@ -1,5 +1,6 @@
 #!/usr/bin/env -S deno run --allow-env --allow-net
 
+import { Buffer } from 'node:buffer'
 import proj4 from 'npm:proj4@2.12.1'
 import { Copc, Las } from 'npm:copc@0.0.9'
 import { FARM_WATCH_GITHUB_OIDC_AUDIENCE } from '../supabase/functions/_shared/github-actions-oidc.ts'
@@ -449,6 +450,43 @@ async function loadLazPerf() {
   })
 }
 
+
+function encodeU8Base64(values: Uint8Array) {
+  return Buffer.from(values).toString('base64')
+}
+
+function encodeU16Base64(values: Uint16Array) {
+  return Buffer.from(
+    new Uint8Array(values.buffer, values.byteOffset, values.byteLength),
+  ).toString('base64')
+}
+
+function heightDistribution(values: number[]) {
+  if (!values.length) {
+    return {
+      count: 0,
+      mean_m: null,
+      p10_m: null,
+      p25_m: null,
+      median_m: null,
+      p75_m: null,
+      p90_m: null,
+      max_m: null,
+    }
+  }
+  const sorted = values.slice().sort((a, b) => a - b)
+  return {
+    count: values.length,
+    mean_m: values.reduce((sum, value) => sum + value, 0) / values.length,
+    p10_m: sortedQuantile(sorted, 0.10),
+    p25_m: sortedQuantile(sorted, 0.25),
+    median_m: sortedQuantile(sorted, 0.50),
+    p75_m: sortedQuantile(sorted, 0.75),
+    p90_m: sortedQuantile(sorted, 0.90),
+    max_m: sorted[sorted.length - 1],
+  }
+}
+
 export async function buildLidarPhysicalArtifactForGeometry(args: {
   analysisGeometry: any
   sourceItems: any[]
@@ -671,6 +709,298 @@ export async function buildLidarPhysicalArtifactForGeometry(args: {
   }
   
     return artifact
+}
+
+
+export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args: {
+  analysisGeometry: any
+  propertyBoundary: any
+  sourceItems: any[]
+  contract: any
+  sourcePlanArtifactSha256: string
+  landscapeDomainIdentity: any
+}) {
+  const contract = args.contract
+  const sourceItems = Array.isArray(args.sourceItems)
+    ? args.sourceItems.slice().sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)))
+    : []
+  if (!sourceItems.length) throw new Error('Phase 3 processing item list is empty')
+
+  const lazPerf = await loadLazPerf()
+  const opened = []
+  for (const item of sourceItems) {
+    const assetUrl = String(item.primary_asset_href || '')
+    if (!assetUrl) throw new Error('Phase 3 asset URL unavailable for ' + item.id)
+    const get = nativeHttpRangeGetter(assetUrl)
+    const copc = await Copc.create(get)
+    const nativeCrs = detectNativeCrs(copc.wkt)
+    if (!nativeCrs) throw new Error('native CRS unresolved for ' + item.id)
+    if (nativeCrs !== contract.native_crs) {
+      throw new Error('unexpected native CRS ' + nativeCrs + ' for ' + item.id)
+    }
+    opened.push({
+      id: String(item.id),
+      asset_url: assetUrl,
+      get,
+      asset_identity: String(item.primary_asset_identity || item.primary_asset_href || ''),
+      copc,
+      native_crs: nativeCrs,
+      projected_geometry: projectGeometry(item.geometry, nativeCrs),
+      nodes: new Map<string, any>(),
+      candidate_point_count: 0,
+    })
+  }
+
+  const nativeCrs = String(contract.native_crs)
+  const analysisGeometry = projectGeometry(args.analysisGeometry, nativeCrs)
+  const propertyGeometry = projectGeometry(args.propertyBoundary, nativeCrs)
+  const queryBbox = geometryBbox(analysisGeometry)
+  if (!queryBbox) throw new Error('projected analysis bbox unavailable')
+
+  const cellNative = Number(contract.cell_meters) * US_SURVEY_FEET_PER_METER
+  const groundRadiusNative = Number(contract.ground_support_radius_meters) * US_SURVEY_FEET_PER_METER
+  const firstRadiusNative =
+    Number(contract.first_return_support_radius_meters) * US_SURVEY_FEET_PER_METER
+  const supportBbox = expandBbox(queryBbox, groundRadiusNative)
+  const groundGrid = createGroundGrid(supportBbox, cellNative)
+  const firstReturnGrid = createGroundGrid(queryBbox, cellNative)
+
+  for (const source of opened) {
+    source.nodes = await collectIntersectingNodes(source.get, source.copc, supportBbox)
+    source.candidate_point_count = [...source.nodes.values()]
+      .reduce((sum: number, node: any) => sum + Number(node.pointCount || 0), 0)
+  }
+
+  let groundPointCount = 0
+  let firstReturnPointCount = 0
+  for (const source of opened) {
+    for (const node of source.nodes.values()) {
+      const view = await Copc.loadPointDataView(source.get, source.copc, node, {
+        lazPerf,
+        include: [
+          'X', 'Y', 'Z', 'Classification', 'ReturnNumber', 'Overlap', 'Withheld',
+        ],
+      })
+      const getX = view.getter('X')
+      const getY = view.getter('Y')
+      const getZ = view.getter('Z')
+      const getClassification = view.getter('Classification')
+      const getReturnNumber = view.getter('ReturnNumber')
+      const getOverlap = view.getter('Overlap')
+      const getWithheld = view.getter('Withheld')
+
+      for (let index = 0; index < view.pointCount; index += 1) {
+        const x = Number(getX(index))
+        const y = Number(getY(index))
+        if (
+          !bboxContains(supportBbox, x, y) ||
+          ownerItemId(x, y, opened) !== source.id
+        ) continue
+        const z = Number(getZ(index))
+        const classification = Number(getClassification(index))
+        const returnNumber = Number(getReturnNumber(index))
+        const overlap = Number(getOverlap(index))
+        const withheld = Number(getWithheld(index))
+        if (!Number.isFinite(z) || withheld || overlap || NOISE_CLASSIFICATIONS.has(classification)) {
+          continue
+        }
+
+        if (classification === 2 && addGroundSample(groundGrid, x, y, z)) {
+          groundPointCount += 1
+        }
+
+        if (
+          returnNumber === 1 &&
+          bboxContains(queryBbox, x, y) &&
+          pointInGeometry(x, y, analysisGeometry) &&
+          addGroundSample(firstReturnGrid, x, y, z)
+        ) {
+          firstReturnPointCount += 1
+        }
+      }
+    }
+  }
+
+  const groundSurface = finalizeGroundSurface(groundGrid, groundRadiusNative)
+  const firstReturnSurface = finalizeGroundSurface(firstReturnGrid, firstRadiusNative)
+  const groundCoverage = parcelSurfaceCoverage(groundSurface, analysisGeometry)
+  const firstCoverage = parcelSurfaceCoverage(firstReturnSurface, analysisGeometry)
+
+  const width = firstReturnSurface.width
+  const height = firstReturnSurface.height
+  const length = width * height
+  const heightCm = new Uint16Array(length)
+  const support = new Uint8Array(length)
+
+  let domainCellCount = 0
+  let propertyCellCount = 0
+  let localRingCellCount = 0
+  let validCellCount = 0
+  let directFirstReturnCellCount = 0
+  let filledFirstReturnCellCount = 0
+  let negativeRawHeightCount = 0
+  let encodedHeightClipCount = 0
+  const domainHeights: number[] = []
+  const propertyHeights: number[] = []
+  const localRingHeights: number[] = []
+
+  for (let row = 0; row < height; row += 1) {
+    const y = firstReturnSurface.bbox[1] + (row + 0.5) * firstReturnSurface.cellSize
+    for (let col = 0; col < width; col += 1) {
+      const x = firstReturnSurface.bbox[0] + (col + 0.5) * firstReturnSurface.cellSize
+      const index = row * width + col
+      if (!pointInGeometry(x, y, analysisGeometry)) continue
+      domainCellCount += 1
+      const insideProperty = pointInGeometry(x, y, propertyGeometry)
+      if (insideProperty) propertyCellCount += 1
+      else localRingCellCount += 1
+
+      const firstZ = firstReturnSurface.surface[index]
+      const groundZ = surfaceValueAt(groundSurface, x, y)
+      if (!Number.isFinite(firstZ) || !Number.isFinite(groundZ)) continue
+
+      validCellCount += 1
+      const directFirst = Number.isFinite(firstReturnSurface.direct[index])
+      support[index] = directFirst ? 1 : 2
+      if (directFirst) directFirstReturnCellCount += 1
+      else filledFirstReturnCellCount += 1
+
+      const rawHeightNative = Number(firstZ) - Number(groundZ)
+      if (rawHeightNative < 0) negativeRawHeightCount += 1
+      const heightM = Math.max(0, rawHeightNative / US_SURVEY_FEET_PER_METER)
+      const encoded = Math.round(heightM * 100)
+      if (encoded > 65535) encodedHeightClipCount += 1
+      heightCm[index] = Math.max(0, Math.min(65535, encoded))
+
+      domainHeights.push(heightM)
+      if (insideProperty) propertyHeights.push(heightM)
+      else localRingHeights.push(heightM)
+    }
+  }
+
+  const itemDatetimes = sourceItems
+    .map((item: any) => Date.parse(String(item.datetime || '')))
+    .filter(Number.isFinite)
+    .sort((a: number, b: number) => a - b)
+  const acquisitionUtcRange = itemDatetimes.length
+    ? [
+        new Date(itemDatetimes[0]).toISOString(),
+        new Date(itemDatetimes[itemDatetimes.length - 1]).toISOString(),
+      ]
+    : null
+
+  const processingFingerprint = {
+    method: 'wiemers_1p2m_first_return_minus_ground_cell_mean_idw_v1',
+    source_plan_artifact_sha256: args.sourcePlanArtifactSha256,
+    domain_identity_sha256: String(args.landscapeDomainIdentity?.identity_sha256 || ''),
+    items: opened.map((source) => ({
+      id: source.id,
+      asset_identity: source.asset_identity,
+      native_crs: source.native_crs,
+      copc_header_point_count: Number(source.copc.header.pointCount),
+      candidate_node_count: source.nodes.size,
+      candidate_point_count: source.candidate_point_count,
+    })),
+    cell_meters: Number(contract.cell_meters),
+    ground_support_radius_meters: Number(contract.ground_support_radius_meters),
+    first_return_support_radius_meters: Number(contract.first_return_support_radius_meters),
+    first_return_rule: 'ReturnNumber=1; exclude withheld, overlap, classes 7/18',
+    ground_rule: 'Classification=2; exclude withheld, overlap, classes 7/18',
+  }
+
+  const percent = (numerator: number, denominator: number) =>
+    denominator ? numerator / denominator * 100 : null
+
+  return {
+    schema: contract.schema,
+    method: contract.method,
+    status: 'available',
+    evidence_class: 'deterministic_derived',
+    source_collection: contract.source_collection,
+    source_plan_artifact_sha256: args.sourcePlanArtifactSha256,
+    processing_item_ids: opened.map((source) => source.id),
+    native_crs: nativeCrs,
+    height_unit: 'm',
+    cell_meters: Number(contract.cell_meters),
+    encoding: 'u16-centimeters+u8-support-v1',
+    acquisition_utc_range: acquisitionUtcRange,
+    acquisition_time_basis: 'central STAC item datetime metadata',
+    domain: {
+      radius_m: Number(contract.domain_meters),
+      identity_sha256: String(args.landscapeDomainIdentity?.identity_sha256 || ''),
+      algorithm_version: String(args.landscapeDomainIdentity?.algorithm_version || ''),
+      output_schema_version: String(args.landscapeDomainIdentity?.output_schema_version || ''),
+      barrier_aware: true,
+    },
+    study_alignment: {
+      measurement_id: 'FW-M02-vegetation-height',
+      citation: 'Wiemers et al. 2014, Wildlife Biology 20:47-56, DOI:10.2981/wlb.13029',
+      published_definition:
+        'Vegetation height = 1.2 m first-return DEM elevation minus 1.2 m bare-ground DEM elevation; published DEMs were rasterized from separate TIN surfaces.',
+      farm_watch_definition:
+        '1.2 m LAS ReturnNumber=1 cell-mean elevation surface minus LAS Class 2 cell-mean ground elevation surface, with bounded deterministic local inverse-distance filling.',
+      interpolation_difference:
+        'Same physical first-return-minus-ground variable and 1.2 m support; Farm Watch does not claim to reproduce the original ArcMap TIN interpolation exactly.',
+    },
+    grid: {
+      bbox: firstReturnSurface.bbox,
+      width,
+      height,
+      cell_meters: Number(contract.cell_meters),
+      cell_size_native: firstReturnSurface.cellSize,
+      encoding: 'u16-centimeters+u8-support-v1',
+      support_codes: {
+        '0': 'outside-domain-or-unavailable',
+        '1': 'direct-first-return-cell-with-ground-support',
+        '2': 'locally-filled-first-return-cell-with-ground-support',
+      },
+      height_cm_u16_base64: encodeU16Base64(heightCm),
+      support_u8_base64: encodeU8Base64(support),
+    },
+    summary: {
+      domain: {
+        cell_count: domainCellCount,
+        valid_cell_count: validCellCount,
+        valid_coverage_percent: percent(validCellCount, domainCellCount),
+        direct_first_return_percent: percent(directFirstReturnCellCount, validCellCount),
+        filled_first_return_percent: percent(filledFirstReturnCellCount, validCellCount),
+        height: heightDistribution(domainHeights),
+      },
+      property: {
+        cell_count: propertyCellCount,
+        valid_cell_count: propertyHeights.length,
+        valid_coverage_percent: percent(propertyHeights.length, propertyCellCount),
+        height: heightDistribution(propertyHeights),
+      },
+      local_ring: {
+        cell_count: localRingCellCount,
+        valid_cell_count: localRingHeights.length,
+        valid_coverage_percent: percent(localRingHeights.length, localRingCellCount),
+        height: heightDistribution(localRingHeights),
+      },
+    },
+    processing_summary: {
+      ground_point_count: groundPointCount,
+      first_return_point_count: firstReturnPointCount,
+      ground_direct_domain_cell_count: groundCoverage.directCells,
+      ground_supported_domain_cell_count: groundCoverage.supportedCells,
+      ground_supported_domain_percent: percent(groundCoverage.supportedCells, groundCoverage.parcelCells),
+      first_return_direct_domain_cell_count: firstCoverage.directCells,
+      first_return_supported_domain_cell_count: firstCoverage.supportedCells,
+      first_return_supported_domain_percent:
+        percent(firstCoverage.supportedCells, firstCoverage.parcelCells),
+      negative_raw_height_count: negativeRawHeightCount,
+      encoded_height_clip_count: encodedHeightClipCount,
+      ground_surface_method: '1.2m class2 cell mean + inverse-distance fill within 10m',
+      first_return_surface_method:
+        '1.2m ReturnNumber=1 cell mean + inverse-distance fill within 2.4m',
+      overlap_policy:
+        'For overlapping selected item footprints, each source point is counted only by the lexicographically first selected item footprint containing that XY location.',
+    },
+    processing_source_fingerprint: processingFingerprint,
+    interpretation_boundary:
+      'Neutral physical study-aligned vegetation height only. This product reproduces the first-return-minus-ground measurement family for FW-M02; it does not infer forage, concealment, habitat quality, bedding, deer use, movement, or hunting value.',
+  }
 }
 
 async function main() {
