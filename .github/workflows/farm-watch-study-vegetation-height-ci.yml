@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/farm-watch-lidar-physical-materialize.ts'
       - 'scripts/farm-watch-study-vegetation-height-materialize.ts'
+      - 'scripts/farm-watch-study-vegetation-height-qa.ts'
       - 'supabase/functions/_shared/farm-watch-study-vegetation-height-contract.ts'
       - 'supabase/functions/_shared/farm-watch-study-vegetation-height-contract.test.ts'
       - 'supabase/functions/farm-watch-study-vegetation-height-worker/**'
@@ -30,6 +31,8 @@ jobs:
         run: deno check scripts/farm-watch-lidar-physical-materialize.ts
       - name: Check study vegetation-height materializer
         run: deno check scripts/farm-watch-study-vegetation-height-materialize.ts
+      - name: Check study vegetation-height QA runner
+        run: deno check scripts/farm-watch-study-vegetation-height-qa.ts
       - name: Check study vegetation-height worker
         run: deno check supabase/functions/farm-watch-study-vegetation-height-worker/index.ts
       - name: Test study vegetation-height contract
