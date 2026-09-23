@@ -230,11 +230,17 @@ async function completeStudyVegetationHeight(slug: string, body: any) {
     processing: {
       ground_point_count: artifact.processing_summary.ground_point_count,
       first_return_point_count: artifact.processing_summary.first_return_point_count,
-      ground_supported_domain_percent:
-        artifact.processing_summary.ground_supported_domain_percent,
-      first_return_supported_domain_percent:
-        artifact.processing_summary.first_return_supported_domain_percent,
+      output_ground_supported_percent:
+        artifact.processing_summary.output_ground_supported_percent,
+      output_first_return_supported_percent:
+        artifact.processing_summary.output_first_return_supported_percent,
+      output_height_valid_percent:
+        artifact.processing_summary.output_height_valid_percent,
       negative_raw_height_count: artifact.processing_summary.negative_raw_height_count,
+      negative_raw_height_percent: artifact.processing_summary.negative_raw_height_percent,
+      negative_magnitude_m: artifact.processing_summary.negative_magnitude_m,
+      negative_threshold_counts: artifact.processing_summary.negative_threshold_counts,
+      negative_support_breakdown: artifact.processing_summary.negative_support_breakdown,
     },
     artifact_size_bytes: bytes.byteLength,
   }
