@@ -197,36 +197,58 @@ begin
     );
 
   select coalesce(jsonb_object_agg(
-    o.related_feature_key,
+    q.related_feature_key,
     jsonb_strip_nulls(jsonb_build_object(
-      'state',case o.observation_state
-        when 'observed_present' then 'observed_present'
-        when 'observed_absent' then 'observed_absent'
-        else 'observed_uncertain'
-      end,
+      'state',q.current_presence_state,
       'evidence_class','operator_field_observation',
-      'observation_key',o.observation_key,
+      'observation_keys',q.observation_keys,
       'observed_date',p_as_of_date,
-      'observed_at',o.observed_at,
-      'persistence_status',o.persistence_status,
-      'geometry_precision_m',o.geometry_precision_m
+      'observed_at',q.latest_observed_at,
+      'persistence_status',q.persistence_status,
+      'geometry_precision_m',q.geometry_precision_m
     ))
   ),'{}'::jsonb)
   into v_observation_by_feature
-  from farm_watch.property_operator_observations_v1 o
-  where o.property_id=v_property_id
-    and o.active
-    and o.observation_kind=(v_contract->>'operator_observation_kind')
-    and o.related_feature_key is not null
-    and (
-      o.observed_at::date=p_as_of_date
-      or (
-        o.observed_date_start is not null
-        and p_as_of_date between o.observed_date_start and coalesce(o.observed_date_end,o.observed_date_start)
+  from (
+    select
+      o.related_feature_key,
+      case
+        when bool_or(o.observation_state='observed_present')
+          and bool_or(o.observation_state='observed_absent')
+          then 'observed_uncertain'
+        when bool_or(o.observation_state='uncertain')
+          and (
+            bool_or(o.observation_state='observed_present')
+            or bool_or(o.observation_state='observed_absent')
+          )
+          then 'observed_uncertain'
+        when bool_or(o.observation_state='observed_present') then 'observed_present'
+        when bool_or(o.observation_state='observed_absent') then 'observed_absent'
+        else 'observed_uncertain'
+      end as current_presence_state,
+      jsonb_agg(o.observation_key order by o.observation_key) as observation_keys,
+      max(o.observed_at) as latest_observed_at,
+      case
+        when count(distinct o.persistence_status)=1 then max(o.persistence_status)
+        else 'unknown'
+      end as persistence_status,
+      max(o.geometry_precision_m) as geometry_precision_m
+    from farm_watch.property_operator_observations_v1 o
+    where o.property_id=v_property_id
+      and o.active
+      and o.observation_kind=(v_contract->>'operator_observation_kind')
+      and o.related_feature_key is not null
+      and (
+        o.observed_at::date=p_as_of_date
+        or (
+          o.observed_date_start is not null
+          and p_as_of_date between o.observed_date_start and coalesce(o.observed_date_end,o.observed_date_start)
+        )
       )
-    );
+    group by o.related_feature_key
+  ) q;
 
-  -- Rebuild mapped features after exact-date observation indexing.
+  -- Build mapped features after exact-date observation indexing.
   select coalesce(jsonb_agg(
     jsonb_strip_nulls(jsonb_build_object(
       'feature_key',f->>'id',
