@@ -836,10 +836,28 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
   let propertyCellCount = 0
   let localRingCellCount = 0
   let validCellCount = 0
+  let groundSupportedOutputCellCount = 0
+  let firstReturnSupportedOutputCellCount = 0
+  let groundDirectOutputCellCount = 0
   let directFirstReturnCellCount = 0
   let filledFirstReturnCellCount = 0
   let negativeRawHeightCount = 0
+  let negativeDirectFirstReturnCount = 0
+  let negativeFilledFirstReturnCount = 0
+  let negativeGroundDirectCellCount = 0
+  let negativeGroundFilledCellCount = 0
+  let negativeDirectBothCount = 0
   let encodedHeightClipCount = 0
+  const negativeMagnitudeMeters: number[] = []
+  const negativeExamples: any[] = []
+  const negativeThresholdCounts = {
+    below_minus_0p05_m: 0,
+    below_minus_0p10_m: 0,
+    below_minus_0p25_m: 0,
+    below_minus_0p50_m: 0,
+    below_minus_1_m: 0,
+    below_minus_2_m: 0,
+  }
   const domainHeights: number[] = []
   const propertyHeights: number[] = []
   const localRingHeights: number[] = []
@@ -857,6 +875,14 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
 
       const firstZ = firstReturnSurface.surface[index]
       const groundZ = surfaceValueAt(groundSurface, x, y)
+      if (Number.isFinite(firstZ)) firstReturnSupportedOutputCellCount += 1
+      if (Number.isFinite(groundZ)) groundSupportedOutputCellCount += 1
+
+      const groundIndex = gridCellIndex(groundSurface, x, y)
+      const groundDirect =
+        groundIndex >= 0 && Number.isFinite(groundSurface.direct[groundIndex])
+      if (groundDirect) groundDirectOutputCellCount += 1
+
       if (!Number.isFinite(firstZ) || !Number.isFinite(groundZ)) continue
 
       validCellCount += 1
@@ -866,8 +892,43 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
       else filledFirstReturnCellCount += 1
 
       const rawHeightNative = Number(firstZ) - Number(groundZ)
-      if (rawHeightNative < 0) negativeRawHeightCount += 1
-      const heightM = Math.max(0, rawHeightNative / US_SURVEY_FEET_PER_METER)
+      const rawHeightM = rawHeightNative / US_SURVEY_FEET_PER_METER
+      if (rawHeightM < 0) {
+        negativeRawHeightCount += 1
+        if (directFirst) negativeDirectFirstReturnCount += 1
+        else negativeFilledFirstReturnCount += 1
+        if (groundDirect) negativeGroundDirectCellCount += 1
+        else negativeGroundFilledCellCount += 1
+        if (directFirst && groundDirect) negativeDirectBothCount += 1
+
+        const magnitudeM = -rawHeightM
+        negativeMagnitudeMeters.push(magnitudeM)
+        if (rawHeightM < -0.05) negativeThresholdCounts.below_minus_0p05_m += 1
+        if (rawHeightM < -0.10) negativeThresholdCounts.below_minus_0p10_m += 1
+        if (rawHeightM < -0.25) negativeThresholdCounts.below_minus_0p25_m += 1
+        if (rawHeightM < -0.50) negativeThresholdCounts.below_minus_0p50_m += 1
+        if (rawHeightM < -1) negativeThresholdCounts.below_minus_1_m += 1
+        if (rawHeightM < -2) negativeThresholdCounts.below_minus_2_m += 1
+
+        const groundDirectZ =
+          groundIndex >= 0 ? groundSurface.direct[groundIndex] : Number.NaN
+        negativeExamples.push({
+          row,
+          col,
+          raw_height_m: rawHeightM,
+          first_return_support: directFirst ? 'direct' : 'filled',
+          ground_cell_support: groundDirect ? 'direct' : 'filled',
+          first_return_direct_point_count: Number(firstReturnGrid.count[index] || 0),
+          ground_direct_point_count:
+            groundIndex >= 0 ? Number(groundGrid.count[groundIndex] || 0) : 0,
+          direct_cell_mean_delta_m:
+            directFirst && Number.isFinite(groundDirectZ)
+              ? (Number(firstReturnSurface.direct[index]) - Number(groundDirectZ)) /
+                US_SURVEY_FEET_PER_METER
+              : null,
+        })
+      }
+      const heightM = Math.max(0, rawHeightM)
       const encoded = Math.round(heightM * 100)
       if (encoded > 65535) encodedHeightClipCount += 1
       heightCm[index] = Math.max(0, Math.min(65535, encoded))
@@ -906,7 +967,11 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
     first_return_support_radius_meters: Number(contract.first_return_support_radius_meters),
     first_return_rule: 'ReturnNumber=1; exclude withheld, overlap, classes 7/18',
     ground_rule: 'Classification=2; exclude withheld, overlap, classes 7/18',
+    qa: 'negative_raw_height_magnitude_and_output_grid_support_v1',
   }
+
+  negativeExamples.sort((a, b) => Number(a.raw_height_m) - Number(b.raw_height_m))
+  const mostNegativeExamples = negativeExamples.slice(0, 20)
 
   const percent = (numerator: number, denominator: number) =>
     denominator ? numerator / denominator * 100 : null
@@ -982,14 +1047,38 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
     processing_summary: {
       ground_point_count: groundPointCount,
       first_return_point_count: firstReturnPointCount,
-      ground_direct_domain_cell_count: groundCoverage.directCells,
-      ground_supported_domain_cell_count: groundCoverage.supportedCells,
-      ground_supported_domain_percent: percent(groundCoverage.supportedCells, groundCoverage.parcelCells),
+      output_domain_cell_count: domainCellCount,
+      output_ground_supported_cell_count: groundSupportedOutputCellCount,
+      output_ground_supported_percent:
+        percent(groundSupportedOutputCellCount, domainCellCount),
+      output_ground_direct_cell_count: groundDirectOutputCellCount,
+      output_ground_direct_percent:
+        percent(groundDirectOutputCellCount, domainCellCount),
+      output_first_return_supported_cell_count: firstReturnSupportedOutputCellCount,
+      output_first_return_supported_percent:
+        percent(firstReturnSupportedOutputCellCount, domainCellCount),
+      output_height_valid_cell_count: validCellCount,
+      output_height_valid_percent: percent(validCellCount, domainCellCount),
+      ground_support_grid_direct_domain_cell_count: groundCoverage.directCells,
+      ground_support_grid_supported_domain_cell_count: groundCoverage.supportedCells,
+      ground_support_grid_percent:
+        percent(groundCoverage.supportedCells, groundCoverage.parcelCells),
       first_return_direct_domain_cell_count: firstCoverage.directCells,
       first_return_supported_domain_cell_count: firstCoverage.supportedCells,
       first_return_supported_domain_percent:
         percent(firstCoverage.supportedCells, firstCoverage.parcelCells),
       negative_raw_height_count: negativeRawHeightCount,
+      negative_raw_height_percent: percent(negativeRawHeightCount, validCellCount),
+      negative_magnitude_m: heightDistribution(negativeMagnitudeMeters),
+      negative_threshold_counts: negativeThresholdCounts,
+      negative_support_breakdown: {
+        direct_first_return_count: negativeDirectFirstReturnCount,
+        filled_first_return_count: negativeFilledFirstReturnCount,
+        direct_ground_cell_count: negativeGroundDirectCellCount,
+        filled_ground_cell_count: negativeGroundFilledCellCount,
+        direct_first_and_direct_ground_count: negativeDirectBothCount,
+      },
+      most_negative_examples: mostNegativeExamples,
       encoded_height_clip_count: encodedHeightClipCount,
       ground_surface_method: '1.2m class2 cell mean + inverse-distance fill within 10m',
       first_return_surface_method:
