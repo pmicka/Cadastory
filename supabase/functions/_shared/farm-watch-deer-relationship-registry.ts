@@ -389,6 +389,8 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       req('biological_state',['deer-biological-state'],['individual_scenario']),
       req('diel_state',['diel-photoperiod-context'],['property']),
       req('thermal_exposure',['thermal-exposure-context'],['local_500m','landscape_1500m']),
+      req('vegetation_height',['lidar-physical-structure'],['local_500m']),
+      req('woody_canopy',['spatial-edge-patch-context'],['local_500m']),
       req('resource_state',['field-phenology-context','browse-resource-context'],['field','property','local_500m'],['available','known','proxy']),
     ],
     biological_state_gates: gate({
@@ -406,6 +408,13 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['cold_generic_movement'],
     output_kind:'ordinal_directional',
     limitations:['South Texas adult males; no generic shade or concealment preference and no transferred coefficients.'],
+    study_measurements:[
+      measurement('FW-M01-operative-temperature','thermal_exposure','operative temperature','Study used blackglobe-based operative temperature representing convective and radiant heat exchange.','mechanism_context_only','required','Physical thermal context only until an operative-temperature-equivalent or calibrated proxy exists.',['Current thermal-exposure-context explicitly does not calculate operative temperature.']),
+      measurement('FW-M02-vegetation-height','vegetation_height','vegetation height','Study used 1 m² vegetation-height raster values associated with deer and random locations.','mechanism_context_only','required','Neutral vertical-structure context only until vegetation-height equivalence is demonstrated.',['LiDAR return-share height bands are not the study vegetation-height measurement.']),
+      measurement('FW-M03-forage-index','resource_state','forage index','Study forage index combined standing crop, crude protein and acid detergent fiber.','unsupported','required','No deer relationship activation.',['Current field phenology or browse context does not reproduce the study forage index.']),
+      measurement('FW-M04-woody-canopy','woody_canopy','woody plant canopy cover','Study evaluated woody plant canopy cover explicitly in the midday thermal model.','mechanism_context_only','required','Canopy context only until the remote canopy metric is aligned to the study variable.'),
+      measurement('FW-M05-activity-period','diel_state','movement-defined activity period','Study defined morning, midday, evening and night from observed movement patterns; night was one hour after sundown to one hour before sunrise.','mechanism_context_only','required','Solar phase may contextualize time of day but is not measurement-equivalent to the study activity periods.'),
+    ],
   }),
   record({
     relationship_id:'FW-R02-thermal-refuge-time-shift',
@@ -430,6 +439,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['cold_generic_movement'],
     output_kind:'mechanism_context',
     limitations:['Enclosure/feeder experiment; reported consumption differences are not transferable coefficients.'],
+    study_measurements:[
+      measurement('FW-M06-shade-thermal-treatment','thermal_exposure','shaded versus unshaded feeder thermal environment','Study experimentally contrasted shaded and unshaded feeders and observed use/consumption shifts.','mechanism_context_only','context_only','Supports thermal-refuge mechanism context only; experimental effect sizes are not transferred.'),
+      measurement('FW-M07-feeding-time-window','diel_state','daytime versus cooler crepuscular feeding use','Study response was feeder use and consumption across thermal/time treatment conditions.','mechanism_context_only','context_only','Use as qualitative temporal thermal context only.'),
+    ],
   }),
   record({
     relationship_id:'FW-R03-winter-snow-conifer-context',
@@ -442,6 +455,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       req('winter_severity',['snow-winter-severity-context'],['property','regional'],['available','known','proxy']),
       req('thermal_exposure',['thermal-exposure-context'],['local_500m','landscape_1500m']),
       req('structure_context',['spatial-edge-patch-context'],['local_500m']),
+      req('conifer_cover',['conifer-cover-context'],['local_500m','landscape_1500m'],['available','known','proxy']),
       req('diel_state',['diel-photoperiod-context'],['property']),
     ],
     biological_state_gates:gate({sex:['female'],seasons:['winter'],required_explicit_dimensions:['sex','season','diel_period']}),
@@ -456,6 +470,11 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['dense_vegetation_generic_bedding_security_cover','cold_generic_movement'],
     output_kind:'mechanism_context',
     limitations:['Northern severe-winter system; not a generic Kentucky dense-cover rule.'],
+    study_measurements:[
+      measurement('FW-M08-snow-depth-severity','winter_severity','snow depth / winter severity','Study related dense-conifer use to observed winter snow conditions over 12 winters.','unsupported','required','No relationship activation until a snow/winter-severity product exists.'),
+      measurement('FW-M09-dense-conifer-cover','conifer_cover','dense conifer cover availability','Study response explicitly distinguished dense conifer from more open vegetation and found availability-dependent effects.','unsupported','required','Generic canopy density or edge structure cannot substitute for dense-conifer cover.'),
+      measurement('FW-M10-winter-solar-context','thermal_exposure','daytime solar/thermal exposure under severe winter conditions','Study interpretation requires solar exposure jointly with snow and minimum temperature.','mechanism_context_only','context_only','Current thermal exposure provides physical context but is not the study winter-cover measurement.'),
+    ],
   }),
   record({
     relationship_id:'FW-R04-hot-bedsite-structure-context',
@@ -481,6 +500,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['dense_vegetation_generic_bedding_security_cover'],
     output_kind:'mechanism_context',
     limitations:['Semiarid Mexico; do not substitute 1.5/3/6 m general viewshed for the field concealment protocol.'],
+    study_measurements:[
+      measurement('FW-M11-gallina-concealment-profile','concealment_measurement','directional low-height concealment profile','Study measured concealment of a 2 m target from 15 m away in four 50 cm vertical strata and cardinal directions.','unsupported','required','No bedsite relationship activation until low-height-concealment-context reproduces or is calibrated to that field protocol.',['Batch 6 horizontal-visibility-context is explicitly not measurement-equivalent.']),
+      measurement('FW-M12-gallina-thermal-cover','thermal_exposure','bedsite thermal-cover structure','Study evaluated physical vegetation/thermal cover at occupied bedsites versus random sites.','mechanism_context_only','context_only','Current thermal exposure may provide mechanism context but does not reproduce the study vegetation-cover protocol.'),
+    ],
   }),
   record({
     relationship_id:'FW-R05-fawning-female-low-concealment',
@@ -508,6 +531,9 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['dense_vegetation_generic_bedding_security_cover'],
     output_kind:'mechanism_context',
     limitations:['Relationship form is state-specific; no universal bedding-cover classification.'],
+    study_measurements:[
+      measurement('FW-M13-gallina-low-strata','concealment_measurement','0-50 cm and 50-100 cm concealment','Study fawning-female signal was specifically in the two lowest 50 cm concealment strata.','unsupported','required','No fawning concealment relationship activation until those vertical strata are represented.'),
+    ],
   }),
   record({
     relationship_id:'FW-R06-moon-phase-negative-constraint',
