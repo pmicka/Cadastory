@@ -570,7 +570,20 @@ A deer module can later consume a physical visibility metric with known scale an
 # Batch 7 — Surface-water availability / persistence context
 
 Priority: P1/P2  
+Status: implemented in source as `surface-water-state-v1`; production migration intentionally pending explicit deployment authorization.  
 Ledger dependencies: FW-D15, D19; water evidence remains weaker/context-specific.
+
+Implementation:
+
+- source-controlled contract: `supabase/functions/_shared/farm-watch-surface-water-state-contract.ts`;
+- date-keyed guarded table/resolver migration: `20260923001000_add_farm_watch_surface_water_state_v1.sql`;
+- current 3DHP + NWI hydrology cache is reused rather than recollected;
+- current conditioned-D8 `terrain-analysis-v2` is bound as drainage geometry only;
+- Batch 4 Seasonal State supplies QPE, drought, off-property gauge, and root-zone moisture with its existing freshness/scope semantics;
+- existing private operator observations supply exact-date `surface_water_presence` evidence;
+- current 3DHP attributes do not establish perennial/intermittent status, so 3DHP persistence remains `mapped_unknown_persistence` rather than being invented;
+- explicit NWI water-regime attributes support mapped persistent/seasonal/temporary classes without being promoted to current water presence;
+- v1 retains raw dated wetness context and deliberately does not invent a generic wet/dry threshold.
 
 ## Objective
 
