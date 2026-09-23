@@ -337,6 +337,27 @@ Best tested method: quadratic/interactions ridge. About 97.3% of held-out mean-b
 
 ---
 
+
+### FW-S21 — Study-aligned first-return minus ground vegetation height
+
+**Question:** Can Farm Watch reproduce the neutral LiDAR vegetation-height variable used by FW-D01/Wiemers et al. without substituting the existing 5 m return-share strata?
+
+**Relationship to prior work:** Extends FW-S02/FW-S04 and the local-domain source handling established by FW-S18. It reuses the canonical KyFromAbove Phase 3 source lineage and the exact barrier-aware `local_500m` domain, but resolves a new measurement-fidelity requirement: FW-D01 used a first-return elevation surface minus a bare-ground elevation surface at 1.2 m support.
+
+**Published measurement:** Wiemers et al. (2014) created separate bare-ground and first-return TINs, rasterized each to 1.2 m DEMs, and calculated vegetation height from their elevation difference.
+
+**Farm Watch method:** `study-aligned-vegetation-height-context-v1`, algorithm `wiemers-first-return-minus-ground-local500m-v1`. Uses LAS `ReturnNumber = 1` for the first-return surface and Classification 2 for ground, excludes withheld/overlap/noise-class points, aggregates at 1.2 m, fills only within bounded local support, and stores vegetation height as uint16 centimetres plus a support byte.
+
+**Interpolation boundary:** The source paper used ArcMap TIN interpolation. Farm Watch uses cell-mean surfaces with deterministic inverse-distance filling. The physical variable and 1.2 m support are aligned, but the original interpolation implementation is not claimed to be numerically identical.
+
+**Boundary:** Neutral vegetation height only. No forage, concealment, canopy-percent, browse, habitat, bedding, deer use, movement, or hunting semantics.
+
+**Implementation contract:** `supabase/functions/_shared/farm-watch-study-vegetation-height-contract.ts`; `docs/FARM_WATCH_STUDY_VEGETATION_HEIGHT_V1.md`.
+
+**Status:** implementation complete in source; production materialization/validation pending.
+
+---
+
 ## Provenance discrepancies that must remain explicit
 
 ### LiDAR acquisition-time basis
