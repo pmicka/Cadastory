@@ -1,6 +1,6 @@
 # Farm Watch Deer Science Evidence Ledger
 
-Status: current as of 2026-09-21  
+Status: current as of 2026-09-22  
 Target species: white-tailed deer (`Odocoileus virginianus`)  
 Primary transfer geography: central Kentucky / lower Ohio Valley  
 Validation property: `validation-property-01`
@@ -72,6 +72,22 @@ Evidence was rejected or downgraded when it was hunting-media advice, anecdote, 
 The initial targeted search did not surface a directly transferable central-Kentucky thermal-selection coefficient or an exact Kentucky rut-movement coefficient. A deeper breeding-phenology review did surface authoritative Kentucky population timing: University of Kentucky Extension describes breeding from October through January with peak activity usually in mid-November, and Kentucky Fish and Wildlife independently describes its mid-November modern gun season as designed to coincide with peak fall breeding. Those sources support a statewide qualitative reproductive-timing gate, not an individual reproductive state or a numeric movement coefficient. Exact annual physiographic-region conception dates remain a source-capture priority rather than a hard-coded rule.
 
 ## Current Farm Watch implementation substrate
+
+### Machine-readable relationship registry
+
+Batch 9 is implemented as `deer-relationship-registry-v1` in
+`supabase/functions/_shared/farm-watch-deer-relationship-registry.ts`.
+
+The registry is the machine transfer contract for this ledger. CI requires every current `FW-Dxx`
+entry to have registry coverage and rejects unsupported numeric coefficients, missing required
+biological-state gates, blocked universal assumptions, stale/unavailable required inputs, and
+input-product scale mismatches. A ledger relationship remains scientifically normative here; the
+registry makes that relationship testable rather than replacing the ledger.
+
+The FW-D04 concealment relationships currently require the planned
+`low-height-concealment-context` measurement-alignment product. The completed general
+`horizontal-visibility-context-v1` remains a neutral physical viewshed and is not silently
+promoted to the sub-meter concealment variable used by the cited bedsite study.
 
 Current neutral products that may feed future science-backed deer terms:
 

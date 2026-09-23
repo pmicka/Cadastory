@@ -672,7 +672,17 @@ A hunting-risk module is unavailable when actual pressure evidence is unavailabl
 # Batch 9 — Machine-readable science relationship registry
 
 Priority: P0 for deer-specific evaluation  
+Status: implemented in `deer-relationship-registry-v1`; no production deployment is required for this repository-level contract.  
 Can begin in parallel once the neutral contracts are stable.
+
+Implementation:
+
+- source-controlled registry: `supabase/functions/_shared/farm-watch-deer-relationship-registry.ts`;
+- ledger-coverage and contract tests: `supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts`;
+- CI: `.github/workflows/farm-watch-deer-relationship-registry-ci.yml`;
+- durable contract: `docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`;
+- Batch 3 `applicable_relationship_ids` now delegates to registry metadata rather than maintaining a separate hard-coded FW-D selector;
+- FW-D04 is explicitly bound to a future research-aligned `low-height-concealment-context` input rather than treating the general Batch 6 horizontal-visibility product as measurement-equivalent.
 
 ## Proposed artifact
 
