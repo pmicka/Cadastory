@@ -162,35 +162,6 @@ begin
 
   select coalesce(jsonb_agg(
     jsonb_strip_nulls(jsonb_build_object(
-      'feature_key',f->>'id',
-      'source_slug',f->'properties'->>'source_slug',
-      'feature_kind',f->'properties'->>'feature_kind',
-      'source_feature_id',f->'properties'->>'source_feature_id',
-      'geometry',f->'geometry',
-      'distance_m',nullif(f->'properties'->>'distance_m','')::numeric,
-      'intersects_property',coalesce((f->'properties'->>'intersects_property')::boolean,false),
-      'mapped_persistence_state',farm_watch.farm_watch_classify_mapped_water_persistence_v1(
-        f->'properties'->>'source_slug',f->'properties'
-      ),
-      'persistence_confidence',case
-        when farm_watch.farm_watch_classify_mapped_water_persistence_v1(
-          f->'properties'->>'source_slug',f->'properties'
-        )='mapped_unknown_persistence' then 'unknown'
-        else 'source_attributed'
-      end,
-      'current_presence',coalesce(
-        v_observation_by_feature->(f->>'id'),
-        jsonb_build_object('state','no_current_observation')
-      ),
-      'properties',f->'properties'
-    ))
-    order by coalesce((f->'properties'->>'distance_m')::numeric,0),f->>'id'
-  ),'[]'::jsonb)
-  into v_mapped_features
-  from jsonb_array_elements(coalesce(v_hydrology->'feature_collection'->'features','[]'::jsonb)) f;
-
-  select coalesce(jsonb_agg(
-    jsonb_strip_nulls(jsonb_build_object(
       'observation_key',o.observation_key,
       'observation_state',o.observation_state,
       'current_presence_state',case o.observation_state
@@ -285,7 +256,7 @@ begin
   into v_mapped_features
   from jsonb_array_elements(coalesce(v_hydrology->'feature_collection'->'features','[]'::jsonb)) f;
 
-  v_seasonal := farm_watch.farm_watch_resolve_seasonal_state_v1_internal(p_slug,p_as_of_date);
+  v_seasonal := farm_watch.farm_watch_get_seasonal_state_v1_internal(p_slug,p_as_of_date);
   v_seasonal_status := coalesce(v_seasonal->>'status','unavailable');
   v_dynamic := jsonb_build_object(
     'qualitative_wetness_state','not_classified',
