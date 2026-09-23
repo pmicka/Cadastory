@@ -126,7 +126,7 @@ The following measurement gaps are both tractable and directly useful to the eve
    Builds directly on the generalized viewshed work and has an unusually practical calibration protocol.
 
 6. **FW-M11 / FW-M13 — Gallina concealment**  
-   Reuses the same terrain/structure/folliage substrate but preserves the original 15 m cover-board geometry and low vertical strata.
+   Reuses the same terrain/structure/foliage substrate but preserves the original 15 m cover-board geometry and low vertical strata.
 
 These remain independent units. Completing one does not authorize another.
 
