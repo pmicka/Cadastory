@@ -779,13 +779,15 @@ These are contract blockers, not requests to invent replacement proxies. Batch 1
 
 The follow-on resolution pass classifies every currently blocked required measurement in `farm-watch-deer-measurement-resolution.ts` and `FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md`.
 
-Current disposition counts:
+Current blocked-measurement disposition counts:
 
-- 22 `reproduce`;
+- 21 `reproduce`;
 - 9 `calibrated_proxy`;
 - 6 `remain_unavailable`.
 
-The highest-value P0 units are study-aligned LiDAR vegetation height; source-faithful male age categories; current corn identity/stage; explicit hunting-event/effort evidence; calibrated stand-vulnerability viewshed; and calibrated Gallina concealment.
+FW-M02 vegetation height is no longer in the blocked queue. The production-validated `study-aligned-vegetation-height-context-v2` is promoted to `derived_equivalent` for FW-R01. FW-D01 nevertheless remains blocked by operative temperature (FW-M01), forage index (FW-M03), woody canopy (FW-M04), and activity-period fidelity (FW-M05).
+
+The remaining highest-value P0 units are source-faithful male age categories; current corn identity/stage; explicit hunting-event/effort evidence; calibrated stand-vulnerability viewshed; and calibrated Gallina concealment.
 
 A resolution decision does not itself unblock a deer relationship. Registry alignment changes only after that measurement product is actually implemented and validated.
 

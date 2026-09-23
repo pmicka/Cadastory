@@ -62,16 +62,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     ['Deploy a small number of black-globe loggers across sun/shade and structure classes', 'Compare bias/RMSE by hour and vegetation class before promotion'],
   ),
   decision(
-    'FW-M02-vegetation-height',
-    'reproduce',
-    'study-aligned-vegetation-height-context',
-    'P0',
-    true,
-    'Wiemers et al. derived vegetation height from LiDAR first-return elevation minus bare-ground elevation at approximately 1 m spatial support. Farm Watch has the same underlying physical information in the central LiDAR source lineage.',
-    'Create a study-aligned height raster from the canonical LiDAR source rather than using current 5 m height-band return shares as a substitute.',
-    ['Match the source definition: first-return surface minus ground surface', 'Validate selected cells against raw point-cloud profiles and high-resolution imagery where useful'],
-  ),
-  decision(
     'FW-M03-forage-index',
     'remain_unavailable',
     null,

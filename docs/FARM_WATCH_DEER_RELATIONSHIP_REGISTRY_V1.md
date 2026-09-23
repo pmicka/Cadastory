@@ -196,7 +196,7 @@ Every measurement that currently blocks a relationship has exactly one dispositi
 - `calibrated_proxy` — implement a plausible estimator and promote it only after study-aligned validation;
 - `remain_unavailable` — do not create a weak substitute.
 
-The current portfolio contains 37 blocked measurements: 22 reproducible, 9 calibrated proxies, and 6 intentionally unavailable.
+The current portfolio contains 36 blocked measurements: 21 reproducible, 9 calibrated proxies, and 6 intentionally unavailable. FW-M02 vegetation height has exited this queue after production validation and promotion to `derived_equivalent`; FW-R01 remains blocked by FW-M01, FW-M03, FW-M04, and FW-M05.
 
 This resolution layer is planning/governance only. A `reproduce` or `calibrated_proxy` decision does not change the relationship registry's current alignment status. The relationship remains blocked until the corresponding neutral product is implemented and its exit gate is satisfied.
 

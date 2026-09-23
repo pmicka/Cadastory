@@ -12,7 +12,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 Deno.test('every currently blocked deer study measurement has exactly one resolution decision', () => {
   assert(validateDeerMeasurementResolutionDecisions())
   const blocked = blockedDeerStudyMeasurements()
-  assert(blocked.length === 37, 'expected 37 blocked study measurements')
+  assert(blocked.length === 36, 'expected 36 blocked study measurements')
   assert(FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.length === blocked.length)
   const decisionIds = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS
     .map((row) => row.measurement_id)
@@ -28,16 +28,17 @@ Deno.test('measurement resolution portfolio preserves the three explicit disposi
     },
     { reproduce: 0, calibrated_proxy: 0, remain_unavailable: 0 },
   )
-  assert(counts.reproduce === 22)
+  assert(counts.reproduce === 21)
   assert(counts.calibrated_proxy === 9)
   assert(counts.remain_unavailable === 6)
 })
 
-Deno.test('Wiemers vegetation height is reproducible while forage chemistry remains unavailable', () => {
+Deno.test('resolved Wiemers vegetation height leaves the blocked resolution queue while forage chemistry remains unavailable', () => {
+  const blocked = blockedDeerStudyMeasurements()
   const height = getDeerMeasurementResolutionDecision('FW-M02-vegetation-height')
   const forage = getDeerMeasurementResolutionDecision('FW-M03-forage-index')
-  assert(height?.disposition === 'reproduce')
-  assert(height?.target_product === 'study-aligned-vegetation-height-context')
+  assert(!blocked.some((row) => row.id === 'FW-M02-vegetation-height'))
+  assert(height === null)
   assert(forage?.disposition === 'remain_unavailable')
   assert(forage?.target_product === null)
 })

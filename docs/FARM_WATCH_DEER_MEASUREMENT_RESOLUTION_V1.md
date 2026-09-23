@@ -19,11 +19,15 @@ A resolution decision is about **input measurement fidelity**, not biological tr
 
 ## Portfolio
 
-The current blocked set contains 37 required study measurements:
+The current blocked set contains 36 required study measurements:
 
-- **22 reproduce**
+- **21 reproduce**
 - **9 calibrated proxy**
 - **6 remain unavailable**
+
+Resolved since this contract was created:
+
+- **FW-M02 — Wiemers vegetation height:** production-validated `study-aligned-vegetation-height-context-v2`; promoted to `derived_equivalent` on 2026-09-23.
 
 CI requires every currently blocked measurement to have one and only one disposition.
 
@@ -31,7 +35,6 @@ CI requires every currently blocked measurement to have one and only one disposi
 
 | ID | Source measurement | Resolution | Priority | Boundary |
 | --- | --- | --- | --- | --- |
-| FW-M02 | Wiemers vegetation height | Build study-aligned vegetation height from canonical LiDAR first-return surface minus ground surface at source-like spatial support | P0 | Current 5 m LiDAR return-share bands are not the study variable |
 | FW-M08 | Snow depth / winter severity | Build physical snow/winter-severity context from authoritative snow depth and temperature; preserve the published Minnesota WSI only as source-defined context | P2 | No Kentucky biological threshold is implied |
 | FW-M15 | Hunsaker male age | Expand explicit biological state to preserve yearling, 2-year-old, and 3+ male categories | P0 | Never infer exact age from generic adult status |
 | FW-M19 | Current corn identity | Accept current-year field-bound identity from explicit observation or another validated/rights-permitted source | P0 | Stale CDL and regional crop progress cannot satisfy it |
@@ -54,9 +57,9 @@ CI requires every currently blocked measurement to have one and only one disposi
 | FW-M54 | Female parturition phase | Preserve explicit pre-parturition / parturition / post-parturition scenarios | P1 | Unknown state remains unknown |
 | FW-M56 | Agriculture along potential dispersal paths | Reproduce source-style simulated potential paths and agricultural exposure along them | P2 | Simple landscape agriculture percentage cannot substitute |
 
-### Why FW-M02 is reproducible
+### Resolved: FW-M02 vegetation height
 
-Wiemers et al. derived vegetation height from LiDAR first-return and bare-ground elevation surfaces. Farm Watch already maintains canonical LiDAR point/ground structure. The required work is therefore a study-aligned neutral LiDAR derivative, not a biological proxy.
+Wiemers et al. derived vegetation height from LiDAR first-return and bare-ground elevation surfaces. Farm Watch implemented and production-validated the same physical variable family at 1.2 m support as `study-aligned-vegetation-height-context-v2`. Raw COPC profile QA passed on Flat Creek, and negative-clamped cells are explicitly excluded from scientific height use. FW-M02 is therefore no longer part of this blocked-measurement queue.
 
 ### Why activity/hunting records are reproducible
 
@@ -110,22 +113,19 @@ For example:
 
 The following measurement gaps are both tractable and directly useful to the eventual pre-flight system:
 
-1. **FW-M02 — study-aligned LiDAR vegetation height**  
-   Exact physical covariate; no field calibration required beyond ordinary physical QA.
-
-2. **FW-M15 — source-faithful male age scenarios**  
+1. **FW-M15 — source-faithful male age scenarios**  
    Small biological-state contract change; immediately prevents age-category collapse.
 
-3. **FW-M19 / FW-M20 — current corn identity and crop stage**  
+2. **FW-M19 / FW-M20 — current corn identity and crop stage**  
    Direct observation/accepted-source route first; automation can follow only after classifier validation.
 
-4. **FW-M25 / FW-M28 / FW-M31 / FW-M33 — explicit hunting activity and effort**  
+3. **FW-M25 / FW-M28 / FW-M31 / FW-M33 — explicit hunting activity and effort**  
    Factual operator activity is unusually high-value because it supports several hunting-risk studies without requiring wildlife disturbance.
 
-5. **FW-M26 — stand vulnerability zone**  
+4. **FW-M26 — stand vulnerability zone**  
    Builds directly on the generalized viewshed work and has an unusually practical calibration protocol.
 
-6. **FW-M11 / FW-M13 — Gallina concealment**  
+5. **FW-M11 / FW-M13 — Gallina concealment**  
    Reuses the same terrain/structure/foliage substrate but preserves the original 15 m cover-board geometry and low vertical strata.
 
 These remain independent units. Completing one does not authorize another.

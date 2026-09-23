@@ -137,7 +137,7 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Farm Watch mapping:** study-aligned operative-temperature or calibrated thermal input + vegetation height + woody canopy + forage state + study activity-period translation.
 
-**Measurement-fidelity note:** Current `thermal-exposure-context-v1` is related physical context but explicitly does not calculate operative temperature. Current LiDAR structure and field-phenology products are not measurement-equivalent to the study's vegetation-height and forage-index variables.
+**Measurement-fidelity note:** Current `thermal-exposure-context-v1` is related physical context but explicitly does not calculate operative temperature. The production-validated `study-aligned-vegetation-height-context-v2` is accepted as a `derived_equivalent` representation of the study vegetation-height variable, with negative-clamped cells excluded from scientific height use. Current field-phenology/browse products remain non-equivalent to the study forage index; woody-canopy and activity-period fidelity also remain unresolved.
 
 **Boundary:** Do not convert to “shade always attracts deer,” “south slopes are bad in summer,” or “concealment is irrelevant.” This was summer, adult males, subtropical Texas, and within-habitat selection.
 

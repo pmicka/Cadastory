@@ -70,7 +70,20 @@ Deno.test('FW-R01 vegetation height is bound only to the production-validated st
     (row) => row.id === 'FW-M02-vegetation-height',
   )
   assert(measurement)
-  assert(measurement.alignment === 'mechanism_context_only')
+  assert(measurement.alignment === 'derived_equivalent')
+
+  const fidelity = deerRelationshipStudyFidelityStatus(relationship)
+  assert(fidelity.status === 'blocked_measurement_alignment')
+  assert(
+    JSON.stringify(fidelity.blocker_ids) ===
+      JSON.stringify([
+        'FW-M01-operative-temperature',
+        'FW-M03-forage-index',
+        'FW-M04-woody-canopy',
+        'FW-M05-activity-period',
+      ]),
+  )
+  assert(!fidelity.blocker_ids.includes('FW-M02-vegetation-height'))
 })
 
 Deno.test('numeric coefficients are rejected when coefficient transfer is not authorized', () => {
