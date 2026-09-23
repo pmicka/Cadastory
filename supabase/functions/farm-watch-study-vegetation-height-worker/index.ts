@@ -79,47 +79,47 @@ function sourceSignatureForDomain(domain: any) {
 
 async function studyVegetationHeightQaContext(slug: string) {
   const domain = await landscapeDomain(slug)
-  const { data: property, error: propertyError } = await admin
-    .schema('farm_watch')
-    .from('properties')
-    .select('id,slug,stated_acres,boundary')
-    .eq('slug', slug)
-    .maybeSingle()
-  if (propertyError || !property?.id || !property?.boundary) {
+  const sourceSignature = sourceSignatureForDomain(domain)
+
+  const [{ data: anchor, error: anchorError }, { data: state, error: stateError }] =
+    await Promise.all([
+      admin.rpc('farm_watch_get_land_anchor_v1_internal', { p_slug: slug }),
+      admin.rpc('farm_watch_get_materialization_v1_internal', {
+        p_slug: slug,
+        p_product_kind: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.productKind,
+        p_algorithm_version: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.algorithmVersion,
+        p_output_schema_version: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.outputSchemaVersion,
+        p_source_signature: sourceSignature,
+      }),
+    ])
+
+  if (anchorError || !anchor?.property_id || !anchor?.boundary_geojson) {
     throw new Error(
-      'study vegetation-height QA property unavailable' +
-        (propertyError?.message ? ': ' + propertyError.message : ''),
+      'study vegetation-height QA property anchor unavailable' +
+        (anchorError?.message ? ': ' + anchorError.message : ''),
     )
   }
-
-  const { data: materializations, error: materializationError } = await admin
-    .schema('farm_watch')
-    .from('property_materializations_v1')
-    .select(
-      'id,identity_sha256,product_kind,algorithm_version,output_schema_version,artifact_sha256,artifact_size_bytes,completed_at,expires_at',
-    )
-    .eq('property_id', property.id)
-    .eq('product_kind', FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.productKind)
-    .eq('algorithm_version', FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.algorithmVersion)
-    .eq('output_schema_version', FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.outputSchemaVersion)
-    .order('completed_at', { ascending: false })
-    .limit(1)
-  if (materializationError || !materializations?.length) {
+  if (
+    stateError ||
+    state?.status !== 'available' ||
+    !state?.materialization?.artifact_sha256 ||
+    !state?.materialization?.artifact_size_bytes
+  ) {
     throw new Error(
       'study vegetation-height QA production materialization unavailable' +
-        (materializationError?.message ? ': ' + materializationError.message : ''),
+        (stateError?.message ? ': ' + stateError.message : ''),
     )
   }
 
   return {
     status: 'available',
-    property_id: property.id,
-    property_slug: property.slug,
-    stated_acres: property.stated_acres,
-    property_boundary_geojson: property.boundary,
+    property_id: anchor.property_id,
+    property_slug: slug,
+    stated_acres: anchor.stated_acres,
+    property_boundary_geojson: anchor.boundary_geojson,
     analysis_domain_geojson: domain.zones.local_500m,
     landscape_domain_identity: domain.identity,
-    production_materialization: materializations[0],
+    production_materialization: state.materialization,
     contract: {
       schema: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.outputSchemaVersion,
       method: FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT.algorithmVersion,
