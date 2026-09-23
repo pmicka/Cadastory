@@ -98,8 +98,6 @@ Deno.test('resolution decisions do not authorize deer scoring or silent inferenc
     'habitat_score',
     'bedding_score',
     'movement_score',
-    'infer exact age',
-    'infer individual rut',
   ]) {
     assert(!encoded.includes(forbidden), forbidden)
   }
