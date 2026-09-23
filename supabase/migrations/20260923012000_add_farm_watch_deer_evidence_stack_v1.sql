@@ -127,27 +127,36 @@ begin
   into v_products,v_available_count,v_stale_count,v_unavailable_count
   from rows r;
 
-  select jsonb_strip_nulls(jsonb_build_object(
-    'status',s.status,
-    'as_of_date',s.as_of_date,
-    'identity_sha256',s.identity_sha256,
-    'algorithm_version',s.algorithm_version,
-    'output_schema_version',s.output_schema_version,
-    'retrieved_at',s.retrieved_at,
-    'context',s.context
-  ))
-  into v_surface_water
-  from farm_watch.property_surface_water_state_v1 s
-  where s.property_id=v_property_id
-    and s.as_of_date=p_as_of_date
-  limit 1;
+  if to_regclass('farm_watch.property_surface_water_state_v1') is not null then
+    execute $sql$
+      select jsonb_strip_nulls(jsonb_build_object(
+        'status',s.status,
+        'as_of_date',s.as_of_date,
+        'identity_sha256',s.identity_sha256,
+        'algorithm_version',s.algorithm_version,
+        'output_schema_version',s.output_schema_version,
+        'retrieved_at',s.retrieved_at,
+        'context',s.context
+      ))
+      from farm_watch.property_surface_water_state_v1 s
+      where s.property_id=$1
+        and s.as_of_date=$2
+      limit 1
+    $sql$
+    into v_surface_water
+    using v_property_id,p_as_of_date;
+  end if;
 
   if v_surface_water is null then
     v_surface_water := jsonb_build_object(
-      'status','not_materialized',
+      'status',case
+        when to_regclass('farm_watch.property_surface_water_state_v1') is null
+          then 'not_deployed'
+        else 'not_materialized'
+      end,
       'as_of_date',p_as_of_date,
       'interpretation_boundary',
-        'Surface Water State v1 is not materialized for this date. Existing mapped hydrography and Seasonal State evidence remain separate inputs.'
+        'Surface Water State v1 is not available for this date. Existing mapped hydrography and Seasonal State evidence remain separate inputs.'
     );
   end if;
 
