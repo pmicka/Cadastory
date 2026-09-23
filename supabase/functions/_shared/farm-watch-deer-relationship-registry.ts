@@ -120,6 +120,11 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     scales: ['local_500m','landscape_1500m'],
     evidence_states: ['available'],
   },
+  'lidar-physical-structure': {
+    status: 'production_neutral_only',
+    scales: ['local_500m'],
+    evidence_states: ['available'],
+  },
   'spatial-edge-patch-context': {
     status: 'production',
     scales: ['local_500m'],
