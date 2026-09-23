@@ -1099,6 +1099,457 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
   }
 }
 
+
+function decodeU8Base64(value: string) {
+  return new Uint8Array(Buffer.from(value, 'base64'))
+}
+
+function decodeU16LeBase64(value: string) {
+  const bytes = new Uint8Array(Buffer.from(value, 'base64'))
+  if (bytes.byteLength % 2) throw new Error('invalid uint16 base64 byte length')
+  const out = new Uint16Array(bytes.byteLength / 2)
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+  for (let index = 0; index < out.length; index += 1) {
+    out[index] = view.getUint16(index * 2, true)
+  }
+  return out
+}
+
+function mean(values: number[]) {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null
+}
+
+function qaDistribution(values: number[]) {
+  if (!values.length) {
+    return {
+      count: 0,
+      min: null,
+      p10: null,
+      p25: null,
+      median: null,
+      mean: null,
+      p75: null,
+      p90: null,
+      max: null,
+    }
+  }
+  const sorted = values.slice().sort((a, b) => a - b)
+  return {
+    count: sorted.length,
+    min: sorted[0],
+    p10: sortedQuantile(sorted, 0.10),
+    p25: sortedQuantile(sorted, 0.25),
+    median: sortedQuantile(sorted, 0.50),
+    mean: mean(sorted),
+    p75: sortedQuantile(sorted, 0.75),
+    p90: sortedQuantile(sorted, 0.90),
+    max: sorted[sorted.length - 1],
+  }
+}
+
+function solve3x3(matrix: number[][], vector: number[]) {
+  const a = matrix.map((row, rowIndex) => [...row, vector[rowIndex]])
+  for (let col = 0; col < 3; col += 1) {
+    let pivot = col
+    for (let row = col + 1; row < 3; row += 1) {
+      if (Math.abs(a[row][col]) > Math.abs(a[pivot][col])) pivot = row
+    }
+    if (Math.abs(a[pivot][col]) < 1e-12) return null
+    if (pivot !== col) [a[pivot], a[col]] = [a[col], a[pivot]]
+    const divisor = a[col][col]
+    for (let k = col; k < 4; k += 1) a[col][k] /= divisor
+    for (let row = 0; row < 3; row += 1) {
+      if (row === col) continue
+      const factor = a[row][col]
+      for (let k = col; k < 4; k += 1) a[row][k] -= factor * a[col][k]
+    }
+  }
+  return [a[0][3], a[1][3], a[2][3]]
+}
+
+function fitLocalGroundPlane(
+  points: Array<{ x: number; y: number; z: number }>,
+  centerX: number,
+  centerY: number,
+) {
+  if (points.length < 6) return null
+  let sxx = 0
+  let syy = 0
+  let sxy = 0
+  let sx = 0
+  let sy = 0
+  let sxz = 0
+  let syz = 0
+  let sz = 0
+  for (const point of points) {
+    const dx = (point.x - centerX) / US_SURVEY_FEET_PER_METER
+    const dy = (point.y - centerY) / US_SURVEY_FEET_PER_METER
+    const z = point.z / US_SURVEY_FEET_PER_METER
+    sxx += dx * dx
+    syy += dy * dy
+    sxy += dx * dy
+    sx += dx
+    sy += dy
+    sxz += dx * z
+    syz += dy * z
+    sz += z
+  }
+  const solved = solve3x3(
+    [
+      [sxx, sxy, sx],
+      [sxy, syy, sy],
+      [sx, sy, points.length],
+    ],
+    [sxz, syz, sz],
+  )
+  if (!solved) return null
+  const [a, b, c] = solved
+  let squared = 0
+  for (const point of points) {
+    const dx = (point.x - centerX) / US_SURVEY_FEET_PER_METER
+    const dy = (point.y - centerY) / US_SURVEY_FEET_PER_METER
+    const actual = point.z / US_SURVEY_FEET_PER_METER
+    const predicted = a * dx + b * dy + c
+    squared += (actual - predicted) ** 2
+  }
+  return {
+    x_slope_m_per_m: a,
+    y_slope_m_per_m: b,
+    slope_percent: Math.hypot(a, b) * 100,
+    center_ground_elevation_m: c,
+    rmse_m: Math.sqrt(squared / points.length),
+  }
+}
+
+function qaHeightClass(heightM: number) {
+  if (heightM <= 0.25) return 'open'
+  if (heightM <= 2) return 'low'
+  if (heightM <= 10) return 'mid'
+  if (heightM >= 15) return 'high'
+  return 'transition'
+}
+
+function selectSpread<T>(values: T[], count: number) {
+  if (values.length <= count) return values.slice()
+  const out: T[] = []
+  const used = new Set<number>()
+  for (let index = 0; index < count; index += 1) {
+    const position = Math.round(((index + 1) / (count + 1)) * (values.length - 1))
+    if (!used.has(position)) {
+      used.add(position)
+      out.push(values[position])
+    }
+  }
+  return out
+}
+
+function meanPointOffset(
+  points: Array<{ x: number; y: number }>,
+  centerX: number,
+  centerY: number,
+) {
+  if (!points.length) return null
+  const x = points.reduce((sum, point) => sum + point.x, 0) / points.length
+  const y = points.reduce((sum, point) => sum + point.y, 0) / points.length
+  return {
+    east_m: (x - centerX) / US_SURVEY_FEET_PER_METER,
+    north_m: (y - centerY) / US_SURVEY_FEET_PER_METER,
+  }
+}
+
+export async function qaStudyAlignedVegetationHeightProfiles(args: {
+  artifact: any
+  analysisGeometry: any
+  propertyBoundary: any
+  sourceItems: any[]
+  representativePerClass?: number
+  negativeOutlierCount?: number
+}) {
+  const artifact = args.artifact
+  const sourceItems = Array.isArray(args.sourceItems)
+    ? args.sourceItems.slice().sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)))
+    : []
+  if (!sourceItems.length) throw new Error('QA Phase 3 processing item list is empty')
+  if (artifact?.status !== 'available') throw new Error('QA artifact is unavailable')
+
+  const nativeCrs = String(artifact.native_crs || '')
+  if (!nativeCrs) throw new Error('QA artifact native CRS unavailable')
+  const analysisGeometry = projectGeometry(args.analysisGeometry, nativeCrs)
+  const propertyGeometry = projectGeometry(args.propertyBoundary, nativeCrs)
+  const grid = artifact.grid
+  const width = Number(grid?.width)
+  const height = Number(grid?.height)
+  const bbox = Array.isArray(grid?.bbox) ? grid.bbox.map(Number) : null
+  const cellNative = Number(grid?.cell_size_native)
+  if (
+    !Number.isInteger(width) || width <= 0 ||
+    !Number.isInteger(height) || height <= 0 ||
+    !bbox || bbox.length !== 4 ||
+    !Number.isFinite(cellNative) || cellNative <= 0
+  ) throw new Error('QA artifact grid metadata invalid')
+
+  const heightsCm = decodeU16LeBase64(String(grid.height_cm_u16_base64 || ''))
+  const support = decodeU8Base64(String(grid.support_u8_base64 || ''))
+  if (heightsCm.length !== width * height || support.length !== width * height) {
+    throw new Error('QA artifact packed-grid length mismatch')
+  }
+
+  const representativeByClass: Record<string, any[]> = {
+    open: [],
+    low: [],
+    mid: [],
+    high: [],
+  }
+  for (let row = 0; row < height; row += 1) {
+    const y = bbox[1] + (row + 0.5) * cellNative
+    for (let col = 0; col < width; col += 1) {
+      const index = row * width + col
+      const flags = support[index]
+      if (
+        !(flags & 1) ||
+        (flags & 2) ||
+        (flags & 4) ||
+        !(flags & 8)
+      ) continue
+      const x = bbox[0] + (col + 0.5) * cellNative
+      if (!pointInGeometry(x, y, propertyGeometry)) continue
+      const artifactHeightM = heightsCm[index] / 100
+      const heightClass = qaHeightClass(artifactHeightM)
+      if (!(heightClass in representativeByClass)) continue
+      representativeByClass[heightClass].push({
+        sample_kind: 'representative',
+        height_class: heightClass,
+        row,
+        col,
+        index,
+        center_x: x,
+        center_y: y,
+        artifact_height_m: artifactHeightM,
+        support_flags: flags,
+        inside_property: true,
+      })
+    }
+  }
+
+  const representativePerClass = Math.max(1, Number(args.representativePerClass || 3))
+  const representativeSamples = Object.entries(representativeByClass).flatMap(
+    ([heightClass, values]) => {
+      values.sort((a, b) => a.index - b.index)
+      return selectSpread(values, representativePerClass).map((row) => ({
+        ...row,
+        height_class: heightClass,
+      }))
+    },
+  )
+
+  const negativeExamples = Array.isArray(artifact?.processing_summary?.most_negative_examples)
+    ? artifact.processing_summary.most_negative_examples
+    : []
+  const negativeOutlierCount = Math.max(1, Number(args.negativeOutlierCount || 10))
+  const negativeSamples = negativeExamples
+    .slice()
+    .sort((a: any, b: any) => Number(a.raw_height_m) - Number(b.raw_height_m))
+    .slice(0, negativeOutlierCount)
+    .map((example: any) => {
+      const row = Number(example.row)
+      const col = Number(example.col)
+      const index = row * width + col
+      const centerX = bbox[0] + (col + 0.5) * cellNative
+      const centerY = bbox[1] + (row + 0.5) * cellNative
+      return {
+        sample_kind: 'negative_outlier',
+        height_class: 'negative_outlier',
+        row,
+        col,
+        index,
+        center_x: centerX,
+        center_y: centerY,
+        artifact_height_m: heightsCm[index] / 100,
+        raw_height_m: Number(example.raw_height_m),
+        support_flags: support[index],
+        inside_property: pointInGeometry(centerX, centerY, propertyGeometry),
+      }
+    })
+
+  const samples = [...representativeSamples, ...negativeSamples]
+  if (representativeSamples.length < representativePerClass * 4) {
+    throw new Error(
+      'QA representative sampling incomplete: expected ' +
+        (representativePerClass * 4) + ', received ' + representativeSamples.length,
+    )
+  }
+  if (!negativeSamples.length) throw new Error('QA negative-outlier sampling unavailable')
+
+  const lazPerf = await loadLazPerf()
+  const opened = []
+  for (const item of sourceItems) {
+    const assetUrl = String(item.primary_asset_href || '')
+    if (!assetUrl) throw new Error('QA Phase 3 asset URL unavailable for ' + item.id)
+    const get = nativeHttpRangeGetter(assetUrl)
+    const copc = await Copc.create(get)
+    const itemNativeCrs = detectNativeCrs(copc.wkt)
+    if (itemNativeCrs !== nativeCrs) {
+      throw new Error('QA source CRS mismatch for ' + item.id)
+    }
+    opened.push({
+      id: String(item.id),
+      get,
+      copc,
+      projected_geometry: projectGeometry(item.geometry, nativeCrs),
+    })
+  }
+
+  const exactHalf = cellNative / 2
+  const groundRadiusNative = 10 * US_SURVEY_FEET_PER_METER
+  const nearFirstRadiusNative = 2.4 * US_SURVEY_FEET_PER_METER
+  const results = []
+
+  for (const sample of samples) {
+    const centerX = Number(sample.center_x)
+    const centerY = Number(sample.center_y)
+    const queryBbox = [
+      centerX - groundRadiusNative,
+      centerY - groundRadiusNative,
+      centerX + groundRadiusNative,
+      centerY + groundRadiusNative,
+    ]
+    const groundPoints: Array<{ x: number; y: number; z: number }> = []
+    const exactGround: Array<{ x: number; y: number; z: number }> = []
+    const exactFirst: Array<{ x: number; y: number; z: number }> = []
+    const nearFirst: Array<{ x: number; y: number; z: number }> = []
+
+    for (const source of opened) {
+      const nodes = await collectIntersectingNodes(source.get, source.copc, queryBbox)
+      for (const node of nodes.values()) {
+        const view = await Copc.loadPointDataView(source.get, source.copc, node, {
+          lazPerf,
+          include: [
+            'X', 'Y', 'Z', 'Classification', 'ReturnNumber', 'Overlap', 'Withheld',
+          ],
+        })
+        const getX = view.getter('X')
+        const getY = view.getter('Y')
+        const getZ = view.getter('Z')
+        const getClassification = view.getter('Classification')
+        const getReturnNumber = view.getter('ReturnNumber')
+        const getOverlap = view.getter('Overlap')
+        const getWithheld = view.getter('Withheld')
+
+        for (let pointIndex = 0; pointIndex < view.pointCount; pointIndex += 1) {
+          const x = Number(getX(pointIndex))
+          const y = Number(getY(pointIndex))
+          if (
+            !bboxContains(queryBbox, x, y) ||
+            ownerItemId(x, y, opened) !== source.id
+          ) continue
+          const z = Number(getZ(pointIndex))
+          const classification = Number(getClassification(pointIndex))
+          const returnNumber = Number(getReturnNumber(pointIndex))
+          const overlap = Number(getOverlap(pointIndex))
+          const withheld = Number(getWithheld(pointIndex))
+          if (
+            !Number.isFinite(z) ||
+            withheld ||
+            overlap ||
+            NOISE_CLASSIFICATIONS.has(classification)
+          ) continue
+
+          const dx = x - centerX
+          const dy = y - centerY
+          const distanceSquared = dx * dx + dy * dy
+          const inExactCell = Math.abs(dx) <= exactHalf && Math.abs(dy) <= exactHalf
+
+          if (
+            classification === 2 &&
+            distanceSquared <= groundRadiusNative * groundRadiusNative
+          ) {
+            const point = { x, y, z }
+            groundPoints.push(point)
+            if (inExactCell) exactGround.push(point)
+          }
+          if (returnNumber === 1) {
+            const point = { x, y, z }
+            if (inExactCell) exactFirst.push(point)
+            if (distanceSquared <= nearFirstRadiusNative * nearFirstRadiusNative) {
+              nearFirst.push(point)
+            }
+          }
+        }
+      }
+    }
+
+    const groundPlane = fitLocalGroundPlane(groundPoints, centerX, centerY)
+    const firstForProfile = exactFirst.length ? exactFirst : nearFirst
+    const aglValuesM = groundPlane
+      ? firstForProfile.map((point) => {
+          const dx = (point.x - centerX) / US_SURVEY_FEET_PER_METER
+          const dy = (point.y - centerY) / US_SURVEY_FEET_PER_METER
+          const groundM =
+            groundPlane.x_slope_m_per_m * dx +
+            groundPlane.y_slope_m_per_m * dy +
+            groundPlane.center_ground_elevation_m
+          return point.z / US_SURVEY_FEET_PER_METER - groundM
+        })
+      : []
+
+    const directFirstMeanZ = mean(exactFirst.map((point) => point.z))
+    const directGroundMeanZ = mean(exactGround.map((point) => point.z))
+    const firstOffset = meanPointOffset(exactFirst, centerX, centerY)
+    const groundOffset = meanPointOffset(exactGround, centerX, centerY)
+    const centroidSeparationM = firstOffset && groundOffset
+      ? Math.hypot(
+          firstOffset.east_m - groundOffset.east_m,
+          firstOffset.north_m - groundOffset.north_m,
+        )
+      : null
+    const agl = qaDistribution(aglValuesM)
+
+    results.push({
+      ...sample,
+      source_profile: {
+        exact_first_return_count: exactFirst.length,
+        near_first_return_2p4m_count: nearFirst.length,
+        exact_ground_class2_count: exactGround.length,
+        ground_class2_10m_count: groundPoints.length,
+        first_return_profile_basis: exactFirst.length ? 'exact_1p2m_cell' : 'nearest_within_2p4m',
+        ground_plane: groundPlane,
+        raw_first_return_agl_m: agl,
+        direct_cell_mean_first_minus_ground_m:
+          directFirstMeanZ != null && directGroundMeanZ != null
+            ? (directFirstMeanZ - directGroundMeanZ) / US_SURVEY_FEET_PER_METER
+            : null,
+        exact_first_xy_offset_m: firstOffset,
+        exact_ground_xy_offset_m: groundOffset,
+        first_ground_centroid_separation_m: centroidSeparationM,
+        artifact_minus_raw_agl_mean_m:
+          agl.mean != null ? Number(sample.artifact_height_m) - Number(agl.mean) : null,
+        artifact_minus_raw_agl_median_m:
+          agl.median != null ? Number(sample.artifact_height_m) - Number(agl.median) : null,
+      },
+    })
+  }
+
+  return {
+    qa_schema: 'study-aligned-vegetation-height-raw-profile-qa-v1',
+    study_measurement_id: 'FW-M02-vegetation-height',
+    production_artifact_schema: artifact.schema,
+    production_artifact_method: artifact.method,
+    source_collection: artifact.source_collection,
+    native_crs: nativeCrs,
+    sampling: {
+      representative_per_class: representativePerClass,
+      representative_count: representativeSamples.length,
+      representative_classes: ['open', 'low', 'mid', 'high'],
+      representative_constraints:
+        'property cell center; height available; direct first return; no negative clamp; local direct Class 2 ground support',
+      negative_outlier_count: negativeSamples.length,
+      negative_outlier_basis:
+        'worst raw first-return-minus-ground residuals retained by production builder QA',
+    },
+    results,
+  }
+}
+
 async function main() {
   const claim = await workerRequest({ operation: 'claim' })
   if (claim?.action === 'reuse') {
