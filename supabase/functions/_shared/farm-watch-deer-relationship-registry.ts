@@ -816,6 +816,11 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['open_hunting_season_equals_current_pressure'],
     output_kind:'ordinal_directional',
     limitations:['Reported magnitude is not a transferable Kentucky multiplier.'],
+    study_measurements:[
+      measurement('FW-M28-daily-hunter-activity','human_activity','daily hunter-use intensity / hunter-selected space','Study compared adult-male selection against contemporaneous hunter activity and hunter-selected landscape characteristics.','unsupported','required','No relationship activation until hunter-use intensity is represented rather than inferred from season or stand geometry.'),
+      measurement('FW-M29-food-opportunity','resource_state','food-resource opportunity','Study documented time-dependent use of food resources under hunting risk.','mechanism_context_only','required','Field phenology/browse layers are related resource context but not yet a study-aligned food-availability measurement.'),
+      measurement('FW-M30-risk-diel-period','diel_state','day versus night risk context','Study contrast depended on hunting-risk availability by time of day.','mechanism_context_only','context_only','Solar phase provides timing context but does not by itself establish hunting risk.'),
+    ],
   }),
   record({
     relationship_id:'FW-R16-sex-risk-food-tradeoff',
@@ -830,7 +835,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       req('biological_state',['deer-biological-state'],['individual_scenario']),
       req('diel_state',['diel-photoperiod-context'],['property']),
     ],
-    biological_state_gates:gate({sex:['male','female'],required_explicit_dimensions:['sex','diel_period']}),
+    biological_state_gates:gate({sex:['male','female'],age_class:['adult'],required_explicit_dimensions:['sex','age_class','diel_period']}),
     spatial_scale:{relationship_scales:['local_500m'],notes:'Risk-food interaction requires explicit sex.'},
     temporal_scale:'hunted-season diel periods',
     relationship_form:'sex by food by risk interaction',
@@ -842,6 +847,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['open_hunting_season_equals_current_pressure'],
     output_kind:'mechanism_context',
     limitations:['No sex-neutral collapse is authorized.'],
+    study_measurements:[
+      measurement('FW-M31-frequent-hunt-risk','human_activity','frequency/intensity of hunted areas','Study contrasted adult male and female use of areas hunted more frequently.','unsupported','required','No sex-specific risk tradeoff activation until hunting frequency/intensity is measured.'),
+      measurement('FW-M32-abundant-food-risk','resource_state','abundant food within risky areas','Study female/male contrast depended on risky areas containing abundant food resources.','unsupported','required','Generic field presence or vegetation greenness cannot substitute for abundant food availability.'),
+    ],
   }),
   record({
     relationship_id:'FW-R17-low-pressure-negative-constraint',
@@ -863,6 +872,12 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['open_hunting_season_equals_current_pressure'],
     output_kind:'negative_constraint',
     limitations:['Does not imply hunting never affects movement; it constrains low-pressure generalization.'],
+    study_measurements:[
+      measurement('FW-M33-low-hunting-pressure','human_activity','low firearms-hunting pressure','Study null result occurred in a demonstrably low-pressure hunting context.','unsupported','required','The negative constraint may fire only when low pressure is actually documented; season-open status is insufficient.'),
+    ],
+    value_constraints:[
+      valueConstraint('FW-C04-pressure-is-low','human_activity','pressure_class','equals',['low'],'FW-D13 constrains inference only under low hunting pressure; unknown or moderate/high pressure cannot inherit the null result.'),
+    ],
   }),
   record({
     relationship_id:'FW-R18-terrain-movement-context',
@@ -877,7 +892,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       req('biological_state',['deer-biological-state'],['individual_scenario']),
       req('human_footprint',['human-footprint-context'],['local_500m','landscape_1500m'],['available','known','proxy'],'static_context_ok'),
     ],
-    biological_state_gates:gate({movement_state:['dispersal'],required_explicit_dimensions:['movement_state']}),
+    biological_state_gates:gate({sex:['male'],age_class:['juvenile'],movement_state:['dispersal'],required_explicit_dimensions:['sex','age_class','movement_state']}),
     spatial_scale:{relationship_scales:['local_500m','landscape_1500m','multiscale'],notes:'Direction differed between landscapes and scales.'},
     temporal_scale:'before/during/after dispersal',
     relationship_form:'terrain and road response changes with landscape context and movement state',
@@ -889,18 +904,23 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['ridge_generic_corridor','draw_generic_corridor','saddle_generic_funnel','roads_generic_avoidance','roads_generic_selection'],
     output_kind:'mechanism_context',
     limitations:['No universal ridge, valley, road, saddle or corridor sign is authorized.'],
+    study_measurements:[
+      measurement('FW-M34-dispersal-terrain-form','terrain','terrain/topographic position during dispersal','Study evaluated scale-dependent topographic selection by dispersing juvenile males in two contrasting Missouri landscapes.','mechanism_context_only','context_only','Farm Watch terrain forms can provide neutral context but the study effect direction cannot transfer without matching landscape context.'),
+      measurement('FW-M35-forest-landscape-context','forest_context','forest availability/configuration at multiple scales','Study terrain and forest-selection responses changed with landscape forest availability/configuration.','mechanism_context_only','required','No property-level sign may be assigned without an aligned multiscale forest-context measurement.'),
+      measurement('FW-M36-road-landscape-context','human_footprint','road response within landscape context','Road response reversed/vanished across study landscapes and movement states.','unsupported','required','No terrain relationship activation until the relevant road/human-footprint context is represented.'),
+    ],
   }),
   record({
     relationship_id:'FW-R19-juvenile-male-dispersal-ag-riparian',
     ledger_ids:['FW-D15'],
     source_citations:['Gilbertson et al. 2022, Movement Ecology 10:43, DOI:10.1186/s40462-022-00342-5'],
-    title:'Juvenile-male dispersal depends on agriculture and riparian context',
+    title:'Juvenile-male dispersal path selection uses agriculture and riparian context',
     module_family:'terrain_movement_context',
-    response_variable:'dispersal probability, distance and path selection',
+    response_variable:'dispersal path selection',
     required_inputs:[
       req('biological_state',['deer-biological-state'],['individual_scenario']),
-      req('agriculture_context',['field-phenology-context'],['field','landscape_1500m','broad_3000m'],['available','known','proxy']),
-      req('water_context',['surface-water-state'],['local_500m','landscape_1500m'],['available','known','proxy']),
+      req('agriculture_context',['agriculture-landcover-context'],['field','landscape_1500m','broad_3000m'],['available','known','proxy'],'static_context_ok'),
+      req('riparian_geometry',['mapped-hydrography-context'],['local_500m','landscape_1500m','broad_3000m'],['available','known'],'static_context_ok'),
     ],
     biological_state_gates:gate({
       sex:['male'],age_class:['juvenile','yearling'],movement_state:['dispersal'],
@@ -908,7 +928,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     }),
     spatial_scale:{relationship_scales:['landscape_1500m','broad_3000m','multiscale'],notes:'Natal-range agriculture and path selection occur at different scales.'},
     temporal_scale:'seasonal dispersal',
-    relationship_form:'agriculture influences dispersal probability/distance while actual paths can avoid agriculture and select riparian features',
+    relationship_form:'during dispersal, paths can avoid agriculture and select areas near rivers and streams',
     direction:'interaction',
     supported_nonlinearity:null,
     coefficient_transfer:{status:'not_supported',numeric_parameters:[]},
@@ -916,7 +936,11 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     null_or_blocked_conditions:['resident adults must not consume this relationship'],
     blocked_universal_assumptions:['nearest_water_or_discharge_equals_deer_use'],
     output_kind:'ordinal_directional',
-    limitations:['Riparian selection in dispersal is not a generic resident-deer water rule.'],
+    limitations:['Riparian selection in dispersal is not a generic resident-deer water rule; current water presence is not required to represent distance to mapped rivers/streams.'],
+    study_measurements:[
+      measurement('FW-M37-dispersal-ag-landcover','agriculture_context','agricultural land use along dispersal paths','Study step-selection analysis used agricultural land use as landscape geometry, not crop phenology or current food state.','derived_equivalent','required','Mapped agricultural land-cover proportion/geometry may represent this covariate when scale is preserved.'),
+      measurement('FW-M38-river-stream-proximity','riparian_geometry','proximity to rivers and streams during dispersal','Study found juvenile males selected areas near rivers and streams during dispersal.','derived_equivalent','required','Authoritative mapped hydrography may represent riparian geometry; this must not be relabeled as water visitation or current water availability.'),
+    ],
   }),
   record({
     relationship_id:'FW-R20-multiscale-cover-food-context',
@@ -941,6 +965,11 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:[],
     output_kind:'mechanism_context',
     limitations:['Population occurrence/abundance is not within-property movement.'],
+    study_measurements:[
+      measurement('FW-M39-d16-study-scales','cover_context','cover at 1 km², 9 km² and hunting-unit scales','Study evaluated occurrence/abundance at explicit 1 km², 9 km², and hunting-unit scales.','unsupported','required','Current 500 m / 1.5 km / 3 km products are not measurement-equivalent to the published scale design.'),
+      measurement('FW-M40-d16-escape-cover-types','cover_context','forest, wetland and CRP escape-cover composition','Study broad-scale cover signal came from forest, wetland and Conservation Reserve Program lands.','unsupported','required','Generic edge/patch structure does not preserve the study cover classes.'),
+      measurement('FW-M41-d16-winter-food','agriculture_state','residual winter cropland / food at fine scale','Study fine-scale food signal emphasized residual winter cropland.','unsupported','required','Current field vegetation context does not establish residual winter crop food availability.'),
+    ],
   }),
   record({
     relationship_id:'FW-R21-human-footprint-seasonal-context',
@@ -952,9 +981,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     required_inputs:[
       req('human_footprint',['human-footprint-context'],['local_500m','landscape_1500m','broad_3000m'],['available','known','proxy'],'static_context_ok'),
       req('resource_context',['field-phenology-context','browse-resource-context'],['field','local_500m','landscape_1500m'],['available','known','proxy']),
+      req('predator_occurrence',['predator-occurrence-context'],['landscape_1500m','broad_3000m','regional'],['available','known','proxy']),
       req('biological_state',['deer-biological-state'],['individual_scenario']),
     ],
-    biological_state_gates:gate({required_explicit_dimensions:['season']}),
+    biological_state_gates:gate({sex:['female'],required_explicit_dimensions:['sex','season']}),
     spatial_scale:{relationship_scales:['landscape_1500m','broad_3000m'],notes:'Cumulative footprint and resource context are landscape dependent.'},
     temporal_scale:'seasonal',
     relationship_form:'linear and polygonal human features interact with resources and risk',
@@ -966,6 +996,11 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['roads_generic_avoidance','roads_generic_selection'],
     output_kind:'mechanism_context',
     limitations:['Boreal range-expansion context; linear features are not universally positive or negative.'],
+    study_measurements:[
+      measurement('FW-M42-human-footprint-composition','human_footprint','polygonal and linear industrial human footprint','Study compared polygonal industrial features and linear features such as roads, trails and seismic lines.','unsupported','required','No relationship activation until footprint subtypes are explicitly represented.'),
+      measurement('FW-M43-intact-deciduous-forest','resource_context','intact deciduous forest / natural habitat composition','Study cumulative-effects model included natural habitat composition, especially intact deciduous forest.','mechanism_context_only','required','Generic resource state does not yet reproduce the study natural-habitat covariates.'),
+      measurement('FW-M44-wolf-occurrence','predator_occurrence','camera-derived wolf occurrence','Top seasonal models included modeled wolf occurrence as predation-risk context.','unsupported','required','Omitting predator occurrence changes the published cumulative-effects model; no activation until represented.'),
+    ],
   }),
   record({
     relationship_id:'FW-R22-extreme-storm-refuge',
@@ -977,6 +1012,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     required_inputs:[
       req('extreme_event',['extreme-weather-event-context'],['event_local','property','regional'],['available','known']),
       req('terrain',['terrain-form-permeability'],['local_500m','landscape_1500m']),
+      req('forest_type',['forest-type-context'],['local_500m','landscape_1500m'],['available','known','proxy']),
       req('water_context',['surface-water-state'],['local_500m','landscape_1500m'],['available','known','proxy']),
     ],
     biological_state_gates:gate(),
@@ -991,6 +1027,11 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['wind_generic_movement'],
     output_kind:'mechanism_context',
     limitations:['Southwestern Florida hurricane event; ordinary weather is explicitly out of scope.'],
+    study_measurements:[
+      measurement('FW-M45-extreme-hurricane-event','extreme_event','active hurricane/extreme climatic event','Study response was observed during Hurricane Irma, not routine rain or wind.','unsupported','required','No activation without an explicit extreme-event state.'),
+      measurement('FW-M46-elevation-refuge','terrain','relative elevation during the event','Study deer increased selection of higher elevation during Hurricane Irma.','derived_equivalent','required','Farm Watch elevation can represent the physical variable, but no Florida coefficient transfers.'),
+      measurement('FW-M47-forest-refuge-type','forest_type','pine and hardwood forest refuge types','Study deer increased selection of pine forests and hardwood forest/swamp types while avoiding marsh/shrub habitats.','unsupported','required','Elevation alone cannot reproduce the study refuge relationship; forest/habitat type is required.'),
+    ],
   }),
   record({
     relationship_id:'FW-R23-water-rainfall-context',
@@ -1000,7 +1041,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     module_family:'water_hydrology_context',
     response_variable:'water-source visitation frequency',
     required_inputs:[
-      req('water_state',['surface-water-state'],['property','local_500m','landscape_1500m'],['available','known','proxy']),
+      req('water_state',['surface-water-state'],['property','local_500m','landscape_1500m'],['available','known']),
       req('recent_precipitation',['seasonal-state'],['property','regional'],['available','known','proxy']),
     ],
     biological_state_gates:gate({seasons:['summer'],required_explicit_dimensions:['season']}),
@@ -1015,6 +1056,13 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     blocked_universal_assumptions:['nearest_water_or_discharge_equals_deer_use'],
     output_kind:'mechanism_context',
     limitations:['Semiarid artificial-water context; no universal central-Kentucky water attraction rule.'],
+    study_measurements:[
+      measurement('FW-M48-usable-water-source','water_state','available stock-pond/trough water source','Study visitation response was measured at known artificial water sources; mapped hydrography or regional discharge alone is not equivalent.','unsupported','required','No water-visitation relationship activation until current usable water-source presence is known.'),
+      measurement('FW-M49-recent-rainfall','recent_precipitation','recent rainfall preceding water-source visitation','Study visitation frequency was related to recent rainfall.','calibrated_proxy','required','QPE or other gridded precipitation may serve only as a documented rainfall proxy with freshness and spatial uncertainty retained.'),
+    ],
+    value_constraints:[
+      valueConstraint('FW-C05-water-present','water_state','current_presence_state','one_of',['observed_present','known_managed_source_present'],'The relationship requires an actually available water source; mapped persistence or an off-property gauge is insufficient.'),
+    ],
   }),
   record({
     relationship_id:'FW-R24-climate-modular-architecture',
@@ -1064,6 +1112,9 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     output_kind:'mechanism_context',
     limitations:['No universal peak day, individual estrus flag or movement multiplier.'],
     biological_state_annotation:{state_codes:['KY']},
+    study_measurements:[
+      measurement('FW-M50-kentucky-regional-breeding','biological_state','Kentucky regional breeding-season context','Relationship is based on Kentucky authoritative population-level timing summaries.','measurement_equivalent','required','May gate regional season context only; it cannot establish individual estrus, mating, conception, or movement intensity.'),
+    ],
   }),
   record({
     relationship_id:'FW-R26-female-age-breeding-context',
@@ -1089,6 +1140,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     output_kind:'mechanism_context',
     limitations:['Illinois mean conception dates are provenance only and must not be assigned to Kentucky.'],
     biological_state_annotation:{sex:['female'],require_known_age:true},
+    study_measurements:[
+      measurement('FW-M51-maternal-age-category','biological_state','maternal age class','Illinois study estimated conception timing by maternal age, including fawns, yearlings and adults.','mechanism_context_only','required','Current Farm Watch juvenile/yearling/adult vocabulary requires an explicit mapping review before using the study age relationship.'),
+      measurement('FW-M52-conception-timing','biological_state','estimated conception timing','Study timing was derived from fetal/reproductive measurements in Illinois.','mechanism_context_only','context_only','Relationship form may be retained, but Illinois conception dates are not Kentucky parameters.'),
+    ],
   }),
   record({
     relationship_id:'FW-R27-ohio-breeding-onset-corroboration',
