@@ -73,8 +73,8 @@ assert(
   'conditioned D8 dependency must remain current and geometry-only',
 )
 assert(
-  sql.includes("farm_watch.farm_watch_resolve_seasonal_state_v1_internal(p_slug,p_as_of_date)"),
-  'Batch 7 must reuse the central Seasonal State resolver',
+  sql.includes("farm_watch.farm_watch_get_seasonal_state_v1_internal(p_slug,p_as_of_date)"),
+  'Batch 7 must reuse the persisted central Seasonal State reader',
 )
 assert(
   sql.includes("farm_watch.farm_watch_context_identity_v1(v_property_id,'hydrology')"),
