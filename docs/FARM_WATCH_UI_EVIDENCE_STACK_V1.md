@@ -1,6 +1,6 @@
 # Farm Watch UI Evidence Stack v1
 
-Status: implemented in source; production migration/Edge deployment pending explicit deployment authorization.
+Status: production-deployed private evidence inventory.
 
 ## Purpose
 
@@ -11,7 +11,7 @@ The Farm Watch UI previously surfaced Deer Context from four components only:
 - deer biological state;
 - field phenology.
 
-That remains useful, but it omitted neutral physical products that were already available centrally, including the new horizontal-visibility product.
+That remains useful, but it omitted neutral physical products that were already available centrally. The inventory now includes both generalized structural products and the production-validated study-aligned vegetation-height measurement.
 
 `deer-evidence-stack-v1` adds a private presentation inventory. It does not compute new environmental evidence and does not perform deer interpretation.
 
@@ -20,6 +20,7 @@ That remains useful, but it omitted neutral physical products that were already 
 The service-only reader returns the latest central metadata/summary for:
 
 - LiDAR physical vertical structure;
+- study-aligned vegetation height (`study-aligned-vegetation-height-context-v2`);
 - landscape physical structure;
 - terrain form / permeability;
 - spatial edge / patch context;
@@ -69,3 +70,16 @@ The output is a private UI review inventory. Product availability does not mean:
 - a score exists.
 
 The UI must preserve each product's own limitations and distinguish neutral physical evidence from later literature-backed relationship modules.
+
+
+## FW-M02 vegetation-height exposure
+
+The evidence inventory includes `study-aligned-vegetation-height-context` as neutral physical evidence.
+
+Its presence means only that the production-validated first-return-minus-ground vegetation-height product is available for review. The deer relationship registry separately controls whether a study relationship may consume it.
+
+For FW-R01/FW-D01:
+
+- FW-M02 is `derived_equivalent`;
+- negative-clamped cells remain unavailable for scientific height use;
+- FW-D01 remains blocked by operative temperature, forage index, woody canopy, and activity-period fidelity.
