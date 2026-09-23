@@ -1,0 +1,32 @@
+name: Farm Watch study vegetation height materialization
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  materialize:
+    if: >-
+      github.actor == 'pmicka' &&
+      github.event.issue.user.login == 'pmicka' &&
+      github.event.issue.title == '[ops] Materialize Farm Watch study vegetation height'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check study vegetation-height materializer
+        run: deno check scripts/farm-watch-study-vegetation-height-materialize.ts
+      - name: Materialize validation property
+        run: >-
+          deno run
+          --allow-env
+          --allow-net
+          scripts/farm-watch-study-vegetation-height-materialize.ts
+          --property validation-property-01
