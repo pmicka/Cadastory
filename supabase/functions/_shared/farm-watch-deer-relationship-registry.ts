@@ -43,6 +43,37 @@ export type DeerRelationshipScale =
 export type DeerRelationshipEvidenceState =
   typeof FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_PRODUCT.evidenceStates[number]
 
+export const FARM_WATCH_DEER_MEASUREMENT_ALIGNMENTS = Object.freeze([
+  'measurement_equivalent',
+  'derived_equivalent',
+  'calibrated_proxy',
+  'mechanism_context_only',
+  'unsupported',
+] as const)
+
+export type DeerMeasurementAlignment =
+  typeof FARM_WATCH_DEER_MEASUREMENT_ALIGNMENTS[number]
+
+export type DeerStudyMeasurementRequirement = {
+  id: string
+  binding_key: string | null
+  study_variable: string
+  study_protocol: string
+  alignment: DeerMeasurementAlignment
+  activation_requirement: 'required' | 'context_only' | 'not_applicable'
+  permitted_use: string
+  limitations: string[]
+}
+
+export type DeerRelationshipValueConstraint = {
+  id: string
+  binding_key: string
+  field: string
+  operator: 'equals' | 'one_of' | 'known' | 'study_specific'
+  values: string[]
+  rationale: string
+}
+
 export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
   'deer-biological-state': {
     status: 'production',
@@ -98,6 +129,31 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     status: 'production_neutral_only',
     scales: ['local_500m'],
     evidence_states: ['available'],
+  },
+  'mapped-hydrography-context': {
+    status: 'production_neutral_context',
+    scales: ['local_500m','landscape_1500m','broad_3000m'],
+    evidence_states: ['available','known'],
+  },
+  'stand-vulnerability-zone-context': {
+    status: 'planned_measurement_alignment',
+    scales: ['event_local','local_500m'],
+    evidence_states: ['available','known','unavailable'],
+  },
+  'conifer-cover-context': {
+    status: 'planned_measurement_alignment',
+    scales: ['local_500m','landscape_1500m'],
+    evidence_states: ['available','known','proxy','unavailable'],
+  },
+  'predator-occurrence-context': {
+    status: 'planned',
+    scales: ['landscape_1500m','broad_3000m','regional'],
+    evidence_states: ['available','known','proxy','unavailable'],
+  },
+  'forest-type-context': {
+    status: 'planned_measurement_alignment',
+    scales: ['local_500m','landscape_1500m'],
+    evidence_states: ['available','known','proxy','unavailable'],
   },
   'low-height-concealment-context': {
     status: 'planned_measurement_alignment',
@@ -204,6 +260,8 @@ export type DeerRelationshipRecord = {
   blocked_universal_assumptions: string[]
   output_kind: DeerRelationshipOutputKind
   limitations: string[]
+  study_measurements: DeerStudyMeasurementRequirement[]
+  value_constraints: DeerRelationshipValueConstraint[]
   biological_state_annotation?: {
     state_codes?: string[]
     sex?: FarmWatchDeerSex[]
@@ -250,8 +308,68 @@ function gate(
   }
 }
 
-function record(value: DeerRelationshipRecord): DeerRelationshipRecord {
-  return Object.freeze(value)
+function record(
+  value: Omit<DeerRelationshipRecord,'study_measurements'|'value_constraints'> &
+    Partial<Pick<DeerRelationshipRecord,'study_measurements'|'value_constraints'>>,
+): DeerRelationshipRecord {
+  return Object.freeze({
+    ...value,
+    study_measurements: value.study_measurements || [],
+    value_constraints: value.value_constraints || [],
+  })
+}
+
+function measurement(
+  id: string,
+  binding_key: string | null,
+  study_variable: string,
+  study_protocol: string,
+  alignment: DeerMeasurementAlignment,
+  activation_requirement: DeerStudyMeasurementRequirement['activation_requirement'],
+  permitted_use: string,
+  limitations: string[] = [],
+): DeerStudyMeasurementRequirement {
+  return {
+    id,
+    binding_key,
+    study_variable,
+    study_protocol,
+    alignment,
+    activation_requirement,
+    permitted_use,
+    limitations,
+  }
+}
+
+function valueConstraint(
+  id: string,
+  binding_key: string,
+  field: string,
+  operator: DeerRelationshipValueConstraint['operator'],
+  values: string[],
+  rationale: string,
+): DeerRelationshipValueConstraint {
+  return { id, binding_key, field, operator, values, rationale }
+}
+
+export function deerRelationshipStudyFidelityStatus(row: DeerRelationshipRecord) {
+  const blockers = row.study_measurements.filter((measurement) =>
+    measurement.activation_requirement === 'required' &&
+    (measurement.alignment === 'mechanism_context_only' || measurement.alignment === 'unsupported')
+  )
+  const contextOnly = row.study_measurements.filter((measurement) =>
+    measurement.activation_requirement === 'context_only' ||
+    measurement.alignment === 'mechanism_context_only'
+  )
+  return {
+    status: blockers.length
+      ? 'blocked_measurement_alignment'
+      : contextOnly.length
+        ? 'context_only'
+        : 'module_eligible',
+    blocker_ids: blockers.map((measurement) => measurement.id),
+    context_only_ids: contextOnly.map((measurement) => measurement.id),
+  } as const
 }
 
 export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = Object.freeze([
