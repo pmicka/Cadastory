@@ -130,6 +130,11 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     scales: ['local_500m'],
     evidence_states: ['available'],
   },
+  'study-aligned-vegetation-height-context': {
+    status: 'production_validated_neutral_measurement',
+    scales: ['local_500m'],
+    evidence_states: ['available'],
+  },
   'spatial-edge-patch-context': {
     status: 'production',
     scales: ['local_500m'],
@@ -394,7 +399,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       req('biological_state',['deer-biological-state'],['individual_scenario']),
       req('diel_state',['diel-photoperiod-context'],['property']),
       req('thermal_exposure',['thermal-exposure-context'],['local_500m','landscape_1500m']),
-      req('vegetation_height',['lidar-physical-structure'],['local_500m']),
+      req('vegetation_height',['study-aligned-vegetation-height-context'],['local_500m']),
       req('woody_canopy',['spatial-edge-patch-context'],['local_500m']),
       req('resource_state',['field-phenology-context','browse-resource-context'],['field','property','local_500m'],['available','known','proxy']),
     ],

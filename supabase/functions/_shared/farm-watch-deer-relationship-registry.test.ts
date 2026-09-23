@@ -1,5 +1,6 @@
 import {
   FARM_WATCH_DEER_BLOCKED_UNIVERSAL_ASSUMPTIONS,
+  FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG,
   FARM_WATCH_DEER_LEDGER_IDS,
   FARM_WATCH_DEER_RELATIONSHIPS,
   applicableBiologicalStateLedgerIds,
@@ -44,6 +45,32 @@ Deno.test('active biological relationships carry explicit study-measurement cont
       relationship.relationship_id + ' has no study-measurement contract',
     )
   }
+})
+
+Deno.test('FW-R01 vegetation height is bound only to the production-validated study-aligned product', () => {
+  const product = FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG[
+    'study-aligned-vegetation-height-context'
+  ]
+  assert(product)
+  assert(product.status === 'production_validated_neutral_measurement')
+  assert(JSON.stringify(product.scales) === JSON.stringify(['local_500m']))
+  assert(JSON.stringify(product.evidence_states) === JSON.stringify(['available']))
+
+  const relationship = getDeerRelationship('FW-R01-summer-thermal-resource-tradeoff')
+  assert(relationship)
+  const requirement = relationship.required_inputs.find((row) => row.key === 'vegetation_height')
+  assert(requirement)
+  assert(
+    JSON.stringify(requirement.product_keys) ===
+      JSON.stringify(['study-aligned-vegetation-height-context']),
+  )
+  assert(!requirement.product_keys.includes('lidar-physical-structure' as any))
+
+  const measurement = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M02-vegetation-height',
+  )
+  assert(measurement)
+  assert(measurement.alignment === 'mechanism_context_only')
 })
 
 Deno.test('numeric coefficients are rejected when coefficient transfer is not authorized', () => {
