@@ -693,7 +693,7 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 | Woody browse | meaningful winter evidence | not ready | defensible browse availability proxy or field observation |
 | Hunting pressure | strong conditional evidence | not ready | dated/local pressure observations or measured use intensity |
 | Roads/trails/human footprint | context dependent | geometry ready | combine with actual resource/risk state; never standalone sign |
-| Water | limited/context-specific | partial hydro context | map actual usable water/persistence; retain drought/precip context |
+| Water | limited/context-specific | neutral surface-water state implemented, pending production deployment | preserve mapped persistence vs current observed presence; retain drought/precip/gauge/soil proxies and do not infer generic deer water preference |
 | Snow/winter severity | strong northern evidence | not ready/currently low priority for KY | snow depth/severity only when relevant |
 | Extreme storm/flood | direct event evidence | partial | event-specific hazard/flood state |
 | Moon phase | negative evidence | computable but should not be used | none; keep blocked |

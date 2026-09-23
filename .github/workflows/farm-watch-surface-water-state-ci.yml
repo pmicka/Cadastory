@@ -1,0 +1,38 @@
+name: Farm Watch surface water state CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-surface-water-state-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-surface-water-state-contract.test.ts'
+      - 'supabase/migrations/*farm_watch_surface_water_state*.sql'
+      - 'scripts/check-farm-watch-surface-water-state-migration.ts'
+      - 'docs/FARM_WATCH_SURFACE_WATER_STATE_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+      - '.github/workflows/farm-watch-surface-water-state-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  surface-water-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check surface-water contract
+        run: deno check supabase/functions/_shared/farm-watch-surface-water-state-contract.ts
+      - name: Test surface-water contract
+        run: deno test supabase/functions/_shared/farm-watch-surface-water-state-contract.test.ts
+      - name: Check migration invariants
+        run: deno run --allow-read scripts/check-farm-watch-surface-water-state-migration.ts
+      - name: Check deer relationship registry compatibility
+        run: deno check supabase/functions/_shared/farm-watch-deer-relationship-registry.ts
+      - name: Test deer relationship registry compatibility
+        run: deno test --allow-read supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts
