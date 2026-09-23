@@ -1,0 +1,28 @@
+name: Farm Watch UI evidence stack CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/farm-watch-private/index.ts'
+      - 'supabase/migrations/*deer_evidence_stack*.sql'
+      - 'scripts/check-farm-watch-ui-evidence-stack.ts'
+      - 'docs/FARM_WATCH_UI_EVIDENCE_STACK_V1.md'
+      - '.github/workflows/farm-watch-ui-evidence-stack-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ui-evidence-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check private Farm Watch edge
+        run: deno check supabase/functions/farm-watch-private/index.ts
+      - name: Check UI evidence-stack invariants
+        run: deno run --allow-read scripts/check-farm-watch-ui-evidence-stack.ts

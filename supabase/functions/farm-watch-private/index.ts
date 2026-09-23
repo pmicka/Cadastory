@@ -377,6 +377,28 @@ async function readDeerContext(slug: string) {
   return data
 }
 
+async function readDeerEvidenceStack(slug: string) {
+  const asOfDate = louisvilleCalendarDate(new Date())
+  const { data, error } = await admin.rpc('farm_watch_get_deer_evidence_stack_v1_internal', {
+    p_slug: slug,
+    p_as_of_date: asOfDate,
+  })
+
+  if (error) {
+    console.error('farm_watch_get_deer_evidence_stack_v1_internal failed', error.message)
+    return {
+      status: 'unavailable',
+      schema: 'deer-evidence-stack-v1',
+      as_of_date: asOfDate,
+      products: {},
+      surface_water_state: { status: 'unavailable' },
+      interpretation_boundary:
+        'Neutral evidence inventory is temporarily unavailable. No scoring or behavioral inference is performed.',
+    }
+  }
+  return data
+}
+
 async function refreshHydrology(slug: string, boundary: any) {
   const sourceRequests = HYDRO_SOURCES.map((source) => {
     const envelope = expandedEnvelope(boundary, source.bufferM)
@@ -570,7 +592,10 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const deerContext = await readDeerContext(slug)
+  const [deerContext, deerEvidenceStack] = await Promise.all([
+    readDeerContext(slug),
+    readDeerEvidenceStack(slug),
+  ])
 
   let center = storedCenter(property)
   if (!center) {
@@ -619,6 +644,7 @@ Deno.serve(async (req: Request) => {
         : landscapeDomain.identity,
     },
     deer_context: deerContext,
+    deer_evidence_stack: deerEvidenceStack,
     access: {
       scope: 'private',
       account_role: normalizedAccountRole,
