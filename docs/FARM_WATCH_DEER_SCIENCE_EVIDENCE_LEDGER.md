@@ -135,7 +135,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **form-transfer-ready; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** future solar/thermal product + canopy + LiDAR/structure-derived vegetation height + resource state + time-of-day.
+**Farm Watch mapping:** study-aligned operative-temperature or calibrated thermal input + vegetation height + woody canopy + forage state + study activity-period translation.
+
+**Measurement-fidelity note:** Current `thermal-exposure-context-v1` is related physical context but explicitly does not calculate operative temperature. Current LiDAR structure and field-phenology products are not measurement-equivalent to the study's vegetation-height and forage-index variables.
 
 **Boundary:** Do not convert to “shade always attracts deer,” “south slopes are bad in summer,” or “concealment is irrelevant.” This was summer, adult males, subtropical Texas, and within-habitat selection.
 
@@ -175,7 +177,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **context-conditional; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** snow-depth/winter-severity state (currently missing), canopy density, solar exposure, time of day.
+**Farm Watch mapping:** snow-depth/winter-severity state + dense-conifer cover availability + solar exposure + time of day.
+
+**Measurement-fidelity note:** Generic canopy density or edge/patch structure must not substitute for the study's dense-conifer cover class.
 
 **Boundary:** Northern severe-winter system. Do not use this to create a generic “dense conifer = winter bedding” rule in central Kentucky. It directly warns against using air temperature without solar exposure and snow state.
 
@@ -193,7 +197,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **mechanism-support/context-conditional; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** potential future visibility/concealment metric from LiDAR + leaf-off structure; future thermal product; sex/reproductive-state gate.
+**Farm Watch mapping:** planned study-aligned `low-height-concealment-context` reproducing or calibrated to the 2 m cover-pole protocol at 15 m with four 50 cm strata and directionality; thermal-cover context; sex/reproductive-state gate.
+
+**Measurement-fidelity note:** `horizontal-visibility-context-v1` is a generalized physical viewshed and is not the Gallina concealment measurement.
 
 **Boundary:** Semiarid Mexico and bedsite-specific inference. Do not label all dense low vegetation as bedding or assume female/male effects outside the documented state.
 
@@ -233,7 +239,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **form-transfer-ready for age × reproductive-state gating; date coefficient/period not directly transferable to Kentucky.**
 
-**Farm Watch mapping:** calendar/photoperiod + locally appropriate breeding phenology + age class if known.
+**Farm Watch mapping:** locally appropriate breeding phenology + explicit male age class with enough resolution to distinguish yearlings, 2-year-olds, and males ≥3 years.
+
+**Measurement-fidelity note:** The current Farm Watch `juvenile | yearling | adult` vocabulary collapses 2-year-old and ≥3-year-old males into `adult`; the age-dependent movement relationship must therefore abstain until age resolution is improved.
 
 **Boundary:** Do not hard-code Wisconsin rut dates for Kentucky.
 
@@ -307,7 +315,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **form-transfer-ready if actual pressure events exist; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** dated hunter/stand/access events (currently missing as a formal pressure surface) + time of day + food/resource features.
+**Farm Watch mapping:** dated hunt events tied to specific stands + stand-specific visibility/vulnerability geometry + hunter-occupancy-aware diel periods; food/resource features remain separate context.
+
+**Measurement-fidelity note:** Sullivan et al. mapped each stand's vulnerability zone by field visibility/rangefinding rather than using a uniform distance buffer. A future generalized viewshed may help derive this geometry, but it requires calibration before being treated as study-equivalent.
 
 **Blocked rule:** Distance to a road, trail, stand, or property boundary alone is not hunting pressure.
 
@@ -361,7 +371,7 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **negative-constraint/context-conditional.**
 
-**Farm Watch implication:** “Hunting season open” is not sufficient evidence of a displacement effect. Pressure intensity/localization must be represented.
+**Farm Watch implication:** “Hunting season open” is not sufficient evidence of a displacement effect. The null result is conditional on a documented low-pressure hunting context, so pressure intensity/localization must be represented before this negative constraint can fire.
 
 ---
 
@@ -395,7 +405,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **form-transfer-ready for juvenile-male dispersal only; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** sex/age + season + agriculture + riparian/hydrography + movement state.
+**Farm Watch mapping:** represent three separate relationships: (1) spring juvenile-male dispersal probability versus natal-range agriculture, (2) dispersal distance versus season and agriculture in potential paths, and (3) dispersal path selection versus agricultural land use and proximity to mapped rivers/streams.
+
+**Measurement-fidelity note:** The path-selection result is about riparian/hydrography geometry, not current water presence or water visitation. Crop phenology is also not the study agriculture variable; agricultural land-use geometry is.
 
 **Boundary:** Do not apply riparian selection from a dispersal study as a generic resident-deer water-use rule.
 
@@ -413,7 +425,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **form-transfer-ready for multiscale architecture; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** existing 500 m / 1.5 km / 3 km context, canopy/cover, wetlands, agricultural residue state (currently missing at field scale).
+**Farm Watch mapping:** preserve the published ~1 km², 9 km², and hunting-unit scale design; represent forest, wetland, and CRP cover separately from fine-scale residual winter cropland.
+
+**Measurement-fidelity note:** Existing 500 m / 1.5 km / 3 km generic structure products are useful context but are not measurement-equivalent to the study's scale design or cover classes.
 
 **Boundary:** Population occurrence/abundance is not identical to within-property movement.
 
@@ -423,7 +437,7 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Citation:** Darlington, S., Ladle, A., Burton, A.C., Volpe, J.P., and Fisher, J.T. 2022. *Cumulative effects of human footprint, natural features and predation risk best predict seasonal resource selection by white-tailed deer.* Scientific Reports 12:1072. DOI: 10.1038/s41598-022-05018-z.
 
-**Population/design:** Range-expanding boreal white-tailed deer in western Canadian oil sands; three years of GPS telemetry, camera-derived predator occurrence, seasonal second-order resource-selection models.
+**Population/design:** Range-expanding boreal white-tailed deer in western Canadian oil sands; 38 captured/collared females, 36 retained for analysis; three years of GPS telemetry, camera-derived predator occurrence, seasonal second-order resource-selection models.
 
 **Response:** Seasonal habitat selection.
 
@@ -431,7 +445,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **context-conditional/negative-constraint.**
 
-**Farm Watch mapping:** linear access features + surrounding vegetation/resource state + season + predator/risk context.
+**Farm Watch mapping:** female biological state + explicit polygonal/linear human-footprint classes + intact deciduous/natural-habitat context + season + predator occurrence/risk context.
+
+**Measurement-fidelity note:** Omitting the study's camera-derived wolf-occurrence component changes the cumulative-effects model; a human-footprint-only module is not study-aligned.
 
 **Blocked rule:** Roads/trails cannot receive a universal deer avoidance penalty. Their effect can reverse with resource configuration and landscape context.
 
@@ -449,7 +465,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **extreme-event-only; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** elevation, flood/wetland context, extreme-weather alert/event state.
+**Farm Watch mapping:** explicit extreme-event state + relative elevation + forest/habitat type + flood/wetland context.
+
+**Measurement-fidelity note:** The Irma response combined higher elevation with increased selection of pine/hardwood refuge types and avoidance of marsh/shrub habitat; elevation alone is insufficient.
 
 **Boundary:** Must never become an ordinary rain/wind movement term.
 
@@ -467,7 +485,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **mechanism-support/context-only for central Kentucky.**
 
-**Farm Watch mapping:** recent precipitation, actual water-source availability/persistence, drought; current stream-gauge discharge alone is not enough.
+**Farm Watch mapping:** recent precipitation + actually available water source state; drought may remain context. Current stream-gauge discharge, mapped hydrography, or persistence classification alone is not enough.
+
+**Measurement-fidelity note:** The study response was visitation to known stock ponds/troughs. A future water relationship must require current usable-source presence rather than accepting a generic `surface-water-state` product solely because it is available.
 
 **Boundary:** Arid/semiarid artificial-water context. Do not infer that central Kentucky deer select nearest water whenever precipitation declines.
 
