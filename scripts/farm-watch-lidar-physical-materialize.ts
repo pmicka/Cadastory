@@ -887,13 +887,18 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
 
       validCellCount += 1
       const directFirst = Number.isFinite(firstReturnSurface.direct[index])
-      support[index] = directFirst ? 1 : 2
       if (directFirst) directFirstReturnCellCount += 1
       else filledFirstReturnCellCount += 1
 
       const rawHeightNative = Number(firstZ) - Number(groundZ)
       const rawHeightM = rawHeightNative / US_SURVEY_FEET_PER_METER
-      if (rawHeightM < 0) {
+      const negativeClamped = rawHeightM < 0
+      let supportFlags = 1
+      if (!directFirst) supportFlags |= 2
+      if (negativeClamped) supportFlags |= 4
+      if (groundDirect) supportFlags |= 8
+      support[index] = supportFlags
+      if (negativeClamped) {
         negativeRawHeightCount += 1
         if (directFirst) negativeDirectFirstReturnCount += 1
         else negativeFilledFirstReturnCount += 1
@@ -987,7 +992,7 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
     native_crs: nativeCrs,
     height_unit: 'm',
     cell_meters: Number(contract.cell_meters),
-    encoding: 'u16-centimeters+u8-support-v1',
+    encoding: 'u16-centimeters+u8-support-flags-v1',
     acquisition_utc_range: acquisitionUtcRange,
     acquisition_time_basis: 'central STAC item datetime metadata',
     domain: {
@@ -1003,7 +1008,7 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
       published_definition:
         'Vegetation height = 1.2 m first-return DEM elevation minus 1.2 m bare-ground DEM elevation; published DEMs were rasterized from separate TIN surfaces.',
       farm_watch_definition:
-        '1.2 m LAS ReturnNumber=1 cell-mean elevation surface minus LAS Class 2 cell-mean ground elevation surface, with bounded deterministic local inverse-distance filling.',
+        '1.2 m LAS ReturnNumber=1 cell-mean elevation surface minus LAS Class 2 cell-mean ground elevation surface, with bounded deterministic local inverse-distance filling. Negative raw residuals are clamped to zero height but preserved in per-cell support flags and QA summaries.',
       interpolation_difference:
         'Same physical first-return-minus-ground variable and 1.2 m support; Farm Watch does not claim to reproduce the original ArcMap TIN interpolation exactly.',
     },
@@ -1013,11 +1018,13 @@ export async function buildStudyAlignedVegetationHeightArtifactForGeometry(args:
       height,
       cell_meters: Number(contract.cell_meters),
       cell_size_native: firstReturnSurface.cellSize,
-      encoding: 'u16-centimeters+u8-support-v1',
-      support_codes: {
-        '0': 'outside-domain-or-unavailable',
-        '1': 'direct-first-return-cell-with-ground-support',
-        '2': 'locally-filled-first-return-cell-with-ground-support',
+      encoding: 'u16-centimeters+u8-support-flags-v1',
+      support_flags: {
+        bit_0_value_1: 'height-available',
+        bit_1_value_2: 'first-return-locally-filled',
+        bit_2_value_4: 'negative-raw-height-clamped-to-zero',
+        bit_3_value_8: 'local-ground-cell-has-direct-class2-support',
+        zero: 'outside-domain-or-unavailable',
       },
       height_cm_u16_base64: encodeU16Base64(heightCm),
       support_u8_base64: encodeU8Base64(support),
