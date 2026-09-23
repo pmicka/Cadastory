@@ -67,6 +67,13 @@ assert(
   'surface-water observations are not date-bounded',
 )
 assert(
+  sql.includes("bool_or(o.observation_state='observed_present')") &&
+  sql.includes("bool_or(o.observation_state='observed_absent')") &&
+  sql.includes("'observation_keys',q.observation_keys"),
+  'conflicting same-date water observations must resolve explicitly and preserve contributing keys',
+)
+
+assert(
   sql.includes("m.product_kind='terrain-analysis'") &&
   sql.includes("m.algorithm_version='phase3-dem-61x61-conditioned-flow-v2'") &&
   sql.includes("'water_presence_inferred',false"),
