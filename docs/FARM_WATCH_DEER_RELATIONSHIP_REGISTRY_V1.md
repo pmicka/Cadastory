@@ -183,6 +183,23 @@ CI rejects:
 
 This prevents published study magnitudes, dates, distances, or effect sizes from becoming Kentucky coefficients merely because the relationship form is useful.
 
+## Blocked-measurement resolution
+
+The 2026-09-23 study-fidelity audit produced a second source-controlled contract:
+
+- `supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts`
+- `docs/FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md`
+
+Every measurement that currently blocks a relationship has exactly one disposition:
+
+- `reproduce` — implement the same semantic variable;
+- `calibrated_proxy` — implement a plausible estimator and promote it only after study-aligned validation;
+- `remain_unavailable` — do not create a weak substitute.
+
+The current portfolio contains 37 blocked measurements: 22 reproducible, 9 calibrated proxies, and 6 intentionally unavailable.
+
+This resolution layer is planning/governance only. A `reproduce` or `calibrated_proxy` decision does not change the relationship registry's current alignment status. The relationship remains blocked until the corresponding neutral product is implemented and its exit gate is satisfied.
+
 ## Batch 9 boundary
 
 Batch 9 ends at the relationship contract and validation layer.
