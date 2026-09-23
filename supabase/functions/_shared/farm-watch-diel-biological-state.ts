@@ -6,6 +6,7 @@ import {
   type FarmWatchDeerReproductiveState,
   type FarmWatchDeerSex,
 } from './farm-watch-diel-biological-state-contract.ts'
+import { applicableBiologicalStateLedgerIds } from './farm-watch-deer-relationship-registry.ts'
 
 export function classifySolarPhase(args: {
   solarElevationDeg: number
@@ -70,19 +71,12 @@ export function applicableDeerRelationshipIds(args: {
   ageClass: FarmWatchDeerAgeClass
   regionalBreedingPhase: ReturnType<typeof regionalBreedingPhase>
 }) {
-  const ids = new Set<string>(['FW-D05'])
-  if (String(args.stateCode).toUpperCase() === 'KY') {
-    ids.add('FW-D21')
-  }
-  if (args.sex === 'female' && args.ageClass !== 'unknown') ids.add('FW-D22')
-  if (
-    args.sex === 'male' &&
-    args.ageClass !== 'unknown' &&
-    ['within_documented_breeding_season','within_peak_month_context'].includes(
-      args.regionalBreedingPhase,
-    )
-  ) ids.add('FW-D06')
-  return [...ids].sort()
+  return applicableBiologicalStateLedgerIds({
+    stateCode: args.stateCode,
+    sex: args.sex,
+    ageClass: args.ageClass,
+    regionalBreedingPhase: args.regionalBreedingPhase,
+  })
 }
 
 export function buildDeerBiologicalState(args: {
