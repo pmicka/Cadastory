@@ -9,7 +9,7 @@ export const FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_PRODUCT = Object.freeze({
   algorithmVersion: 'farm-watch-deer-relationship-registry-v1',
   outputSchemaVersion: 'deer-relationship-registry-v1',
   species: 'Odocoileus virginianus',
-  ledgerVersion: '2026-09-21',
+  ledgerVersion: '2026-09-23',
   outputKinds: Object.freeze([
     'quantitative_relative_selection',
     'ordinal_directional',
@@ -282,7 +282,7 @@ export type DeerRelationshipRecord = {
 
 const ALL_SEX = [...FARM_WATCH_DEER_BIOLOGICAL_STATE_PRODUCT.sexVocabulary]
 const ALL_AGE = [...FARM_WATCH_DEER_BIOLOGICAL_STATE_PRODUCT.ageVocabulary]
-const PARAMETER_SOURCE = 'FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md@2026-09-21'
+const PARAMETER_SOURCE = 'FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md@2026-09-23'
 
 function req(
   key: string,
