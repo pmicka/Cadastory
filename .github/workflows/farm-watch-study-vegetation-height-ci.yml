@@ -1,0 +1,36 @@
+name: Farm Watch study vegetation height CI
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/farm-watch-lidar-physical-materialize.ts'
+      - 'scripts/farm-watch-study-vegetation-height-materialize.ts'
+      - 'supabase/functions/_shared/farm-watch-study-vegetation-height-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-study-vegetation-height-contract.test.ts'
+      - 'supabase/functions/farm-watch-study-vegetation-height-worker/**'
+      - 'docs/FARM_WATCH_STUDY_VEGETATION_HEIGHT_V1.md'
+      - 'docs/FARM_WATCH_STRUCTURE_EVIDENCE_LEDGER.md'
+      - '.github/workflows/farm-watch-study-vegetation-height-ci.yml'
+      - '.github/workflows/farm-watch-study-vegetation-height.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  study-vegetation-height:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check shared LiDAR materializer
+        run: deno check scripts/farm-watch-lidar-physical-materialize.ts
+      - name: Check study vegetation-height materializer
+        run: deno check scripts/farm-watch-study-vegetation-height-materialize.ts
+      - name: Check study vegetation-height worker
+        run: deno check supabase/functions/farm-watch-study-vegetation-height-worker/index.ts
+      - name: Test study vegetation-height contract
+        run: deno test supabase/functions/_shared/farm-watch-study-vegetation-height-contract.test.ts
