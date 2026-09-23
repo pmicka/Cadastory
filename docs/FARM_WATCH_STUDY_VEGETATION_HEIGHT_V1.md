@@ -44,14 +44,16 @@ Therefore the product is intended as a **derived-equivalent measurement**, not a
 - native CRS: EPSG:6473;
 - height unit: metres;
 - encoded height: uint16 centimetres;
-- support byte:
+- support byte is a bitmask:
+  - bit 0 (`1`): height available;
+  - bit 1 (`2`): first-return surface required local filling;
+  - bit 2 (`4`): raw first-return-minus-ground residual was negative and the physical height was clamped to zero;
+  - bit 3 (`8`): the local ground cell contains direct LAS Class 2 support;
   - `0`: outside domain or unavailable;
-  - `1`: direct first-return cell with ground support;
-  - `2`: locally filled first-return cell with ground support;
 - ground fill radius: 10 m;
 - first-return fill radius: 2.4 m.
 
-Only the derived height surface and support byte are persisted. Raw COPC/LAZ data, duplicate ground surfaces, and duplicate first-return elevation surfaces are not stored.
+Only the derived height surface and support byte are persisted. Negative raw residuals remain distinguishable through the support flags and aggregate QA. Raw COPC/LAZ data, duplicate ground surfaces, and duplicate first-return elevation surfaces are not stored.
 
 ## Spatial scope
 

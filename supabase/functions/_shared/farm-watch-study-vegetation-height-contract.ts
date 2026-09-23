@@ -4,7 +4,7 @@ export const FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT = Object.freeze({
   key: 'study-aligned-vegetation-height-context',
   productKind: 'study-aligned-vegetation-height-context',
   algorithmVersion: 'wiemers-first-return-minus-ground-local500m-v1',
-  outputSchemaVersion: 'study-aligned-vegetation-height-context-v1',
+  outputSchemaVersion: 'study-aligned-vegetation-height-context-v2',
   evidenceClass: 'deterministic_derived',
   artifactBucket: 'farm-watch-derived',
   artifactFormat: 'farm-watch-study-aligned-vegetation-height-json-v1',
@@ -15,7 +15,7 @@ export const FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT = Object.freeze({
   cellMeters: 1.2,
   groundSupportRadiusMeters: 10,
   firstReturnSupportRadiusMeters: 2.4,
-  heightEncoding: 'u16-centimeters+u8-support-v1',
+  heightEncoding: 'u16-centimeters+u8-support-flags-v1',
   refreshDays: 30,
 })
 
@@ -50,6 +50,7 @@ export function studyVegetationHeightSourceSignature(args: {
     'ground=LAS_Class_2',
     'surface=cell_mean_then_local_idw_v1',
     'height=first_return_minus_ground',
+    'support_flags=available|first_filled|negative_clamped|ground_direct_v1',
     'qa=negative_raw_height_magnitude_and_output_grid_support_v1',
   ].join('|')
 }
