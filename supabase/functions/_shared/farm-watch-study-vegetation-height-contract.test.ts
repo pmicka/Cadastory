@@ -68,6 +68,7 @@ Deno.test('study vegetation-height source signature binds domain and published s
   assert(a.includes('first_return=LAS_ReturnNumber_1'))
   assert(a.includes('height=first_return_minus_ground'))
   assert(a.includes('qa=negative_raw_height_magnitude_and_output_grid_support_v1'))
+  assert(a.includes('support_flags=available|first_filled|negative_clamped|ground_direct_v1'))
 })
 
 Deno.test('study vegetation-height artifact validates encoded grid lengths', () => {
