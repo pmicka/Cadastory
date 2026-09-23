@@ -100,6 +100,11 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     scales: ['field','property','local_500m','landscape_1500m','broad_3000m'],
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
+  'agriculture-landcover-context': {
+    status: 'production_neutral_context',
+    scales: ['field','property','local_500m','landscape_1500m','broad_3000m'],
+    evidence_states: ['available','known','proxy'],
+  },
   'current-crop-identity': {
     status: 'candidate_blocked_rights',
     scales: ['field','property','local_500m','landscape_1500m','broad_3000m'],
