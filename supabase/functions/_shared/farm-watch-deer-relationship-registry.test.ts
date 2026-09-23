@@ -3,6 +3,7 @@ import {
   FARM_WATCH_DEER_LEDGER_IDS,
   FARM_WATCH_DEER_RELATIONSHIPS,
   applicableBiologicalStateLedgerIds,
+  deerRelationshipStudyFidelityStatus,
   getDeerRelationship,
   relationshipsForLedgerId,
   validateDeerRelationshipRecord,
@@ -16,7 +17,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 
 Deno.test('Batch 9 registry validates as a whole', () => {
   assert(validateDeerRelationshipRegistry())
-  assert(FARM_WATCH_DEER_RELATIONSHIPS.length >= 23)
+  assert(FARM_WATCH_DEER_RELATIONSHIPS.length >= 31)
 })
 
 Deno.test('every durable deer ledger entry has machine-readable relationship coverage', async () => {
@@ -31,8 +32,22 @@ Deno.test('every durable deer ledger entry has machine-readable relationship cov
   }
 })
 
+Deno.test('active biological relationships carry explicit study-measurement contracts', () => {
+  for (const relationship of FARM_WATCH_DEER_RELATIONSHIPS) {
+    if (
+      relationship.output_kind === 'negative_constraint' ||
+      relationship.output_kind === 'not_applicable' ||
+      relationship.module_family === 'architecture_context'
+    ) continue
+    assert(
+      relationship.study_measurements.length > 0,
+      relationship.relationship_id + ' has no study-measurement contract',
+    )
+  }
+})
+
 Deno.test('numeric coefficients are rejected when coefficient transfer is not authorized', () => {
-  const relationship = getDeerRelationship('FW-R09-male-breeding-age-movement')
+  const relationship = getDeerRelationship('FW-R25-kentucky-breeding-context')
   assert(relationship)
   assert(relationship.coefficient_transfer.status === 'not_supported')
   assert(!validateRelationshipModuleDefinition({
@@ -42,10 +57,11 @@ Deno.test('numeric coefficients are rejected when coefficient transfer is not au
       key: 'biological_state',
       product_key: 'deer-biological-state',
       evidence_state: 'available',
-      scale: 'individual_scenario',
+      scale: 'statewide',
     }],
     coefficient_transfer_status: 'not_supported',
     numeric_parameters: [1.25],
+    study_measurement_ids: ['FW-M50-kentucky-regional-breeding'],
   }))
 })
 
@@ -73,7 +89,7 @@ Deno.test('conditional biological gates must declare the state dimensions they r
 })
 
 Deno.test('blocked universal assumptions cannot enter a future relationship module', () => {
-  const relationship = getDeerRelationship('FW-R09-male-breeding-age-movement')
+  const relationship = getDeerRelationship('FW-R25-kentucky-breeding-context')
   assert(relationship)
   assert(FARM_WATCH_DEER_BLOCKED_UNIVERSAL_ASSUMPTIONS.includes('moon_phase_generic_movement'))
   assert(!validateRelationshipModuleDefinition({
@@ -83,16 +99,17 @@ Deno.test('blocked universal assumptions cannot enter a future relationship modu
       key: 'biological_state',
       product_key: 'deer-biological-state',
       evidence_state: 'available',
-      scale: 'individual_scenario',
+      scale: 'statewide',
     }],
     coefficient_transfer_status: 'not_supported',
     numeric_parameters: [],
     universal_assumption_ids: ['moon_phase_generic_movement'],
+    study_measurement_ids: ['FW-M50-kentucky-regional-breeding'],
   }))
 })
 
 Deno.test('stale required inputs are not silently accepted', () => {
-  const relationship = getDeerRelationship('FW-R09-male-breeding-age-movement')
+  const relationship = getDeerRelationship('FW-R25-kentucky-breeding-context')
   assert(relationship)
   assert(!validateRelationshipModuleDefinition({
     relationship_id: relationship.relationship_id,
@@ -101,15 +118,16 @@ Deno.test('stale required inputs are not silently accepted', () => {
       key: 'biological_state',
       product_key: 'deer-biological-state',
       evidence_state: 'stale',
-      scale: 'individual_scenario',
+      scale: 'statewide',
     }],
     coefficient_transfer_status: 'not_supported',
     numeric_parameters: [],
+    study_measurement_ids: ['FW-M50-kentucky-regional-breeding'],
   }))
 })
 
-Deno.test('input scale mismatch is rejected', () => {
-  const relationship = getDeerRelationship('FW-R09-male-breeding-age-movement')
+Deno.test('input scale mismatch is rejected independently of fidelity blockers', () => {
+  const relationship = getDeerRelationship('FW-R25-kentucky-breeding-context')
   assert(relationship)
   assert(!validateRelationshipModuleDefinition({
     relationship_id: relationship.relationship_id,
@@ -122,7 +140,39 @@ Deno.test('input scale mismatch is rejected', () => {
     }],
     coefficient_transfer_status: 'not_supported',
     numeric_parameters: [],
+    study_measurement_ids: ['FW-M50-kentucky-regional-breeding'],
   }))
+})
+
+Deno.test('measurement-aligned module definitions must declare the study measurement contract', () => {
+  const relationship = getDeerRelationship('FW-R25-kentucky-breeding-context')
+  assert(relationship)
+  assert(deerRelationshipStudyFidelityStatus(relationship).status === 'module_eligible')
+  const base = {
+    relationship_id: relationship.relationship_id,
+    ledger_ids: relationship.ledger_ids,
+    input_bindings: [{
+      key: 'biological_state' as const,
+      product_key: 'deer-biological-state' as const,
+      evidence_state: 'available' as const,
+      scale: 'statewide' as const,
+    }],
+    coefficient_transfer_status: 'not_supported' as const,
+    numeric_parameters: [],
+  }
+  assert(!validateRelationshipModuleDefinition(base))
+  assert(validateRelationshipModuleDefinition({
+    ...base,
+    study_measurement_ids: ['FW-M50-kentucky-regional-breeding'],
+  }))
+})
+
+Deno.test('value-level study constraints must be declared by a future module', () => {
+  const relationship = getDeerRelationship('FW-R12-crop-phenology-home-range-response')
+  assert(relationship)
+  assert(relationship.value_constraints.some((row) => row.id === 'FW-C01-crop-is-corn'))
+  assert(relationship.value_constraints.some((row) => row.id === 'FW-C02-corn-stage'))
+  assert(deerRelationshipStudyFidelityStatus(relationship).status === 'blocked_measurement_alignment')
 })
 
 Deno.test('Batch 6 general viewshed is not silently substituted for FW-D04 low concealment', () => {
@@ -133,7 +183,63 @@ Deno.test('Batch 6 general viewshed is not silently substituted for FW-D04 low c
     assert(concealment)
     assert(concealment.product_keys.includes('low-height-concealment-context'))
     assert(!concealment.product_keys.includes('horizontal-visibility-context'))
+    assert(deerRelationshipStudyFidelityStatus(relationship).status === 'blocked_measurement_alignment')
   }
+})
+
+Deno.test('Hunsaker movement relationship is blocked until two-year versus three-plus age fidelity exists', () => {
+  const relationship = getDeerRelationship('FW-R09-male-breeding-age-movement')
+  assert(relationship)
+  const age = relationship.study_measurements.find((row) => row.id === 'FW-M15-hunsaker-male-age')
+  assert(age)
+  assert(age.alignment === 'unsupported')
+  assert(deerRelationshipStudyFidelityStatus(relationship).status === 'blocked_measurement_alignment')
+})
+
+Deno.test('FW-D14 terrain relationship preserves juvenile-male dispersal gate', () => {
+  const relationship = getDeerRelationship('FW-R18-terrain-movement-context')
+  assert(relationship)
+  assert(JSON.stringify(relationship.biological_state_gates.sex) === JSON.stringify(['male']))
+  assert(JSON.stringify(relationship.biological_state_gates.age_class) === JSON.stringify(['juvenile']))
+  assert(JSON.stringify(relationship.biological_state_gates.movement_state) === JSON.stringify(['dispersal']))
+})
+
+Deno.test('FW-D15 keeps spring probability, dispersal distance, and path selection separate', () => {
+  const relationships = relationshipsForLedgerId('FW-D15')
+  const ids = new Set(relationships.map((row) => row.relationship_id))
+  assert(ids.has('FW-R19-juvenile-male-dispersal-ag-riparian'))
+  assert(ids.has('FW-R30-spring-juvenile-male-dispersal-probability'))
+  assert(ids.has('FW-R31-juvenile-male-dispersal-distance'))
+
+  const path = getDeerRelationship('FW-R19-juvenile-male-dispersal-ag-riparian')
+  assert(path)
+  const riparian = path.required_inputs.find((row) => row.key === 'riparian_geometry')
+  assert(riparian)
+  assert(riparian.product_keys.includes('mapped-hydrography-context'))
+  assert(!riparian.product_keys.includes('surface-water-state'))
+
+  const spring = getDeerRelationship('FW-R30-spring-juvenile-male-dispersal-probability')
+  assert(spring)
+  assert(JSON.stringify(spring.biological_state_gates.seasons) === JSON.stringify(['spring']))
+})
+
+Deno.test('FW-D13 low-pressure null result requires explicit low pressure', () => {
+  const relationship = getDeerRelationship('FW-R17-low-pressure-negative-constraint')
+  assert(relationship)
+  const pressure = relationship.value_constraints.find((row) => row.id === 'FW-C04-pressure-is-low')
+  assert(pressure)
+  assert(JSON.stringify(pressure.values) === JSON.stringify(['low']))
+  assert(deerRelationshipStudyFidelityStatus(relationship).status === 'blocked_measurement_alignment')
+})
+
+Deno.test('FW-D17 preserves female-only sample and predator-occurrence component', () => {
+  const relationship = getDeerRelationship('FW-R21-human-footprint-seasonal-context')
+  assert(relationship)
+  assert(JSON.stringify(relationship.biological_state_gates.sex) === JSON.stringify(['female']))
+  const predator = relationship.required_inputs.find((row) => row.key === 'predator_occurrence')
+  assert(predator)
+  assert(predator.product_keys.includes('predator-occurrence-context'))
+  assert(deerRelationshipStudyFidelityStatus(relationship).status === 'blocked_measurement_alignment')
 })
 
 Deno.test('existing Batch 3 relationship annotations are registry-driven', () => {
