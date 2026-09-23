@@ -1,4 +1,7 @@
-const migration = await Deno.readTextFile('supabase/migrations/20260923012000_add_farm_watch_deer_evidence_stack_v1.sql')
+const migration = [
+  await Deno.readTextFile('supabase/migrations/20260923012000_add_farm_watch_deer_evidence_stack_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260923223500_expose_study_vegetation_height_in_deer_evidence_stack_v1.sql'),
+].join('\n')
 const edge = await Deno.readTextFile('supabase/functions/farm-watch-private/index.ts')
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -7,6 +10,7 @@ function assert(condition: unknown, message: string): asserts condition {
 
 for (const product of [
   'lidar-physical-structure',
+  'study-aligned-vegetation-height-context',
   'landscape-structure-context',
   'terrain-form-permeability',
   'spatial-edge-patch-context',
