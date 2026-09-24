@@ -343,8 +343,15 @@ function louisvilleCalendarDate(value = new Date()): string {
   return `${values.year}-${values.month}-${values.day}`
 }
 
-async function readDeerContext(slug: string) {
-  const now = new Date()
+function calendarDatePlusDays(value: string, days: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  if (!match) throw new Error('invalid calendar date')
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+async function readDeerContext(slug: string, now = new Date()) {
   const asOfDate = louisvilleCalendarDate(now)
   const at = now.toISOString()
 
@@ -377,8 +384,7 @@ async function readDeerContext(slug: string) {
   return data
 }
 
-async function readDeerEvidenceStack(slug: string) {
-  const asOfDate = louisvilleCalendarDate(new Date())
+async function readDeerEvidenceStack(slug: string, asOfDate = louisvilleCalendarDate(new Date())) {
   const { data, error } = await admin.rpc('farm_watch_get_deer_evidence_stack_v1_internal', {
     p_slug: slug,
     p_as_of_date: asOfDate,
@@ -397,6 +403,54 @@ async function readDeerEvidenceStack(slug: string) {
     }
   }
   return data
+}
+
+async function readDielPhotoperiod(slug: string, solarDate: string) {
+  const { data, error } = await admin.rpc('farm_watch_resolve_diel_photoperiod_v1_internal', {
+    p_slug: slug,
+    p_solar_date: solarDate,
+  })
+  if (error) {
+    console.error('farm_watch_resolve_diel_photoperiod_v1_internal failed', error.message)
+    return {
+      status: 'unavailable',
+      solar_date: solarDate,
+      context: null,
+    }
+  }
+  return data
+}
+
+function huntingDaylightPlanning(
+  asOfDate: string,
+  todayDiel: any,
+  tomorrowDiel: any,
+) {
+  const tomorrowDate = calendarDatePlusDays(asOfDate, 1)
+  const statuses = [todayDiel?.status, tomorrowDiel?.status]
+  return {
+    schema: 'hunting-daylight-planning-v1',
+    status: statuses.every((status) => status === 'available')
+      ? 'available'
+      : statuses.some((status) => status === 'available')
+        ? 'partial'
+        : 'unavailable',
+    time_zone: 'America/Kentucky/Louisville',
+    days: [
+      {
+        relative_day: 'today',
+        date: asOfDate,
+        diel_photoperiod: todayDiel || null,
+      },
+      {
+        relative_day: 'tomorrow',
+        date: tomorrowDate,
+        diel_photoperiod: tomorrowDiel || null,
+      },
+    ],
+    interpretation_boundary:
+      'Property-specific deterministic solar timing only. Legal hunting windows are applied separately from property-scoped hunting regulations; setup targets are presentation-level planning buffers, not biological inference.',
+  }
 }
 
 async function refreshHydrology(slug: string, boundary: any) {
@@ -592,10 +646,19 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const [deerContext, deerEvidenceStack] = await Promise.all([
-    readDeerContext(slug),
-    readDeerEvidenceStack(slug),
+  const deerNow = new Date()
+  const deerAsOfDate = louisvilleCalendarDate(deerNow)
+  const tomorrowDate = calendarDatePlusDays(deerAsOfDate, 1)
+  const [deerContext, deerEvidenceStack, tomorrowDiel] = await Promise.all([
+    readDeerContext(slug, deerNow),
+    readDeerEvidenceStack(slug, deerAsOfDate),
+    readDielPhotoperiod(slug, tomorrowDate),
   ])
+  const daylightPlanning = huntingDaylightPlanning(
+    deerAsOfDate,
+    deerContext?.diel_photoperiod,
+    tomorrowDiel,
+  )
 
   let center = storedCenter(property)
   if (!center) {
@@ -644,6 +707,7 @@ Deno.serve(async (req: Request) => {
         : landscapeDomain.identity,
     },
     deer_context: deerContext,
+    hunting_daylight_planning: daylightPlanning,
     deer_evidence_stack: deerEvidenceStack,
     access: {
       scope: 'private',
