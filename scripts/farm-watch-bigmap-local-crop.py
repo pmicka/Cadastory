@@ -136,30 +136,57 @@ def main() -> int:
     output = Path(args.output_dir).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     sources = find_sources(roots)
+    manifest_path = output / "farm-watch-bigmap-mast-crops-manifest.json"
+    previous_items: dict[int, dict[str, Any]] = {}
+    if manifest_path.exists():
+        try:
+            previous = json.loads(manifest_path.read_text())
+            if previous.get("schema") == SCHEMA:
+                previous_items = {
+                    int(item["spcd"]): item
+                    for item in previous.get("items", [])
+                    if int(item.get("spcd", -1)) in SPECIES
+                }
+        except (OSError, ValueError, TypeError):
+            previous_items = {}
+
     items: list[dict[str, Any]] = []
     missing: list[int] = []
 
     for spcd in sorted(SPECIES):
         spec = SPECIES[spcd]
         source = sources.get(spcd)
-        if source is None:
-            missing.append(spcd)
-            continue
-        validate(run_json("gdalinfo", "-json", str(source)), SOURCE_SIZE, SOURCE_GT, source.name)
         crop = output / crop_name(spcd, spec["common_name"])
-        if args.overwrite or not crop.exists():
-            print(f"Cropping {spcd:04d} {spec['common_name']}")
-            subprocess.run([
-                "gdal_translate", "-srcwin", *map(str, CROP_WINDOW),
-                "-of", "GTiff", "-co", "TILED=YES", "-co", "COMPRESS=DEFLATE", "-co", "PREDICTOR=3",
-                str(source), str(crop),
-            ], check=True)
+
+        if source is not None:
+            validate(run_json("gdalinfo", "-json", str(source)), SOURCE_SIZE, SOURCE_GT, source.name)
+            if args.overwrite or not crop.exists():
+                print(f"Cropping {spcd:04d} {spec['common_name']}")
+                subprocess.run([
+                    "gdal_translate", "-srcwin", *map(str, CROP_WINDOW),
+                    "-of", "GTiff", "-co", "TILED=YES", "-co", "COMPRESS=DEFLATE", "-co", "PREDICTOR=3",
+                    str(source), str(crop),
+                ], check=True)
+            source_name = source.name
+            source_size = source.stat().st_size
+        else:
+            prior = previous_items.get(spcd)
+            if not crop.exists() or prior is None:
+                missing.append(spcd)
+                continue
+            source_name = str(prior.get("source_tiff_name") or "")
+            source_size = int(prior.get("source_tiff_size_bytes") or 0)
+            if not source_name or source_size <= 0:
+                missing.append(spcd)
+                continue
+            print(f"Reusing validated bounded crop {spcd:04d} {spec['common_name']}")
+
         validate(run_json("gdalinfo", "-json", str(crop)), CROP_WINDOW[2:], CROP_GT, crop.name)
         items.append({
             "spcd": spcd,
             **spec,
-            "source_tiff_name": source.name,
-            "source_tiff_size_bytes": source.stat().st_size,
+            "source_tiff_name": source_name,
+            "source_tiff_size_bytes": source_size,
             "crop_file": crop.name,
             "crop_size_bytes": crop.stat().st_size,
             "crop_sha256": sha256(crop),
@@ -187,7 +214,6 @@ def main() -> int:
         "missing_species_codes": missing,
         "items": items,
     }
-    manifest_path = output / "farm-watch-bigmap-mast-crops-manifest.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     print(f"Validated {len(items)}/{len(SPECIES)} required species")
     print(f"Manifest: {manifest_path}")
