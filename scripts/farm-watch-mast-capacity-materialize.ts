@@ -463,7 +463,9 @@ async function main() {
           source_transport: localManifest
             ? 'operator_workstation_usfs_raster_gateway_bounded_crop'
             : 'github_actions_public_usfs_arcgis',
-          source_file_name: localManifest ? exported.sourceFileName : null,
+          source_file_name: localManifest && 'sourceFileName' in exported
+            ? exported.sourceFileName
+            : null,
         }
         sourceGroups[group].push(item)
         sourceItems.push({ group, ...item })
