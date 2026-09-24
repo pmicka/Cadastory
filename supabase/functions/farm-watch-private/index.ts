@@ -406,19 +406,30 @@ async function readDeerEvidenceStack(slug: string, asOfDate = louisvilleCalendar
 }
 
 async function readDielPhotoperiod(slug: string, solarDate: string) {
-  const { data, error } = await admin.rpc('farm_watch_resolve_diel_photoperiod_v1_internal', {
+  const read = await admin.rpc('farm_watch_get_diel_photoperiod_v1_internal', {
     p_slug: slug,
     p_solar_date: solarDate,
   })
-  if (error) {
-    console.error('farm_watch_resolve_diel_photoperiod_v1_internal failed', error.message)
+  if (!read.error && !['missing', 'stale'].includes(String(read.data?.status || ''))) {
+    return read.data
+  }
+  if (read.error) {
+    console.error('farm_watch_get_diel_photoperiod_v1_internal failed', read.error.message)
+  }
+
+  const refresh = await admin.rpc('farm_watch_refresh_diel_photoperiod_v1_internal', {
+    p_slug: slug,
+    p_solar_date: solarDate,
+  })
+  if (refresh.error) {
+    console.error('farm_watch_refresh_diel_photoperiod_v1_internal failed', refresh.error.message)
     return {
       status: 'unavailable',
       solar_date: solarDate,
       context: null,
     }
   }
-  return data
+  return refresh.data
 }
 
 function huntingDaylightPlanning(
