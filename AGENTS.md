@@ -24,6 +24,14 @@ Do not silently convert hunting folklore, generic habitat heuristics, or neutral
 
 Local observations are for validation/calibration of transferred relationships unless a genuinely unresolved scientific question is explicitly being studied.
 
+## Farm Watch account-role presentation
+
+Before changing Farm Watch account roles, raw-evidence exposure, viewer interpretation, QA visibility, or role-dependent map/materialization presentation, read:
+
+- `docs/FARM_WATCH_PRESENTATION_ROLES_V1.md`
+
+Farm Watch uses one canonical evidence/science pipeline with role-dependent presentation. `owner` and `admin` use the technical profile; `viewer` uses the guided profile. Guided presentation must preserve uncertainty and interpretation boundaries rather than invent stronger biological conclusions. Server-enforced artifact restrictions are authorization boundaries and must not be replaced by browser-only hiding.
+
 ## Scout MCP architecture doctrine
 
 Before changing any Scout MCP tool, public/model-visible capability, routing contract, privacy/exposure rule, presentation contract, external-capability handoff, persistent agent state, or specialized Scout surface, read and follow:
