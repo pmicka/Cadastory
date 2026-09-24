@@ -3,6 +3,12 @@ name: Farm Watch mast capacity materialization
 on:
   issues:
     types: [opened]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Draft release tag containing the bounded BIGMAP crop bundle
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -11,9 +17,11 @@ permissions:
 jobs:
   materialize:
     if: >-
-      github.actor == 'pmicka' &&
-      github.event.issue.user.login == 'pmicka' &&
-      github.event.issue.title == '[ops] Materialize Farm Watch mast capacity'
+      (github.event_name == 'issues' &&
+       github.actor == 'pmicka' &&
+       github.event.issue.user.login == 'pmicka' &&
+       github.event.issue.title == '[ops] Materialize Farm Watch mast capacity') ||
+      (github.event_name == 'workflow_dispatch' && github.actor == 'pmicka')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -23,7 +31,36 @@ jobs:
           deno-version: v2.x
       - name: Check mast capacity materializer
         run: deno check scripts/farm-watch-mast-capacity-materialize.ts
-      - name: Materialize validation property
+      - name: Download bounded BIGMAP source bundle
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_TAG" =~ ^farm-watch-mast-staging-[A-Za-z0-9._-]+$ ]]
+          mkdir -p /tmp/farm-watch-mast-source
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern 'farm-watch-bigmap-mast-crops-validation-property-01.tar.gz' \
+            --dir /tmp/farm-watch-mast-source
+          mkdir -p /tmp/farm-watch-mast-source/extracted
+          tar -xzf /tmp/farm-watch-mast-source/farm-watch-bigmap-mast-crops-validation-property-01.tar.gz \
+            -C /tmp/farm-watch-mast-source/extracted
+          test -f /tmp/farm-watch-mast-source/extracted/farm-watch-bigmap-mast-crops-manifest.json
+      - name: Materialize validation property from local bounded sources
+        if: github.event_name == 'workflow_dispatch'
+        run: >-
+          deno run
+          --allow-env
+          --allow-net
+          --allow-read=/tmp/farm-watch-mast-source/extracted
+          scripts/farm-watch-mast-capacity-materialize.ts
+          --property validation-property-01
+          --local-source-manifest
+          /tmp/farm-watch-mast-source/extracted/farm-watch-bigmap-mast-crops-manifest.json
+      - name: Materialize validation property from ArcGIS service
+        if: github.event_name == 'issues'
         run: >-
           deno run
           --allow-env

@@ -1214,10 +1214,14 @@ Contract state is now `blocked_no_record_license`.
 
 **Next Batch 4 unit:** obtain explicit trained-model permission/license clarification. Until that clears, do not download, vendor, redistribute, or execute the model artifact. If permission is obtained, the next implementation unit remains the non-persistent field-scoped inference prototype with candidate-only output and no harvest promotion.
 
-## Batch 5A production stopping point — 2026-09-22
+## Batch 5A source-transport resolution — 2026-09-24
 
-The neutral mast-capacity implementation is merged and deployed, but production validation is blocked by authoritative source transport rather than by the Farm Watch contract or materialization architecture.
+The neutral mast-capacity implementation remains merged/deployed, and the prior cloud source-access failure is now bounded by an operator-assisted transport path rather than a Farm Watch architecture change.
 
-The intended bounded BIGMAP analytical routes were tested from both available cloud execution environments. The legacy Geoplatform ImageServer returns HTTP 403 to GitHub-hosted Actions; the official Forest Service ArcGIS Online BIGMAP ImageServer cannot currently be DNS-resolved from Supabase Edge; and a direct GitHub Actions fetch to that host fails before an ArcGIS response. The official Raster Data Gateway exposes whole-CONUS per-species archives, but pulling 28 complete national rasters for a 3 km property context is not accepted as the production architecture.
+The failed cloud routes remain documented: the legacy Geoplatform ImageServer returns HTTP 403 to GitHub-hosted Actions; the official Forest Service ArcGIS Online BIGMAP ImageServer cannot currently be DNS-resolved from Supabase Edge; and a direct GitHub Actions fetch to that host fails before an ArcGIS response.
 
-Batch 5A therefore stops at **implementation complete / production data unavailable**. The next 5A action, if resumed, is source-access engineering only: identify a bounded authoritative Forest Service delivery path that is reachable from the production worker environment, or deliberately redesign around centrally cached national source artifacts. Do not begin Batch 5B as part of that repair.
+A workstation fallback was validated using the official Forest Service Raster Data Gateway. The owner downloads the official per-species archive locally, verifies/extracts it, and crops only the current Farm Watch native-grid broad-domain bounding window before any transport into the cloud path. White oak SPCD 0802 proved the contract end to end at the source boundary: the official 89,932 × 91,150, 30 m Float32 CONUS raster cropped exactly to source window `42166,43231,206,222`, bounds `957150,1752060,963330,1758720`, with zero reprojection/resampling. The resulting bounded TIFF was 100 KB with SHA-256 `b9cfdb257ae7c55e5ada6bbf1ef20305ddc04eb61e16cb517edeee4d9cca3045`.
+
+The implementation now includes a source-controlled Debian crop/manifest helper and a draft-release handoff into the existing GitHub OIDC materializer. The draft release is ephemeral transport for bounded official source crops only; it is not a national source cache and should be deleted after successful materialization.
+
+Batch 5A is therefore **transport workaround validated / full 28-species production materialization pending**. Complete the bounded source bundle, run production materialization, validate the resulting artifact, and only then close Batch 5A. Do not begin Batch 5B as part of this transport repair.

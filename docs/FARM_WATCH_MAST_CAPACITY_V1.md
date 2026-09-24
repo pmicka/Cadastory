@@ -1,6 +1,6 @@
 # Farm Watch Mast Capacity v1
 
-Status: Batch 5A implementation merged/deployed; production materialization blocked on upstream BIGMAP source transport
+Status: Batch 5A implementation merged/deployed; operator-assisted bounded BIGMAP transport validated 2026-09-24; full 28-species production materialization pending
 
 ## Purpose
 
@@ -8,7 +8,9 @@ Status: Batch 5A implementation merged/deployed; production materialization bloc
 
 ## Operational v1 source
 
-Batch 5A uses USDA Forest Service FIA **BIGMAP 2018 Tree Species Aboveground Biomass**, a 30 m modeled/imputed species biomass product expressed in tons/acre. The intended operational source is the official Forest Service ArcGIS Online BIGMAP ImageServer (`di-usfsdata.img.arcgis.com`) for bounded analytical reads; raw CONUS rasters are not copied into Farm Watch. Production validation on 2026-09-22 established that neither available cloud execution path can currently reach the analytical service: `imagery.geoplatform.gov` returned edge-level HTTP 403 responses to GitHub-hosted Actions on both GET and POST; the official `di-usfsdata.img.arcgis.com` host failed DNS resolution from Supabase Edge; and direct GitHub Actions access to that host failed before an HTTP response. Therefore no BIGMAP source raster was materialized and no mast-capacity artifact is currently available in production.
+Batch 5A uses USDA Forest Service FIA **BIGMAP 2018 Tree Species Aboveground Biomass**, a 30 m modeled/imputed species biomass product expressed in tons/acre. The preferred operational source remains the official Forest Service ArcGIS Online BIGMAP ImageServer (`di-usfsdata.img.arcgis.com`) for bounded analytical reads; raw CONUS rasters are not copied into Farm Watch. Production validation on 2026-09-22 established that neither available cloud execution path can currently reach the analytical service: `imagery.geoplatform.gov` returned edge-level HTTP 403 responses to GitHub-hosted Actions on both GET and POST; the official `di-usfsdata.img.arcgis.com` host failed DNS resolution from Supabase Edge; and direct GitHub Actions access to that host failed before an HTTP response.
+
+On 2026-09-24 an operator-assisted fallback was validated against the official Forest Service Raster Data Gateway: download the authoritative whole-CONUS species archive on a trusted workstation, crop only the exact Farm Watch native-grid `broad_3000m` bounding window with GDAL, verify the bounded crop, and transport only that bounded source into the existing OIDC-gated GitHub materializer. The national raster remains workstation-local and is not persisted by Farm Watch.
 
 TreeMap 2023 remains a fresher future refinement candidate because its plot-ID raster can be linked to the accompanying FIA tree table. Batch 5A does not block on that bulk-delivery path.
 
@@ -45,7 +47,7 @@ This is **capacity**, not mast production. A positive white-oak biomass pixel do
 
 Annual KDFWR mast state belongs to Batch 5B and remains separate.
 
-## Production validation stopping point — 2026-09-22
+## Source-transport validation — 2026-09-24
 
 Implementation is merged and the protected worker is deployed, but Batch 5A has **not** passed its production exit gate.
 
@@ -65,6 +67,8 @@ Production source-access attempts:
 2. official Forest Service ArcGIS Online BIGMAP host from Supabase Edge: DNS resolution failure;
 3. official Forest Service ArcGIS Online BIGMAP host directly from GitHub Actions: fetch failure before an ArcGIS HTTP response.
 
-The Forest Service Raster Data Gateway does provide official whole-CONUS per-species downloads with checksums, but replacing a bounded 3 km analytical read with 28 whole-CONUS downloads would violate the intended bounded-centralization architecture and was not adopted.
+The Forest Service Raster Data Gateway whole-CONUS archive is now used only as a **workstation transport source**, not as a Farm Watch storage architecture. The validated white-oak (`SPCD 0802`) source raster was 89,932 × 91,150 Float32 cells on the expected 30 m NAD83 CONUS Albers grid. The exact Farm Watch crop used source window `42166,43231,206,222`, producing bounds `957150,1752060,963330,1758720` with zero reprojection or resampling. The bounded crop was 100 KB with SHA-256 `b9cfdb257ae7c55e5ada6bbf1ef20305ddc04eb61e16cb517edeee4d9cca3045`; independent GDAL statistics reported 42.25% valid cells, mean white-oak biomass 1.6397 tons/acre, and maximum 11.0013 tons/acre.
 
-**Current state:** implementation-ready but source-transport blocked. No capacity values, annual mast state, deer inference, or Batch 5B work should be considered production-complete until a bounded, authoritative, cloud-reachable BIGMAP/TreeMap delivery route is verified.
+A source-controlled Debian helper now validates the national grid, performs the same native-grid crop for all 28 required mast species, hashes the bounded crops, and emits a manifest/bundle. The GitHub materializer accepts that bundle through a draft-release handoff and still uses the existing OIDC-gated claim/complete/storage path. The draft release is transport only and should be deleted after successful materialization.
+
+**Current state:** bounded authoritative transport is validated, but the full 28-species source bundle has not yet been supplied and the production `mast-capacity-v1` artifact is therefore still unavailable. Batch 5B remains out of scope until Batch 5A production materialization passes.
