@@ -15,9 +15,7 @@ from pathlib import Path
 from typing import Any
 
 SCHEMA = "farm-watch-bigmap-local-crop-manifest-v1"
-SOURCE_SIZE = [89932, 91150]
-SOURCE_GT = [-307830.0, 30.0, 0.0, 3055650.0, 0.0, -30.0]
-CROP_WINDOW = [42166, 43231, 206, 222]
+CROP_SIZE = [206, 222]
 CROP_GT = [957150.0, 30.0, 0.0, 1758720.0, 0.0, -30.0]
 CROP_BBOX = [957150.0, 1752060.0, 963330.0, 1758720.0]
 NODATA = 3.4e38
