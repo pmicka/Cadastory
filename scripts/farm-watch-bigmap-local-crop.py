@@ -71,12 +71,24 @@ def run_json(*args: str) -> dict[str, Any]:
 def close(a: float, b: float) -> bool:
     return math.isclose(float(a), float(b), abs_tol=1e-6, rel_tol=0)
 
-def validate(info: dict[str, Any], expected_size: list[int], expected_gt: list[float], label: str) -> None:
-    if info.get("size") != expected_size:
-        raise RuntimeError(f"{label}: unexpected size {info.get('size')}")
+def validate_raster_common(info: dict[str, Any], label: str) -> tuple[list[int], list[float]]:
+    size = info.get("size")
+    if (
+        not isinstance(size, list)
+        or len(size) != 2
+        or any(not isinstance(value, int) or value <= 0 for value in size)
+    ):
+        raise RuntimeError(f"{label}: invalid raster size {size}")
     gt = info.get("geoTransform")
-    if not isinstance(gt, list) or len(gt) != 6 or any(not close(a, b) for a, b in zip(gt, expected_gt)):
-        raise RuntimeError(f"{label}: unexpected geotransform {gt}")
+    if (
+        not isinstance(gt, list)
+        or len(gt) != 6
+        or not close(gt[1], 30.0)
+        or not close(gt[2], 0.0)
+        or not close(gt[4], 0.0)
+        or not close(gt[5], -30.0)
+    ):
+        raise RuntimeError(f"{label}: unexpected 30 m north-up geotransform {gt}")
     wkt = str(info.get("coordinateSystem", {}).get("wkt") or "")
     if "USA_Contiguous_Albers_Equal_Area_Conic_USGS_version" not in wkt or "NAD83" not in wkt:
         raise RuntimeError(f"{label}: unexpected CRS")
@@ -86,6 +98,35 @@ def validate(info: dict[str, Any], expected_size: list[int], expected_gt: list[f
     nodata = bands[0].get("noDataValue")
     if nodata is None or abs(float(nodata) / NODATA - 1) > 0.01:
         raise RuntimeError(f"{label}: unexpected NoData {nodata}")
+    return [int(size[0]), int(size[1])], [float(value) for value in gt]
+
+
+def source_window(info: dict[str, Any], label: str) -> tuple[list[int], list[int], list[float]]:
+    size, gt = validate_raster_common(info, label)
+    xoff_raw = (CROP_GT[0] - gt[0]) / 30.0
+    yoff_raw = (gt[3] - CROP_GT[3]) / 30.0
+    xoff = round(xoff_raw)
+    yoff = round(yoff_raw)
+    if not close(xoff_raw, xoff) or not close(yoff_raw, yoff):
+        raise RuntimeError(
+            f"{label}: source grid is not aligned to the Farm Watch 30 m target grid "
+            f"(offsets {xoff_raw}, {yoff_raw})"
+        )
+    width, height = CROP_SIZE
+    if xoff < 0 or yoff < 0 or xoff + width > size[0] or yoff + height > size[1]:
+        raise RuntimeError(
+            f"{label}: Farm Watch crop lies outside this species raster extent "
+            f"(source size {size}, window {[xoff, yoff, width, height]})"
+        )
+    return [xoff, yoff, width, height], size, gt
+
+
+def validate_crop(info: dict[str, Any], label: str) -> None:
+    size, gt = validate_raster_common(info, label)
+    if size != CROP_SIZE:
+        raise RuntimeError(f"{label}: unexpected crop size {size}")
+    if any(not close(a, b) for a, b in zip(gt, CROP_GT)):
+        raise RuntimeError(f"{label}: unexpected crop geotransform {gt}")
 
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
@@ -159,11 +200,15 @@ def main() -> int:
         crop = output / crop_name(spcd, spec["common_name"])
 
         if source is not None:
-            validate(run_json("gdalinfo", "-json", str(source)), SOURCE_SIZE, SOURCE_GT, source.name)
+            source_info = run_json("gdalinfo", "-json", str(source))
+            window, source_dimensions, source_geotransform = source_window(source_info, source.name)
             if args.overwrite or not crop.exists():
-                print(f"Cropping {spcd:04d} {spec['common_name']}")
+                print(
+                    f"Cropping {spcd:04d} {spec['common_name']} "
+                    f"from source window {window[0]},{window[1]},{window[2]},{window[3]}"
+                )
                 subprocess.run([
-                    "gdal_translate", "-srcwin", *map(str, CROP_WINDOW),
+                    "gdal_translate", "-srcwin", *map(str, window),
                     "-of", "GTiff", "-co", "TILED=YES", "-co", "COMPRESS=DEFLATE", "-co", "PREDICTOR=3",
                     str(source), str(crop),
                 ], check=True)
@@ -176,17 +221,23 @@ def main() -> int:
                 continue
             source_name = str(prior.get("source_tiff_name") or "")
             source_size = int(prior.get("source_tiff_size_bytes") or 0)
+            source_dimensions = prior.get("source_dimensions")
+            source_geotransform = prior.get("source_geotransform")
+            window = prior.get("source_window")
             if not source_name or source_size <= 0:
                 missing.append(spcd)
                 continue
             print(f"Reusing validated bounded crop {spcd:04d} {spec['common_name']}")
 
-        validate(run_json("gdalinfo", "-json", str(crop)), CROP_WINDOW[2:], CROP_GT, crop.name)
+        validate_crop(run_json("gdalinfo", "-json", str(crop)), crop.name)
         items.append({
             "spcd": spcd,
             **spec,
             "source_tiff_name": source_name,
             "source_tiff_size_bytes": source_size,
+            "source_dimensions": source_dimensions,
+            "source_geotransform": source_geotransform,
+            "source_window": window,
             "crop_file": crop.name,
             "crop_size_bytes": crop.stat().st_size,
             "crop_sha256": sha256(crop),
@@ -205,7 +256,7 @@ def main() -> int:
         },
         "crop": {
             "property_slug": "validation-property-01",
-            "window": {"x_offset": 42166, "y_offset": 43231, "width": 206, "height": 222},
+            "window": {"width": 206, "height": 222, "source_window_per_species": True},
             "bbox_esri_102039": CROP_BBOX,
             "resampling_performed": False,
         },
