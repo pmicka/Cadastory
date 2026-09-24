@@ -13,6 +13,7 @@ import { sha256Hex } from '../supabase/functions/_shared/farm-watch-terrain.ts'
 const EDGE_URL =
   'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/farm-watch-mast-capacity-worker'
 const propertySlug = arg('--property', 'validation-property-01')!
+const localSourceManifest = arg('--local-source-manifest')
 const ESRI_102039 =
   '+proj=aea +lat_1=29.5 +lat_2=45.5 +lat_0=23 +lon_0=-96 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs +type=crs'
 proj4.defs('ESRI:102039', ESRI_102039)
@@ -255,6 +256,88 @@ async function exportSpecies(
   }
 }
 
+async function loadLocalSourceManifest(path: string) {
+  const payload = JSON.parse(await Deno.readTextFile(path))
+  if (payload?.schema !== 'farm-watch-bigmap-local-crop-manifest-v1') {
+    throw new Error('local BIGMAP manifest schema is invalid')
+  }
+  if (String(payload?.crop?.property_slug || '') !== propertySlug) {
+    throw new Error('local BIGMAP manifest property does not match materialization target')
+  }
+  const expected = FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder
+    .flatMap((group) => FARM_WATCH_MAST_CAPACITY_GROUPS[group].map((row) => row.spcd))
+    .sort((a, b) => a - b)
+  const present = Array.isArray(payload?.present_species_codes)
+    ? payload.present_species_codes.map(Number).sort((a: number, b: number) => a - b)
+    : []
+  if (JSON.stringify(expected) !== JSON.stringify(present)) {
+    throw new Error('local BIGMAP manifest does not contain the complete mast species set')
+  }
+  return payload
+}
+
+function siblingFile(manifestPath: string, fileName: string) {
+  if (!/^[A-Za-z0-9._-]+$/.test(fileName)) {
+    throw new Error('local BIGMAP crop filename is invalid')
+  }
+  const slash = manifestPath.lastIndexOf('/')
+  return (slash >= 0 ? manifestPath.slice(0, slash + 1) : '') + fileName
+}
+
+async function readLocalSpecies(
+  manifest: any,
+  manifestPath: string,
+  expected: any,
+  requestBbox: number[],
+  width: number,
+  height: number,
+) {
+  const crop = manifest?.crop
+  const manifestBbox = Array.isArray(crop?.bbox_esri_102039)
+    ? crop.bbox_esri_102039.map(Number)
+    : []
+  if (
+    Number(crop?.window?.width) !== width ||
+    Number(crop?.window?.height) !== height ||
+    manifestBbox.length !== 4 ||
+    manifestBbox.some((value: number, i: number) => Math.abs(value - requestBbox[i]) > 0.01)
+  ) throw new Error('local BIGMAP crop grid does not match current Farm Watch landscape domain')
+
+  const item = (manifest?.items || []).find((row: any) => Number(row?.spcd) === expected.spcd)
+  if (!item) throw new Error('local BIGMAP manifest is missing SPCD ' + expected.spcd)
+  const filePath = siblingFile(manifestPath, String(item.crop_file || ''))
+  const bytes = await Deno.readFile(filePath)
+  const sourceSha256 = await sha256Hex(bytes)
+  if (sourceSha256 !== String(item.crop_sha256 || '').toLowerCase()) {
+    throw new Error('local BIGMAP crop checksum mismatch for SPCD ' + expected.spcd)
+  }
+
+  const tiff = await fromArrayBuffer(bytes.buffer)
+  const image = await tiff.getImage()
+  if (image.getWidth() !== width || image.getHeight() !== height) {
+    throw new Error('local BIGMAP crop dimensions changed for SPCD ' + expected.spcd)
+  }
+  const bbox = image.getBoundingBox().map(Number)
+  if (bbox.some((value, i) => Math.abs(value - requestBbox[i]) > 0.01)) {
+    throw new Error('local BIGMAP crop bounds changed for SPCD ' + expected.spcd)
+  }
+
+  const raster = await image.readRasters({ interleave: true })
+  const values = new Float32Array(width * height)
+  for (let i = 0; i < values.length; i += 1) {
+    const value = Number((raster as any)[i])
+    values[i] = Number.isFinite(value) && value > 0 && value < 100000 ? value : 0
+  }
+  return {
+    values,
+    bbox,
+    sourceSha256,
+    sourceBytes: bytes.byteLength,
+    sourceFileName: String(item.source_tiff_name || ''),
+    transport: 'operator_workstation_usfs_raster_gateway_bounded_crop',
+  }
+}
+
 async function freshOidcToken() {
   const requestUrl = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_URL') || ''
   const requestToken = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_TOKEN') || ''
@@ -318,8 +401,15 @@ async function main() {
     const height = Math.max(1, Math.round((requestBbox[3] - requestBbox[1]) / cell))
     if (width * height > 250000) throw new Error('mast capacity bounded grid is unexpectedly large')
 
-    console.log('Querying BIGMAP 2018 species catalog from official public ArcGIS service')
-    const catalog = await querySpeciesCatalog()
+    const localManifest = localSourceManifest
+      ? await loadLocalSourceManifest(localSourceManifest)
+      : null
+    if (localManifest) {
+      console.log('Using operator-cropped official USDA Raster Data Gateway BIGMAP sources')
+    } else {
+      console.log('Querying BIGMAP 2018 species catalog from official public ArcGIS service')
+    }
+    const catalog = localManifest ? null : await querySpeciesCatalog()
     const groupValues: Record<string, Float32Array> = Object.fromEntries(
       FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder.map((group) => [
         group,
@@ -334,9 +424,26 @@ async function main() {
 
     for (const group of FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder) {
       for (const expected of FARM_WATCH_MAST_CAPACITY_GROUPS[group]) {
-        const record = catalog.get(expected.spcd)
+        const record = localManifest
+          ? {
+              objectid: null,
+              spcd: expected.spcd,
+              common_name: expected.common_name,
+              genus: expected.scientific_name.split(' ')[0],
+              species: expected.scientific_name.split(' ').slice(1).join(' '),
+            }
+          : catalog!.get(expected.spcd)
         console.log(`Sampling BIGMAP SPCD ${expected.spcd} ${expected.common_name}`)
-        const exported = await exportSpecies(record, requestBbox, width, height)
+        const exported = localManifest
+          ? await readLocalSpecies(
+              localManifest,
+              localSourceManifest!,
+              expected,
+              requestBbox,
+              width,
+              height,
+            )
+          : await exportSpecies(record, requestBbox, width, height)
         if (!rasterBbox) rasterBbox = exported.bbox
         else if (exported.bbox.some((value, i) => Math.abs(value - rasterBbox![i]) > 0.01)) {
           throw new Error('BIGMAP export grids are not co-registered')
@@ -345,7 +452,7 @@ async function main() {
         for (let i = 0; i < target.length; i += 1) target[i] += exported.values[i]
 
         const item = {
-          object_id: Number(record.objectid),
+          object_id: record.objectid == null ? null : Number(record.objectid),
           spcd: expected.spcd,
           common_name: String(record.common_name || expected.common_name),
           genus: String(record.genus || expected.scientific_name.split(' ')[0]),
@@ -353,6 +460,10 @@ async function main() {
           scientific_name: expected.scientific_name,
           source_tiff_sha256: exported.sourceSha256,
           source_tiff_size_bytes: exported.sourceBytes,
+          source_transport: localManifest
+            ? 'operator_workstation_usfs_raster_gateway_bounded_crop'
+            : 'github_actions_public_usfs_arcgis',
+          source_file_name: localManifest ? exported.sourceFileName : null,
         }
         sourceGroups[group].push(item)
         sourceItems.push({ group, ...item })
@@ -398,7 +509,12 @@ async function main() {
         width,
         height,
         interpolation: 'RSP_NearestNeighbor',
-        transport: 'github_actions_public_usfs_arcgis',
+        transport: localManifest
+          ? 'operator_workstation_usfs_raster_gateway_bounded_crop'
+          : 'github_actions_public_usfs_arcgis',
+        bulk_download_page: localManifest
+          ? String(localManifest?.source?.bulk_download_page || '')
+          : null,
       },
       landscape_domain_identity_sha256: claim.landscape_domain_identity.identity_sha256,
       source_items: sourceItems,
@@ -454,6 +570,9 @@ async function main() {
         sampled_species_count: sourceItems.length,
         sampled_species_codes: sourceItems.map((row) => row.spcd).sort((a, b) => a - b),
         raw_source_persisted: false,
+        bounded_source_transport: localManifest
+          ? 'operator_workstation_usfs_raster_gateway_bounded_crop'
+          : 'github_actions_public_usfs_arcgis',
       },
       processing_source_fingerprint: fingerprint,
       processing_source_fingerprint_sha256: fingerprintSha256,
