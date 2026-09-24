@@ -34,6 +34,20 @@ Owner and admin accounts retain the current evidence-heavy interpretation: raw m
 
 This is a presentation profile, not a second science pipeline. Both profiles must remain bound to the same canonical evidence, source identities, freshness rules, interpretation boundaries, and deer-science relationship registry.
 
+## Technical-account viewer preview
+
+A technical account may expose a client-side `Viewer preview` control for presentation QA. The preview may change only the effective browser presentation between `technical` and `guided`.
+
+The preview:
+
+- must not mutate `account_role`, authorization tables, JWT/session claims, or backend capabilities;
+- must remain available only to a server-authorized technical account;
+- may persist only as a browser-local presentation preference;
+- must not be treated as proof that the browser is operating with viewer-level data access, because the authenticated technical account may already possess full technical payloads;
+- should suppress technical-only controls and overlays so the visible surface approximates the guided viewer experience.
+
+Actual viewer authorization remains server-enforced and cannot be unlocked by this client control.
+
 ## Server enforcement
 
 `farm-watch-materialization` enforces viewer artifact restrictions before private Storage download. Client presentation is not a substitute for that boundary.
