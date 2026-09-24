@@ -1,4 +1,5 @@
-export type FarmWatchAccountRole = 'owner' | 'viewer'
+export type FarmWatchAccountRole = 'owner' | 'admin' | 'viewer'
+export type FarmWatchPresentationProfile = 'technical' | 'guided'
 
 export const FARM_WATCH_PRESENTATION_POLICY = Object.freeze({
   viewerSummaryOnlyMaterializations: Object.freeze([
@@ -13,22 +14,33 @@ export const FARM_WATCH_PRESENTATION_POLICY = Object.freeze({
 })
 
 export function normalizeFarmWatchAccountRole(value: unknown): FarmWatchAccountRole | null {
-  return value === 'owner' || value === 'viewer' ? value : null
+  return value === 'owner' || value === 'admin' || value === 'viewer' ? value : null
+}
+
+export function farmWatchPresentationProfile(
+  accountRole: FarmWatchAccountRole,
+): FarmWatchPresentationProfile {
+  return accountRole === 'viewer' ? 'guided' : 'technical'
 }
 
 export function canReadFarmWatchMaterializationArtifact(
   accountRole: FarmWatchAccountRole,
   productKey: string,
 ) {
-  if (accountRole === 'owner') return true
+  if (farmWatchPresentationProfile(accountRole) === 'technical') return true
   return !FARM_WATCH_PRESENTATION_POLICY.viewerSummaryOnlyMaterializations.includes(productKey)
 }
 
 export function farmWatchPresentationCapabilities(accountRole: FarmWatchAccountRole) {
-  const owner = accountRole === 'owner'
+  const profile = farmWatchPresentationProfile(accountRole)
+  const technical = profile === 'technical'
   return Object.freeze({
-    qa_controls: owner,
-    landscape_structure_map: owner,
+    presentation_profile: profile,
+    guided_interpretation: !technical,
+    technical_evidence: technical,
+    qa_controls: technical,
+    landscape_structure_map: technical,
+    field_evidence_table: technical,
   })
 }
 
