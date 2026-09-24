@@ -109,8 +109,14 @@ def find_sources(roots: list[Path]) -> dict[int, Path]:
                 hits[int(match.group(1))].append(path.resolve())
     out: dict[int, Path] = {}
     for spcd, paths in hits.items():
-        if paths:
-            out[spcd] = max(set(paths), key=lambda p: p.stat().st_size)
+        unique = sorted(set(paths))
+        if len(unique) > 1:
+            raise RuntimeError(
+                f"multiple BIGMAP source TIFFs found for SPCD {spcd:04d}: "
+                + ", ".join(str(path) for path in unique)
+            )
+        if unique:
+            out[spcd] = unique[0]
     return out
 
 def main() -> int:

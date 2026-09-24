@@ -502,7 +502,10 @@ async function main() {
     const fingerprint = {
       source_authority: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceAuthority,
       source_product: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceProduct,
-      source_service: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
+      source_service: localManifest
+        ? String(localManifest?.source?.bulk_download_page || '')
+        : FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
+      source_analytical_service: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
       source_data_year: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceDataYear,
       source_value_unit: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceValueUnit,
       export_request: {
@@ -539,7 +542,13 @@ async function main() {
         authority: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceAuthority,
         product: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceProduct,
         data_year: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceDataYear,
-        service: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
+        service: localManifest
+          ? String(localManifest?.source?.bulk_download_page || '')
+          : FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
+        analytical_service: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
+        delivery: localManifest
+          ? 'usfs_raster_data_gateway_workstation_bounded_crop'
+          : 'usfs_arcgis_bounded_export',
         native_pixel_meters: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourcePixelMeters,
         value_unit: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceValueUnit,
         groups: sourceGroups,
