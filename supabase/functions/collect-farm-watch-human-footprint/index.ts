@@ -25,6 +25,67 @@ async function sha256Hex(value: string) {
   return [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+function epochIso(value: unknown): string | null {
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric) || numeric <= 0) return null
+  const date = new Date(numeric)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+function coverage(nonNull: unknown, total: number) {
+  const count = Number(nonNull)
+  if (!Number.isFinite(count) || count < 0) {
+    throw new Error('invalid FEMA USA Structures completeness count')
+  }
+  return {
+    non_null_count: count,
+    coverage_fraction: total > 0 ? count / total : null,
+  }
+}
+
+function sourceProfile(metadata: any, attributes: any, total: number, checkedAt: string) {
+  return {
+    source_slug: 'fema-usa-structures-current',
+    source_name: 'FEMA USA Structures View',
+    source_checked_at: checkedAt,
+    service: {
+      service_item_id: String(metadata?.serviceItemId || ''),
+      is_view: metadata?.isView === true,
+      has_static_data: metadata?.hasStaticData === true,
+      max_record_count: Number(metadata?.maxRecordCount || 0),
+      last_edit_at: epochIso(metadata?.editingInfo?.lastEditDate),
+      schema_last_edit_at: epochIso(metadata?.editingInfo?.schemaLastEditDate),
+      data_last_edit_at: epochIso(metadata?.editingInfo?.dataLastEditDate),
+    },
+    local_feature_vintage: {
+      production_date: {
+        min: epochIso(attributes?.prod_date_min),
+        max: epochIso(attributes?.prod_date_max),
+        ...coverage(attributes?.prod_date_count, total),
+      },
+      imagery_date: {
+        min: epochIso(attributes?.image_date_min),
+        max: epochIso(attributes?.image_date_max),
+        ...coverage(attributes?.image_date_count, total),
+      },
+    },
+    completeness: {
+      queried_feature_count: total,
+      inventory_design: 'structures greater than 450 square feet in the United States and its territories',
+      known_minimum_structure_area_sqft: 450,
+      spatial_completeness_status: 'not_quantified_by_source',
+      query_method: 'ArcGIS aggregate statistics over exact 10.36 km2 analytical window',
+      transfer_limit_risk: 'none_for_aggregate_statistics',
+      attribute_coverage: {
+        source_attribution: coverage(attributes?.source_count, total),
+        validation_method: coverage(attributes?.val_method_count, total),
+        uuid: coverage(attributes?.uuid_count, total),
+      },
+      interpretation: 'Field coverage and source vintage are measured for returned features; they do not establish that every real-world structure above the source threshold is present.',
+    },
+  }
+}
+
 function propertySlug(value: unknown) {
   const slug = String(value || 'validation-property-01')
   if (!/^[a-z0-9][a-z0-9-]{0,79}$/.test(slug)) {
@@ -77,42 +138,64 @@ Deno.serve(withCollectorRun('collect-farm-watch-human-footprint', async (req) =>
     }
     const metadataSha256 = await sha256Hex(metadataText)
 
+    const outStatistics = [
+      { statisticType: 'count', onStatisticField: 'OBJECTID', outStatisticFieldName: 'total_count' },
+      { statisticType: 'count', onStatisticField: 'PROD_DATE', outStatisticFieldName: 'prod_date_count' },
+      { statisticType: 'min', onStatisticField: 'PROD_DATE', outStatisticFieldName: 'prod_date_min' },
+      { statisticType: 'max', onStatisticField: 'PROD_DATE', outStatisticFieldName: 'prod_date_max' },
+      { statisticType: 'count', onStatisticField: 'IMAGE_DATE', outStatisticFieldName: 'image_date_count' },
+      { statisticType: 'min', onStatisticField: 'IMAGE_DATE', outStatisticFieldName: 'image_date_min' },
+      { statisticType: 'max', onStatisticField: 'IMAGE_DATE', outStatisticFieldName: 'image_date_max' },
+      { statisticType: 'count', onStatisticField: 'SOURCE', outStatisticFieldName: 'source_count' },
+      { statisticType: 'count', onStatisticField: 'VAL_METHOD', outStatisticFieldName: 'val_method_count' },
+      { statisticType: 'count', onStatisticField: 'UUID', outStatisticFieldName: 'uuid_count' },
+    ]
     const params = new URLSearchParams({
       where: '1=1',
       geometry: envelope.map((value: unknown) => Number(value)).join(','),
       geometryType: 'esriGeometryEnvelope',
       inSR: String(query.in_sr || 32616),
       spatialRel: 'esriSpatialRelIntersects',
-      returnCountOnly: 'true',
+      returnGeometry: 'false',
+      outStatistics: JSON.stringify(outStatistics),
       f: 'json',
     })
 
-    const countResponse = await fetch(LAYER_URL + '/query?' + params.toString(), {
+    const statsResponse = await fetch(LAYER_URL + '/query?' + params.toString(), {
       headers: {
         accept: 'application/json',
         'user-agent': 'Scout-by-Cadastory/1.0',
       },
       signal: AbortSignal.timeout(30_000),
     })
-    if (!countResponse.ok) {
-      throw new Error('FEMA USA Structures count query returned ' + countResponse.status)
+    if (!statsResponse.ok) {
+      throw new Error('FEMA USA Structures statistics query returned ' + statsResponse.status)
     }
-    const countPayload = await countResponse.json()
-    const buildingCount = Number(countPayload?.count)
+    const statsPayload = await statsResponse.json()
+    if (statsPayload?.error) {
+      throw new Error(
+        'FEMA USA Structures statistics query failed: ' +
+          JSON.stringify(statsPayload.error).slice(0, 500),
+      )
+    }
+    const attributes = statsPayload?.features?.[0]?.attributes
+    const buildingCount = Number(attributes?.total_count)
     if (!Number.isInteger(buildingCount) || buildingCount < 0) {
       throw new Error(
-        'FEMA USA Structures count query did not return a valid count: ' +
-          JSON.stringify(countPayload).slice(0, 300),
+        'FEMA USA Structures statistics query did not return a valid count: ' +
+          JSON.stringify(statsPayload).slice(0, 500),
       )
     }
 
     const checkedAt = new Date().toISOString()
+    const profile = sourceProfile(metadata, attributes, buildingCount, checkedAt)
     const stored = await admin.rpc(
-      'farm_watch_record_human_footprint_context_v1_internal',
+      'farm_watch_record_human_footprint_context_v2_internal',
       {
         p_slug: property,
         p_building_count: buildingCount,
         p_building_metadata_sha256: metadataSha256,
+        p_building_source_profile: profile,
         p_building_checked_at: checkedAt,
       },
     )
@@ -129,6 +212,7 @@ Deno.serve(withCollectorRun('collect-farm-watch-human-footprint', async (req) =>
       checked_at: checkedAt,
       valid_at: checkedAt,
       building_metadata_sha256: metadataSha256,
+      building_source_profile: profile,
     })
   } catch (error) {
     console.error(
