@@ -109,7 +109,7 @@ Current neutral products that may feed future science-backed deer terms:
 Important **active** gaps are now restricted to measurements that fit the intended low-maintenance operating model:
 
 - calibrated woody-canopy and low-height concealment measurements where one-time/static calibration is defensible;
-- snow/winter-severity and potential-path agriculture remain active; road context, building density, multiscale forest context, exact 1/9 km² analytical scales, the explicit extreme-event gate, and the M47 six-class habitat-distance context are now production-validated;
+- potential-path agriculture remains active; snow/winter severity, road context, building density, multiscale forest context, exact 1/9 km² analytical scales, the explicit extreme-event gate, and the M47 six-class habitat-distance context are now production-validated;
 - stand-vulnerability and managed food/water feature context only where bounded one-time/static configuration is practical;
 - parcel-scale usable water persistence / ephemeral water state, with Batch 7 still pending production deployment.
 
@@ -186,9 +186,13 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Farm Watch mapping:** snow-depth/winter-severity state + dense-conifer cover availability + solar exposure + time of day.
 
-**Measurement-fidelity note:** Generic canopy density or edge/patch structure must not substitute for the study's dense-conifer cover class.
+**Recovered M08 measurement — 2026-09-25:** The fitted physical winter covariates were daily snow depth (cm) and minimum daily temperature (°C). Minnesota's cumulative WSI was additional source context rather than a replacement for those daily variables: one point per day for snow depth ≥38 cm and one point per day for minimum temperature ≤-17.7 °C during November-May.
 
-**Boundary:** Northern severe-winter system. Do not use this to create a generic “dense conifer = winter bedding” rule in central Kentucky. It directly warns against using air temperature without solar exposure and snow state.
+**Farm Watch M08 production mapping — 2026-09-25:** `snow-winter-severity-context-v1` keeps the daily variables first-class. NOAA/NWS/NOHRSC National Snow Analysis supplies a daily property-targeted assimilated snow-depth estimate; the existing NOAA/NCEP HRRR f00 archive supplies a local-calendar-day modeled minimum temperature when at least 75% of expected hourly analyses are present. Minnesota WSI arithmetic is retained only as source provenance/context and no severity category is assigned.
+
+**Measurement-fidelity note:** NOHRSC snow is modeled/observationally assimilated rather than an on-property ruler measurement, and the HRRR minimum is an hourly-analysis approximation to a daily minimum. Generic canopy density or edge/patch structure still must not substitute for the separate study dense-conifer cover class.
+
+**Boundary:** Northern severe-winter system. M08 does not authorize a generic “dense conifer = winter bedding” rule, a cold-weather movement multiplier, a Minnesota WSI severity category for Kentucky, or any transferred coefficient. FW-R03 remains blocked until FW-M09 dense-conifer cover is aligned.
 
 ---
 
@@ -727,7 +731,7 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 | Hunting pressure | strong conditional evidence | scientifically unresolved and parked for 2026 | no repeated hunt/activity logging requirement; module must abstain when pressure is unknown |
 | Roads/trails/human footprint | context dependent | Tier 1 road/building neutral context production-validated | retain neutral geometry/context; never assign a standalone road/building deer sign |
 | Water | limited/context-specific | neutral surface-water state implemented, pending production deployment | preserve mapped persistence vs current observed presence; retain drought/precip/gauge/soil proxies and do not infer generic deer water preference |
-| Snow/winter severity | strong northern evidence | active autonomous target | add authoritative snow depth/severity context only when climatically relevant |
+| Snow/winter severity | strong northern evidence | production neutral source-substituted daily snow/minimum-temperature context | retain raw physical variables; Minnesota WSI is provenance only and no Kentucky severity category transfers |
 | Extreme storm/flood | direct event evidence | explicit Tier 1 tropical/extreme-wind event gate + M47 six-class habitat-distance context production-validated | ordinary weather remains excluded; retain explicit event gating and no Florida coefficient transfer |
 | Moon phase | negative evidence | computable but should not be used | none; keep blocked |
 | Barometric pressure | insufficient general evidence | current forcing absent | do not prioritize until relationship evidence improves |
