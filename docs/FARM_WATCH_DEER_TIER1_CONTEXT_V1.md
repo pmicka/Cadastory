@@ -135,14 +135,14 @@ The collector was consequently moved to the registered current `fema-usa-structu
 
 The four Tier 1 measurements passed their production exit gates for `validation-property-01`.
 
-- **FW-M24:** FEMA USA Structures returned 68 buildings in the exact 10.36 km² analytical window, or 6.5637065637 buildings/km². The source is queried directly and unfiltered by Scout's commercial-building discovery rules. The production context now also records service edit timestamps, local feature production/imagery-date ranges, field-coverage fractions, the >450 sq ft source inventory threshold, and an explicit `not_quantified_by_source` spatial-completeness state.
+- **FW-M24:** FEMA USA Structures returned 68 buildings in the exact 10.36 km² analytical window, or 6.5637065637 buildings/km². The source is queried directly and unfiltered by Scout's commercial-building discovery rules. The live view reports service last edit `2026-06-08T18:21:34.830Z`, schema last edit `2025-10-14T22:09:11.713Z`, and data last edit `2025-09-23T21:20:35.029Z`. All 68 returned features carry `PROD_DATE`, `IMAGE_DATE`, source attribution, validation method, and UUID. Local production dates span 2020-01-13 through 2020-01-21, while local imagery dates span 2014-07-05 through 2017-04-15. These local feature vintages are the meaningful temporal caveat: the later service edit dates do not make the local footprints 2026 captures. Spatial completeness remains `not_quantified_by_source`, and the source inventory design excludes structures at or below 450 sq ft.
 - **FW-M36:** the current Geofabrik OSM road snapshot is bound into `human-footprint-context-v1`, and `road-focal-context-v1` now reproduces the Stephens physical transformation on demand. At the validation-property center the nearest canonical road is 909.935 m; the 10 m grid yields mean distance-to-road values of 910.504 m at 30 m (26 cells), 909.985 m at 90 m (254 cells), and 917.631 m at 270 m (2,284 cells). These are neutral geometry facts, not deer-response signs.
 - **FW-M39:** the persisted analytical windows measure exactly 1,000,000 m² and 9,000,000 m² in EPSG:32616, with 1,000 m and 3,000 m sides respectively.
 - **FW-M45:** the current authoritative NWS extreme-event context is `inactive`, with zero qualifying tropical/extreme-wind events. Ordinary severe thunderstorms/rain/wind cannot activate it.
 
 Production identities:
 
-- human-footprint context: `fa2bef863161e1819c1c41422da5dd57ed3402badeaf6790fb862f3efac49b6d`;
+- human-footprint context: `5617a84ed6576b20a355cd9424e75956e3170573f2a6a4be760c2de579170058`;
 - 1 km² study window: `7e05c65020b950a8565690af1c6a811f9f8ba8f46a2986b90ff435ec5f94c312`;
 - 9 km² study window: `5ff93b28e8f7aa42bb1ef03bd3351911a6f54aaebaf5c343051f07f854585210`.
 
