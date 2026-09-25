@@ -10,6 +10,7 @@ on:
       - 'supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
       - 'supabase/migrations/20260925162500_finalize_farm_watch_m36_road_focal_context_v1.sql'
       - 'supabase/migrations/20260925163500_finalize_farm_watch_m24_building_vintage_completeness_v1.sql'
+      - 'supabase/migrations/20260925180500_finalize_farm_watch_m45_extreme_event_source_health_v1.sql'
       - 'docs/FARM_WATCH_DEER_TIER1_CONTEXT_V1.md'
       - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
   push:
@@ -22,6 +23,7 @@ on:
       - 'supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
       - 'supabase/migrations/20260925162500_finalize_farm_watch_m36_road_focal_context_v1.sql'
       - 'supabase/migrations/20260925163500_finalize_farm_watch_m24_building_vintage_completeness_v1.sql'
+      - 'supabase/migrations/20260925180500_finalize_farm_watch_m45_extreme_event_source_health_v1.sql'
       - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
 
 jobs:
@@ -77,3 +79,17 @@ jobs:
           grep -q "building_source_profile_sha256" "$file"
           grep -q "local_feature_vintage" supabase/functions/collect-farm-watch-human-footprint/index.ts
           grep -q "outStatistics" supabase/functions/collect-farm-watch-human-footprint/index.ts
+
+      - name: Check M45 event source-health gate
+        run: |
+          set -euo pipefail
+          file='supabase/migrations/20260925180500_finalize_farm_watch_m45_extreme_event_source_health_v1.sql'
+          grep -q "nws-tropical-extreme-event-gate-v2" "$file"
+          grep -q "nws_alert_poll_status_v1" "$file"
+          grep -q "http_status is distinct from 200" "$file"
+          grep -q "unresolved_qualifying_event_count" "$file"
+          grep -q "applicability_state" "$file"
+          grep -q "not_applicable" "$file"
+          grep -q "source_unavailable" "$file"
+          grep -q "e.status='Actual'" "$file"
+          grep -q "ordinary_weather_activation_allowed',false" "$file"
