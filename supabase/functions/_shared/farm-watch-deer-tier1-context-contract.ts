@@ -1,11 +1,11 @@
 export const FARM_WATCH_DEER_TIER1_CONTEXT_PRODUCT = Object.freeze({
   humanFootprint: Object.freeze({
     key: 'human-footprint-context',
-    algorithmVersion: 'ky-ornl-osm-human-footprint-context-v1',
+    algorithmVersion: 'fema-usastructures-osm-human-footprint-v1',
     outputSchemaVersion: 'human-footprint-context-v1',
     buildingStudyAreaKm2: 10.36,
     buildingSource:
-      'Kentucky ORNL / FEMA USA Structures Building Footprints',
+      'FEMA USA Structures View',
     roadSource: 'OpenStreetMap Geofabrik Access Snapshot',
     roadStudyRadiiM: Object.freeze([30, 90, 270] as const),
   }),
