@@ -47,9 +47,9 @@ Machine posture values:
 - `parked_2026_individual_state` — scientifically preserved, but individual identity/state differentiation is not reliably captured this season;
 - `parked_2026_manual_or_noncore` — scientifically preserved, but the measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or a study-specific variable that is not operationally available.
 
-Current posture counts across the 29 blocked measurements:
+Current posture counts across the 28 blocked measurements:
 
-- **11 active**
+- **10 active**
 - **3 parked — individual state**
 - **15 parked — manual/non-core**
 
@@ -87,7 +87,6 @@ These remain scientifically explicit, but no 2026 implementation effort should b
 
 | ID | Source measurement | Resolution | Priority | Boundary |
 | --- | --- | --- | --- | --- |
-| FW-M08 | Snow depth / winter severity | Build physical snow/winter-severity context from authoritative snow depth and temperature; preserve the published Minnesota WSI only as source-defined context | P2 | No Kentucky biological threshold is implied |
 | FW-M15 | Hunsaker male age | Expand explicit biological state to preserve yearling, 2-year-old, and 3+ male categories | P0 | Never infer exact age from generic adult status |
 | FW-M19 | Current corn identity | Accept current-year field-bound identity from explicit observation or another validated/rights-permitted source | P0 | Stale CDL and regional crop progress cannot satisfy it |
 | FW-M20 | Corn stage / harvest | Represent explicit field-level tasseling/silking or harvested state; direct/accepted observation first | P0 | Raw HLS trajectory alone cannot promote crop stage |
@@ -167,15 +166,33 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 
 ### Active autonomous spatial/environmental work
 
-- **FW-M08 — snow depth / winter severity**
 - **FW-M29 / FW-M32 — explicit managed-food feature geometry**
 - **FW-M43 — AVI species-specific overstorey composition (“intact deciduous forest” shorthand)**
 - **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
 - **FW-M56 — agriculture along simulated potential dispersal paths**
 
-The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M24, FW-M35, FW-M36, FW-M39, FW-M45, and FW-M47 are no longer listed here because their production exit gates passed on 2026-09-25.
+The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M08, FW-M24, FW-M35, FW-M36, FW-M39, FW-M45, and FW-M47 are no longer listed here because their production exit gates passed on 2026-09-25.
 
 The six `remain_unavailable` measurements continue to force abstention. Their inclusion in parked D means there is also no 2026 effort to find weak substitutes.
+
+### FW-M08 production resolution — 2026-09-25
+
+The DelGiudice et al. (2013) winter measurement has been production-resolved as `snow-winter-severity-context-v1`.
+
+The source relationship did **not** use a generic “winter severity” class as its fitted physical predictor. The study modeled daily snow depth in centimeters and minimum daily temperature in degrees Celsius directly. Minnesota's winter-severity index (WSI) was a separate cumulative context measure: one point per day for snow depth at least 38 cm and one point per day for minimum temperature at or below -17.7 °C during November-May.
+
+Farm Watch therefore keeps the two daily physical variables first-class:
+
+- snow depth from NOAA/NWS/NOHRSC National Snow Analysis, sampled once daily at the property target;
+- minimum daily temperature derived from the centrally persisted NOAA/NCEP HRRR f00 analysis archive over the property's local calendar day.
+
+The HRRR-derived daily minimum is accepted only when at least 75% of the expected 23-25 local-day hourly analyses are present. Lower coverage stays partial rather than being promoted to a complete daily minimum.
+
+The Minnesota WSI arithmetic is reproduced only as **source provenance/context**. Farm Watch does not emit a Minnesota severity category, copy a northern biological threshold to Kentucky, transfer a DelGiudice coefficient, infer dense-cover use, or create a generic cold-weather movement rule.
+
+The initial Flat Creek production sample on 2026-09-25 returned 0 cm NOHRSC snow. Because the local day was still in progress, the daily record correctly remained `partial` with minimum temperature pending. The WSI context was `not_applicable` because September is outside its November-May source window.
+
+FW-M08 is therefore no longer a blocked measurement. FW-R03 remains blocked independently on **FW-M09 dense-conifer cover**, so completing M08 does not activate the northern winter-cover relationship.
 
 ### FW-M43 method-definition correction — 2026-09-25
 
