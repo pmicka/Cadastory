@@ -5,26 +5,84 @@ import {
 
 export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_PRODUCT = Object.freeze({
   key: 'deer-measurement-resolution-decisions',
-  version: '2026-09-23',
+  version: '2026-09-25',
   dispositions: Object.freeze([
     'reproduce',
     'calibrated_proxy',
     'remain_unavailable',
   ] as const),
+  operationalPostures: Object.freeze([
+    'active',
+    'parked_2026_individual_state',
+    'parked_2026_manual_or_noncore',
+  ] as const),
 })
 
 export type DeerMeasurementResolutionDisposition =
   typeof FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_PRODUCT.dispositions[number]
+export type DeerMeasurementOperationalPosture =
+  typeof FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_PRODUCT.operationalPostures[number]
 
 export type DeerMeasurementResolutionDecision = {
   measurement_id: string
   disposition: DeerMeasurementResolutionDisposition
   target_product: string | null
   priority: 'P0' | 'P1' | 'P2' | 'defer'
+  operational_posture: DeerMeasurementOperationalPosture
+  operational_note: string
   contract_change_required: boolean
   rationale: string
   implementation_boundary: string
   validation: string[]
+}
+
+const PARKED_2026_INDIVIDUAL_STATE_IDS = new Set([
+  'FW-M15-hunsaker-male-age',
+  'FW-M51-maternal-age-category',
+  'FW-M54-female-parturition-phase',
+])
+
+const PARKED_2026_MANUAL_OR_NONCORE_IDS = new Set([
+  'FW-M01-operative-temperature',
+  'FW-M03-forage-index',
+  'FW-M05-activity-period',
+  'FW-M19-current-corn-identity',
+  'FW-M20-corn-stage-harvest',
+  'FW-M23-woody-twig-density',
+  'FW-M25-discrete-stand-hunt',
+  'FW-M28-daily-hunter-activity',
+  'FW-M31-frequent-hunt-risk',
+  'FW-M33-low-hunting-pressure',
+  'FW-M40-d16-escape-cover-types',
+  'FW-M41-d16-winter-food',
+  'FW-M42-human-footprint-composition',
+  'FW-M44-wolf-occurrence',
+  'FW-M53-male-reproductive-phase',
+])
+
+function operationalPosture(measurementId: string): {
+  operational_posture: DeerMeasurementOperationalPosture
+  operational_note: string
+} {
+  if (PARKED_2026_INDIVIDUAL_STATE_IDS.has(measurementId)) {
+    return {
+      operational_posture: 'parked_2026_individual_state',
+      operational_note:
+        'Parked for the 2026 season because reliable individual identification/differentiation is not part of the current Farm Watch operating model. Scientific abstention remains required when the individual state is unknown.',
+    }
+  }
+  if (PARKED_2026_MANUAL_OR_NONCORE_IDS.has(measurementId)) {
+    return {
+      operational_posture: 'parked_2026_manual_or_noncore',
+      operational_note:
+        'Parked for the 2026 season because this measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or an unavailable study-specific variable. Its scientific disposition is unchanged.',
+    }
+  }
+  return {
+    operational_posture: 'active',
+    operational_note:
+      'Active implementation candidate because it can be pursued autonomously or with bounded one-time/static configuration under the current Farm Watch operating model.',
+  }
 }
 
 function decision(
@@ -42,6 +100,7 @@ function decision(
     disposition,
     target_product,
     priority,
+    ...operationalPosture(measurement_id),
     contract_change_required,
     rationale,
     implementation_boundary,
@@ -139,16 +198,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     'The source age categories are explicit biological scenario states: yearling, 2-year-old, and 3+ male. Farm Watch can preserve these categories exactly when the scenario/animal age is known or intentionally selected.',
     'Expand age-state vocabulary or add a source-specific male-age dimension. Never infer exact age from calendar, imagery or generic adult status.',
     ['Unit-test that unknown adult age abstains and 2-year/3+ scenarios remain distinct'],
-  ),
-  decision(
-    'FW-M17-annual-mast-fall',
-    'calibrated_proxy',
-    'annual-mast-state',
-    'P1',
-    false,
-    'The source relationship depends on contemporaneous annual acorn production, not mast-capable tree distribution. Regional mast surveys and local observations can inform an annual property state but require transfer/calibration.',
-    'Keep mast capacity and annual production separate. Regional survey values are context, not property mast abundance.',
-    ['Use standardized low-disturbance local mast observations where available', 'Compare local observations with regional survey class before property-wide promotion'],
   ),
   decision(
     'FW-M19-current-corn-identity',
@@ -439,6 +488,8 @@ export function validateDeerMeasurementResolutionDecisions() {
     if (seen.has(decision.measurement_id)) return false
     seen.add(decision.measurement_id)
     if (!FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_PRODUCT.dispositions.includes(decision.disposition)) return false
+    if (!FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_PRODUCT.operationalPostures.includes(decision.operational_posture)) return false
+    if (!decision.operational_note.trim()) return false
     if (decision.disposition !== 'remain_unavailable' && !decision.target_product) return false
     if (!decision.rationale.trim() || !decision.implementation_boundary.trim()) return false
   }
