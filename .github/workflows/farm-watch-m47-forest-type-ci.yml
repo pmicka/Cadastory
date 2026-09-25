@@ -46,7 +46,7 @@ jobs:
       - name: Test deer measurement resolution
         run: deno test supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts
       - name: Test deer relationship registry
-        run: deno test supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts
+        run: deno test --allow-read supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts
       - name: Check M47 science boundaries
         run: |
           set -euo pipefail
