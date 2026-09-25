@@ -86,6 +86,27 @@ Deno.test('FW-R01 vegetation height is bound only to the production-validated st
   assert(!fidelity.blocker_ids.includes('FW-M02-vegetation-height'))
 })
 
+Deno.test('completed mast products are reconciled without promoting regional survey state to property mast abundance', () => {
+  assert(FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['mast-capacity'].status === 'production')
+  assert(
+    FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['annual-mast-state'].status ===
+      'production_exact_year_regional_proxy',
+  )
+
+  const relationship = getDeerRelationship('FW-R11-mast-fall-space-use')
+  assert(relationship)
+  const annual = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M17-annual-mast-fall',
+  )
+  assert(annual)
+  assert(annual.alignment === 'calibrated_proxy')
+  assert(/regional proxy/i.test(annual.permitted_use))
+  assert(/property.*abundance/i.test(annual.limitations.join(' ')))
+  assert(!deerRelationshipStudyFidelityStatus(relationship).blocker_ids.includes(
+    'FW-M17-annual-mast-fall',
+  ))
+})
+
 Deno.test('numeric coefficients are rejected when coefficient transfer is not authorized', () => {
   const relationship = getDeerRelationship('FW-R25-kentucky-breeding-context')
   assert(relationship)

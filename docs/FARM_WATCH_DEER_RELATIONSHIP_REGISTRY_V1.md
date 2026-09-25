@@ -196,9 +196,19 @@ Every measurement that currently blocks a relationship has exactly one dispositi
 - `calibrated_proxy` — implement a plausible estimator and promote it only after study-aligned validation;
 - `remain_unavailable` — do not create a weak substitute.
 
-The current portfolio contains 36 blocked measurements: 21 reproducible, 9 calibrated proxies, and 6 intentionally unavailable. FW-M02 vegetation height has exited this queue after production validation and promotion to `derived_equivalent`; FW-R01 remains blocked by FW-M01, FW-M03, FW-M04, and FW-M05.
+The current portfolio contains 35 blocked measurements: 21 reproducible, 8 calibrated proxies, and 6 intentionally unavailable. FW-M02 vegetation height exited this queue after production validation and promotion to `derived_equivalent`. FW-M17 annual mast state also exited after Batch 5A/5B: the exact-year KDFWR statewide/regional survey state is now accepted as a `calibrated_proxy` for the annual-state input at regional scope only. It is not property mast abundance and prior-year survey state is never carried forward. FW-R01 remains blocked by FW-M01, FW-M03, FW-M04, and FW-M05.
 
 This resolution layer is planning/governance only. A `reproduce` or `calibrated_proxy` decision does not change the relationship registry's current alignment status. The relationship remains blocked until the corresponding neutral product is implemented and its exit gate is satisfied.
+
+### 2026 operating posture
+
+The measurement-resolution contract now also records whether a scientifically unresolved measurement is active engineering work for the 2026 season.
+
+- `active` — autonomous or bounded one-time/static work remains in scope;
+- `parked_2026_individual_state` — individual age/reproductive-state differentiation is preserved scientifically but not pursued operationally this season;
+- `parked_2026_manual_or_noncore` — repeated manual logging, non-core calibration stacks, and unavailable study-specific variables are preserved as abstention gates but removed from the 2026 implementation queue.
+
+Parking never changes a study measurement from unsupported to supported and never relaxes a module gate. It only prevents scientifically legitimate abstentions from masquerading as active engineering backlog.
 
 ## Batch 9 boundary
 

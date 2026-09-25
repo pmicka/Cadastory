@@ -9,7 +9,7 @@ export const FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_PRODUCT = Object.freeze({
   algorithmVersion: 'farm-watch-deer-relationship-registry-v1',
   outputSchemaVersion: 'deer-relationship-registry-v1',
   species: 'Odocoileus virginianus',
-  ledgerVersion: '2026-09-23',
+  ledgerVersion: '2026-09-25',
   outputKinds: Object.freeze([
     'quantitative_relative_selection',
     'ordinal_directional',
@@ -111,12 +111,12 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     evidence_states: ['candidate_only','accepted','abstained','blocked','unavailable'],
   },
   'mast-capacity': {
-    status: 'implemented_source_transport_blocked',
+    status: 'production',
     scales: ['property','local_500m','landscape_1500m','broad_3000m'],
     evidence_states: ['available','unavailable'],
   },
   'annual-mast-state': {
-    status: 'planned',
+    status: 'production_exact_year_regional_proxy',
     scales: ['property','regional'],
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
@@ -287,7 +287,7 @@ export type DeerRelationshipRecord = {
 
 const ALL_SEX = [...FARM_WATCH_DEER_BIOLOGICAL_STATE_PRODUCT.sexVocabulary]
 const ALL_AGE = [...FARM_WATCH_DEER_BIOLOGICAL_STATE_PRODUCT.ageVocabulary]
-const PARAMETER_SOURCE = 'FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md@2026-09-23'
+const PARAMETER_SOURCE = 'FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md@2026-09-25'
 
 function req(
   key: string,
@@ -691,9 +691,9 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     null_or_blocked_conditions:['mast capacity alone cannot activate the relationship'],
     blocked_universal_assumptions:[],
     output_kind:'ordinal_directional',
-    limitations:['No current-year mast state means insufficient input; modeled tree capacity is not mast production.'],
+    limitations:['No current-year mast state means insufficient input; modeled tree capacity is not mast production. KDFWR annual survey state is a regional proxy for an unsurveyed property, not property mast abundance.'],
     study_measurements:[
-      measurement('FW-M17-annual-mast-fall','annual_mast_state','annual acorn mast fall / production','Study related female deer space use and foraging to contemporaneous acorn mast fall in the study forest.','unsupported','required','No mast-response activation until annual mast production/state is available at a defensible local or regional transfer scale.'),
+      measurement('FW-M17-annual-mast-fall','annual_mast_state','annual acorn mast fall / production','Study related female deer space use and foraging to contemporaneous acorn mast fall in the study forest.','calibrated_proxy','required','Exact-year KDFWR statewide/regional mast survey state may satisfy the annual-state input only as an authoritative regional proxy. It must not be represented as measured property mast abundance.',['No prior-year carry-forward is allowed.','Property-specific mast abundance remains unknown unless separately observed.']),
       measurement('FW-M18-mast-producing-area','mast_capacity','acorn-producing area availability','Study deer shifted ranges to include acorn-producing areas during mast fall.','mechanism_context_only','context_only','Modeled mast-producing species capacity is potential resource structure, not observed annual acorn production.'),
     ],
   }),

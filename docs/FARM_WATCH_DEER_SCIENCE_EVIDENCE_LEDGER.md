@@ -1,6 +1,6 @@
 # Farm Watch Deer Science Evidence Ledger
 
-Status: current as of 2026-09-22  
+Status: current as of 2026-09-25  
 Target species: white-tailed deer (`Odocoileus virginianus`)  
 Primary transfer geography: central Kentucky / lower Ohio Valley  
 Validation property: `validation-property-01`
@@ -101,17 +101,24 @@ Current neutral products that may feed future science-backed deer terms:
 - Seasonal State v1: precipitation, drought, stream discharge proxy, root-zone soil-moisture proxy, state fieldwork, regional crop progress, state crop stage, mapped crop vintage;
 - property-grade NOAA HRRR meteorological forcing v1: current modeled temperature, dew point/RH, true wind, shortwave, longwave, cloud and precipitation-rate forcing with exact grid/model provenance;
 - historical environment context: Daymet temperature/precipitation on historical context dates;
+- Batch 5A `mast-capacity-v1`: production 28-species BIGMAP capacity context with modeled capacity kept separate from annual production;
+- Batch 5B `mast-resource-context-v1`: production exact-year KDFWR statewide/regional annual mast proxy with no prior-year carry-forward and optional local observations kept separate;
+- `horizontal-visibility-context-v1`: production neutral physical visibility/obstruction; not a Gallina concealment substitute;
 - roads/trails/buildings and other access geometry already available elsewhere in Farm Watch/Scout.
 
-Important current gaps include:
+Important **active** gaps are now restricted to measurements that fit the intended low-maintenance operating model:
 
-- a validated operative-temperature or animal heat-balance formulation, if later science requires one;
-- source-controlled exact Kentucky physiographic-region breeding-date series beyond the statewide qualitative timing gate;
-- current field-level crop phenology/harvest state;
-- mast abundance/species/vintage;
-- measured localized hunting pressure or human-use intensity;
-- calibrated concealment/visibility metric from the existing neutral 3-D structure;
-- parcel-scale usable water persistence / ephemeral water state.
+- calibrated woody-canopy and low-height concealment measurements where one-time/static calibration is defensible;
+- snow/winter-severity, forest/road/multiscale landscape context, building density, forest refuge classes, extreme-event state, and potential-path agriculture;
+- stand-vulnerability and managed food/water feature context only where bounded one-time/static configuration is practical;
+- parcel-scale usable water persistence / ephemeral water state, with Batch 7 still pending production deployment.
+
+The following scientifically valid gaps are **parked for the 2026 season** rather than treated as active engineering blockers:
+
+- individual-state differentiation requiring reliable individual identity: male age category, maternal age, and female parturition phase;
+- repeated/manual or non-core inputs: operative-temperature field calibration, movement-defined activity periods, current field crop identity/stage/harvest, explicit hunting sessions/effort, residual winter crop food, forage chemistry, browse/twig density, CRP-complete D16 escape cover, oil-sands footprint composition, wolf occurrence, and individual male rut/post-rut phase.
+
+Parking changes implementation posture only. Relationships that require parked measurements still abstain; no proxy is promoted merely to make them fire.
 
 The generic Scout weather snapshot table remains out of scope for deer thermal work; Farm Watch now has its own property-targeted HRRR forcing contract.
 
@@ -704,17 +711,17 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 | Scientific term family | Evidence status | Farm Watch input readiness | Next neutral work |
 | --- | --- | --- | --- |
 | Thermal exposure / refuge | strong mechanism + conditional field evidence | production neutral substrate | deer interpretation still requires explicit state/resource gates |
-| Diel state | strong | implementation candidate | deterministic solar/photoperiod contract in Batch 3 |
+| Diel state | strong | production | deterministic solar/photoperiod contract is complete; study-specific movement-defined activity periods remain parked |
 | Rut / reproductive timing | strong, region-dependent | statewide Kentucky qualitative gate ready; exact regional dates incomplete | use FW-D21 statewide gate; capture authoritative annual physiographic-region dates before finer regionalization |
 | Terrain/topography | strong evidence of context dependence | neutral inputs ready | no new physical data required before conditional model; movement-state gate required |
 | Fine vegetation structure | moderate-to-strong mechanism evidence; state-specific | strong neutral structure inputs | derive/validate neutral visibility/concealment metric before biological labeling |
-| Mast | strong direct evidence | not ready | oak/mast-species inventory + annual mast state |
-| Crop resource state | strong | partial/stale | field-level current crop + phenology + harvest/residue state |
-| Woody browse | meaningful winter evidence | not ready | defensible browse availability proxy or field observation |
-| Hunting pressure | strong conditional evidence | not ready | dated/local pressure observations or measured use intensity |
+| Mast | strong direct evidence | production substrate complete; 2026 exact-year annual component awaits KDFWR publication | Batch 5A capacity + Batch 5B regional annual proxy are reconciled; property mast abundance remains unknown unless separately observed |
+| Crop resource state | strong | neutral HLS/seasonal substrate available, deer relationship input parked for 2026 | current field crop identity/stage/harvest remains scientifically required but is not an active engineering target this season |
+| Woody browse | meaningful winter evidence | unavailable for the cited relationship | parked; do not substitute LiDAR/greenness for palatable twig density |
+| Hunting pressure | strong conditional evidence | scientifically unresolved and parked for 2026 | no repeated hunt/activity logging requirement; module must abstain when pressure is unknown |
 | Roads/trails/human footprint | context dependent | geometry ready | combine with actual resource/risk state; never standalone sign |
 | Water | limited/context-specific | neutral surface-water state implemented, pending production deployment | preserve mapped persistence vs current observed presence; retain drought/precip/gauge/soil proxies and do not infer generic deer water preference |
-| Snow/winter severity | strong northern evidence | not ready/currently low priority for KY | snow depth/severity only when relevant |
+| Snow/winter severity | strong northern evidence | active autonomous target | add authoritative snow depth/severity context only when climatically relevant |
 | Extreme storm/flood | direct event evidence | partial | event-specific hazard/flood state |
 | Moon phase | negative evidence | computable but should not be used | none; keep blocked |
 | Barometric pressure | insufficient general evidence | current forcing absent | do not prioritize until relationship evidence improves |

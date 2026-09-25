@@ -647,6 +647,7 @@ Deer modules can distinguish mapped/observed usable-water evidence from mere dra
 # Batch 8 — Explicit human-activity and hunting-pressure evidence
 
 Priority: P1  
+Status: parked for the 2026 operating season; the science remains valid, but repeated hunt/activity logging is outside the intended low-maintenance operating model.  
 Ledger dependencies: FW-D10–D13, D17.
 
 ## Objective
@@ -795,17 +796,19 @@ These are contract blockers, not requests to invent replacement proxies. Batch 1
 
 The follow-on resolution pass classifies every currently blocked required measurement in `farm-watch-deer-measurement-resolution.ts` and `FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md`.
 
-Current blocked-measurement disposition counts:
+Current blocked-measurement disposition counts after the 2026-09-25 mast reconciliation:
 
 - 21 `reproduce`;
-- 9 `calibrated_proxy`;
+- 8 `calibrated_proxy`;
 - 6 `remain_unavailable`.
 
-FW-M02 vegetation height is no longer in the blocked queue. The production-validated `study-aligned-vegetation-height-context-v2` is promoted to `derived_equivalent` for FW-R01. FW-D01 nevertheless remains blocked by operative temperature (FW-M01), forage index (FW-M03), woody canopy (FW-M04), and activity-period fidelity (FW-M05).
+FW-M02 vegetation height is no longer in the blocked queue. The production-validated `study-aligned-vegetation-height-context-v2` is promoted to `derived_equivalent` for FW-R01. FW-M17 annual mast state also leaves the blocked queue: Batch 5B exact-year KDFWR statewide/regional state is accepted as a `calibrated_proxy` at regional scope only, with property mast abundance still explicitly unknown. FW-D01 nevertheless remains scientifically blocked by operative temperature (FW-M01), forage index (FW-M03), woody canopy (FW-M04), and activity-period fidelity (FW-M05).
 
-The private `deer-evidence-stack-v1` inventory now exposes `study-aligned-vegetation-height-context` metadata/summary alongside the other neutral Farm Watch products; this exposure does not alter relationship applicability or coefficient-transfer status.
+The private `deer-evidence-stack-v1` inventory exposes the completed neutral products without changing coefficient-transfer status.
 
-The remaining highest-value P0 units are source-faithful male age categories; current corn identity/stage; explicit hunting-event/effort evidence; calibrated stand-vulnerability viewshed; and calibrated Gallina concealment.
+The 2026 operating posture now separates unresolved science from active engineering work. Individual-state differentiation (FW-M15, FW-M51, FW-M54) is parked because reliable individual differentiation is not part of the current operating model. Repeated/manual or non-core measurements—including current crop identity/stage, explicit hunting sessions/effort, operative-temperature field calibration, movement-defined activity periods, residual winter crop food, and the six intentionally unavailable study-specific variables—are also parked for the 2026 season. These measurements continue to cause abstention where required; parking does not make them satisfied.
+
+Active work is therefore limited to autonomous or bounded one-time/static measurements such as woody canopy, snow/conifer context, building/forest/road/multiscale geometry, Gallina concealment, stand vulnerability, managed food/water feature geometry, forest refuge/extreme-event context, and potential-path agriculture.
 
 A resolution decision does not itself unblock a deer relationship. Registry alignment changes only after that measurement product is actually implemented and validated.
 
@@ -1075,6 +1078,8 @@ Use permanence attribution when available but preserve source scope. Current wat
 
 # Priority order
 
+The original scientific priority labels remain below for provenance, but the 2026 operating posture in `FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md` overrides them for implementation scheduling. Parked B/D measurements are not active backlog even when their original scientific priority is P0/P1.
+
 ## P0 — unblock scientifically meaningful first deer output
 
 1. meteorological forcing;
@@ -1084,15 +1089,15 @@ Use permanence attribution when available but preserve source scope. Current wat
 5. regional breeding-state review + biological-state contract;
 6. field phenology;
 7. science relationship registry;
-8. first thermal/resource/agriculture modules;
-9. `deer-science-context-v1`.
+8. first deer modules that can satisfy their study measurements from the active autonomous/static queue;
+9. `deer-science-context-v1`, with explicit abstention for parked inputs.
 
 ## P1 — materially improve decision quality
 
 10. mast resource context;
 11. horizontal visibility;
-12. human-activity / pressure observations;
-13. mast and localized-risk modules;
+12. bounded one-time/static property configuration where useful;
+13. mast module after exact-year annual state is available; localized hunting-risk remains parked unless explicit activity evidence is intentionally added;
 14. surface-water state.
 
 ## P2 — quantitative sophistication

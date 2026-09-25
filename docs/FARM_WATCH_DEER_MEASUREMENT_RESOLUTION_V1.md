@@ -1,7 +1,7 @@
 # Farm Watch Deer Measurement Resolution v1
 
 Status: source-controlled study-fidelity disposition contract  
-Version: 2026-09-23  
+Version: 2026-09-25  
 Normative upstream science: `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`  
 Machine contract: `supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts`
 
@@ -19,17 +19,64 @@ A resolution decision is about **input measurement fidelity**, not biological tr
 
 ## Portfolio
 
-The current blocked set contains 36 required study measurements:
+The current blocked set contains 35 required study measurements:
 
 - **21 reproduce**
-- **9 calibrated proxy**
+- **8 calibrated proxy**
 - **6 remain unavailable**
 
 Resolved since this contract was created:
 
 - **FW-M02 — Wiemers vegetation height:** production-validated `study-aligned-vegetation-height-context-v2`; promoted to `derived_equivalent` on 2026-09-23.
+- **FW-M17 — annual mast fall / production:** Batch 5A + 5B now provide production mast capacity plus exact-year KDFWR statewide/regional mast state. The registry promotes FW-M17 from `unsupported` to `calibrated_proxy` **only at the authoritative regional-survey scope**. This does not establish property mast abundance, does not authorize prior-year carry-forward, and does not make the modeled capacity layer annual production.
 
 CI requires every currently blocked measurement to have one and only one disposition.
+
+## 2026 operating posture
+
+Scientific disposition and implementation priority are now separated from **operating posture**. A measurement can remain scientifically important while being intentionally removed from the 2026 implementation queue.
+
+Machine posture values:
+
+- `active` — still in the implementation queue because it can be pursued autonomously or with bounded one-time/static configuration;
+- `parked_2026_individual_state` — scientifically preserved, but individual identity/state differentiation is not reliably captured this season;
+- `parked_2026_manual_or_noncore` — scientifically preserved, but the measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or a study-specific variable that is not operationally available.
+
+Current posture counts across the 35 blocked measurements:
+
+- **17 active**
+- **3 parked — individual state**
+- **15 parked — manual/non-core**
+
+Parking does **not** weaken the science contract. Parked measurements still cause abstention wherever the relationship requires them; they simply no longer appear as active engineering work for the 2026 season.
+
+### Parked B — individual-state differentiation
+
+- FW-M15 — Hunsaker male age;
+- FW-M51 — maternal age category;
+- FW-M54 — female parturition phase.
+
+These are parked because Farm Watch will not rely on repeated individual identification/differentiation this season.
+
+### Parked D — repeated manual input / non-core stack
+
+- FW-M01 — operative temperature calibration;
+- FW-M03 — forage chemistry index;
+- FW-M05 — movement-defined activity periods;
+- FW-M19 — current corn identity;
+- FW-M20 — corn stage / harvest;
+- FW-M23 — woody twig density;
+- FW-M25 — dated stand hunt;
+- FW-M28 — daily hunter activity;
+- FW-M31 — frequent-hunt risk;
+- FW-M33 — low hunting pressure;
+- FW-M40 — complete D16 escape-cover bundle;
+- FW-M41 — residual winter cropland food;
+- FW-M42 — oil-sands human-footprint composition;
+- FW-M44 — wolf occurrence;
+- FW-M53 — individual male rut/post-rut phase.
+
+These remain scientifically explicit, but no 2026 implementation effort should be spent manufacturing substitutes or asking for recurring manual data entry.
 
 ## Reproduce
 
@@ -75,7 +122,6 @@ Sullivan et al. and later hunting-risk studies depend on observed or recorded hu
 | FW-M09 | Dense conifer cover | Forest type + canopy closure | P2 | Validate conifer class and closure against imagery/field observations |
 | FW-M11 | Gallina directional 2 m concealment profile | Virtual cover-board from terrain + height-specific vegetation + woody continuity + seasonal foliage | P0 | Segmented 2 m target, 15 m distance, directional field observations; holdout validation |
 | FW-M13 | Gallina 0–50 / 50–100 cm concealment | Same virtual cover-board, preserving low strata separately | P0 | Validate each low stratum independently |
-| FW-M17 | Annual mast fall / production | Regional mast evidence + standardized local low-disturbance observations | P1 | Compare local observations with regional survey state; never conflate capacity with production |
 | FW-M26 | Stand-specific hunter vulnerability zone | Seasonal terrain/vegetation viewshed from each stand | P0 | Laser/rangefinder visibility spot checks by bearing; leaf-on/off validation |
 | FW-M41 | Residual winter cropland food | Crop identity + harvest state + residue-state model | P2 | Roadside/operator residue observations by crop/harvest class |
 
@@ -109,43 +155,34 @@ For example:
 - Farm Watch can still preserve Kentucky regional breeding timing without asserting that a particular male is in the study's rut/post-rut phase.
 - A future Kentucky predator study could justify a different predator relationship without pretending wolf occurrence and coyote context are interchangeable.
 
-## Highest-value P0 resolution work
+## Active 2026 implementation queue
 
-The following measurement gaps are both tractable and directly useful to the eventual pre-flight system:
+Priority labels remain useful for scientific sequencing, but the operating posture is authoritative for what Farm Watch should actually build this season.
 
-1. **FW-M15 — source-faithful male age scenarios**  
-   Small biological-state contract change; immediately prevents age-category collapse.
+### Active calibrated/static work
 
-2. **FW-M19 / FW-M20 — current corn identity and crop stage**  
-   Direct observation/accepted-source route first; automation can follow only after classifier validation.
+- **FW-M11 / FW-M13 — Gallina concealment:** optional calibrated one-time/static configuration path; no bedding-site intrusion is required.
+- **FW-M26 — stand vulnerability zone:** optional calibrated one-time/static stand viewshed path.
+- **FW-M04 — woody canopy:** autonomous/static spatial measurement once calibration is bounded.
+- **FW-M09 — dense conifer cover:** autonomous/static spatial classification once validation is bounded.
 
-3. **FW-M25 / FW-M28 / FW-M31 / FW-M33 — explicit hunting activity and effort**  
-   Factual operator activity is unusually high-value because it supports several hunting-risk studies without requiring wildlife disturbance.
+### Active autonomous spatial/environmental work
 
-4. **FW-M26 — stand vulnerability zone**  
-   Builds directly on the generalized viewshed work and has an unusually practical calibration protocol.
+- **FW-M08 — snow depth / winter severity**
+- **FW-M24 — building/development density**
+- **FW-M29 / FW-M32 — explicit managed-food feature geometry**
+- **FW-M35 — multiscale forest context**
+- **FW-M36 — road landscape context**
+- **FW-M39 — exact D16 study scales**
+- **FW-M43 — intact deciduous forest**
+- **FW-M45 — explicit extreme-event state**
+- **FW-M47 — forest refuge type**
+- **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
+- **FW-M56 — agriculture along simulated potential dispersal paths**
 
-5. **FW-M11 / FW-M13 — Gallina concealment**  
-   Reuses the same terrain/structure/foliage substrate but preserves the original 15 m cover-board geometry and low vertical strata.
+The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue.
 
-These remain independent units. Completing one does not authorize another.
-
-## P1 resolution work
-
-- operative-temperature proxy and black-globe calibration;
-- woody-canopy percent calibration;
-- annual mast state;
-- building/development density;
-- explicit food-plot/managed-food feature context;
-- usable managed-water-source state;
-- maternal-age and female-parturition scenario alignment;
-- multiscale forest context and roads.
-
-## P2 / deferred work
-
-P2 includes snow/conifer winter context, local activity-period calibration, D16 scale/residual-crop work, forest-type/extreme-event context, and potential dispersal-path simulation.
-
-The six unavailable measurements should not enter an implementation queue unless their evidentiary situation changes.
+The six `remain_unavailable` measurements continue to force abstention. Their inclusion in parked D means there is also no 2026 effort to find weak substitutes.
 
 ## Machine enforcement
 
@@ -157,7 +194,8 @@ CI fails if:
 - a decision exists for a measurement that is not currently blocked;
 - a measurement has duplicate decisions;
 - a reproducible or calibrated-proxy decision has no target product;
-- the expected portfolio invariants regress.
+- an operating posture is missing or invalid;
+- the blocked/disposition/posture portfolio invariants regress.
 
 The decision contract does **not** itself unblock a relationship. Each future measurement implementation must update the corresponding measurement-alignment state only after its own evidence/validation exit gate is satisfied.
 
