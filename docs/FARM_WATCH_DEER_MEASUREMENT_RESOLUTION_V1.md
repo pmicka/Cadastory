@@ -46,7 +46,7 @@ Machine posture values:
 - `parked_2026_individual_state` — scientifically preserved, but individual identity/state differentiation is not reliably captured this season;
 - `parked_2026_manual_or_noncore` — scientifically preserved, but the measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or a study-specific variable that is not operationally available.
 
-Current posture counts across the 35 blocked measurements:
+Current posture counts across the 31 blocked measurements:
 
 - **13 active**
 - **3 parked — individual state**
