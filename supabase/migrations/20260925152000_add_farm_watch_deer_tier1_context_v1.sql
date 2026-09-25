@@ -149,10 +149,10 @@ begin
       'geometry_type','esriGeometryEnvelope',
       'in_sr',32616,
       'envelope',jsonb_build_array(
-        extensions.st_xmin(v_window),
-        extensions.st_ymin(v_window),
-        extensions.st_xmax(v_window),
-        extensions.st_ymax(v_window)
+        extensions.st_x(v_center_utm)-v_half,
+        extensions.st_y(v_center_utm)-v_half,
+        extensions.st_x(v_center_utm)+v_half,
+        extensions.st_y(v_center_utm)+v_half
       ),
       'source_url',
         'https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_ORNL_Building_Footprints_WGS84WM/MapServer/0'
