@@ -137,23 +137,56 @@ Deno.test('extreme-weather gate rejects ordinary weather and accepts explicit tr
     evidence_class: 'authoritative_event_context',
     ordinary_weather_activation_allowed: false,
     deer_inference_performed: false,
+    coefficient_transfer_performed: false,
+    source_health: {
+      status: 'healthy',
+      http_status: 200,
+      poll_age_seconds: 120,
+      unresolved_qualifying_event_count: 0,
+    },
   }
 
   assert(validateFarmWatchExtremeWeatherEventContext({
     ...base,
+    applicability_state: 'not_applicable',
     event_active: false,
     events: [],
   }))
 
   assert(validateFarmWatchExtremeWeatherEventContext({
     ...base,
+    applicability_state: 'active_extreme_event',
     event_active: true,
-    events: [{ event_type: 'Hurricane Warning' }],
+    events: [{ event_type: 'Hurricane Warning', status: 'Actual' }],
   }))
 
   assert(!validateFarmWatchExtremeWeatherEventContext({
     ...base,
+    applicability_state: 'active_extreme_event',
     event_active: true,
-    events: [{ event_type: 'Severe Thunderstorm Warning' }],
+    events: [{ event_type: 'Severe Thunderstorm Warning', status: 'Actual' }],
+  }))
+
+  assert(!validateFarmWatchExtremeWeatherEventContext({
+    ...base,
+    applicability_state: 'not_applicable',
+    event_active: false,
+    events: [],
+    source_health: {
+      ...base.source_health,
+      status: 'unavailable',
+      http_status: 503,
+    },
+  }))
+
+  assert(!validateFarmWatchExtremeWeatherEventContext({
+    ...base,
+    applicability_state: 'not_applicable',
+    event_active: false,
+    events: [],
+    source_health: {
+      ...base.source_health,
+      poll_age_seconds: 3600,
+    },
   }))
 })

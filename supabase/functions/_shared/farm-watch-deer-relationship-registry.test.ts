@@ -171,6 +171,16 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
 
   const storm = getDeerRelationship('FW-R22-extreme-storm-refuge')
   assert(storm)
+  const stormMeasurement = storm.study_measurements.find(
+    (row) => row.id === 'FW-M45-extreme-hurricane-event',
+  )
+  assert(stormMeasurement)
+  assert(/healthy poll with no qualifying intersection is explicitly not applicable/i.test(
+    stormMeasurement.permitted_use,
+  ))
+  assert(/source failure, stale polling, or unresolved qualifying alert geometry is unavailable/i.test(
+    stormMeasurement.permitted_use,
+  ))
   assert(deerRelationshipStudyFidelityStatus(storm).blocker_ids.includes(
     'FW-M47-forest-refuge-type',
   ))

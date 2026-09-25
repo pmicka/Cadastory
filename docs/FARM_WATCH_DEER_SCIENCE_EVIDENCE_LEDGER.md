@@ -472,7 +472,7 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **extreme-event-only; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** explicit extreme-event state + relative elevation + forest/habitat type + flood/wetland context.
+**Farm Watch mapping:** explicit extreme-event state + relative elevation + forest/habitat type + flood/wetland context. FW-M45 is production-validated as an authoritative NWS event+footprint+time gate. A fresh successful jurisdiction poll with no qualifying property-intersecting event is `not_applicable`; source failure/staleness or unresolved qualifying alert geometry is unavailable rather than treated as an ordinary inactive state.
 
 **Measurement-fidelity note:** The Irma response combined higher elevation with increased selection of pine/hardwood refuge types and avoidance of marsh/shrub habitat; elevation alone is insufficient.
 
