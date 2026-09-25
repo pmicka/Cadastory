@@ -1,6 +1,6 @@
 # Farm Watch Mast Resource Context v1
 
-Status: Batch 5B implementation candidate — 2026-09-25
+Status: Batch 5B production deployed and validated — 2026-09-25; 2026 exact-year KDFWR annual component unavailable pending publication/ingest
 
 ## Purpose
 
@@ -172,6 +172,23 @@ This preserves the architecture required for later FW-D07 evaluation:
 - exact-year annual survey state available or unavailable;
 - property observation available or unavailable;
 - deer-specific mast response remains downstream.
+
+## Production validation — 2026-09-25
+
+Production migration and validation completed for `validation-property-01`.
+
+- canonical KDFWR reports stored: 2 (2024 and 2025);
+- canonical annual group rows stored: 24 (4 groups × 3 scopes × 2 years);
+- validation-property survey region: `west`, derived from authoritative KDFWR Figure 4;
+- 2025 context: `available`, identity `f570fd3d2c10e4c2bc9a546008bb484ab78702c4e1282f39fc4c54096ee46e69`;
+- 2026 context: `partial`, identity `99ba13dbad88b07afa3c2522d0aaa63db145aef758113eeb575ae9e646fe1992`;
+- 2026 mast capacity: `available`;
+- 2026 annual mast proxy: `unavailable`, latest canonical report year 2025, `applied_prior_year=false`;
+- current property mast observations: none.
+
+The deer evidence stack exposes both the existing `mast-capacity` product and the separate 2026 `mast_resource_context`, preserving the intended capacity-versus-annual-state boundary.
+
+Both required agent-contract assertions passed after deployment. Supabase advisory review identified no Batch 5B-specific release blocker; project-wide informational RLS/no-policy and unused-index notices remain consistent with existing service-only/private table patterns.
 
 ## Interpretation boundary
 
