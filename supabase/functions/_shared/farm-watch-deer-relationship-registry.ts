@@ -211,7 +211,7 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
   'snow-winter-severity-context': {
-    status: 'planned',
+    status: 'production_source_substituted_neutral_measurement',
     scales: ['property','regional'],
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
@@ -496,7 +496,20 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     output_kind:'mechanism_context',
     limitations:['Northern severe-winter system; not a generic Kentucky dense-cover rule.'],
     study_measurements:[
-      measurement('FW-M08-snow-depth-severity','winter_severity','snow depth / winter severity','Study related dense-conifer use to observed winter snow conditions over 12 winters.','unsupported','required','No relationship activation until a snow/winter-severity product exists.'),
+      measurement(
+        'FW-M08-snow-depth-severity',
+        'winter_severity',
+        'daily snow depth (cm) and minimum daily temperature (C), with Minnesota WSI retained as source context',
+        'DelGiudice et al. modeled winter cover use with daily snow depth and minimum daily temperature directly. The Minnesota winter-severity index separately accumulated one point for snow depth at least 38 cm and one point for minimum temperature at or below -17.7 C during November-May.',
+        'derived_equivalent',
+        'required',
+        'Farm Watch supplies neutral daily physical context using NOAA/NWS/NOHRSC assimilated snow depth plus the minimum of centrally persisted NOAA/NCEP HRRR f00 analyses over the property local day. The source-defined Minnesota WSI arithmetic is retained only as provenance/context; no Minnesota severity category, response coefficient, or Kentucky biological threshold transfers.',
+        [
+          'NOHRSC snow depth is a modeled/observationally assimilated analysis rather than an on-property ruler measurement.',
+          'HRRR daily minimum is derived from hourly modeled analyses and requires at least 75% local-day coverage; incomplete coverage remains partial.',
+          'FW-D03 remains blocked until the separate FW-M09 dense-conifer-cover measurement is aligned.',
+        ],
+      ),
       measurement('FW-M09-dense-conifer-cover','conifer_cover','dense conifer cover availability','Study response explicitly distinguished dense conifer from more open vegetation and found availability-dependent effects.','unsupported','required','Generic canopy density or edge structure cannot substitute for dense-conifer cover.'),
       measurement('FW-M10-winter-solar-context','thermal_exposure','daytime solar/thermal exposure under severe winter conditions','Study interpretation requires solar exposure jointly with snow and minimum temperature.','mechanism_context_only','context_only','Current thermal exposure provides physical context but is not the study winter-cover measurement.'),
     ],
