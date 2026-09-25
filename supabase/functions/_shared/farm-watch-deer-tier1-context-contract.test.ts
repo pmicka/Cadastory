@@ -2,6 +2,7 @@ import {
   FARM_WATCH_DEER_TIER1_CONTEXT_PRODUCT,
   validateFarmWatchExtremeWeatherEventContext,
   validateFarmWatchHumanFootprintContext,
+  validateFarmWatchRoadFocalContext,
   validateFarmWatchMultiscaleCoverContext,
 } from './farm-watch-deer-tier1-context-contract.ts'
 
@@ -32,6 +33,36 @@ Deno.test('human-footprint context preserves Delisle building area and Stephens 
     deer_inference_performed: false,
   }
   assert(validateFarmWatchHumanFootprintContext(value))
+})
+
+Deno.test('M36 road focal context preserves 10 m road-distance raster and 30/90/270 m focal means', () => {
+  const value = {
+    schema: FARM_WATCH_DEER_TIER1_CONTEXT_PRODUCT.roadFocal.outputSchemaVersion,
+    method: FARM_WATCH_DEER_TIER1_CONTEXT_PRODUCT.roadFocal.algorithmVersion,
+    evidence_class: 'deterministic_derived',
+    source_method: {
+      study_road_raster_resolution_m: 10,
+      study_focal_radii_m: [30, 90, 270],
+    },
+    focal_mean_distance_to_road_m: {
+      '30m': { mean_m: 910.504, cell_count: 26 },
+      '90m': { mean_m: 909.985, cell_count: 254 },
+      '270m': { mean_m: 917.631, cell_count: 2284 },
+    },
+    source_signature_sha256: sha,
+    identity_sha256: sha,
+    deer_inference_performed: false,
+    coefficient_transfer_performed: false,
+  }
+  assert(validateFarmWatchRoadFocalContext(value))
+
+  assert(!validateFarmWatchRoadFocalContext({
+    ...value,
+    source_method: {
+      study_road_raster_resolution_m: 30,
+      study_focal_radii_m: [30, 90, 270],
+    },
+  }))
 })
 
 Deno.test('multiscale context requires exact 1 and 9 km2 windows', () => {
