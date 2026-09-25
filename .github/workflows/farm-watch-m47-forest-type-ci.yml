@@ -1,0 +1,65 @@
+name: Farm Watch M47 forest type CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-forest-type-context-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-forest-type-context-contract.test.ts'
+      - 'supabase/functions/farm-watch-forest-type-context/index.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
+      - 'supabase/migrations/20260925221020_add_farm_watch_m47_forest_type_context_v1.sql'
+      - 'docs/FARM_WATCH_FOREST_TYPE_CONTEXT_V1.md'
+      - 'docs/FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
+      - '.github/workflows/farm-watch-m47-forest-type-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/_shared/farm-watch-forest-type-context-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-forest-type-context-contract.test.ts'
+      - 'supabase/functions/farm-watch-forest-type-context/index.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
+      - 'supabase/migrations/20260925221020_add_farm_watch_m47_forest_type_context_v1.sql'
+      - '.github/workflows/farm-watch-m47-forest-type-ci.yml'
+
+jobs:
+  m47-forest-type:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check M47 contract
+        run: deno check supabase/functions/_shared/farm-watch-forest-type-context-contract.ts
+      - name: Test M47 contract
+        run: deno test supabase/functions/_shared/farm-watch-forest-type-context-contract.test.ts
+      - name: Check M47 worker
+        run: deno check supabase/functions/farm-watch-forest-type-context/index.ts
+      - name: Test deer measurement resolution
+        run: deno test supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts
+      - name: Test deer relationship registry
+        run: deno test supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts
+      - name: Check M47 science boundaries
+        run: |
+          set -euo pipefail
+          contract='supabase/functions/_shared/farm-watch-forest-type-context-contract.ts'
+          worker='supabase/functions/farm-watch-forest-type-context/index.ts'
+          migration='supabase/migrations/20260925221020_add_farm_watch_m47_forest_type_context_v1.sql'
+          grep -q "searchRadiusM: 3000" "$contract"
+          grep -q "pine_forest" "$contract"
+          grep -q "hardwood_swamp" "$contract"
+          grep -q "hardwood_hammock" "$contract"
+          grep -q "evidence_state: 'proxy'" "$worker"
+          grep -q "deer_inference_performed: false" "$worker"
+          grep -q "coefficient_transfer_performed: false" "$worker"
+          grep -q "scoring_performed: false" "$worker"
+          grep -q "PFO1" "$migration"
+          grep -q "PEM" "$migration"
+          grep -q "usgs-annual-nlcd-land-cover" "$migration"
