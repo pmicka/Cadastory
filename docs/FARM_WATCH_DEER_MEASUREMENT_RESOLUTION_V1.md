@@ -97,7 +97,7 @@ These remain scientifically explicit, but no 2026 implementation effort should b
 | FW-M31 | Frequent hunting risk | Derive event frequency / hunter-hours over explicit windows | P0 | Stand presence does not imply hunting frequency |
 | FW-M32 | Forage-rich risky areas | Bind to explicit mapped food plots / study-relevant cover types | P1 | Does not claim measured nutrient abundance |
 | FW-M33 | Low hunting pressure | Represent quantitative hunter effort density and compare with source context | P0 | Do not invent a universal low/high threshold |
-| FW-M43 | Intact deciduous forest | Derive forest type and intact/fragmented landscape state | P2 | Does not make the rest of FW-D17 available |
+| FW-M43 | AVI species-specific overstorey composition (“intact deciduous forest” shorthand) | Reproduce point-extracted percent overstorey composition for the source tree-species family, or keep unresolved until a defensible source-equivalent species-composition method exists | P2 | Generic Trees/TCC, broad deciduous class, edge density or fragmentation is not equivalent; does not make the rest of FW-D17 available |
 | FW-M47 | Forest refuge type | Derive pine/hardwood/swamp/marsh/shrub physical habitat classes | P2 | Covariate reproduction does not transfer the Florida effect |
 | FW-M48 | Usable water source | Represent current stock-pond/trough availability by managed-source inventory or dated observation | P1 | Hydrography/gauge context cannot prove usable source presence |
 | FW-M51 | Maternal age category | Preserve explicit fawn/yearling/adult maternal-age scenarios | P1 | Do not transfer Illinois conception dates |
@@ -170,7 +170,7 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 
 - **FW-M08 — snow depth / winter severity**
 - **FW-M29 / FW-M32 — explicit managed-food feature geometry**
-- **FW-M43 — intact deciduous forest**
+- **FW-M43 — AVI species-specific overstorey composition (“intact deciduous forest” shorthand)**
 - **FW-M47 — forest refuge type**
 - **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
 - **FW-M56 — agriculture along simulated potential dispersal paths**
@@ -178,6 +178,35 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M24, FW-M35, FW-M36, FW-M39, and FW-M45 are no longer listed here because their production exit gates passed on 2026-09-25.
 
 The six `remain_unavailable` measurements continue to force abstention. Their inclusion in parked D means there is also no 2026 effort to find weak substitutes.
+
+### FW-M43 method-definition correction — 2026-09-25
+
+The source measurement has now been recovered from Darlington et al. (2022) closely enough to remove an earlier ambiguity.
+
+The paper's abstract describes the cumulative model as including **intact deciduous forest**, but the Methods and Table 1 operationalize natural forest composition as Alberta Vegetation Inventory (AVI) overstorey species-composition percentages:
+
+- `PCT Aw` — trembling aspen (*Populus tremuloides*);
+- `PCT Bw` — white birch (*Betula papyrifera*);
+- `PCT Fb` — balsam fir (*Abies balsamea*);
+- `PCT Lt` — tamarack (*Larix laricina*);
+- `PCT Pb` — balsam poplar (*Populus balsamifera*);
+- `PCT Pj` — jack pine (*Pinus banksiana*);
+- `PCT Sb` — black spruce (*Picea mariana*);
+- `PCT Sw` — white spruce (*Picea glauca*).
+
+The paper defines `PCT` as the percent of the forest-canopy overstorey dominated by the leading tree species. These covariates were extracted at each used and available point and the percent-cover variables were standardized before modeling. The season-specific 2,093 / 4,249 / 2,172 / 3,903 m buffers defined the RSF availability domain; they were **not** focal radii used to compute forest composition.
+
+Accordingly, FW-M43 is **not** a source-defined fragmentation metric, edge metric, distance-to-deciduous metric, binary intact-forest class, or focal-buffer proportion. “Intact deciduous forest” is retained in the stable measurement ID for provenance, but it must not drive implementation semantics.
+
+Current Farm Watch registered substrates do not yet satisfy the reproduced measurement:
+
+- Sentinel-2 10 m LULC supplies a generic `Trees` class;
+- NLCD / Science TCC supplies total percent tree-canopy cover;
+- neither registered source supplies source-equivalent overstorey tree-species composition.
+
+Therefore M43 remains an active research/implementation candidate but **unmaterialized**. A broad deciduous/forest-type product may still be useful neutral context, but it cannot be promoted as reproduced FW-M43 without an explicit fidelity reclassification and validation. USFS FIA/TreeMap and LANDFIRE are plausible source families to evaluate, but accepting either as source-equivalent requires a separate method decision; categorical forest type alone is insufficient.
+
+This correction does not change the FW-D17 abstention boundary. FW-M42 human-footprint composition and FW-M44 wolf occurrence remain unavailable, so resolving M43 alone cannot activate the Darlington relationship.
 
 ## Machine enforcement
 
