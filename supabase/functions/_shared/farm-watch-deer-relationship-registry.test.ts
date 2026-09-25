@@ -121,6 +121,10 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
       'production_neutral_measurement',
   )
   assert(
+    FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['multiscale-forest-context'].status ===
+      'production_on_demand_neutral_measurement',
+  )
+  assert(
     FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['extreme-weather-event-context'].status ===
       'production_authoritative_event_gate',
   )
@@ -162,6 +166,18 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
   assert(roadMeasurement)
   assert(/10 m distance-to-nearest-road/i.test(roadMeasurement.permitted_use))
   assert(/30\/90\/270 m/i.test(roadMeasurement.permitted_use))
+
+  const forestReq = road.required_inputs.find((row) => row.key === 'forest_context')
+  assert(forestReq)
+  assert(JSON.stringify(forestReq.product_keys) === JSON.stringify(['multiscale-forest-context']))
+  const forestMeasurement = road.study_measurements.find(
+    (row) => row.id === 'FW-M35-forest-landscape-context',
+  )
+  assert(forestMeasurement)
+  assert(forestMeasurement.alignment === 'derived_equivalent')
+  assert(/10 m support/i.test(forestMeasurement.permitted_use))
+  assert(/30\/90\/270 m/i.test(forestMeasurement.permitted_use))
+  assert(/source.*substitution/i.test(forestMeasurement.limitations.join(' ')))
 
   const multiscale = getDeerRelationship('FW-R20-multiscale-cover-food-context')
   assert(multiscale)
