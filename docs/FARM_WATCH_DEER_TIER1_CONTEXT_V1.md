@@ -1,6 +1,6 @@
 # Farm Watch Deer Tier 1 Context v1
 
-Status: production candidate — 2026-09-25
+Status: production deployed and validated — 2026-09-25
 
 ## Scope
 
@@ -118,3 +118,23 @@ Those biological decisions remain in the relationship registry and downstream Ba
 The initial production collector targeted the Kentucky DGI-hosted ORNL/FEMA building layer. Supabase Edge timed out while fetching that ArcGIS service metadata. Existing Scout building-candidate tables were not substituted because their ingestion intentionally filters the national structures source for commercial-building discovery and therefore cannot represent the all-building count required by FW-M24.
 
 The collector was consequently moved to the registered current `fema-usa-structures-current` source (`FEMA USA Structures View`) and queries that source directly with `returnCountOnly=true`. No Scout commercial-building size/use filter is applied to the deer-science measurement.
+
+
+## Production validation — 2026-09-25
+
+The four Tier 1 measurements passed their production exit gates for `validation-property-01`.
+
+- **FW-M24:** FEMA USA Structures returned 68 buildings in the exact 10.36 km² analytical window, or 6.5637065637 buildings/km². The source was queried directly and unfiltered; Scout's commercial-building discovery filters were not reused.
+- **FW-M36:** the current Geofabrik OSM road snapshot is bound into `human-footprint-context-v1`. The property-centered nearest mapped canonical road is 909.9 m; the barrier-aware 1.5 km domain contains 4 road features / 4,439.9 m clipped road length and the broad 3 km domain contains 7 / 12,728.7 m. The local 500 m barrier-aware domain contains no canonical source-road feature. These are neutral geometry facts, not deer-response signs.
+- **FW-M39:** the persisted analytical windows measure exactly 1,000,000 m² and 9,000,000 m² in EPSG:32616, with 1,000 m and 3,000 m sides respectively.
+- **FW-M45:** the current authoritative NWS extreme-event context is `inactive`, with zero qualifying tropical/extreme-wind events. Ordinary severe thunderstorms/rain/wind cannot activate it.
+
+Production identities:
+
+- human-footprint context: `fa2bef863161e1819c1c41422da5dd57ed3402badeaf6790fb862f3efac49b6d`;
+- 1 km² study window: `7e05c65020b950a8565690af1c6a811f9f8ba8f46a2986b90ff435ec5f94c312`;
+- 9 km² study window: `5ff93b28e8f7aa42bb1ef03bd3351911a6f54aaebaf5c343051f07f854585210`.
+
+The human-footprint collector runs monthly, the extreme-event gate refreshes every 10 minutes, and the study-scale windows are deterministic/static until property geometry changes. No recurring user input is required.
+
+The relationship registry now marks FW-M24, FW-M36, FW-M39, and FW-M45 as `derived_equivalent`. This removes them from the blocked-measurement queue while leaving each downstream biological relationship subject to its other study measurements, biological-state gates, geography limits, and coefficient-transfer restrictions.

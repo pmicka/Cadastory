@@ -12,7 +12,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 Deno.test('every currently blocked deer study measurement has exactly one resolution decision', () => {
   assert(validateDeerMeasurementResolutionDecisions())
   const blocked = blockedDeerStudyMeasurements()
-  assert(blocked.length === 35, 'expected 35 blocked study measurements')
+  assert(blocked.length === 31, 'expected 31 blocked study measurements')
   assert(FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.length === blocked.length)
   const decisionIds = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS
     .map((row) => row.measurement_id)
@@ -28,9 +28,22 @@ Deno.test('measurement resolution portfolio preserves the three explicit disposi
     },
     { reproduce: 0, calibrated_proxy: 0, remain_unavailable: 0 },
   )
-  assert(counts.reproduce === 21)
+  assert(counts.reproduce === 17)
   assert(counts.calibrated_proxy === 8)
   assert(counts.remain_unavailable === 6)
+})
+
+Deno.test('production Tier 1 measurements leave the blocked resolution queue', () => {
+  const blocked = blockedDeerStudyMeasurements()
+  for (const id of [
+    'FW-M24-building-density',
+    'FW-M36-road-landscape-context',
+    'FW-M39-d16-study-scales',
+    'FW-M45-extreme-hurricane-event',
+  ]) {
+    assert(!blocked.some((row) => row.id === id), id)
+    assert(getDeerMeasurementResolutionDecision(id) === null, id)
+  }
 })
 
 Deno.test('completed Batch 5 mast annual state leaves the blocked resolution queue as a regional calibrated proxy', () => {
@@ -52,7 +65,7 @@ Deno.test('2026 operating posture parks individual-state and manual/non-core mea
       parked_2026_manual_or_noncore: 0,
     },
   )
-  assert(counts.active === 17)
+  assert(counts.active === 13)
   assert(counts.parked_2026_individual_state === 3)
   assert(counts.parked_2026_manual_or_noncore === 15)
 

@@ -19,9 +19,9 @@ A resolution decision is about **input measurement fidelity**, not biological tr
 
 ## Portfolio
 
-The current blocked set contains 35 required study measurements:
+The current blocked set contains 31 required study measurements:
 
-- **21 reproduce**
+- **17 reproduce**
 - **8 calibrated proxy**
 - **6 remain unavailable**
 
@@ -29,6 +29,10 @@ Resolved since this contract was created:
 
 - **FW-M02 — Wiemers vegetation height:** production-validated `study-aligned-vegetation-height-context-v2`; promoted to `derived_equivalent` on 2026-09-23.
 - **FW-M17 — annual mast fall / production:** Batch 5A + 5B now provide production mast capacity plus exact-year KDFWR statewide/regional mast state. The registry promotes FW-M17 from `unsupported` to `calibrated_proxy` **only at the authoritative regional-survey scope**. This does not establish property mast abundance, does not authorize prior-year carry-forward, and does not make the modeled capacity layer annual production.
+- **FW-M24 — building/development density:** production `human-footprint-context-v1` now supplies an all-building FEMA USA Structures count/density over the exact 10.36 km² Delisle landscape area; promoted to `derived_equivalent`.
+- **FW-M36 — road landscape context:** production `human-footprint-context-v1` preserves canonical paved/unpaved road geometry context, nearest-road distance, and the Stephens 30/90/270 m downstream focal-scale contract; promoted to `derived_equivalent` without assigning a road-response sign.
+- **FW-M39 — D16 study scales:** production `multiscale-cover-context-v1` supplies exact 1 km² and 9 km² analytical windows; promoted to `derived_equivalent`. North Dakota hunting-unit geometry remains untransferred.
+- **FW-M45 — extreme hurricane event:** production `extreme-weather-event-context-v1` supplies an authoritative NWS tropical/extreme-wind event gate and explicitly rejects ordinary weather; promoted to `derived_equivalent`.
 
 CI requires every currently blocked measurement to have one and only one disposition.
 
@@ -42,9 +46,9 @@ Machine posture values:
 - `parked_2026_individual_state` — scientifically preserved, but individual identity/state differentiation is not reliably captured this season;
 - `parked_2026_manual_or_noncore` — scientifically preserved, but the measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or a study-specific variable that is not operationally available.
 
-Current posture counts across the 35 blocked measurements:
+Current posture counts across the 31 blocked measurements:
 
-- **17 active**
+- **13 active**
 - **3 parked — individual state**
 - **15 parked — manual/non-core**
 
@@ -86,7 +90,6 @@ These remain scientifically explicit, but no 2026 implementation effort should b
 | FW-M15 | Hunsaker male age | Expand explicit biological state to preserve yearling, 2-year-old, and 3+ male categories | P0 | Never infer exact age from generic adult status |
 | FW-M19 | Current corn identity | Accept current-year field-bound identity from explicit observation or another validated/rights-permitted source | P0 | Stale CDL and regional crop progress cannot satisfy it |
 | FW-M20 | Corn stage / harvest | Represent explicit field-level tasseling/silking or harvested state; direct/accepted observation first | P0 | Raw HLS trajectory alone cannot promote crop stage |
-| FW-M24 | Building/development density | Derive from validated building-footprint geometry at study scale | P1 | Source completeness and vintage remain explicit |
 | FW-M25 | Dated stand hunt | Record actual stand-specific hunt sessions with start/end time | P0 | Hunting season or stand presence is not a hunt event |
 | FW-M28 | Daily hunter activity | Derive hunter use/intensity from known sessions and access activity | P0 | Off-property or unlogged activity remains unknown |
 | FW-M29 | Food opportunity in adult-male hunting study | Bind to explicit food-plot / managed-food feature geometry and current management state | P1 | Generic vegetation greenness is not the study resource |
@@ -94,10 +97,7 @@ These remain scientifically explicit, but no 2026 implementation effort should b
 | FW-M32 | Forage-rich risky areas | Bind to explicit mapped food plots / study-relevant cover types | P1 | Does not claim measured nutrient abundance |
 | FW-M33 | Low hunting pressure | Represent quantitative hunter effort density and compare with source context | P0 | Do not invent a universal low/high threshold |
 | FW-M35 | Forest landscape context | Derive forest availability/configuration at the source study scales | P1 | Current local 500 m edge product alone is insufficient |
-| FW-M36 | Road landscape context | Derive road geometry/proximity/density from validated transportation geometry | P1 | Neutral geometry receives no universal deer sign |
-| FW-M39 | D16 study scales | Reproduce fixed 1 km² and 9 km² source windows exactly | P2 | Source hunting-unit scale remains study-administrative context unless a comparable unit is justified |
 | FW-M43 | Intact deciduous forest | Derive forest type and intact/fragmented landscape state | P2 | Does not make the rest of FW-D17 available |
-| FW-M45 | Extreme hurricane event | Represent explicit authoritative tropical-cyclone/extreme-event footprint and timing | P2 | Must not activate for routine rain/wind |
 | FW-M47 | Forest refuge type | Derive pine/hardwood/swamp/marsh/shrub physical habitat classes | P2 | Covariate reproduction does not transfer the Florida effect |
 | FW-M48 | Usable water source | Represent current stock-pond/trough availability by managed-source inventory or dated observation | P1 | Hydrography/gauge context cannot prove usable source presence |
 | FW-M51 | Maternal age category | Preserve explicit fawn/yearling/adult maternal-age scenarios | P1 | Do not transfer Illinois conception dates |
@@ -169,18 +169,14 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 ### Active autonomous spatial/environmental work
 
 - **FW-M08 — snow depth / winter severity**
-- **FW-M24 — building/development density**
 - **FW-M29 / FW-M32 — explicit managed-food feature geometry**
 - **FW-M35 — multiscale forest context**
-- **FW-M36 — road landscape context**
-- **FW-M39 — exact D16 study scales**
 - **FW-M43 — intact deciduous forest**
-- **FW-M45 — explicit extreme-event state**
 - **FW-M47 — forest refuge type**
 - **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
 - **FW-M56 — agriculture along simulated potential dispersal paths**
 
-The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue.
+The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M24, FW-M36, FW-M39, and FW-M45 are no longer listed here because their production exit gates passed on 2026-09-25.
 
 The six `remain_unavailable` measurements continue to force abstention. Their inclusion in parked D means there is also no 2026 effort to find weak substitutes.
 
