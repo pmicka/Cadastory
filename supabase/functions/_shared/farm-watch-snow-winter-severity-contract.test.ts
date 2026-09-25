@@ -8,7 +8,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
   if (!condition) throw new Error(message)
 }
 
-function baseContext() {
+function baseContext(): any {
   return {
     schema: FARM_WATCH_SNOW_WINTER_SEVERITY_PRODUCT.outputSchemaVersion,
     method: FARM_WATCH_SNOW_WINTER_SEVERITY_PRODUCT.algorithmVersion,
