@@ -166,9 +166,9 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     evidence_states: ['available','known','proxy','unavailable'],
   },
   'forest-type-context': {
-    status: 'planned_measurement_alignment',
-    scales: ['local_500m','landscape_1500m'],
-    evidence_states: ['available','known','proxy','unavailable'],
+    status: 'production_neutral_measurement',
+    scales: ['property','local_500m','landscape_1500m','broad_3000m'],
+    evidence_states: ['available','proxy','stale','unavailable'],
   },
   'low-height-concealment-context': {
     status: 'planned_measurement_alignment',
@@ -1001,7 +1001,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     response_variable:'seasonal habitat selection',
     required_inputs:[
       req('human_footprint',['human-footprint-context'],['local_500m','landscape_1500m','broad_3000m'],['available','known','proxy'],'static_context_ok'),
-      req('resource_context',['field-phenology-context','browse-resource-context'],['field','local_500m','landscape_1500m'],['available','known','proxy']),
+      req('resource_context',['forest-type-context'],['local_500m','landscape_1500m','broad_3000m'],['available','proxy'],'static_context_ok'),
       req('predator_occurrence',['predator-occurrence-context'],['landscape_1500m','broad_3000m','regional'],['available','known','proxy']),
       req('biological_state',['deer-biological-state'],['individual_scenario']),
     ],
@@ -1019,7 +1019,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     limitations:['Boreal range-expansion context; linear features are not universally positive or negative.'],
     study_measurements:[
       measurement('FW-M42-human-footprint-composition','human_footprint','polygonal and linear industrial human footprint','Study compared polygonal industrial features and linear features such as roads, trails and seismic lines.','unsupported','required','No relationship activation until footprint subtypes are explicitly represented.'),
-      measurement('FW-M43-intact-deciduous-forest','resource_context','intact deciduous forest / natural habitat composition','Study cumulative-effects model included natural habitat composition, especially intact deciduous forest.','mechanism_context_only','required','Generic resource state does not yet reproduce the study natural-habitat covariates.'),
+      measurement('FW-M43-intact-deciduous-forest','resource_context','deciduous / natural overstorey composition context','Study natural covariates came from Alberta Vegetation Inventory percent crown closure of dominant overstorey species; intact deciduous forest was landscape context rather than a generic fragmentation score.','calibrated_proxy','required','Farm Watch uses aggregate 30 m LANDFIRE EVT Tree+Hardwood physiognomy and matching EVC tree cover as a Kentucky deciduous-composition proxy. This is not the original AVI species-specific crown-closure measurement and must not be interpreted pixel-by-pixel.',['No biological intactness, fragmentation, old-growth, or undisturbed-forest score is inferred.','FW-R21 remains blocked by FW-M42 industrial human-footprint composition and FW-M44 camera-derived wolf occurrence.']),
       measurement('FW-M44-wolf-occurrence','predator_occurrence','camera-derived wolf occurrence','Top seasonal models included modeled wolf occurrence as predation-risk context.','unsupported','required','Omitting predator occurrence changes the published cumulative-effects model; no activation until represented.'),
     ],
   }),
