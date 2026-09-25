@@ -109,7 +109,7 @@ Current neutral products that may feed future science-backed deer terms:
 Important **active** gaps are now restricted to measurements that fit the intended low-maintenance operating model:
 
 - calibrated woody-canopy and low-height concealment measurements where one-time/static calibration is defensible;
-- snow/winter-severity, multiscale forest composition, forest refuge classes, and potential-path agriculture; road context, building density, exact 1/9 km² analytical scales, and the explicit extreme-event gate are now production-validated;
+- snow/winter-severity, forest refuge classes, and potential-path agriculture; road context, building density, multiscale forest context, exact 1/9 km² analytical scales, and the explicit extreme-event gate are now production-validated;
 - stand-vulnerability and managed food/water feature context only where bounded one-time/static configuration is practical;
 - parcel-scale usable water persistence / ephemeral water state, with Batch 7 still pending production deployment.
 
@@ -394,7 +394,7 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **context-conditional + negative-constraint.**
 
-**Farm Watch mapping:** terrain form, forest/canopy context, roads, movement state, multiscale landscape context. FW-M36 is now supported by a neutral on-demand `road-focal-context-v1` evaluator that reproduces a 10 m distance-to-nearest-road grid and mean 30/90/270 m focal extraction while recording the OSM-for-TIGER road-source substitution. This closes the physical road-measurement path only; it does not transfer a road-response sign.
+**Farm Watch mapping:** terrain form, forest/canopy context, roads, movement state, multiscale landscape context. FW-M35 now has a dedicated neutral `multiscale-forest-context-v1`: 10 m tree-class forest proportion plus built-excluded internal forest-edge density at the study 30/90/270 m focal radii. Farm Watch uses the open annual Sentinel-2 10 m LULC time series as a documented classifier/time-composite substitution for the study Dynamic World 2015–2019 dominant composite. No forest-selection direction, Missouri landscape identity, or coefficient transfers. FW-M36 is now supported by a neutral on-demand `road-focal-context-v1` evaluator that reproduces a 10 m distance-to-nearest-road grid and mean 30/90/270 m focal extraction while recording the OSM-for-TIGER road-source substitution. This closes the physical road-measurement path only; it does not transfer a road-response sign.
 
 **Blocked rule:** No universal “ridges are travel corridors,” “draws are travel corridors,” or fixed ridge/valley bonus. Terrain must interact with landscape context and movement state.
 

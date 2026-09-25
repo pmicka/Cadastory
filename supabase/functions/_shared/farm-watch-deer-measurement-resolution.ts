@@ -299,16 +299,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     ['Store hunter-hours or hunter-events per area/time', 'Do not promote a Kentucky low/high threshold without separate transfer review'],
   ),
   decision(
-    'FW-M35-forest-landscape-context',
-    'reproduce',
-    'multiscale-forest-context',
-    'P1',
-    true,
-    'Forest availability/configuration is a mapped land-cover geometry and can be derived at the same spatial scales used by the dispersal study.',
-    'Build source-scale forest proportion/configuration rather than using only the current local-500 m edge product.',
-    ['Verify forest mask against authoritative land cover and imagery'],
-  ),
-  decision(
     'FW-M40-d16-escape-cover-types',
     'remain_unavailable',
     null,

@@ -19,9 +19,9 @@ A resolution decision is about **input measurement fidelity**, not biological tr
 
 ## Portfolio
 
-The current blocked set contains 31 required study measurements:
+The current blocked set contains 30 required study measurements:
 
-- **17 reproduce**
+- **16 reproduce**
 - **8 calibrated proxy**
 - **6 remain unavailable**
 
@@ -33,6 +33,7 @@ Resolved since this contract was created:
 - **FW-M36 — road landscape context:** production `human-footprint-context-v1` preserves canonical road geometry and `road-focal-context-v1` now supplies an on-demand 10 m distance-to-nearest-road grid with mean 30/90/270 m focal extraction. This closes the physical measurement path while recording the OSM-for-TIGER source substitution; the measurement remains `derived_equivalent` and assigns no road-response sign.
 - **FW-M39 — D16 study scales:** production `multiscale-cover-context-v1` supplies exact 1 km² and 9 km² analytical windows; promoted to `derived_equivalent`. North Dakota hunting-unit geometry remains untransferred.
 - **FW-M45 — extreme hurricane event:** production `extreme-weather-event-context-v1` supplies an authoritative NWS tropical/extreme-wind event + footprint + time gate. The v2 source-health contract returns `not_applicable` only after a fresh successful jurisdiction poll, and fails closed on stale/failed polling or unresolved qualifying alert geometry; ordinary weather remains excluded. The measurement remains `derived_equivalent`.
+- **FW-M35 — multiscale forest landscape context:** `multiscale-forest-context-v1` reproduces 10 m tree-class forest proportion and built-excluded internal forest-edge density at 30/90/270 m. The open Sentinel-2 annual LULC classifier is a documented substitution for the study Dynamic World 2015–2019 composite; no forest-response sign or Stephens coefficient transfers.
 
 CI requires every currently blocked measurement to have one and only one disposition.
 
@@ -46,9 +47,9 @@ Machine posture values:
 - `parked_2026_individual_state` — scientifically preserved, but individual identity/state differentiation is not reliably captured this season;
 - `parked_2026_manual_or_noncore` — scientifically preserved, but the measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or a study-specific variable that is not operationally available.
 
-Current posture counts across the 31 blocked measurements:
+Current posture counts across the 30 blocked measurements:
 
-- **13 active**
+- **12 active**
 - **3 parked — individual state**
 - **15 parked — manual/non-core**
 
@@ -96,7 +97,6 @@ These remain scientifically explicit, but no 2026 implementation effort should b
 | FW-M31 | Frequent hunting risk | Derive event frequency / hunter-hours over explicit windows | P0 | Stand presence does not imply hunting frequency |
 | FW-M32 | Forage-rich risky areas | Bind to explicit mapped food plots / study-relevant cover types | P1 | Does not claim measured nutrient abundance |
 | FW-M33 | Low hunting pressure | Represent quantitative hunter effort density and compare with source context | P0 | Do not invent a universal low/high threshold |
-| FW-M35 | Forest landscape context | Derive forest availability/configuration at the source study scales | P1 | Current local 500 m edge product alone is insufficient |
 | FW-M43 | Intact deciduous forest | Derive forest type and intact/fragmented landscape state | P2 | Does not make the rest of FW-D17 available |
 | FW-M47 | Forest refuge type | Derive pine/hardwood/swamp/marsh/shrub physical habitat classes | P2 | Covariate reproduction does not transfer the Florida effect |
 | FW-M48 | Usable water source | Represent current stock-pond/trough availability by managed-source inventory or dated observation | P1 | Hydrography/gauge context cannot prove usable source presence |
@@ -170,13 +170,12 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 
 - **FW-M08 — snow depth / winter severity**
 - **FW-M29 / FW-M32 — explicit managed-food feature geometry**
-- **FW-M35 — multiscale forest context**
 - **FW-M43 — intact deciduous forest**
 - **FW-M47 — forest refuge type**
 - **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
 - **FW-M56 — agriculture along simulated potential dispersal paths**
 
-The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M24, FW-M36, FW-M39, and FW-M45 are no longer listed here because their production exit gates passed on 2026-09-25.
+The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M24, FW-M35, FW-M36, FW-M39, and FW-M45 are no longer listed here because their production exit gates passed on 2026-09-25.
 
 The six `remain_unavailable` measurements continue to force abstention. Their inclusion in parked D means there is also no 2026 effort to find weak substitutes.
 

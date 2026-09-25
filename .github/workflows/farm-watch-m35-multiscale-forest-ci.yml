@@ -1,0 +1,54 @@
+name: Farm Watch M35 multiscale forest CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-multiscale-forest-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-multiscale-forest-contract.test.ts'
+      - 'supabase/functions/farm-watch-multiscale-forest-context/index.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
+      - 'supabase/migrations/20260925185000_add_farm_watch_m35_multiscale_forest_context_v1.sql'
+      - 'docs/FARM_WATCH_MULTISCALE_FOREST_CONTEXT_V1.md'
+      - '.github/workflows/farm-watch-m35-multiscale-forest-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/_shared/farm-watch-multiscale-forest-contract.ts'
+      - 'supabase/functions/farm-watch-multiscale-forest-context/index.ts'
+      - 'supabase/migrations/20260925185000_add_farm_watch_m35_multiscale_forest_context_v1.sql'
+      - '.github/workflows/farm-watch-m35-multiscale-forest-ci.yml'
+
+jobs:
+  m35-multiscale-forest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check M35 contract
+        run: deno check supabase/functions/_shared/farm-watch-multiscale-forest-contract.ts
+      - name: Test M35 contract
+        run: deno test supabase/functions/_shared/farm-watch-multiscale-forest-contract.test.ts
+      - name: Check M35 worker
+        run: deno check supabase/functions/farm-watch-multiscale-forest-context/index.ts
+      - name: Check M35 science boundaries
+        run: |
+          set -euo pipefail
+          contract='supabase/functions/_shared/farm-watch-multiscale-forest-contract.ts'
+          worker='supabase/functions/farm-watch-multiscale-forest-context/index.ts'
+          migration='supabase/migrations/20260925185000_add_farm_watch_m35_multiscale_forest_context_v1.sql'
+          grep -q "sourceResolutionM: 10" "$contract"
+          grep -q "focalRadiiM: Object.freeze(\[30, 90, 270\]" "$contract"
+          grep -q "forestClassValue: 2" "$contract"
+          grep -q "builtClassValue: 7" "$contract"
+          grep -q "count_boundary default false" "$worker"
+          grep -q "Built Area and cloud/no-data removed; focal-window boundary not counted" "$worker"
+          grep -q "deer_inference_performed: false" "$worker"
+          grep -q "coefficient_transfer_performed: false" "$worker"
+          grep -q "CC BY 4.0" "$migration"
+          grep -q "allowed_with_attribution" "$migration"
+          grep -q "multiscale_forest_context" "$migration"
