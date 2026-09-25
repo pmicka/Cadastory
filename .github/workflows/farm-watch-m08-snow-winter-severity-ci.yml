@@ -1,0 +1,64 @@
+name: Farm Watch M08 snow winter severity CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-snow-winter-severity-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-snow-winter-severity-contract.test.ts'
+      - 'supabase/functions/farm-watch-snow-winter-severity/index.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
+      - 'supabase/migrations/20260925234318_add_farm_watch_m08_snow_winter_severity_v1.sql'
+      - 'docs/FARM_WATCH_SNOW_WINTER_SEVERITY_CONTEXT_V1.md'
+      - 'docs/FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
+      - '.github/workflows/farm-watch-m08-snow-winter-severity-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/_shared/farm-watch-snow-winter-severity-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-snow-winter-severity-contract.test.ts'
+      - 'supabase/functions/farm-watch-snow-winter-severity/index.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
+      - 'supabase/migrations/20260925234318_add_farm_watch_m08_snow_winter_severity_v1.sql'
+      - 'docs/FARM_WATCH_SNOW_WINTER_SEVERITY_CONTEXT_V1.md'
+      - '.github/workflows/farm-watch-m08-snow-winter-severity-ci.yml'
+
+jobs:
+  m08-snow-winter-severity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check M08 contract
+        run: deno check supabase/functions/_shared/farm-watch-snow-winter-severity-contract.ts
+      - name: Test M08 contract
+        run: deno test supabase/functions/_shared/farm-watch-snow-winter-severity-contract.test.ts
+      - name: Check M08 worker
+        run: deno check supabase/functions/farm-watch-snow-winter-severity/index.ts
+      - name: Test deer measurement resolution
+        run: deno test supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts
+      - name: Test deer relationship registry
+        run: deno test --allow-read supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts
+      - name: Check M08 science boundaries
+        run: |
+          set -euo pipefail
+          contract='supabase/functions/_shared/farm-watch-snow-winter-severity-contract.ts'
+          worker='supabase/functions/farm-watch-snow-winter-severity/index.ts'
+          migration='supabase/migrations/20260925234318_add_farm_watch_m08_snow_winter_severity_v1.sql'
+          grep -q "snowThresholdCm: 38" "$contract"
+          grep -q "minimumTemperatureThresholdC: -17.7" "$contract"
+          grep -q "minimumTemperatureCoverageRatio: 0.75" "$contract"
+          grep -q "NOHRSC_Snow_Analysis" "$worker"
+          grep -q "farm_watch_validate_materialization_worker_v1_internal" "$worker"
+          grep -q "severity_category_assigned" "$migration"
+          grep -q "deer_inference_performed" "$migration"
+          grep -q "coefficient_transfer_performed" "$migration"
+          grep -q "noaa-nohrsc-national-snow-analysis" "$migration"
