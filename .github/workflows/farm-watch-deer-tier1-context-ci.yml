@@ -9,6 +9,7 @@ on:
       - 'supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
       - 'supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
       - 'supabase/migrations/20260925162500_finalize_farm_watch_m36_road_focal_context_v1.sql'
+      - 'supabase/migrations/20260925163500_finalize_farm_watch_m24_building_vintage_completeness_v1.sql'
       - 'docs/FARM_WATCH_DEER_TIER1_CONTEXT_V1.md'
       - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
   push:
@@ -20,6 +21,7 @@ on:
       - 'supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
       - 'supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
       - 'supabase/migrations/20260925162500_finalize_farm_watch_m36_road_focal_context_v1.sql'
+      - 'supabase/migrations/20260925163500_finalize_farm_watch_m24_building_vintage_completeness_v1.sql'
       - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
 
 jobs:
@@ -64,3 +66,14 @@ jobs:
           grep -q "study_focal_radii_m',jsonb_build_array(30,90,270)" "$file"
           grep -q "coefficient_transfer_performed',false" "$file"
           grep -q "deer_inference_performed',false" "$file"
+
+      - name: Check M24 source-vintage completeness contract
+        run: |
+          set -euo pipefail
+          file='supabase/migrations/20260925163500_finalize_farm_watch_m24_building_vintage_completeness_v1.sql'
+          grep -q "fema-usastructures-osm-human-footprint-v2" "$file"
+          grep -q "known_minimum_structure_area_sqft.*450" "$file"
+          grep -q "spatial_completeness_status.*not_quantified_by_source" "$file"
+          grep -q "building_source_profile_sha256" "$file"
+          grep -q "local_feature_vintage" supabase/functions/collect-farm-watch-human-footprint/index.ts
+          grep -q "outStatistics" supabase/functions/collect-farm-watch-human-footprint/index.ts
