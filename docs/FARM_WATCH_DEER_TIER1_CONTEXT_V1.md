@@ -1,6 +1,6 @@
 # Farm Watch Deer Tier 1 Context v1
 
-Status: implementation candidate — 2026-09-25
+Status: production candidate — 2026-09-25
 
 ## Scope
 
@@ -19,7 +19,7 @@ Product:
 
 - key: `human-footprint-context`
 - schema: `human-footprint-context-v1`
-- algorithm: `ky-ornl-osm-human-footprint-context-v1`
+- algorithm: `fema-usastructures-osm-human-footprint-v1`
 
 ### FW-M24 building density
 
@@ -28,11 +28,11 @@ Delisle et al. (2024) sampled deer activity in fixed 10.36 km² landscapes and c
 Farm Watch therefore uses:
 
 - an exact 10.36 km² property-centered square analytical window;
-- the Kentucky ORNL / FEMA USA Structures polygon layer;
+- the current FEMA USA Structures View polygon layer;
 - building count;
 - building density expressed as count / 10.36 km².
 
-The property-centered window reproduces the study area size but not the original Indiana landscape placement. The result is therefore a source-aligned derived measurement, not the original study sample.
+The property-centered window reproduces the study area size but not the original Indiana landscape placement or Microsoft building-footprint source. The current FEMA USA Structures View is used as an authoritative/open current building geometry source. The result is therefore a source-aligned derived measurement, not a recreation of the original study sample.
 
 ### FW-M36 road context
 
@@ -93,7 +93,7 @@ The validation property context refreshes every 10 minutes from the existing can
 
 ## Automation
 
-- building/development context: external authoritative source check on the first day of each month;
+- building/development context: direct unfiltered FEMA USA Structures count over the exact 10.36 km² analytical window on the first day of each month;
 - roads: reused from the centrally maintained OSM access snapshot;
 - 1/9 km² analytical windows: deterministic/static until property geometry changes;
 - extreme-event gate: refreshed every 10 minutes from canonical NWS alerts.
@@ -111,3 +111,10 @@ These products do not claim:
 - any published coefficient transfers to Kentucky.
 
 Those biological decisions remain in the relationship registry and downstream Batch 10+ modules.
+
+
+## Source-transport refinement — 2026-09-25
+
+The initial production collector targeted the Kentucky DGI-hosted ORNL/FEMA building layer. Supabase Edge timed out while fetching that ArcGIS service metadata. Existing Scout building-candidate tables were not substituted because their ingestion intentionally filters the national structures source for commercial-building discovery and therefore cannot represent the all-building count required by FW-M24.
+
+The collector was consequently moved to the registered current `fema-usa-structures-current` source (`FEMA USA Structures View`) and queries that source directly with `returnCountOnly=true`. No Scout commercial-building size/use filter is applied to the deer-science measurement.

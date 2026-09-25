@@ -3,7 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.57.4'
 import { withCollectorRun } from '../_shared/collector-runtime.ts'
 
 const LAYER_URL =
-  'https://kygisserver.ky.gov/arcgis/rest/services/WGS84WM_Services/Ky_ORNL_Building_Footprints_WGS84WM/MapServer/0'
+  'https://services2.arcgis.com/FiaPA4ga0iQKduv3/arcgis/rest/services/USA_Structures_View/FeatureServer/0'
 
 function serviceKey(): string {
   try {
@@ -68,12 +68,12 @@ Deno.serve(withCollectorRun('collect-farm-watch-human-footprint', async (req) =>
       signal: AbortSignal.timeout(20_000),
     })
     if (!metadataResponse.ok) {
-      throw new Error('Kentucky building metadata returned ' + metadataResponse.status)
+      throw new Error('FEMA USA Structures metadata returned ' + metadataResponse.status)
     }
     const metadataText = await metadataResponse.text()
     const metadata = JSON.parse(metadataText)
     if (metadata?.type !== 'Feature Layer' || metadata?.geometryType !== 'esriGeometryPolygon') {
-      throw new Error('Kentucky building source metadata is not the expected polygon feature layer')
+      throw new Error('FEMA USA Structures source metadata is not the expected polygon feature layer')
     }
     const metadataSha256 = await sha256Hex(metadataText)
 
@@ -95,13 +95,13 @@ Deno.serve(withCollectorRun('collect-farm-watch-human-footprint', async (req) =>
       signal: AbortSignal.timeout(30_000),
     })
     if (!countResponse.ok) {
-      throw new Error('Kentucky building count query returned ' + countResponse.status)
+      throw new Error('FEMA USA Structures count query returned ' + countResponse.status)
     }
     const countPayload = await countResponse.json()
     const buildingCount = Number(countPayload?.count)
     if (!Number.isInteger(buildingCount) || buildingCount < 0) {
       throw new Error(
-        'Kentucky building count query did not return a valid count: ' +
+        'FEMA USA Structures count query did not return a valid count: ' +
           JSON.stringify(countPayload).slice(0, 300),
       )
     }
