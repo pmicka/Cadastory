@@ -327,16 +327,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     'Retain the source as a negative constraint against universal road avoidance/selection. Do not activate the positive cumulative-effects relationship for Flat Creek by substituting generic development.',
   ),
   decision(
-    'FW-M43-intact-deciduous-forest',
-    'reproduce',
-    'forest-type-context',
-    'P2',
-    true,
-    'Intact deciduous forest composition is a mapped habitat/fragmentation variable that can be derived from land-cover/forest-type data and landscape geometry.',
-    'Keep this neutral and source-scale; it does not rescue the FW-D17 relationship if human-footprint composition or predator occurrence remains unavailable.',
-    ['Validate deciduous/intact classification against imagery and fragmentation geometry'],
-  ),
-  decision(
     'FW-M44-wolf-occurrence',
     'remain_unavailable',
     null,
