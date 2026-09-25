@@ -27,9 +27,10 @@ export const FARM_WATCH_DEER_TIER1_CONTEXT_PRODUCT = Object.freeze({
   }),
   extremeWeather: Object.freeze({
     key: 'extreme-weather-event-context',
-    algorithmVersion: 'nws-tropical-extreme-event-gate-v1',
+    algorithmVersion: 'nws-tropical-extreme-event-gate-v2',
     outputSchemaVersion: 'extreme-weather-event-context-v1',
     source: 'NOAA National Weather Service Alerts API',
+    maximumAcceptedPollAgeSeconds: 1800,
     qualifyingEventTypes: Object.freeze([
       'Hurricane Warning',
       'Hurricane Watch',
@@ -136,14 +137,30 @@ export function validateFarmWatchExtremeWeatherEventContext(value: any) {
     value?.evidence_class !== 'authoritative_event_context' ||
     typeof value?.event_active !== 'boolean' ||
     value?.ordinary_weather_activation_allowed !== false ||
-    value?.deer_inference_performed !== false
+    value?.deer_inference_performed !== false ||
+    value?.coefficient_transfer_performed !== false ||
+    value?.source_health?.status !== 'healthy' ||
+    Number(value?.source_health?.http_status) !== 200 ||
+    Number(value?.source_health?.poll_age_seconds) >
+      p.maximumAcceptedPollAgeSeconds ||
+    Number(value?.source_health?.unresolved_qualifying_event_count) !== 0
   ) return false
 
   if (value.event_active) {
-    if (!Array.isArray(value.events) || value.events.length < 1) return false
+    if (
+      value?.applicability_state !== 'active_extreme_event' ||
+      !Array.isArray(value.events) ||
+      value.events.length < 1
+    ) return false
     return value.events.every((row: any) =>
+      row?.status === 'Actual' &&
       p.qualifyingEventTypes.includes(String(row.event_type) as any)
     )
   }
-  return Array.isArray(value.events) && value.events.length === 0
+
+  return (
+    value?.applicability_state === 'not_applicable' &&
+    Array.isArray(value.events) &&
+    value.events.length === 0
+  )
 }
