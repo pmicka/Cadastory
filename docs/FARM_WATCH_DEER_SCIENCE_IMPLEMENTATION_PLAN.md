@@ -1224,4 +1224,17 @@ A workstation fallback was validated using the official Forest Service Raster Da
 
 The implementation now includes a source-controlled Debian crop/manifest helper and a draft-release handoff into the existing GitHub OIDC materializer. The draft release is ephemeral transport for bounded official source crops only; it is not a national source cache and should be deleted after successful materialization.
 
-Batch 5A is therefore **transport workaround validated / full 28-species production materialization pending**. Complete the bounded source bundle, run production materialization, validate the resulting artifact, and only then close Batch 5A. Do not begin Batch 5B as part of this transport repair.
+Batch 5A production validation completed on 2026-09-25. All 28 required species crops were validated and bundled on the operator workstation, the bounded bundle was transferred through the owner-only GitHub workflow, and the protected Supabase worker completed the canonical `mast-capacity-v1` materialization for `validation-property-01`.
+
+Production identifiers:
+
+- materialization ID: `4815b4fb-20c6-4f46-bb3c-1dc145bb31d5`;
+- artifact SHA-256: `7b20a6b46673ebee42df42ce090dafcbcf8c151bcc72911421dc8967496f3834`;
+- landscape-domain identity: `bd69c24e98c485a9320c07db036548c4b065a2c381e77f2ab5cd73fc73e9ae5f`;
+- sampled species count: 28;
+- transport provenance: `operator_workstation_usfs_raster_gateway_bounded_crop`;
+- raw national source persistence: false.
+
+The final production handoff also verified two operational controls: draft-release assets are downloaded by resolved asset ID, and `workflow_dispatch` OIDC trust is authorized only for the mast-capacity workflow while the remaining trusted Farm Watch workflows retain their existing `issues`-only event gate.
+
+Batch 5A is therefore **complete for the validation property**. Batch 5B may proceed independently as annual/regional mast-state evidence and must not collapse into or overwrite the modeled species-capacity semantics established here.
