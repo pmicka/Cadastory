@@ -109,7 +109,7 @@ Current neutral products that may feed future science-backed deer terms:
 Important **active** gaps are now restricted to measurements that fit the intended low-maintenance operating model:
 
 - calibrated woody-canopy and low-height concealment measurements where one-time/static calibration is defensible;
-- snow/winter-severity, forest refuge classes, and potential-path agriculture; road context, building density, multiscale forest context, exact 1/9 km² analytical scales, and the explicit extreme-event gate are now production-validated;
+- snow/winter-severity and potential-path agriculture remain active; road context, building density, multiscale forest context, exact 1/9 km² analytical scales, the explicit extreme-event gate, and the M47 six-class habitat-distance context are now production-validated;
 - stand-vulnerability and managed food/water feature context only where bounded one-time/static configuration is practical;
 - parcel-scale usable water persistence / ephemeral water state, with Batch 7 still pending production deployment.
 
@@ -476,9 +476,13 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Farm Watch mapping:** explicit extreme-event state + relative elevation + forest/habitat type + flood/wetland context. FW-M45 is production-validated as an authoritative NWS event+footprint+time gate. A fresh successful jurisdiction poll with no qualifying property-intersecting event is `not_applicable`; source failure/staleness or unresolved qualifying alert geometry is unavailable rather than treated as an ordinary inactive state.
 
-**Measurement-fidelity note:** The Irma response combined higher elevation with increased selection of pine/hardwood refuge types and avoidance of marsh/shrub habitat; elevation alone is insufficient.
+**Recovered M47 measurement — 2026-09-25:** The habitat term was not a single forest/refuge category. Abernathy et al. used Florida Natural Areas Inventory Cooperative Land Cover v3.2 at 10 m, reclassified land cover, retained six classes in the analysis — pine forest, hardwood swamp, marsh, prairie, shrub, and hardwood hammock — and calculated continuous Euclidean distance to each class from each raster cell. Elevation and the six distance covariates were extracted at used and available locations; model variables were scaled and centered.
 
-**Boundary:** Must never become an ordinary rain/wind movement term.
+**Farm Watch M47 production mapping — 2026-09-25:** `forest-type-context-v1` reproduces that six-distance variable family with an explicit national source substitution. Annual NLCD supplies Evergreen Forest (42) → pine-forest analogue, Grassland/Herbaceous (71) → prairie analogue, Shrub/Scrub (52) → shrub, and Deciduous Forest (41) → hardwood-hammock/upland-hardwood analogue. USFWS NWI supplies PFO1* → hardwood-swamp analogue and PEM* → marsh. The output is `evidence_state: proxy` because these national classes are not literal FNAI Florida communities. No Florida selection coefficient, deer refuge score, or storm-response sign is encoded in the neutral product.
+
+**Measurement-fidelity note:** The Irma response combined higher elevation with habitat-distance context. Elevation alone is insufficient. Likewise, generic forest proportion, total canopy cover, a Trees class, or wetland presence alone does not reproduce M47.
+
+**Boundary:** Must never become an ordinary rain/wind movement term. The production M47 input removes the habitat-measurement blocker, but FW-D18 still requires the explicit qualifying extreme-event state and preserves `coefficient-transfer-not-supported`.
 
 ---
 
@@ -724,7 +728,7 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 | Roads/trails/human footprint | context dependent | Tier 1 road/building neutral context production-validated | retain neutral geometry/context; never assign a standalone road/building deer sign |
 | Water | limited/context-specific | neutral surface-water state implemented, pending production deployment | preserve mapped persistence vs current observed presence; retain drought/precip/gauge/soil proxies and do not infer generic deer water preference |
 | Snow/winter severity | strong northern evidence | active autonomous target | add authoritative snow depth/severity context only when climatically relevant |
-| Extreme storm/flood | direct event evidence | explicit Tier 1 tropical/extreme-wind event gate production-validated; refuge-type input still unresolved | ordinary weather remains excluded; finish forest/refuge context before FW-D18 can activate |
+| Extreme storm/flood | direct event evidence | explicit Tier 1 tropical/extreme-wind event gate + M47 six-class habitat-distance context production-validated | ordinary weather remains excluded; retain explicit event gating and no Florida coefficient transfer |
 | Moon phase | negative evidence | computable but should not be used | none; keep blocked |
 | Barometric pressure | insufficient general evidence | current forcing absent | do not prioritize until relationship evidence improves |
 
