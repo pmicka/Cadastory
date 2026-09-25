@@ -109,7 +109,7 @@ Current neutral products that may feed future science-backed deer terms:
 Important **active** gaps are now restricted to measurements that fit the intended low-maintenance operating model:
 
 - calibrated woody-canopy and low-height concealment measurements where one-time/static calibration is defensible;
-- snow/winter-severity, forest/road/multiscale landscape context, building density, forest refuge classes, extreme-event state, and potential-path agriculture;
+- snow/winter-severity, multiscale forest composition, forest refuge classes, and potential-path agriculture; road context, building density, exact 1/9 km² analytical scales, and the explicit extreme-event gate are now production-validated;
 - stand-vulnerability and managed food/water feature context only where bounded one-time/static configuration is practical;
 - parcel-scale usable water persistence / ephemeral water state, with Batch 7 still pending production deployment.
 
@@ -719,10 +719,10 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 | Crop resource state | strong | neutral HLS/seasonal substrate available, deer relationship input parked for 2026 | current field crop identity/stage/harvest remains scientifically required but is not an active engineering target this season |
 | Woody browse | meaningful winter evidence | unavailable for the cited relationship | parked; do not substitute LiDAR/greenness for palatable twig density |
 | Hunting pressure | strong conditional evidence | scientifically unresolved and parked for 2026 | no repeated hunt/activity logging requirement; module must abstain when pressure is unknown |
-| Roads/trails/human footprint | context dependent | geometry ready | combine with actual resource/risk state; never standalone sign |
+| Roads/trails/human footprint | context dependent | Tier 1 road/building neutral context production-validated | retain neutral geometry/context; never assign a standalone road/building deer sign |
 | Water | limited/context-specific | neutral surface-water state implemented, pending production deployment | preserve mapped persistence vs current observed presence; retain drought/precip/gauge/soil proxies and do not infer generic deer water preference |
 | Snow/winter severity | strong northern evidence | active autonomous target | add authoritative snow depth/severity context only when climatically relevant |
-| Extreme storm/flood | direct event evidence | partial | event-specific hazard/flood state |
+| Extreme storm/flood | direct event evidence | explicit Tier 1 tropical/extreme-wind event gate production-validated; refuge-type input still unresolved | ordinary weather remains excluded; finish forest/refuge context before FW-D18 can activate |
 | Moon phase | negative evidence | computable but should not be used | none; keep blocked |
 | Barometric pressure | insufficient general evidence | current forcing absent | do not prioritize until relationship evidence improves |
 
