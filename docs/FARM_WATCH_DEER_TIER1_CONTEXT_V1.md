@@ -40,14 +40,20 @@ Stephens et al. (2024) represented roads from paved and unpaved road geometry, c
 
 Farm Watch uses the current local OpenStreetMap Geofabrik access snapshot and includes only canonical `feature_class=road` features. Driveways, service roads, parking aisles, and sidewalks are excluded from the source-aligned road class.
 
-The v1 context stores:
+The base human-footprint context stores:
 
 - property-center distance to the nearest mapped road;
 - clipped road length and road-feature count inside the existing barrier-aware 500 m, 1.5 km, and 3 km Farm Watch domains;
-- source snapshot timestamp;
-- the source study's 30/90/270 m focal radii as an explicit downstream contract.
+- source snapshot timestamp.
 
-No positive or negative deer response to roads is assigned. A future step-selection implementation must still calculate the study-style local/focal road covariate at the evaluated location.
+FW-M36 is now additionally backed by the on-demand `road-focal-context-v1` evaluator. For any bounded evaluation point it reproduces the source transformation:
+
+- 10 m distance-to-nearest-road grid;
+- mean cell values within 30 m, 90 m, and 270 m circular focal radii;
+- deterministic UTM grid alignment and explicit cell counts;
+- current canonical OSM road geometry with the TIGER-to-OSM source substitution recorded.
+
+No positive or negative deer response to roads is assigned. A later step-selection module can call this same evaluator at observed/available step endpoints rather than implementing a new road measurement.
 
 ## Multiscale Cover Context v1
 
@@ -125,7 +131,7 @@ The collector was consequently moved to the registered current `fema-usa-structu
 The four Tier 1 measurements passed their production exit gates for `validation-property-01`.
 
 - **FW-M24:** FEMA USA Structures returned 68 buildings in the exact 10.36 km² analytical window, or 6.5637065637 buildings/km². The source was queried directly and unfiltered; Scout's commercial-building discovery filters were not reused.
-- **FW-M36:** the current Geofabrik OSM road snapshot is bound into `human-footprint-context-v1`. The property-centered nearest mapped canonical road is 909.9 m; the barrier-aware 1.5 km domain contains 4 road features / 4,439.9 m clipped road length and the broad 3 km domain contains 7 / 12,728.7 m. The local 500 m barrier-aware domain contains no canonical source-road feature. These are neutral geometry facts, not deer-response signs.
+- **FW-M36:** the current Geofabrik OSM road snapshot is bound into `human-footprint-context-v1`, and `road-focal-context-v1` now reproduces the Stephens physical transformation on demand. At the validation-property center the nearest canonical road is 909.935 m; the 10 m grid yields mean distance-to-road values of 910.504 m at 30 m (26 cells), 909.985 m at 90 m (254 cells), and 917.631 m at 270 m (2,284 cells). These are neutral geometry facts, not deer-response signs.
 - **FW-M39:** the persisted analytical windows measure exactly 1,000,000 m² and 9,000,000 m² in EPSG:32616, with 1,000 m and 3,000 m sides respectively.
 - **FW-M45:** the current authoritative NWS extreme-event context is `inactive`, with zero qualifying tropical/extreme-wind events. Ordinary severe thunderstorms/rain/wind cannot activate it.
 
