@@ -122,8 +122,8 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
   )
 
   const expected = new Map([
-    ['FW-M24-building-density', 'FW-R13-winter-food-activity-interaction'],
-    ['FW-M36-road-landscape-context', 'FW-R18-terrain-landscape-context'],
+    ['FW-M24-building-density', 'FW-R13-winter-food-configuration-activity'],
+    ['FW-M36-road-landscape-context', 'FW-R18-terrain-movement-context'],
     ['FW-M39-d16-study-scales', 'FW-R20-multiscale-cover-food-context'],
     ['FW-M45-extreme-hurricane-event', 'FW-R22-extreme-storm-refuge'],
   ])
