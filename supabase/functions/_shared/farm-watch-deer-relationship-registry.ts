@@ -1001,7 +1001,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     response_variable:'seasonal habitat selection',
     required_inputs:[
       req('human_footprint',['human-footprint-context'],['local_500m','landscape_1500m','broad_3000m'],['available','known','proxy'],'static_context_ok'),
-      req('resource_context',['field-phenology-context','browse-resource-context'],['field','local_500m','landscape_1500m'],['available','known','proxy']),
+      req('resource_context',['forest-type-context'],['field','local_500m','landscape_1500m'],['available','known','proxy']),
       req('predator_occurrence',['predator-occurrence-context'],['landscape_1500m','broad_3000m','regional'],['available','known','proxy']),
       req('biological_state',['deer-biological-state'],['individual_scenario']),
     ],
@@ -1019,7 +1019,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     limitations:['Boreal range-expansion context; linear features are not universally positive or negative.'],
     study_measurements:[
       measurement('FW-M42-human-footprint-composition','human_footprint','polygonal and linear industrial human footprint','Study compared polygonal industrial features and linear features such as roads, trails and seismic lines.','unsupported','required','No relationship activation until footprint subtypes are explicitly represented.'),
-      measurement('FW-M43-intact-deciduous-forest','resource_context','intact deciduous forest / natural habitat composition','Study cumulative-effects model included natural habitat composition, especially intact deciduous forest.','mechanism_context_only','required','Generic resource state does not yet reproduce the study natural-habitat covariates.'),
+      measurement('FW-M43-intact-deciduous-forest','resource_context','AVI species-specific overstorey canopy composition','The abstract describes intact deciduous forest, but the operational natural-habitat covariates were percent overstorey canopy dominated by each of eight leading tree species, extracted at used and available points.','mechanism_context_only','required','Generic Trees land cover, total canopy cover, broad deciduous classification, edge density or fragmentation do not reproduce the source measurement.'),
       measurement('FW-M44-wolf-occurrence','predator_occurrence','camera-derived wolf occurrence','Top seasonal models included modeled wolf occurrence as predation-risk context.','unsupported','required','Omitting predator occurrence changes the published cumulative-effects model; no activation until represented.'),
     ],
   }),
