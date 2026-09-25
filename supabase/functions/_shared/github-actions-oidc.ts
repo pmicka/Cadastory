@@ -10,7 +10,6 @@ const TRUST = Object.freeze({
   actor: 'pmicka',
   actorId: '30001949',
   ref: 'refs/heads/main',
-  eventName: 'issues',
   workflowRefs: [
     'pmicka/Cadastory/.github/workflows/farm-watch-lidar-physical.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-leaf-off.yml@refs/heads/main',
@@ -20,7 +19,6 @@ const TRUST = Object.freeze({
     'pmicka/Cadastory/.github/workflows/farm-watch-horizontal-visibility.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-study-vegetation-height.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-hls-field-observations.yml@refs/heads/main',
-    'pmicka/Cadastory/.github/workflows/farm-watch-mast-capacity.yml@refs/heads/main',
     'pmicka/Cadastory/.github/workflows/farm-watch-mast-capacity.yml@refs/heads/main',
   ],
 })
@@ -138,15 +136,26 @@ export async function verifyFarmWatchGitHubActionsOidc(token: string) {
     ['actor', TRUST.actor],
     ['actor_id', TRUST.actorId],
     ['ref', TRUST.ref],
-    ['event_name', TRUST.eventName],
   ]
   for (const [keyName, expected] of required) {
     if (claimString(claims, keyName) !== expected) {
       throw new Error('untrusted GitHub OIDC claim: ' + keyName)
     }
   }
-  if (!TRUST.workflowRefs.includes(claimString(claims, 'workflow_ref'))) {
+
+  const workflowRef = claimString(claims, 'workflow_ref')
+  if (!TRUST.workflowRefs.includes(workflowRef)) {
     throw new Error('untrusted GitHub OIDC claim: workflow_ref')
+  }
+
+  const eventName = claimString(claims, 'event_name')
+  const mastCapacityWorkflowRef =
+    'pmicka/Cadastory/.github/workflows/farm-watch-mast-capacity.yml@refs/heads/main'
+  const trustedEvent =
+    eventName === 'issues' ||
+    (workflowRef === mastCapacityWorkflowRef && eventName === 'workflow_dispatch')
+  if (!trustedEvent) {
+    throw new Error('untrusted GitHub OIDC claim: event_name')
   }
 
   return {
