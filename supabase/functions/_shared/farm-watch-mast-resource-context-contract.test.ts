@@ -79,7 +79,7 @@ Deno.test('available exact-year annual mast proxy validates', () => {
 })
 
 Deno.test('prior-year mast ratings cannot be carried forward as current state', () => {
-  const value = base()
+  const value: any = base()
   value.survey_year = 2026
   value.annual_mast_proxy = {
     status: 'unavailable',
@@ -94,7 +94,7 @@ Deno.test('prior-year mast ratings cannot be carried forward as current state', 
 })
 
 Deno.test('unavailable annual state cannot smuggle prior-year group results', () => {
-  const value = base()
+  const value: any = base()
   value.survey_year = 2026
   value.annual_mast_proxy = {
     status: 'unavailable',
