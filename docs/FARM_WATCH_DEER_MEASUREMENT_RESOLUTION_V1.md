@@ -98,7 +98,6 @@ These remain scientifically explicit, but no 2026 implementation effort should b
 | FW-M32 | Forage-rich risky areas | Bind to explicit mapped food plots / study-relevant cover types | P1 | Does not claim measured nutrient abundance |
 | FW-M33 | Low hunting pressure | Represent quantitative hunter effort density and compare with source context | P0 | Do not invent a universal low/high threshold |
 | FW-M43 | AVI species-specific overstorey composition (“intact deciduous forest” shorthand) | Reproduce point-extracted percent overstorey composition for the source tree-species family, or keep unresolved until a defensible source-equivalent species-composition method exists | P2 | Generic Trees/TCC, broad deciduous class, edge density or fragmentation is not equivalent; does not make the rest of FW-D17 available |
-| FW-M47 | Forest refuge type | Derive pine/hardwood/swamp/marsh/shrub physical habitat classes | P2 | Covariate reproduction does not transfer the Florida effect |
 | FW-M48 | Usable water source | Represent current stock-pond/trough availability by managed-source inventory or dated observation | P1 | Hydrography/gauge context cannot prove usable source presence |
 | FW-M51 | Maternal age category | Preserve explicit fawn/yearling/adult maternal-age scenarios | P1 | Do not transfer Illinois conception dates |
 | FW-M54 | Female parturition phase | Preserve explicit pre-parturition / parturition / post-parturition scenarios | P1 | Unknown state remains unknown |
@@ -171,11 +170,10 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 - **FW-M08 — snow depth / winter severity**
 - **FW-M29 / FW-M32 — explicit managed-food feature geometry**
 - **FW-M43 — AVI species-specific overstorey composition (“intact deciduous forest” shorthand)**
-- **FW-M47 — forest refuge type**
 - **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
 - **FW-M56 — agriculture along simulated potential dispersal paths**
 
-The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M24, FW-M35, FW-M36, FW-M39, and FW-M45 are no longer listed here because their production exit gates passed on 2026-09-25.
+The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M24, FW-M35, FW-M36, FW-M39, FW-M45, and FW-M47 are no longer listed here because their production exit gates passed on 2026-09-25.
 
 The six `remain_unavailable` measurements continue to force abstention. Their inclusion in parked D means there is also no 2026 effort to find weak substitutes.
 
@@ -207,6 +205,34 @@ Current Farm Watch registered substrates do not yet satisfy the reproduced measu
 Therefore M43 remains an active research/implementation candidate but **unmaterialized**. A broad deciduous/forest-type product may still be useful neutral context, but it cannot be promoted as reproduced FW-M43 without an explicit fidelity reclassification and validation. USFS FIA/TreeMap and LANDFIRE are plausible source families to evaluate, but accepting either as source-equivalent requires a separate method decision; categorical forest type alone is insufficient.
 
 This correction does not change the FW-D17 abstention boundary. FW-M42 human-footprint composition and FW-M44 wolf occurrence remain unavailable, so resolving M43 alone cannot activate the Darlington relationship.
+
+### FW-M47 production resolution — 2026-09-25
+
+The Abernathy et al. (2019) source measurement is now recovered and production-materialized.
+
+The study did **not** model a single categorical “forest refuge type” flag. It reclassified Florida Natural Areas Inventory Cooperative Land Cover v3.2 at 10 m, retained six habitat classes, calculated a continuous Euclidean-distance surface to each class, extracted those distances at used and available deer locations, and scaled/centered model variables. The six retained source classes were:
+
+- pine forest;
+- hardwood swamp;
+- marsh;
+- prairie;
+- shrub;
+- hardwood hammock.
+
+Farm Watch therefore implements M47 as six **neutral distance-to-class covariates**, not as a refuge score or deer-habitat classification.
+
+Because the FNAI classes are Florida-specific, the production product records an explicit national source substitution rather than pretending literal equivalence:
+
+- pine forest → Annual NLCD Evergreen Forest (42), treated as a broad evergreen analogue rather than a pine-species map;
+- hardwood swamp → NWI PFO1*, Palustrine Forested Broad-Leaved Deciduous;
+- marsh → NWI PEM*, Palustrine Emergent;
+- prairie → Annual NLCD Grassland/Herbaceous (71), with pasture/hay and cultivated crops intentionally excluded;
+- shrub → Annual NLCD Shrub/Scrub (52);
+- hardwood hammock → Annual NLCD Deciduous Forest (41), treated as an upland/broad hardwood analogue rather than asserting that a Florida hammock community occurs in Kentucky.
+
+The product preserves the source measurement form while carrying `evidence_state: proxy` for the class crosswalk. It stores no deer selection sign, refuge quality, hurricane response, survival benefit, or weighted habitat score. Right-censored distances are reported explicitly when a mapped class is absent inside the fixed 3 km search radius; source failure remains unavailable rather than absence.
+
+Flat Creek production validation used Annual NLCD 2024 plus the existing authoritative NWI cache. All six classes resolved within the search radius at the property center. The source substitution does **not** authorize Abernathy’s Florida coefficients in Kentucky and does not turn ordinary rain or wind into an FW-D18 event.
 
 ## Machine enforcement
 
