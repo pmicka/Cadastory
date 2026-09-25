@@ -20,7 +20,7 @@ security definer
 set search_path to 'intelligence','public','extensions'
 as $function$
 declare
-  state_code text;
+  v_state_code text;
   req extensions.http_request;
   resp extensions.http_response;
   body jsonb;
@@ -33,18 +33,20 @@ declare
   cnt integer;
   v_fetched_at timestamptz := now();
   v_error text;
+  v_http_status integer;
 begin
   perform extensions.http_set_curlopt('CURLOPT_TIMEOUT_MS','8000');
   perform extensions.http_set_curlopt('CURLOPT_CONNECTTIMEOUT_MS','3000');
 
-  foreach state_code in array array['KY','IN','OH'] loop
+  foreach v_state_code in array array['KY','IN','OH'] loop
     cnt := 0;
     v_error := null;
+    v_http_status := null;
 
     begin
       req := row(
         'GET',
-        'https://api.weather.gov/alerts/active?area='||state_code,
+        'https://api.weather.gov/alerts/active?area='||v_state_code,
         array[
           row(
             'User-Agent',
@@ -60,7 +62,8 @@ begin
       )::extensions.http_request;
 
       resp := extensions.http(req);
-      state_status := state_status || jsonb_build_object(state_code,resp.status);
+      v_http_status := resp.status;
+      state_status := state_status || jsonb_build_object(v_state_code,resp.status);
 
       if resp.status=200 then
         body := resp.content::jsonb;
@@ -68,21 +71,21 @@ begin
           jsonb_array_length(coalesce(body->'features','[]'::jsonb)),
           0
         );
-        state_counts := state_counts || jsonb_build_object(state_code,cnt);
+        state_counts := state_counts || jsonb_build_object(v_state_code,cnt);
         combined := combined || coalesce(body->'features','[]'::jsonb);
       else
-        state_counts := state_counts || jsonb_build_object(state_code,0);
+        state_counts := state_counts || jsonb_build_object(v_state_code,0);
         v_error := 'HTTP '||resp.status::text;
       end if;
     exception when others then
       v_error := sqlerrm;
       state_status :=
-        state_status || jsonb_build_object(state_code,'error:'||v_error);
+        state_status || jsonb_build_object(v_state_code,'error:'||v_error);
       state_counts :=
-        state_counts || jsonb_build_object(state_code,0);
+        state_counts || jsonb_build_object(v_state_code,0);
     end;
 
-    insert into intelligence.nws_alert_poll_status_v1(
+    insert into intelligence.nws_alert_poll_status_v1 as poll_status(
       state_code,
       fetched_at,
       http_status,
@@ -90,12 +93,9 @@ begin
       error_message,
       updated_at
     ) values (
-      state_code,
+      v_state_code,
       v_fetched_at,
-      case
-        when v_error is null then resp.status
-        else null
-      end,
+      v_http_status,
       cnt,
       v_error,
       now()
