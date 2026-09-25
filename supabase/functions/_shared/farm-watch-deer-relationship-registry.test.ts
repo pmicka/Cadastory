@@ -107,6 +107,50 @@ Deno.test('completed mast products are reconciled without promoting regional sur
   ))
 })
 
+Deno.test('production Tier 1 context measurements are promoted without biological overreach', () => {
+  assert(
+    FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['human-footprint-context'].status ===
+      'production_neutral_measurement',
+  )
+  assert(
+    FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['multiscale-cover-context'].status ===
+      'production_neutral_measurement',
+  )
+  assert(
+    FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['extreme-weather-event-context'].status ===
+      'production_authoritative_event_gate',
+  )
+
+  const expected = new Map([
+    ['FW-M24-building-density', 'FW-R13-winter-food-activity-interaction'],
+    ['FW-M36-road-landscape-context', 'FW-R18-terrain-landscape-context'],
+    ['FW-M39-d16-study-scales', 'FW-R20-multiscale-cover-food-context'],
+    ['FW-M45-extreme-hurricane-event', 'FW-R22-extreme-storm-refuge'],
+  ])
+  for (const [measurementId, relationshipId] of expected) {
+    const relationship = getDeerRelationship(relationshipId)
+    assert(relationship, relationshipId)
+    const measurement = relationship.study_measurements.find((row) => row.id === measurementId)
+    assert(measurement, measurementId)
+    assert(measurement.alignment === 'derived_equivalent', measurementId)
+  }
+
+  const multiscale = getDeerRelationship('FW-R20-multiscale-cover-food-context')
+  assert(multiscale)
+  const scaleReq = multiscale.required_inputs.find((row) => row.key === 'study_scales')
+  assert(scaleReq)
+  assert(JSON.stringify(scaleReq.product_keys) === JSON.stringify(['multiscale-cover-context']))
+
+  const storm = getDeerRelationship('FW-R22-extreme-storm-refuge')
+  assert(storm)
+  assert(deerRelationshipStudyFidelityStatus(storm).blocker_ids.includes(
+    'FW-M47-forest-refuge-type',
+  ))
+  assert(!deerRelationshipStudyFidelityStatus(storm).blocker_ids.includes(
+    'FW-M45-extreme-hurricane-event',
+  ))
+})
+
 Deno.test('numeric coefficients are rejected when coefficient transfer is not authorized', () => {
   const relationship = getDeerRelationship('FW-R25-kentucky-breeding-context')
   assert(relationship)
