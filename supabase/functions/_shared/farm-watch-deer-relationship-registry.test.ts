@@ -139,6 +139,18 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
     assert(measurement.alignment === 'derived_equivalent', measurementId)
   }
 
+  const buildingRelationship = getDeerRelationship('FW-R13-winter-food-configuration-activity')
+  assert(buildingRelationship)
+  const buildingMeasurement = buildingRelationship.study_measurements.find(
+    (row) => row.id === 'FW-M24-building-density',
+  )
+  assert(buildingMeasurement)
+  assert(/production\/imagery vintage/i.test(buildingMeasurement.permitted_use))
+  assert(/450 sq ft/i.test(buildingMeasurement.permitted_use))
+  assert(/not treated as a census-complete inventory/i.test(
+    buildingMeasurement.limitations.join(' '),
+  ))
+
   const road = getDeerRelationship('FW-R18-terrain-movement-context')
   assert(road)
   const roadReq = road.required_inputs.find((row) => row.key === 'road_context')
