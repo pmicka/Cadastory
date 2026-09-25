@@ -12,7 +12,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 Deno.test('every currently blocked deer study measurement has exactly one resolution decision', () => {
   assert(validateDeerMeasurementResolutionDecisions())
   const blocked = blockedDeerStudyMeasurements()
-  assert(blocked.length === 30, 'expected 30 blocked study measurements')
+  assert(blocked.length === 29, 'expected 29 blocked study measurements')
   assert(FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.length === blocked.length)
   const decisionIds = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS
     .map((row) => row.measurement_id)
@@ -28,7 +28,7 @@ Deno.test('measurement resolution portfolio preserves the three explicit disposi
     },
     { reproduce: 0, calibrated_proxy: 0, remain_unavailable: 0 },
   )
-  assert(counts.reproduce === 16)
+  assert(counts.reproduce === 15)
   assert(counts.calibrated_proxy === 8)
   assert(counts.remain_unavailable === 6)
 })
@@ -52,6 +52,12 @@ Deno.test('production M35 multiscale forest context leaves the blocked resolutio
   assert(getDeerMeasurementResolutionDecision('FW-M35-forest-landscape-context') === null)
 })
 
+Deno.test('production M43 forest type proxy leaves the blocked resolution queue', () => {
+  const blocked = blockedDeerStudyMeasurements()
+  assert(!blocked.some((row) => row.id === 'FW-M43-intact-deciduous-forest'))
+  assert(getDeerMeasurementResolutionDecision('FW-M43-intact-deciduous-forest') === null)
+})
+
 Deno.test('completed Batch 5 mast annual state leaves the blocked resolution queue as a regional calibrated proxy', () => {
   const blocked = blockedDeerStudyMeasurements()
   const mast = getDeerMeasurementResolutionDecision('FW-M17-annual-mast-fall')
@@ -71,7 +77,7 @@ Deno.test('2026 operating posture parks individual-state and manual/non-core mea
       parked_2026_manual_or_noncore: 0,
     },
   )
-  assert(counts.active === 12)
+  assert(counts.active === 11)
   assert(counts.parked_2026_individual_state === 3)
   assert(counts.parked_2026_manual_or_noncore === 15)
 
