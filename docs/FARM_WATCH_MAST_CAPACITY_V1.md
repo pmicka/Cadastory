@@ -1,6 +1,6 @@
 # Farm Watch Mast Capacity v1
 
-Status: Batch 5A implementation merged/deployed; operator-assisted bounded BIGMAP transport validated 2026-09-24; full 28-species production materialization pending
+Status: Batch 5A production materialization complete 2026-09-25 for `validation-property-01`; 28-species bounded BIGMAP transport validated
 
 ## Purpose
 
@@ -49,7 +49,7 @@ Annual KDFWR mast state belongs to Batch 5B and remains separate.
 
 ## Source-transport validation — 2026-09-24
 
-Implementation is merged and the protected worker is deployed, but Batch 5A has **not** passed its production exit gate.
+Implementation is merged, the protected worker is deployed, and Batch 5A **passed its production exit gate on 2026-09-25** for `validation-property-01`.
 
 Validated successfully:
 
@@ -71,4 +71,8 @@ The Forest Service Raster Data Gateway whole-CONUS archive is now used only as a
 
 A source-controlled Debian helper now validates the national grid, performs the same native-grid crop for all 28 required mast species, hashes the bounded crops, and emits a manifest/bundle. The GitHub materializer accepts that bundle through a draft-release handoff and still uses the existing OIDC-gated claim/complete/storage path. The draft release is transport only and should be deleted after successful materialization.
 
-**Current state:** bounded authoritative transport is validated, but the full 28-species source bundle has not yet been supplied and the production `mast-capacity-v1` artifact is therefore still unavailable. Batch 5B remains out of scope until Batch 5A production materialization passes.
+**Production validation — 2026-09-25:** the complete 28-species bounded bundle materialized successfully through the owner-only GitHub workflow and protected Supabase worker. The resulting build is `available` with materialization ID `4815b4fb-20c6-4f46-bb3c-1dc145bb31d5`, artifact SHA-256 `7b20a6b46673ebee42df42ce090dafcbcf8c151bcc72911421dc8967496f3834`, and landscape-domain identity `bd69c24e98c485a9320c07db036548c4b065a2c381e77f2ab5cd73fc73e9ae5f`. Provenance records all 28 sampled SPCDs and `bounded_source_transport=operator_workstation_usfs_raster_gateway_bounded_crop`; no raw national source raster was persisted. The production artifact is available in the private `farm-watch-derived` bucket and expires 2027-09-25 under the current annual refresh contract.
+
+The manual transport path required two bounded operational fixes during final validation: draft GitHub releases are resolved by release-asset ID rather than release-by-tag, and the shared GitHub OIDC verifier permits `workflow_dispatch` only for the source-controlled mast-capacity workflow while retaining the existing repository/owner/actor/main-ref/workflow-ref checks. Other Farm Watch workflows remain `issues`-only.
+
+**Current state:** Batch 5A is complete for the validation property. Batch 5B may now proceed as a separate annual-mast-state unit; it must remain semantically separate from this modeled species-capacity product.
