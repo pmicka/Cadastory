@@ -181,9 +181,14 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
   'human-footprint-context': {
-    status: 'planned',
+    status: 'production_neutral_measurement',
     scales: ['local_500m','landscape_1500m','broad_3000m'],
     evidence_states: ['available','known','proxy','stale','unavailable'],
+  },
+  'multiscale-cover-context': {
+    status: 'production_neutral_measurement',
+    scales: ['multiscale'],
+    evidence_states: ['available'],
   },
   'browse-resource-context': {
     status: 'planned',
@@ -201,7 +206,7 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
   'extreme-weather-event-context': {
-    status: 'planned',
+    status: 'production_authoritative_event_gate',
     scales: ['event_local','property','regional'],
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
@@ -760,7 +765,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     study_measurements:[
       measurement('FW-M22-winter-agriculture-amount','agriculture_state','landscape amount/configuration of agriculture','Study evaluated winter activity as an interaction with landscape agricultural availability.','mechanism_context_only','context_only','Mapped agricultural context may support mechanism interpretation but does not reproduce the study landscape metric by itself.'),
       measurement('FW-M23-woody-twig-density','browse_state','woody twig density / browse availability','Study interaction used woody twig density, not generic canopy or vegetation greenness.','unsupported','required','No relationship activation until a browse/twig resource measurement or calibrated proxy exists.'),
-      measurement('FW-M24-building-density','human_footprint','building/development density','Overall activity level in the study also responded to building density.','unsupported','required','No relationship activation until the human-footprint input represents the relevant development context.'),
+      measurement('FW-M24-building-density','human_footprint','building/development density','Overall activity level in the study also responded to building density.','derived_equivalent','required','Farm Watch reproduces the study variable family as an all-building count/density in an exact 10.36 km² analytical window using FEMA USA Structures. This is a source-aligned derived measurement, not the original Indiana landscape sample.',['No Delisle coefficient or Kentucky activity effect is transferred.']),
     ],
   }),
   record({
@@ -912,7 +917,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     study_measurements:[
       measurement('FW-M34-dispersal-terrain-form','terrain','terrain/topographic position during dispersal','Study evaluated scale-dependent topographic selection by dispersing juvenile males in two contrasting Missouri landscapes.','mechanism_context_only','context_only','Farm Watch terrain forms can provide neutral context but the study effect direction cannot transfer without matching landscape context.'),
       measurement('FW-M35-forest-landscape-context','forest_context','forest availability/configuration at multiple scales','Study terrain and forest-selection responses changed with landscape forest availability/configuration.','mechanism_context_only','required','No property-level sign may be assigned without an aligned multiscale forest-context measurement.'),
-      measurement('FW-M36-road-landscape-context','human_footprint','road response within landscape context','Road response reversed/vanished across study landscapes and movement states.','unsupported','required','No terrain relationship activation until the relevant road/human-footprint context is represented.'),
+      measurement('FW-M36-road-landscape-context','human_footprint','road response within landscape context','Road response reversed/vanished across study landscapes and movement states.','derived_equivalent','required','Farm Watch now preserves paved/unpaved canonical road geometry, nearest-road context, and the source 30/90/270 m focal-scale contract. A future step-selection evaluation must still derive the study-local covariate at the evaluated location.',['No universal road selection or avoidance sign is authorized.']),
     ],
   }),
   record({
@@ -955,6 +960,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     module_family:'terrain_movement_context',
     response_variable:'winter occurrence and abundance',
     required_inputs:[
+      req('study_scales',['multiscale-cover-context'],['multiscale'],['available'],'static_context_ok'),
       req('cover_context',['spatial-edge-patch-context'],['local_500m']),
       req('agriculture_state',['field-phenology-context'],['field','landscape_1500m','broad_3000m'],['available','known','proxy']),
     ],
@@ -971,7 +977,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     output_kind:'mechanism_context',
     limitations:['Population occurrence/abundance is not within-property movement.'],
     study_measurements:[
-      measurement('FW-M39-d16-study-scales','cover_context','cover at 1 km², 9 km² and hunting-unit scales','Study evaluated occurrence/abundance at explicit 1 km², 9 km², and hunting-unit scales.','unsupported','required','Current 500 m / 1.5 km / 3 km products are not measurement-equivalent to the published scale design.'),
+      measurement('FW-M39-d16-study-scales','study_scales','cover at 1 km², 9 km² and hunting-unit scales','Study evaluated occurrence/abundance at explicit 1 km², 9 km², and hunting-unit scales.','derived_equivalent','required','Farm Watch reproduces exact-area 1 km² and 9 km² square analytical windows in a projected CRS. The North Dakota hunting-unit scale is explicitly not transferred.',['Property-centered placement is a target analytical frame, not the source study grid origin.']),
       measurement('FW-M40-d16-escape-cover-types','cover_context','forest, wetland and CRP escape-cover composition','Study broad-scale cover signal came from forest, wetland and Conservation Reserve Program lands.','unsupported','required','Generic edge/patch structure does not preserve the study cover classes.'),
       measurement('FW-M41-d16-winter-food','agriculture_state','residual winter cropland / food at fine scale','Study fine-scale food signal emphasized residual winter cropland.','unsupported','required','Current field vegetation context does not establish residual winter crop food availability.'),
     ],
@@ -1033,7 +1039,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     output_kind:'mechanism_context',
     limitations:['Southwestern Florida hurricane event; ordinary weather is explicitly out of scope.'],
     study_measurements:[
-      measurement('FW-M45-extreme-hurricane-event','extreme_event','active hurricane/extreme climatic event','Study response was observed during Hurricane Irma, not routine rain or wind.','unsupported','required','No activation without an explicit extreme-event state.'),
+      measurement('FW-M45-extreme-hurricane-event','extreme_event','active hurricane/extreme climatic event','Study response was observed during Hurricane Irma, not routine rain or wind.','derived_equivalent','required','Farm Watch uses an authoritative NWS tropical/extreme-wind alert gate intersecting the property and active at the requested time. Ordinary storms, rain, heat, and routine wind are explicitly excluded.',['The event gate establishes extreme-event context only; it does not transfer the Hurricane Irma deer response coefficient.']),
       measurement('FW-M46-elevation-refuge','terrain','relative elevation during the event','Study deer increased selection of higher elevation during Hurricane Irma.','derived_equivalent','required','Farm Watch elevation can represent the physical variable, but no Florida coefficient transfers.'),
       measurement('FW-M47-forest-refuge-type','forest_type','pine and hardwood forest refuge types','Study deer increased selection of pine forests and hardwood forest/swamp types while avoiding marsh/shrub habitats.','unsupported','required','Elevation alone cannot reproduce the study refuge relationship; forest/habitat type is required.'),
     ],
