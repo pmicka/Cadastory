@@ -391,10 +391,25 @@ Deno.test('FW-D13 low-pressure null result requires explicit low pressure', () =
   assert(deerRelationshipStudyFidelityStatus(relationship).status === 'blocked_measurement_alignment')
 })
 
-Deno.test('FW-D17 preserves female-only sample and predator-occurrence component', () => {
+Deno.test('FW-D17 preserves female-only sample, source-aligned forest composition, and predator occurrence', () => {
   const relationship = getDeerRelationship('FW-R21-human-footprint-seasonal-context')
   assert(relationship)
   assert(JSON.stringify(relationship.biological_state_gates.sex) === JSON.stringify(['female']))
+
+  const resource = relationship.required_inputs.find((row) => row.key === 'resource_context')
+  assert(resource)
+  assert(JSON.stringify(resource.product_keys) === JSON.stringify(['forest-type-context']))
+  assert(!resource.product_keys.includes('field-phenology-context' as any))
+  assert(!resource.product_keys.includes('browse-resource-context' as any))
+
+  const forest = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M43-intact-deciduous-forest',
+  )
+  assert(forest)
+  assert(/species-specific overstorey canopy composition/i.test(forest.study_variable))
+  assert(/eight leading tree species/i.test(forest.study_protocol))
+  assert(/fragmentation/i.test(forest.permitted_use))
+
   const predator = relationship.required_inputs.find((row) => row.key === 'predator_occurrence')
   assert(predator)
   assert(predator.product_keys.includes('predator-occurrence-context'))
