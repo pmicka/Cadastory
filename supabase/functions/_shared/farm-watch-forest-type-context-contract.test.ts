@@ -50,9 +50,9 @@ Deno.test('M43 forest type context preserves source substitution and abstention 
         broad_3000m: scope(),
       },
     },
-    center_point: {
-      evt: { value: 7305, name: 'Southern Interior Low Plateau Dry-Mesic Oak Forest' },
-      hardwood_deciduous_proxy: true,
+    source_selection: {
+      probe_basis: 'property_center_internal_source_health_only',
+      pixel_interpretation_exposed: false,
     },
     intactness_metric_performed: false,
     behavioral_inference_performed: false,
