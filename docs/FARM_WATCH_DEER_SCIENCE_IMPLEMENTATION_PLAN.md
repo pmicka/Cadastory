@@ -453,7 +453,7 @@ The deer layer can distinguish standing/active crop, probable harvest transition
 
 # Batch 5 — Mast capacity and annual mast state
 
-Status: Batch 5A production complete 2026-09-25; Batch 5B mast-resource context implemented, with exact-year annual state intentionally unavailable when KDFWR has not published/ingested that survey year  
+Status: Batch 5A production complete 2026-09-25; Batch 5B production deployed/validated 2026-09-25, with exact-year annual state intentionally unavailable when KDFWR has not published/ingested that survey year  
 Priority: P1  
 Ledger dependency: FW-D07.
 
@@ -527,7 +527,7 @@ The context keeps three components separate:
 2. the exact-year KDFWR annual mast proxy;
 3. dated operator `mast_resource` field observations.
 
-The 2026 row is intentionally `partial`: spatial mast capacity is available, while the annual mast proxy is unavailable because the current KDFWR report index still lists 2025 as the latest report as of 2026-09-25. 2025 values are not carried forward.
+The 2026 row is intentionally `partial`: spatial mast capacity is available, while the annual mast proxy is unavailable because the current KDFWR report index still lists 2025 as the latest report as of 2026-09-25. 2025 values are not carried forward. Production validation confirmed 2025 as `available` and 2026 as `partial`, with the current-year annual component explicitly `unavailable` and `applied_prior_year=false`.
 
 The product is also exposed separately in `deer-evidence-stack-v1`; the existing `mast-capacity` product remains independently visible so downstream deer science cannot silently conflate spatial capacity with annual production state.
 
