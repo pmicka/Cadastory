@@ -19,7 +19,7 @@ Product:
 
 - key: `human-footprint-context`
 - schema: `human-footprint-context-v1`
-- algorithm: `fema-usastructures-osm-human-footprint-v1`
+- algorithm: `fema-usastructures-osm-human-footprint-v2`
 
 ### FW-M24 building density
 
@@ -30,9 +30,14 @@ Farm Watch therefore uses:
 - an exact 10.36 km² property-centered square analytical window;
 - the current FEMA USA Structures View polygon layer;
 - building count;
-- building density expressed as count / 10.36 km².
+- building density expressed as count / 10.36 km²;
+- live ArcGIS service edit timestamps;
+- local returned-feature production-date and imagery-date ranges plus non-null coverage;
+- explicit source-completeness metadata.
 
-The property-centered window reproduces the study area size but not the original Indiana landscape placement or Microsoft building-footprint source. The current FEMA USA Structures View is used as an authoritative/open current building geometry source. The result is therefore a source-aligned derived measurement, not a recreation of the original study sample.
+The property-centered window reproduces the study area size but not the original Indiana landscape placement or Microsoft building-footprint source. The current FEMA USA Structures View is used as an authoritative/open current building geometry source. FEMA's USA Structures inventory is designed around structures greater than 450 square feet; Farm Watch therefore records that threshold and **does not** describe the returned count as a census-complete inventory. The source does not publish a defensible completeness percentage for this property window, so spatial completeness remains `not_quantified_by_source`.
+
+Service edit dates are treated as service currency, not feature capture dates. Feature-level `PROD_DATE` and `IMAGE_DATE` ranges are recorded separately because those are the relevant local vintage signals.
 
 ### FW-M36 road context
 
@@ -123,14 +128,14 @@ Those biological decisions remain in the relationship registry and downstream Ba
 
 The initial production collector targeted the Kentucky DGI-hosted ORNL/FEMA building layer. Supabase Edge timed out while fetching that ArcGIS service metadata. Existing Scout building-candidate tables were not substituted because their ingestion intentionally filters the national structures source for commercial-building discovery and therefore cannot represent the all-building count required by FW-M24.
 
-The collector was consequently moved to the registered current `fema-usa-structures-current` source (`FEMA USA Structures View`) and queries that source directly with `returnCountOnly=true`. No Scout commercial-building size/use filter is applied to the deer-science measurement.
+The collector was consequently moved to the registered current `fema-usa-structures-current` source (`FEMA USA Structures View`) and now queries that source directly with ArcGIS aggregate statistics over the exact analytical window. The aggregate query returns the building count plus local `PROD_DATE` / `IMAGE_DATE` vintage ranges and field-completeness counts without record-pagination truncation. No Scout commercial-building size/use filter is applied to the deer-science measurement.
 
 
 ## Production validation — 2026-09-25
 
 The four Tier 1 measurements passed their production exit gates for `validation-property-01`.
 
-- **FW-M24:** FEMA USA Structures returned 68 buildings in the exact 10.36 km² analytical window, or 6.5637065637 buildings/km². The source was queried directly and unfiltered; Scout's commercial-building discovery filters were not reused.
+- **FW-M24:** FEMA USA Structures returned 68 buildings in the exact 10.36 km² analytical window, or 6.5637065637 buildings/km². The source is queried directly and unfiltered by Scout's commercial-building discovery rules. The production context now also records service edit timestamps, local feature production/imagery-date ranges, field-coverage fractions, the >450 sq ft source inventory threshold, and an explicit `not_quantified_by_source` spatial-completeness state.
 - **FW-M36:** the current Geofabrik OSM road snapshot is bound into `human-footprint-context-v1`, and `road-focal-context-v1` now reproduces the Stephens physical transformation on demand. At the validation-property center the nearest canonical road is 909.935 m; the 10 m grid yields mean distance-to-road values of 910.504 m at 30 m (26 cells), 909.985 m at 90 m (254 cells), and 917.631 m at 270 m (2,284 cells). These are neutral geometry facts, not deer-response signs.
 - **FW-M39:** the persisted analytical windows measure exactly 1,000,000 m² and 9,000,000 m² in EPSG:32616, with 1,000 m and 3,000 m sides respectively.
 - **FW-M45:** the current authoritative NWS extreme-event context is `inactive`, with zero qualifying tropical/extreme-wind events. Ordinary severe thunderstorms/rain/wind cannot activate it.

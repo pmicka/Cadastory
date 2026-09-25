@@ -21,6 +21,44 @@ Deno.test('human-footprint context preserves Delisle building area and Stephens 
       study_area_km2: 10.36,
       building_count: 12,
       building_density_per_km2: 12 / 10.36,
+      source_profile: {
+        service: {
+          service_item_id: '0ec8512ad21e4bb987d7e848d14e7e24',
+          is_view: true,
+          has_static_data: true,
+          max_record_count: 2000,
+          last_edit_at: '2026-06-08T00:00:00.000Z',
+          schema_last_edit_at: '2025-10-14T00:00:00.000Z',
+          data_last_edit_at: '2025-09-23T00:00:00.000Z',
+        },
+        local_feature_vintage: {
+          production_date: {
+            min: '2021-01-01T00:00:00.000Z',
+            max: '2023-01-01T00:00:00.000Z',
+            non_null_count: 12,
+            coverage_fraction: 1,
+          },
+          imagery_date: {
+            min: '2020-01-01T00:00:00.000Z',
+            max: '2022-01-01T00:00:00.000Z',
+            non_null_count: 10,
+            coverage_fraction: 10 / 12,
+          },
+        },
+        completeness: {
+          queried_feature_count: 12,
+          inventory_design: 'structures greater than 450 square feet in the United States and its territories',
+          known_minimum_structure_area_sqft: 450,
+          spatial_completeness_status: 'not_quantified_by_source',
+          query_method: 'ArcGIS aggregate statistics over exact 10.36 km2 analytical window',
+          transfer_limit_risk: 'none_for_aggregate_statistics',
+          attribute_coverage: {
+            source_attribution: { non_null_count: 12, coverage_fraction: 1 },
+            validation_method: { non_null_count: 8, coverage_fraction: 8 / 12 },
+            uuid: { non_null_count: 12, coverage_fraction: 1 },
+          },
+        },
+      },
     },
     road_context: {
       study_sampling_radii_m: [30, 90, 270],
@@ -33,6 +71,19 @@ Deno.test('human-footprint context preserves Delisle building area and Stephens 
     deer_inference_performed: false,
   }
   assert(validateFarmWatchHumanFootprintContext(value))
+  assert(!validateFarmWatchHumanFootprintContext({
+    ...value,
+    building_development: {
+      ...value.building_development,
+      source_profile: {
+        ...value.building_development.source_profile,
+        completeness: {
+          ...value.building_development.source_profile.completeness,
+          spatial_completeness_status: 'assumed_complete',
+        },
+      },
+    },
+  }))
 })
 
 Deno.test('M36 road focal context preserves 10 m road-distance raster and 30/90/270 m focal means', () => {

@@ -304,7 +304,7 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **form-transfer-ready/context-conditional; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** agriculture availability at landscape scale + future browse/twig resource proxy + buildings/development + diel period.
+**Farm Watch mapping:** agriculture availability at landscape scale + future browse/twig resource proxy + buildings/development + diel period. FW-M24 building density is now backed by an exact 10.36 km² FEMA USA Structures count/density with source service edit dates, local feature production/imagery vintage coverage, the source's >450 sq ft inventory threshold, and spatial completeness explicitly left unquantified rather than assumed.
 
 **Boundary:** Do not create independent “more agriculture = more activity” or “more browse = more activity” weights.
 

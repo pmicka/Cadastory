@@ -1,13 +1,14 @@
 export const FARM_WATCH_DEER_TIER1_CONTEXT_PRODUCT = Object.freeze({
   humanFootprint: Object.freeze({
     key: 'human-footprint-context',
-    algorithmVersion: 'fema-usastructures-osm-human-footprint-v1',
+    algorithmVersion: 'fema-usastructures-osm-human-footprint-v2',
     outputSchemaVersion: 'human-footprint-context-v1',
     buildingStudyAreaKm2: 10.36,
     buildingSource:
       'FEMA USA Structures View',
     roadSource: 'OpenStreetMap Geofabrik Access Snapshot',
     roadStudyRadiiM: Object.freeze([30, 90, 270] as const),
+    knownMinimumStructureAreaSqft: 450,
   }),
   roadFocal: Object.freeze({
     key: 'road-focal-context',
@@ -58,12 +59,21 @@ export function validateFarmWatchHumanFootprintContext(value: any) {
   ) return false
 
   const buildings = value.building_development
+  const profile = buildings?.source_profile
+  const completeness = profile?.completeness
   if (
     Number(buildings.study_area_km2) !== p.buildingStudyAreaKm2 ||
     !Number.isInteger(Number(buildings.building_count)) ||
     Number(buildings.building_count) < 0 ||
     !Number.isFinite(Number(buildings.building_density_per_km2)) ||
-    Number(buildings.building_density_per_km2) < 0
+    Number(buildings.building_density_per_km2) < 0 ||
+    !profile?.service?.service_item_id ||
+    !profile?.local_feature_vintage ||
+    Number(completeness?.queried_feature_count) !== Number(buildings.building_count) ||
+    Number(completeness?.known_minimum_structure_area_sqft) !==
+      p.knownMinimumStructureAreaSqft ||
+    completeness?.spatial_completeness_status !== 'not_quantified_by_source' ||
+    completeness?.transfer_limit_risk !== 'none_for_aggregate_statistics'
   ) return false
 
   const roads = value.road_context
