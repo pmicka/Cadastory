@@ -7,6 +7,7 @@ on:
       - 'supabase/functions/_shared/farm-watch-deer-tier1-context-contract.test.ts'
       - 'supabase/functions/collect-farm-watch-human-footprint/index.ts'
       - 'supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
+      - 'supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
       - 'docs/FARM_WATCH_DEER_TIER1_CONTEXT_V1.md'
       - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
   push:
@@ -16,6 +17,7 @@ on:
       - 'supabase/functions/_shared/farm-watch-deer-tier1-context-contract.test.ts'
       - 'supabase/functions/collect-farm-watch-human-footprint/index.ts'
       - 'supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
+      - 'supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
       - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
 
 jobs:
@@ -42,3 +44,11 @@ jobs:
           grep -q "ordinary_weather_activation_allowed',false" "$file"
           grep -q "Severe thunderstorms, routine wind, ordinary rainfall" "$file"
           grep -q "deer_inference_performed',false" "$file"
+
+      - name: Check FEMA building-source refinement
+        run: |
+          set -euo pipefail
+          file='supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
+          grep -q "fema-usastructures-osm-human-footprint-v1" "$file"
+          grep -q "fema-usa-structures-current" "$file"
+          grep -q "USA_Structures_View/FeatureServer/0" "$file"
