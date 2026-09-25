@@ -242,7 +242,7 @@ declare
   v_algorithm text;
   v_schema text;
 
-  v_capacity record;
+  v_capacity_row record;
   v_capacity_status text;
   v_capacity jsonb;
 
@@ -302,7 +302,7 @@ begin
     m.source_provenance,
     m.completed_at,
     m.expires_at
-  into v_capacity
+  into v_capacity_row
   from farm_watch.property_materializations_v1 m
   where m.property_id=v_property_id
     and m.product_kind='mast-capacity'
@@ -311,8 +311,8 @@ begin
   limit 1;
 
   v_capacity_status := case
-    when v_capacity.product_kind is null then 'unavailable'
-    when v_capacity.expires_at is not null and v_capacity.expires_at <= now() then 'stale'
+    when v_capacity_row.product_kind is null then 'unavailable'
+    when v_capacity_row.expires_at is not null and v_capacity_row.expires_at <= now() then 'stale'
     else 'available'
   end;
 
@@ -327,11 +327,11 @@ begin
       jsonb_build_object(
         'status',v_capacity_status,
         'product_kind','mast-capacity',
-        'identity_sha256',v_capacity.identity_sha256,
-        'artifact_sha256',v_capacity.artifact_sha256,
-        'completed_at',v_capacity.completed_at,
-        'expires_at',v_capacity.expires_at,
-        'summary',v_capacity.summary,
+        'identity_sha256',v_capacity_row.identity_sha256,
+        'artifact_sha256',v_capacity_row.artifact_sha256,
+        'completed_at',v_capacity_row.completed_at,
+        'expires_at',v_capacity_row.expires_at,
+        'summary',v_capacity_row.summary,
         'interpretation_boundary',
           'Mast Capacity v1 is modeled/imputed species biomass capacity at 30 m. It is not annual mast production or a property tree inventory.'
       )
@@ -493,8 +493,8 @@ begin
     'survey_year',p_survey_year,
     'mast_capacity',jsonb_build_object(
       'status',v_capacity_status,
-      'identity_sha256',v_capacity.identity_sha256,
-      'artifact_sha256',v_capacity.artifact_sha256
+      'identity_sha256',v_capacity_row.identity_sha256,
+      'artifact_sha256',v_capacity_row.artifact_sha256
     ),
     'annual_mast_proxy',case
       when v_report.survey_year is null then jsonb_build_object(
@@ -522,7 +522,7 @@ begin
     '|',
     'product=mast-resource-context',
     'survey_year='||p_survey_year::text,
-    'mast_capacity_identity='||coalesce(v_capacity.identity_sha256,'unavailable'),
+    'mast_capacity_identity='||coalesce(v_capacity_row.identity_sha256,'unavailable'),
     'annual_report='||coalesce(v_report.report_url,'unavailable'),
     'property_region='||coalesce(v_region,'unresolved'),
     'source_fingerprint_sha256='||v_source_fingerprint_sha256
