@@ -9,6 +9,14 @@ export const FARM_WATCH_DEER_TIER1_CONTEXT_PRODUCT = Object.freeze({
     roadSource: 'OpenStreetMap Geofabrik Access Snapshot',
     roadStudyRadiiM: Object.freeze([30, 90, 270] as const),
   }),
+  roadFocal: Object.freeze({
+    key: 'road-focal-context',
+    algorithmVersion: 'stephens-road-distance-focal-10m-v1',
+    outputSchemaVersion: 'road-focal-context-v1',
+    roadSource: 'OpenStreetMap Geofabrik Access Snapshot',
+    rasterResolutionM: 10,
+    focalRadiiM: Object.freeze([30, 90, 270] as const),
+  }),
   multiscaleCover: Object.freeze({
     key: 'multiscale-cover-context',
     algorithmVersion: 'nagy-reis-property-centered-grid-scales-v1',
@@ -67,6 +75,31 @@ export function validateFarmWatchHumanFootprintContext(value: any) {
     !roads.scopes?.landscape_1500m
   ) return false
 
+  return true
+}
+
+
+export function validateFarmWatchRoadFocalContext(value: any) {
+  const p = FARM_WATCH_DEER_TIER1_CONTEXT_PRODUCT.roadFocal
+  if (
+    value?.schema !== p.outputSchemaVersion ||
+    value?.method !== p.algorithmVersion ||
+    value?.evidence_class !== 'deterministic_derived' ||
+    value?.source_method?.study_road_raster_resolution_m !== p.rasterResolutionM ||
+    JSON.stringify(value?.source_method?.study_focal_radii_m) !== JSON.stringify([...p.focalRadiiM]) ||
+    value?.deer_inference_performed !== false ||
+    value?.coefficient_transfer_performed !== false ||
+    !sha(value?.source_signature_sha256) ||
+    !sha(value?.identity_sha256)
+  ) return false
+
+  const focal = value?.focal_mean_distance_to_road_m
+  for (const radius of p.focalRadiiM) {
+    const row = focal?.[`${radius}m`]
+    if (!row || !Number.isFinite(Number(row.mean_m)) || Number(row.cell_count) < 1) {
+      return false
+    }
+  }
   return true
 }
 

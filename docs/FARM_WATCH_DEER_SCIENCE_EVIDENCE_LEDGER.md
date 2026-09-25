@@ -394,7 +394,7 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **context-conditional + negative-constraint.**
 
-**Farm Watch mapping:** terrain form, forest/canopy context, roads, movement state, multiscale landscape context.
+**Farm Watch mapping:** terrain form, forest/canopy context, roads, movement state, multiscale landscape context. FW-M36 is now supported by a neutral on-demand `road-focal-context-v1` evaluator that reproduces a 10 m distance-to-nearest-road grid and mean 30/90/270 m focal extraction while recording the OSM-for-TIGER road-source substitution. This closes the physical road-measurement path only; it does not transfer a road-response sign.
 
 **Blocked rule:** No universal “ridges are travel corridors,” “draws are travel corridors,” or fixed ridge/valley bonus. Terrain must interact with landscape context and movement state.
 

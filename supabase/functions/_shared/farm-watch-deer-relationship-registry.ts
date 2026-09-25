@@ -185,6 +185,11 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     scales: ['local_500m','landscape_1500m','broad_3000m'],
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
+  'road-focal-context': {
+    status: 'production_on_demand_neutral_measurement',
+    scales: ['event_local','local_500m','landscape_1500m'],
+    evidence_states: ['available','unavailable'],
+  },
   'multiscale-cover-context': {
     status: 'production_neutral_measurement',
     scales: ['multiscale'],
@@ -900,7 +905,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       req('terrain',['terrain-form-permeability'],['local_500m','landscape_1500m']),
       req('forest_context',['spatial-edge-patch-context'],['local_500m']),
       req('biological_state',['deer-biological-state'],['individual_scenario']),
-      req('human_footprint',['human-footprint-context'],['local_500m','landscape_1500m'],['available','known','proxy'],'static_context_ok'),
+      req('road_context',['road-focal-context'],['event_local','local_500m','landscape_1500m'],['available'],'static_context_ok'),
     ],
     biological_state_gates:gate({sex:['male'],age_class:['juvenile'],movement_state:['dispersal'],required_explicit_dimensions:['sex','age_class','movement_state']}),
     spatial_scale:{relationship_scales:['local_500m','landscape_1500m','multiscale'],notes:'Direction differed between landscapes and scales.'},
@@ -917,7 +922,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     study_measurements:[
       measurement('FW-M34-dispersal-terrain-form','terrain','terrain/topographic position during dispersal','Study evaluated scale-dependent topographic selection by dispersing juvenile males in two contrasting Missouri landscapes.','mechanism_context_only','context_only','Farm Watch terrain forms can provide neutral context but the study effect direction cannot transfer without matching landscape context.'),
       measurement('FW-M35-forest-landscape-context','forest_context','forest availability/configuration at multiple scales','Study terrain and forest-selection responses changed with landscape forest availability/configuration.','mechanism_context_only','required','No property-level sign may be assigned without an aligned multiscale forest-context measurement.'),
-      measurement('FW-M36-road-landscape-context','human_footprint','road response within landscape context','Road response reversed/vanished across study landscapes and movement states.','derived_equivalent','required','Farm Watch now preserves paved/unpaved canonical road geometry, nearest-road context, and the source 30/90/270 m focal-scale contract. A future step-selection evaluation must still derive the study-local covariate at the evaluated location.',['No universal road selection or avoidance sign is authorized.']),
+      measurement('FW-M36-road-landscape-context','road_context','road response within landscape context','Road response reversed/vanished across study landscapes and movement states.','derived_equivalent','required','Farm Watch now provides an on-demand 10 m distance-to-nearest-road grid evaluator with source-style mean focal extraction at 30/90/270 m around any bounded evaluation point. OSM replaces the study TIGER road geometry, but the physical transformation is preserved.',['No universal road selection or avoidance sign is authorized.','The downstream deer relationship still requires juvenile-male dispersal state plus aligned forest/terrain landscape context.']),
     ],
   }),
   record({
