@@ -86,6 +86,31 @@ Deno.test('FW-R01 vegetation height is bound only to the production-validated st
   assert(!fidelity.blocker_ids.includes('FW-M02-vegetation-height'))
 })
 
+Deno.test('production M08 preserves daily snow and minimum temperature without promoting Minnesota severity to Kentucky', () => {
+  const product = FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['snow-winter-severity-context']
+  assert(product)
+  assert(product.status === 'production_source_substituted_neutral_measurement')
+
+  const relationship = getDeerRelationship('FW-R03-winter-snow-conifer-context')
+  assert(relationship)
+  const snow = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M08-snow-depth-severity',
+  )
+  assert(snow)
+  assert(snow.alignment === 'derived_equivalent')
+  assert(/daily snow depth/i.test(snow.study_variable))
+  assert(/minimum daily temperature/i.test(snow.study_variable))
+  assert(/NOHRSC/i.test(snow.permitted_use))
+  assert(/HRRR/i.test(snow.permitted_use))
+  assert(/provenance\/context/i.test(snow.permitted_use))
+  assert(/75%/i.test(snow.limitations.join(' ')))
+
+  const fidelity = deerRelationshipStudyFidelityStatus(relationship)
+  assert(!fidelity.blocker_ids.includes('FW-M08-snow-depth-severity'))
+  assert(fidelity.blocker_ids.includes('FW-M09-dense-conifer-cover'))
+  assert(fidelity.status === 'blocked_measurement_alignment')
+})
+
 Deno.test('completed mast products are reconciled without promoting regional survey state to property mast abundance', () => {
   assert(FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['mast-capacity'].status === 'production')
   assert(
