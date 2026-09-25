@@ -1,0 +1,44 @@
+name: Farm Watch deer Tier 1 context CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-deer-tier1-context-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-tier1-context-contract.test.ts'
+      - 'supabase/functions/collect-farm-watch-human-footprint/index.ts'
+      - 'supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
+      - 'docs/FARM_WATCH_DEER_TIER1_CONTEXT_V1.md'
+      - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/_shared/farm-watch-deer-tier1-context-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-tier1-context-contract.test.ts'
+      - 'supabase/functions/collect-farm-watch-human-footprint/index.ts'
+      - 'supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
+      - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
+
+jobs:
+  deer-tier1-context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check Tier 1 contract
+        run: deno check supabase/functions/_shared/farm-watch-deer-tier1-context-contract.ts
+      - name: Test Tier 1 contract
+        run: deno test supabase/functions/_shared/farm-watch-deer-tier1-context-contract.test.ts
+      - name: Check human-footprint collector
+        run: deno check supabase/functions/collect-farm-watch-human-footprint/index.ts
+      - name: Check Tier 1 science boundaries
+        run: |
+          set -euo pipefail
+          file='supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
+          grep -q "building_study_area_km2',10.36" "$file"
+          grep -q "jsonb_build_array(30,90,270)" "$file"
+          grep -q "array\[1,9\]" "$file"
+          grep -q "ordinary_weather_activation_allowed',false" "$file"
+          grep -q "Severe thunderstorms, routine wind, ordinary rainfall" "$file"
+          grep -q "deer_inference_performed',false" "$file"
