@@ -1,4 +1,5 @@
 name: Farm Watch M47 forest type CI
+# Production M47 validation workflow.
 
 on:
   pull_request:
