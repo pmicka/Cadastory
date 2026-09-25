@@ -125,6 +125,10 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
       'production_on_demand_neutral_measurement',
   )
   assert(
+    FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['forest-type-context'].status ===
+      'production_neutral_measurement',
+  )
+  assert(
     FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['extreme-weather-event-context'].status ===
       'production_authoritative_event_gate',
   )
@@ -178,6 +182,23 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
   assert(/10 m support/i.test(forestMeasurement.permitted_use))
   assert(/30\/90\/270 m/i.test(forestMeasurement.permitted_use))
   assert(/source.*substitution/i.test(forestMeasurement.limitations.join(' ')))
+
+  const cumulative = getDeerRelationship('FW-R21-human-footprint-seasonal-context')
+  assert(cumulative)
+  const forestTypeReq = cumulative.required_inputs.find((row) => row.key === 'resource_context')
+  assert(forestTypeReq)
+  assert(JSON.stringify(forestTypeReq.product_keys) === JSON.stringify(['forest-type-context']))
+  const intactForest = cumulative.study_measurements.find(
+    (row) => row.id === 'FW-M43-intact-deciduous-forest',
+  )
+  assert(intactForest)
+  assert(intactForest.alignment === 'calibrated_proxy')
+  assert(/LANDFIRE/i.test(intactForest.permitted_use))
+  assert(/intactness|fragmentation/i.test(intactForest.limitations.join(' ')))
+  const cumulativeFidelity = deerRelationshipStudyFidelityStatus(cumulative)
+  assert(!cumulativeFidelity.blocker_ids.includes('FW-M43-intact-deciduous-forest'))
+  assert(cumulativeFidelity.blocker_ids.includes('FW-M42-human-footprint-composition'))
+  assert(cumulativeFidelity.blocker_ids.includes('FW-M44-wolf-occurrence'))
 
   const multiscale = getDeerRelationship('FW-R20-multiscale-cover-food-context')
   assert(multiscale)
