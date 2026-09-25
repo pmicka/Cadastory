@@ -166,8 +166,8 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     evidence_states: ['available','known','proxy','unavailable'],
   },
   'forest-type-context': {
-    status: 'planned_measurement_alignment',
-    scales: ['local_500m','landscape_1500m'],
+    status: 'production_source_substituted',
+    scales: ['point','property','local_500m','landscape_1500m','broad_3000m'],
     evidence_states: ['available','known','proxy','unavailable'],
   },
   'low-height-concealment-context': {
@@ -1033,7 +1033,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     required_inputs:[
       req('extreme_event',['extreme-weather-event-context'],['event_local','property','regional'],['available','known']),
       req('terrain',['terrain-form-permeability'],['local_500m','landscape_1500m']),
-      req('forest_type',['forest-type-context'],['local_500m','landscape_1500m'],['available','known','proxy']),
+      req('forest_type',['forest-type-context'],['point','property','local_500m','landscape_1500m','broad_3000m'],['available','known','proxy']),
       req('water_context',['surface-water-state'],['local_500m','landscape_1500m'],['available','known','proxy']),
     ],
     biological_state_gates:gate(),
@@ -1051,7 +1051,21 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     study_measurements:[
       measurement('FW-M45-extreme-hurricane-event','extreme_event','active hurricane/extreme climatic event','Study response was observed during Hurricane Irma, not routine rain or wind.','derived_equivalent','required','Farm Watch uses a fresh authoritative NWS tropical/extreme-wind alert poll plus property-intersecting alert geometry and active event time. A healthy poll with no qualifying intersection is explicitly not applicable; source failure, stale polling, or unresolved qualifying alert geometry is unavailable rather than inactive. Ordinary storms, rain, heat, and routine wind are explicitly excluded.',['The event gate establishes extreme-event context only; it does not transfer the Hurricane Irma deer response coefficient.','Only NWS status Actual is eligible for activation.']),
       measurement('FW-M46-elevation-refuge','terrain','relative elevation during the event','Study deer increased selection of higher elevation during Hurricane Irma.','derived_equivalent','required','Farm Watch elevation can represent the physical variable, but no Florida coefficient transfers.'),
-      measurement('FW-M47-forest-refuge-type','forest_type','pine and hardwood forest refuge types','Study deer increased selection of pine forests and hardwood forest/swamp types while avoiding marsh/shrub habitats.','unsupported','required','Elevation alone cannot reproduce the study refuge relationship; forest/habitat type is required.'),
+      measurement(
+        'FW-M47-forest-refuge-type',
+        'forest_type',
+        'Euclidean distance to pine forest, hardwood swamp, marsh, prairie, shrub and hardwood hammock',
+        'Abernathy et al. reclassified FNAI Cooperative Land Cover v3.2 at 10 m and calculated continuous Euclidean distance to each of six retained habitat classes, then extracted those distance covariates at used and available locations and scaled/centered variables for modeling.',
+        'derived_equivalent',
+        'required',
+        'Farm Watch reproduces the six distance-to-class variable family using explicit national source substitutions: Annual NLCD Evergreen Forest (42), Grassland/Herbaceous (71), Shrub/Scrub (52), Deciduous Forest (41), plus NWI PFO1* and PEM*. The product carries proxy evidence state because the national classes are not literal FNAI Florida communities; no source coefficient or hurricane response is transferred.',
+        [
+          'Annual NLCD 42 is a broad evergreen analogue and must not be relabeled as a pine-species map.',
+          'Annual NLCD 41 is an upland/deciduous-hardwood analogue and must not be represented as literal Florida hardwood hammock in Kentucky.',
+          'Annual NLCD 71 is a prairie analogue; pasture/hay and cultivated crops are intentionally excluded.',
+          'NWI PFO1* and PEM* preserve forested broad-leaved-deciduous wetland versus emergent wetland physiognomy.',
+        ],
+      ),
     ],
   }),
   record({
