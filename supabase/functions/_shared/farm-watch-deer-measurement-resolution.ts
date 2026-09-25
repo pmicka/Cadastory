@@ -332,9 +332,9 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     'forest-type-context',
     'P2',
     true,
-    'Intact deciduous forest composition is a mapped habitat/fragmentation variable that can be derived from land-cover/forest-type data and landscape geometry.',
-    'Keep this neutral and source-scale; it does not rescue the FW-D17 relationship if human-footprint composition or predator occurrence remains unavailable.',
-    ['Validate deciduous/intact classification against imagery and fragmentation geometry'],
+    'Darlington et al. did not model a standalone binary intact-deciduous class or a fragmentation metric. The published natural-habitat covariates were AVI percent overstorey canopy composition for eight leading tree species (Aw trembling aspen, Bw white birch, Fb balsam fir, Lt tamarack, Pb balsam poplar, Pj jack pine, Sb black spruce and Sw white spruce), extracted at used and available points and standardized before modeling. The abstract phrase intact deciduous forest is therefore descriptive shorthand rather than the operational measurement.',
+    'Reproduce species-specific overstorey composition at point support, or keep M43 unresolved until a defensible source-equivalent species-composition method exists. Generic Trees land cover, total tree-canopy cover, a broad deciduous class, forest edge density, fragmentation geometry, or the study seasonal availability buffers are not measurement-equivalent substitutes. Keep the product neutral; resolving M43 does not rescue FW-D17 while human-footprint composition or predator occurrence remains unavailable.',
+    ['Verify the chosen source explicitly represents overstorey tree-species composition rather than only tree presence or total canopy cover', 'Validate mapped species composition against independent FIA/imagery/field evidence appropriate to the chosen source before promotion'],
   ),
   decision(
     'FW-M44-wolf-occurrence',
