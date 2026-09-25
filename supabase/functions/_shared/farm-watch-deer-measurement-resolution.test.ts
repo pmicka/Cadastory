@@ -149,6 +149,16 @@ Deno.test('hunting food relationships bind to explicit managed food features', (
   }
 })
 
+Deno.test('FW-M43 requires species-specific overstorey composition rather than generic forest structure', () => {
+  const decision = getDeerMeasurementResolutionDecision('FW-M43-intact-deciduous-forest')
+  assert(decision?.disposition === 'reproduce')
+  assert(decision?.target_product === 'forest-type-context')
+  assert(/eight leading tree species/i.test(decision.rationale))
+  assert(/Generic Trees/i.test(decision.implementation_boundary))
+  assert(/fragmentation/i.test(decision.implementation_boundary))
+  assert(/unresolved/i.test(decision.implementation_boundary))
+})
+
 Deno.test('weak substitutions remain unavailable', () => {
   const unavailable = [
     'FW-M03-forage-index',
