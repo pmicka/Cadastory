@@ -24,6 +24,7 @@ export const FARM_WATCH_FOREST_TYPE_CONTEXT_LIMITATIONS = Object.freeze([
   'Hardwood EVT physiognomy is used as a deciduous/natural-forest composition proxy. It does not establish species-specific overstorey percentages.',
   'No generic fragmentation, old-growth, undisturbed, or biological intactness score is calculated. The source paper used intact natural vegetation descriptively; its natural covariates were species-composition/canopy variables.',
   'LANDFIRE classes are modeled mapped vegetation classes and canopy cover, not a field inventory of every stand.',
+  'LANDFIRE cautions against treating individual or small groups of 30 m pixels as authoritative local measurements. Farm Watch therefore uses aggregated property/landscape summaries and does not expose a pixel-level M43 evidence API.',
   'This neutral product does not activate the Darlington cumulative-effects relationship while industrial human-footprint composition and camera-derived wolf occurrence remain unavailable.',
   'No deer selection direction, coefficient, habitat-quality score, movement inference, or management recommendation is produced.',
 ])
@@ -92,10 +93,8 @@ export function validateForestTypeContext(value: any) {
   }
 
   return Boolean(
-    value?.center_point?.evt &&
-    Number.isInteger(Number(value?.center_point?.evt?.value)) &&
-    typeof value?.center_point?.evt?.name === 'string' &&
-    typeof value?.center_point?.hardwood_deciduous_proxy === 'boolean' &&
+    value?.source_selection?.probe_basis === 'property_center_internal_source_health_only' &&
+    value?.source_selection?.pixel_interpretation_exposed === false &&
     value?.interpretation_boundary
   )
 }
