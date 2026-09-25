@@ -85,7 +85,7 @@ Product:
 
 - key: `extreme-weather-event-context`
 - schema: `extreme-weather-event-context-v1`
-- algorithm: `nws-tropical-extreme-event-gate-v1`
+- algorithm: `nws-tropical-extreme-event-gate-v2`
 
 FW-D18 is anchored to deer response during Hurricane Irma. It must not become a generic rain, wind, thunderstorm, or weather-front rule.
 
@@ -96,18 +96,24 @@ The Farm Watch event gate therefore accepts only authoritative NWS events in thi
 - Storm Surge Warning / Watch;
 - Extreme Wind Warning.
 
-The property boundary must intersect the alert geometry and the alert must be temporally active for the requested time.
+The property boundary must intersect the authoritative alert geometry and the alert must be temporally active for the requested time. Only NWS alerts with status `Actual` are eligible.
 
-Severe thunderstorms, ordinary rain/wind, heat, routine flood context, and generic storminess do not activate this measurement.
+The production gate now distinguishes three operational states:
 
-The validation property context refreshes every 10 minutes from the existing canonical NWS weather-event table.
+- `active_extreme_event` — a fresh successful NWS jurisdiction poll plus an active qualifying alert whose resolved geometry intersects the property;
+- `not_applicable` — a fresh successful NWS jurisdiction poll with no intersecting qualifying event;
+- `source_unavailable` — the jurisdiction poll failed or is stale, or a current qualifying jurisdiction alert lacks resolved geometry.
+
+That distinction is important: source failure is never silently converted into “no hurricane.” Severe thunderstorms, ordinary rain/wind, heat, routine flood context, and generic storminess do not activate this measurement.
+
+The central NWS collector polls KY/IN/OH every 10 minutes and now persists per-jurisdiction poll health. The validation-property event context refresh runs two minutes after each poll so an ordinary inactive state is backed by a known-good source check.
 
 ## Automation
 
 - building/development context: direct unfiltered FEMA USA Structures count over the exact 10.36 km² analytical window on the first day of each month;
 - roads: reused from the centrally maintained OSM access snapshot;
 - 1/9 km² analytical windows: deterministic/static until property geometry changes;
-- extreme-event gate: refreshed every 10 minutes from canonical NWS alerts.
+- extreme-event gate: refreshed every 10 minutes, two minutes after the canonical NWS poll, with explicit jurisdiction source-health and unresolved-geometry fail-closed checks.
 
 No recurring user input is required.
 
@@ -138,7 +144,7 @@ The four Tier 1 measurements passed their production exit gates for `validation-
 - **FW-M24:** FEMA USA Structures returned 68 buildings in the exact 10.36 km² analytical window, or 6.5637065637 buildings/km². The source is queried directly and unfiltered by Scout's commercial-building discovery rules. The live view reports service last edit `2026-06-08T18:21:34.830Z`, schema last edit `2025-10-14T22:09:11.713Z`, and data last edit `2025-09-23T21:20:35.029Z`. All 68 returned features carry `PROD_DATE`, `IMAGE_DATE`, source attribution, validation method, and UUID. Local production dates span 2020-01-13 through 2020-01-21, while local imagery dates span 2014-07-05 through 2017-04-15. These local feature vintages are the meaningful temporal caveat: the later service edit dates do not make the local footprints 2026 captures. Spatial completeness remains `not_quantified_by_source`, and the source inventory design excludes structures at or below 450 sq ft.
 - **FW-M36:** the current Geofabrik OSM road snapshot is bound into `human-footprint-context-v1`, and `road-focal-context-v1` now reproduces the Stephens physical transformation on demand. At the validation-property center the nearest canonical road is 909.935 m; the 10 m grid yields mean distance-to-road values of 910.504 m at 30 m (26 cells), 909.985 m at 90 m (254 cells), and 917.631 m at 270 m (2,284 cells). These are neutral geometry facts, not deer-response signs.
 - **FW-M39:** the persisted analytical windows measure exactly 1,000,000 m² and 9,000,000 m² in EPSG:32616, with 1,000 m and 3,000 m sides respectively.
-- **FW-M45:** the current authoritative NWS extreme-event context is `inactive`, with zero qualifying tropical/extreme-wind events. Ordinary severe thunderstorms/rain/wind cannot activate it.
+- **FW-M45:** the authoritative event gate now requires event type + `Actual` NWS status + resolved alert footprint + active event time + a fresh successful Kentucky NWS poll. In normal conditions a healthy zero-event result is explicitly `not_applicable`; stale/failed polling or unresolved qualifying geometry is `source_unavailable`, not `inactive`. Ordinary severe thunderstorms/rain/wind cannot activate it.
 
 Production identities:
 
