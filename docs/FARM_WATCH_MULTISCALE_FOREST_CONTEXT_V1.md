@@ -1,6 +1,6 @@
 # Farm Watch Multiscale Forest Context v1
 
-Status: implementation candidate — 2026-09-25
+Status: production deployed and validated — 2026-09-25
 
 ## Purpose
 
@@ -113,3 +113,45 @@ It does **not** authorize:
 - activation outside an explicit juvenile-male dispersal state.
 
 Those conditions remain enforced by FW-R18 and the deer relationship registry.
+
+
+## Production validation — 2026-09-25
+
+Validation property: `validation-property-01` / Flat Creek Test Property.
+
+The production materialization completed successfully against the 2025 Sentinel-2 annual LULC layer.
+
+Identity:
+
+- algorithm: `stephens-forest-focal-context-v1`;
+- schema: `multiscale-forest-context-v1`;
+- source year: 2025;
+- source metadata SHA-256: `9f47fa285986746bced51541f24e01b96bebf08275c494277f32caa616aabeb2`;
+- exported bounded raster SHA-256: `44f0295a07dca329f76c347b06d5b0f953eb1bfb3033c71500e3cebcb207a29c`;
+- production identity SHA-256: `b186251965afe66b930f281e9d0125da37798acf71f1523cc08e6669441c974e`.
+
+Raster support was exactly 10 m in EPSG:32616 over a 57 × 57-cell bounded request.
+
+At the property center the source classified every valid focal cell as `Trees`:
+
+| Radius | Valid cells | Forest proportion | Internal forest edge | Edge density |
+| --- | ---: | ---: | ---: | ---: |
+| 30 m | 26 | 1.0000 / 100% | 0 m | 0 m/ha |
+| 90 m | 254 | 1.0000 / 100% | 0 m | 0 m/ha |
+| 270 m | 2,284 | 1.0000 / 100% | 0 m | 0 m/ha |
+
+This result was independently checked against the source ImageServer `computeStatisticsHistograms` response over the same bounded area, which also returned only class value 2 (`Trees`). The zero edge result is therefore a source-derived physical fact at the property center rather than a processing fallback.
+
+The on-demand path was also exercised using the property-center coordinates supplied explicitly:
+
+- HTTP 200;
+- status `available`;
+- point basis `explicit_point`;
+- 30/90/270 m outputs returned;
+- no property-center materialization was written by the on-demand request.
+
+A point outside the current `broad_3000m` Farm Watch domain correctly returns `out_of_scope`.
+
+The deer evidence stack now exposes `multiscale_forest_context.status=available`.
+
+Both required architecture assertions passed after deployment. Supabase advisor review showed no M35-specific release blocker; the new service-only table follows the established RLS + revoked public/anon/authenticated access pattern.
