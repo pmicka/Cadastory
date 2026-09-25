@@ -50,8 +50,10 @@ function finiteCoordinate(value: unknown, min: number, max: number) {
 }
 
 async function sha256Hex(value: string | Uint8Array) {
-  const bytes = typeof value === 'string' ? new TextEncoder().encode(value) : value
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
+  const source = typeof value === 'string' ? new TextEncoder().encode(value) : value
+  const bytes = new Uint8Array(source.byteLength)
+  bytes.set(source)
+  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes.buffer))
   return [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
