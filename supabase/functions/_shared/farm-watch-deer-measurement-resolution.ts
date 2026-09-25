@@ -346,16 +346,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     'Leave this source relationship unavailable for the current Flat Creek implementation. A different predator relationship requires its own evidence ledger entry.',
   ),
   decision(
-    'FW-M47-forest-refuge-type',
-    'reproduce',
-    'forest-type-context',
-    'P2',
-    true,
-    'Pine, hardwood forest/swamp, marsh and shrub habitat classes are physical land-cover types that can be represented from forest-type, wetland and land-cover data.',
-    'Preserve the Florida hurricane transfer limitation; reproducing the covariate does not authorize a generic storm-refuge effect.',
-    ['Cross-check forest/wetland classes against imagery and NWI/land-cover sources'],
-  ),
-  decision(
     'FW-M48-usable-water-source',
     'reproduce',
     'surface-water-state',
