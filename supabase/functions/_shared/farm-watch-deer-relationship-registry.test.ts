@@ -197,12 +197,25 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
   assert(/source failure, stale polling, or unresolved qualifying alert geometry is unavailable/i.test(
     stormMeasurement.permitted_use,
   ))
-  assert(deerRelationshipStudyFidelityStatus(storm).blocker_ids.includes(
+  const forestRefuge = storm.study_measurements.find(
+    (row) => row.id === 'FW-M47-forest-refuge-type',
+  )
+  assert(forestRefuge)
+  assert(forestRefuge.alignment === 'derived_equivalent')
+  assert(/Euclidean distance/i.test(forestRefuge.study_variable))
+  for (const expected of ['pine forest','hardwood swamp','marsh','prairie','shrub','hardwood hammock']) {
+    assert(forestRefuge.study_variable.toLowerCase().includes(expected), expected)
+  }
+  assert(/Annual NLCD/i.test(forestRefuge.permitted_use))
+  assert(/NWI/i.test(forestRefuge.permitted_use))
+  assert(/proxy evidence state/i.test(forestRefuge.permitted_use))
+  assert(!deerRelationshipStudyFidelityStatus(storm).blocker_ids.includes(
     'FW-M47-forest-refuge-type',
   ))
   assert(!deerRelationshipStudyFidelityStatus(storm).blocker_ids.includes(
     'FW-M45-extreme-hurricane-event',
   ))
+  assert(deerRelationshipStudyFidelityStatus(storm).status === 'module_eligible')
 })
 
 Deno.test('numeric coefficients are rejected when coefficient transfer is not authorized', () => {
