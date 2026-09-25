@@ -8,6 +8,7 @@ on:
       - 'supabase/functions/collect-farm-watch-human-footprint/index.ts'
       - 'supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
       - 'supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
+      - 'supabase/migrations/20260925162500_finalize_farm_watch_m36_road_focal_context_v1.sql'
       - 'docs/FARM_WATCH_DEER_TIER1_CONTEXT_V1.md'
       - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
   push:
@@ -18,6 +19,7 @@ on:
       - 'supabase/functions/collect-farm-watch-human-footprint/index.ts'
       - 'supabase/migrations/20260925152000_add_farm_watch_deer_tier1_context_v1.sql'
       - 'supabase/migrations/20260925154500_refine_farm_watch_human_footprint_building_source_v1.sql'
+      - 'supabase/migrations/20260925162500_finalize_farm_watch_m36_road_focal_context_v1.sql'
       - '.github/workflows/farm-watch-deer-tier1-context-ci.yml'
 
 jobs:
@@ -52,3 +54,13 @@ jobs:
           grep -q "fema-usastructures-osm-human-footprint-v1" "$file"
           grep -q "fema-usa-structures-current" "$file"
           grep -q "USA_Structures_View/FeatureServer/0" "$file"
+
+      - name: Check M36 source-style road focal evaluator
+        run: |
+          set -euo pipefail
+          file='supabase/migrations/20260925162500_finalize_farm_watch_m36_road_focal_context_v1.sql'
+          grep -q "stephens-road-distance-focal-10m-v1" "$file"
+          grep -q "study_road_raster_resolution_m',10" "$file"
+          grep -q "study_focal_radii_m',jsonb_build_array(30,90,270)" "$file"
+          grep -q "coefficient_transfer_performed',false" "$file"
+          grep -q "deer_inference_performed',false" "$file"
