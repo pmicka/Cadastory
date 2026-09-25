@@ -5,7 +5,11 @@ on:
     paths:
       - 'supabase/functions/_shared/farm-watch-mast-resource-context-contract.ts'
       - 'supabase/functions/_shared/farm-watch-mast-resource-context-contract.test.ts'
+      - 'supabase/functions/_shared/farm-watch-kdfwr-mast-publication.ts'
+      - 'supabase/functions/_shared/farm-watch-kdfwr-mast-publication.test.ts'
+      - 'supabase/functions/collect-farm-watch-mast-publication/index.ts'
       - 'supabase/migrations/20260925053000_add_farm_watch_mast_resource_context_v1.sql'
+      - 'supabase/migrations/20260925062000_schedule_farm_watch_mast_publication_watch_v1.sql'
       - 'docs/FARM_WATCH_MAST_RESOURCE_CONTEXT_V1.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
@@ -15,7 +19,11 @@ on:
     paths:
       - 'supabase/functions/_shared/farm-watch-mast-resource-context-contract.ts'
       - 'supabase/functions/_shared/farm-watch-mast-resource-context-contract.test.ts'
+      - 'supabase/functions/_shared/farm-watch-kdfwr-mast-publication.ts'
+      - 'supabase/functions/_shared/farm-watch-kdfwr-mast-publication.test.ts'
+      - 'supabase/functions/collect-farm-watch-mast-publication/index.ts'
       - 'supabase/migrations/20260925053000_add_farm_watch_mast_resource_context_v1.sql'
+      - 'supabase/migrations/20260925062000_schedule_farm_watch_mast_publication_watch_v1.sql'
       - '.github/workflows/farm-watch-mast-resource-context-ci.yml'
 
 jobs:
@@ -30,6 +38,12 @@ jobs:
         run: deno check supabase/functions/_shared/farm-watch-mast-resource-context-contract.ts
       - name: Test mast resource contract
         run: deno test supabase/functions/_shared/farm-watch-mast-resource-context-contract.test.ts
+      - name: Check KDFWR publication parser
+        run: deno check supabase/functions/_shared/farm-watch-kdfwr-mast-publication.ts
+      - name: Test KDFWR publication parser
+        run: deno test supabase/functions/_shared/farm-watch-kdfwr-mast-publication.test.ts
+      - name: Check KDFWR publication collector
+        run: deno check supabase/functions/collect-farm-watch-mast-publication/index.ts
       - name: Check migration interpretation boundaries
         run: |
           set -euo pipefail
@@ -39,3 +53,11 @@ jobs:
           grep -q "behavioral_inference_performed',false" "$file"
           grep -q "deer_mast_response_inferred',false" "$file"
           grep -q "observation_kind='mast_resource'" "$file"
+
+      - name: Check seasonal publication-watch cadence
+        run: |
+          set -euo pipefail
+          file='supabase/migrations/20260925062000_schedule_farm_watch_mast_publication_watch_v1.sql'
+          grep -q "'20 14 \* 9-11 \*'" "$file"
+          grep -q "'35 14 \* 9-11 \*'" "$file"
+          grep -q "collect-farm-watch-mast-publication" "$file"

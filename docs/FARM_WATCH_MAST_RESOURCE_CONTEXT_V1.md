@@ -108,6 +108,23 @@ It is not represented as a KDFWR property-level survey observation.
 
 A future multi-property implementation should replace one-off mapped relations with a source-controlled, reproducible survey-region geography if KDFWR or the referenced USFS classification can be operationalized cleanly.
 
+## Seasonal publication monitoring
+
+The authoritative KDFWR mast-report index is polled once daily only during the expected publication window:
+
+- September 1 through November 30: daily check at 14:20 UTC;
+- December 1 through August 31: no scheduled external KDFWR mast-report polling.
+
+That gives a three-month daily watch followed by a nine-month dormant period.
+
+Publication discovery is kept separate from canonical ingestion. The monitor records one of:
+
+- `not_published`;
+- `published_pending_ingest`;
+- `ingested`.
+
+A newly discovered PDF therefore does not silently become annual mast state until its authoritative values are canonically ingested into the Batch 5B tables. The validation-property mast-resource context refresh follows at 14:35 UTC on the same September-November cadence.
+
 ## Current-year handling
 
 As of 2026-09-25, the KDFWR report index still lists 2025 as the latest Kentucky Mast Survey report.
