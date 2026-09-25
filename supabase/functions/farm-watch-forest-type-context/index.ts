@@ -491,12 +491,6 @@ Deno.serve(async (req: Request) => {
     const slug = boundedSlug(body?.property || 'validation-property-01')
     if (!slug) return json({ error: 'invalid request' }, 400)
 
-    const lon = finiteCoordinate(body?.lon, -180, 180)
-    const lat = finiteCoordinate(body?.lat, -90, 90)
-    if (Number.isNaN(lon) || Number.isNaN(lat) || ((lon == null) !== (lat == null))) {
-      return json({ error: 'invalid request' }, 400)
-    }
-
     const workerToken = typeof body?.worker_token === 'string' ? body.worker_token : null
     const { data: workerAllowed, error: workerError } = await admin.rpc(
       'farm_watch_validate_materialization_worker_v1_internal',
@@ -506,7 +500,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: requestData, error: requestError } = await admin.rpc(
       'farm_watch_get_forest_type_context_request_v1_internal',
-      { p_slug: slug, p_lon: lon, p_lat: lat },
+      { p_slug: slug },
     )
     if (requestError) throw new Error(requestError.message)
     if (requestData?.status !== 'available') {
@@ -532,13 +526,6 @@ Deno.serve(async (req: Request) => {
     ])
     const evt = evtCatalog(evtTableText)
     const evc = evcTreeCoverCatalog(evcTableText)
-    const centerPoint = pointClassification(
-      selected.evtValue,
-      selected.evcValue,
-      evt,
-      evc,
-    )
-
     const source = {
       authority: FARM_WATCH_FOREST_TYPE_CONTEXT_PRODUCT.sourceAuthority,
       product: FARM_WATCH_FOREST_TYPE_CONTEXT_PRODUCT.sourceProduct,
@@ -555,38 +542,6 @@ Deno.serve(async (req: Request) => {
       evc_attribute_table_sha256: await sha256Hex(evcTableText),
       evt_hardwood_proxy_rule: 'EVT_LF=Tree AND EVT_PHYS=Hardwood',
       evc_tree_cover_rule: 'CLASSNAMES=Tree Cover = N%',
-    }
-
-    if (requestData?.persist_property_center !== true) {
-      return json({
-        ok: true,
-        status: 'available',
-        property: requestData.property,
-        context: {
-          schema: FARM_WATCH_FOREST_TYPE_CONTEXT_PRODUCT.outputSchemaVersion,
-          method: FARM_WATCH_FOREST_TYPE_CONTEXT_PRODUCT.algorithmVersion,
-          status: 'available',
-          evidence_class: FARM_WATCH_FOREST_TYPE_CONTEXT_PRODUCT.semanticEvidenceClass,
-          source,
-          evaluation_point: requestData.evaluation_point,
-          point: centerPoint,
-          source_alignment: {
-            source_study: 'Darlington et al. 2022, Scientific Reports 12:1072',
-            source_measurement:
-              'Alberta Vegetation Inventory percent crown closure of dominant overstorey species',
-            farm_watch_alignment: 'calibrated_proxy',
-            reason:
-              'LANDFIRE 30 m EVT hardwood physiognomy plus EVC tree cover reproduces mapped deciduous/hardwood composition context but not AVI species-specific crown-closure percentages.',
-          },
-          intactness_metric_performed: false,
-          behavioral_inference_performed: false,
-          coefficient_transfer_performed: false,
-          scoring_performed: false,
-          interpretation_boundary:
-            'Point-level neutral mapped forest-type context only. Hardwood/deciduous is a source-substituted proxy; no deer response or biological intactness is inferred.',
-        },
-        materialized: null,
-      })
     }
 
     const bbox = (requestData?.raster_request?.bbox_5070 || []).map(Number)
@@ -663,7 +618,13 @@ Deno.serve(async (req: Request) => {
         cell_meters: FARM_WATCH_FOREST_TYPE_CONTEXT_PRODUCT.sourcePixelMeters,
         resampling: 'nearest_neighbor',
       },
-      center_point: centerPoint,
+      source_selection: {
+        selected_landfire_version: selected.version,
+        probe_basis: 'property_center_internal_source_health_only',
+        pixel_interpretation_exposed: false,
+        probe_evt_value: selected.evtValue,
+        probe_evc_value: selected.evcValue,
+      },
       summary: { scopes },
       limitations: FARM_WATCH_FOREST_TYPE_CONTEXT_LIMITATIONS,
       intactness_metric_performed: false,
@@ -672,7 +633,7 @@ Deno.serve(async (req: Request) => {
       scoring_performed: false,
       retrieved_at: retrievedAt,
       interpretation_boundary:
-        'Neutral mapped forest type/canopy context. The product does not calculate a generic intactness or fragmentation score. Hardwood EVT physiognomy is a calibrated deciduous-composition proxy for FW-M43; the Darlington relationship remains unavailable without its industrial human-footprint and wolf-occurrence inputs.',
+        'Neutral aggregated mapped forest type/canopy context. The product does not calculate a generic intactness or fragmentation score and does not expose individual LANDFIRE pixels as M43 evidence. Hardwood EVT physiognomy is a calibrated deciduous-composition proxy for FW-M43; the Darlington relationship remains unavailable without its industrial human-footprint and wolf-occurrence inputs.',
     }
 
     if (!validateForestTypeContext(context)) {
