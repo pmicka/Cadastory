@@ -150,16 +150,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     ['Estimate local diel detection/activity curves from independent observations', 'Hold out observations when defining period boundaries'],
   ),
   decision(
-    'FW-M08-snow-depth-severity',
-    'reproduce',
-    'snow-winter-severity-context',
-    'P2',
-    true,
-    'The source uses daily snow depth, minimum temperature, and a published winter-severity index definition. These are physical environmental variables available from authoritative observed/modelled snow and temperature products.',
-    'Represent raw snow depth and temperature separately. The Minnesota WSI may be reproduced as provenance/context but must not become a Kentucky biological threshold without transfer review.',
-    ['Cross-check modelled snow depth with nearby authoritative observations during snow events'],
-  ),
-  decision(
     'FW-M09-dense-conifer-cover',
     'calibrated_proxy',
     'conifer-cover-context',
