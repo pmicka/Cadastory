@@ -613,7 +613,11 @@ declare
   v_stale_count integer := 0;
   v_unavailable_count integer := 0;
 begin
-  if p_slug is null or p_slug !~ '^[a-z0-9][a-z0-9-]{0,79}
+  if p_slug is null
+     or length(p_slug)>80
+     or left(p_slug,1)='-'
+     or p_slug ~ '[^a-z0-9-]' then
+    raise exception 'invalid Farm Watch property slug';
   end if;
   if p_as_of_date is null then
     raise exception 'evidence-stack as-of date is required';
