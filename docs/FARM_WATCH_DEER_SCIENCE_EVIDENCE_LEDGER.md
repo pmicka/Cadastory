@@ -452,9 +452,11 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **context-conditional/negative-constraint.**
 
-**Farm Watch mapping:** female biological state + explicit polygonal/linear human-footprint classes + intact deciduous/natural-habitat context + season + predator occurrence/risk context.
+**Farm Watch mapping:** female biological state + explicit polygonal/linear human-footprint classes + source-aligned natural-habitat composition + season + predator occurrence/risk context.
 
-**Measurement-fidelity note:** Omitting the study's camera-derived wolf-occurrence component changes the cumulative-effects model; a human-footprint-only module is not study-aligned.
+**Recovered natural-habitat measurement — 2026-09-25:** The abstract's “intact deciduous forest” description is not a standalone fragmentation variable in the fitted model. Methods/Table 1 operationalize forest composition as AVI percent overstorey canopy dominated by eight leading tree species: trembling aspen (Aw), white birch (Bw), balsam fir (Fb), tamarack (Lt), balsam poplar (Pb), jack pine (Pj), black spruce (Sb), and white spruce (Sw). These percent-cover covariates were extracted at used/available points and standardized before modeling. The seasonal MCP buffers defined availability domains; they were not forest-composition focal windows. Do not substitute generic tree cover, a broad deciduous class, edge density, or fragmentation geometry and call it study-aligned M43.
+
+**Measurement-fidelity note:** Omitting the study's camera-derived wolf-occurrence component changes the cumulative-effects model; a human-footprint-only module is not study-aligned. The source natural model also included distance to open wetland; preserving M43 alone therefore does not reproduce the full natural-habitat model set.
 
 **Blocked rule:** Roads/trails cannot receive a universal deer avoidance penalty. Their effect can reverse with resource configuration and landscape context.
 
