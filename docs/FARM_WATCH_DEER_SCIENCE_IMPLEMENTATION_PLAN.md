@@ -796,9 +796,9 @@ These are contract blockers, not requests to invent replacement proxies. Batch 1
 
 The follow-on resolution pass classifies every currently blocked required measurement in `farm-watch-deer-measurement-resolution.ts` and `FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md`.
 
-Current blocked-measurement disposition counts after the 2026-09-25 mast reconciliation:
+Current blocked-measurement disposition counts after the 2026-09-25 Tier 1 production pass:
 
-- 21 `reproduce`;
+- 17 `reproduce`;
 - 8 `calibrated_proxy`;
 - 6 `remain_unavailable`.
 
@@ -808,7 +808,7 @@ The private `deer-evidence-stack-v1` inventory exposes the completed neutral pro
 
 The 2026 operating posture now separates unresolved science from active engineering work. Individual-state differentiation (FW-M15, FW-M51, FW-M54) is parked because reliable individual differentiation is not part of the current operating model. Repeated/manual or non-core measurements—including current crop identity/stage, explicit hunting sessions/effort, operative-temperature field calibration, movement-defined activity periods, residual winter crop food, and the six intentionally unavailable study-specific variables—are also parked for the 2026 season. These measurements continue to cause abstention where required; parking does not make them satisfied.
 
-Active work is therefore limited to autonomous or bounded one-time/static measurements such as woody canopy, snow/conifer context, building/forest/road/multiscale geometry, Gallina concealment, stand vulnerability, managed food/water feature geometry, forest refuge/extreme-event context, and potential-path agriculture.
+Tier 1 production validation closed FW-M24 building density, FW-M36 road landscape context, FW-M39 exact 1/9 km² study scales, and FW-M45 the explicit extreme-event gate. Active work is therefore limited to the remaining autonomous or bounded one-time/static measurements such as woody canopy, snow/conifer context, multiscale forest composition, Gallina concealment, stand vulnerability, managed food/water feature geometry, forest refuge classes, and potential-path agriculture.
 
 A resolution decision does not itself unblock a deer relationship. Registry alignment changes only after that measurement product is actually implemented and validated.
 
