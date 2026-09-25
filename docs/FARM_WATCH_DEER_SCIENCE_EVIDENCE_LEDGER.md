@@ -259,9 +259,9 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Transfer disposition:** **form-transfer-ready; coefficient-transfer-not-supported.**
 
-**Farm Watch mapping:** oak/mast-producing species distribution + annual mast state (both currently missing), season, distance/availability.
+**Farm Watch mapping:** Batch 5A now supplies the neutral `mast-capacity-v1` spatial species-capacity layer. Batch 5B supplies `mast-resource-context-v1`, which keeps exact-year KDFWR annual mast survey state, property-region relation, and dated property mast observations separate from capacity. Season and distance/availability remain downstream FW-D07 inputs.
 
-**Critical gap:** CDL/canopy/leaf-off structure cannot substitute for annual mast availability.
+**Critical gap / abstention rule:** CDL/canopy/leaf-off structure cannot substitute for annual mast availability, and a prior-year KDFWR survey cannot be carried forward as current-year mast state. As of 2026-09-25 KDFWR still lists 2025 as the latest published Kentucky Mast Survey report, so 2026 annual mast state must remain unavailable until an exact-year report is canonically ingested.
 
 ---
 

@@ -453,7 +453,7 @@ The deer layer can distinguish standing/active crop, probable harvest transition
 
 # Batch 5 — Mast capacity and annual mast state
 
-Status: Batch 5A implementation merged/deployed but production source-transport blocked; Batch 5B annual-production layer not started  
+Status: Batch 5A production complete 2026-09-25; Batch 5B mast-resource context implemented, with exact-year annual state intentionally unavailable when KDFWR has not published/ingested that survey year  
 Priority: P1  
 Ledger dependency: FW-D07.
 
@@ -513,7 +513,23 @@ Do not multiply these into an undocumented “food score” in the neutral produ
 
 ## Exit gate
 
-FW-D07 can consume an explicit current mast state without pretending canopy density equals acorn availability.
+FW-D07 can consume an explicit exact-year mast state without pretending canopy density equals acorn availability. If KDFWR has not published/ingested the requested survey year, the annual component must abstain rather than carrying forward the prior year's rating.
+
+## Batch 5B implementation — 2026-09-25
+
+Batch 5B now has a source-controlled neutral `mast-resource-context-v1` contract and central service-only persistence.
+
+Canonical authoritative records currently include the KDFWR 2024 and 2025 Mast Survey reports with published Table 1 values for statewide, East, and West scopes. The validation property has an explicit `west` survey-region relation derived from Figure 4 of the 2025 KDFWR report; that relation is stored as `derived_from_authoritative_map`, not as a KDFWR property observation.
+
+The context keeps three components separate:
+
+1. the Batch 5A `mast-capacity-v1` materialization;
+2. the exact-year KDFWR annual mast proxy;
+3. dated operator `mast_resource` field observations.
+
+The 2026 row is intentionally `partial`: spatial mast capacity is available, while the annual mast proxy is unavailable because the current KDFWR report index still lists 2025 as the latest report as of 2026-09-25. 2025 values are not carried forward.
+
+The product is also exposed separately in `deer-evidence-stack-v1`; the existing `mast-capacity` product remains independently visible so downstream deer science cannot silently conflate spatial capacity with annual production state.
 
 ---
 

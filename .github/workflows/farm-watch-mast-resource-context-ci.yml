@@ -1,0 +1,41 @@
+name: Farm Watch mast resource context CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-mast-resource-context-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-mast-resource-context-contract.test.ts'
+      - 'supabase/migrations/20260925053000_add_farm_watch_mast_resource_context_v1.sql'
+      - 'docs/FARM_WATCH_MAST_RESOURCE_CONTEXT_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
+      - '.github/workflows/farm-watch-mast-resource-context-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/_shared/farm-watch-mast-resource-context-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-mast-resource-context-contract.test.ts'
+      - 'supabase/migrations/20260925053000_add_farm_watch_mast_resource_context_v1.sql'
+      - '.github/workflows/farm-watch-mast-resource-context-ci.yml'
+
+jobs:
+  mast-resource-context:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check mast resource contract
+        run: deno check supabase/functions/_shared/farm-watch-mast-resource-context-contract.ts
+      - name: Test mast resource contract
+        run: deno test supabase/functions/_shared/farm-watch-mast-resource-context-contract.test.ts
+      - name: Check migration interpretation boundaries
+        run: |
+          set -euo pipefail
+          file='supabase/migrations/20260925053000_add_farm_watch_mast_resource_context_v1.sql'
+          grep -q "applied_prior_year',false" "$file"
+          grep -q "scoring_performed',false" "$file"
+          grep -q "behavioral_inference_performed',false" "$file"
+          grep -q "deer_mast_response_inferred',false" "$file"
+          grep -q "observation_kind='mast_resource'" "$file"
