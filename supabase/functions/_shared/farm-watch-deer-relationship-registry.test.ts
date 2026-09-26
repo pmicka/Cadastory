@@ -107,8 +107,43 @@ Deno.test('production M08 preserves daily snow and minimum temperature without p
 
   const fidelity = deerRelationshipStudyFidelityStatus(relationship)
   assert(!fidelity.blocker_ids.includes('FW-M08-snow-depth-severity'))
-  assert(fidelity.blocker_ids.includes('FW-M09-dense-conifer-cover'))
-  assert(fidelity.status === 'blocked_measurement_alignment')
+  assert(!fidelity.blocker_ids.includes('FW-M09-dense-conifer-cover'))
+  assert(fidelity.status === 'context_only')
+  assert(fidelity.context_only_ids.includes('FW-M10-winter-solar-context'))
+})
+
+Deno.test('production M09 preserves source conifer availability classes as a calibrated proxy', () => {
+  const product = FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['conifer-cover-context']
+  assert(product)
+  assert(product.status === 'production_calibrated_proxy')
+  assert(product.scales.includes('broad_3000m'))
+
+  const relationship = getDeerRelationship('FW-R03-winter-snow-conifer-context')
+  assert(relationship)
+  const requirement = relationship.required_inputs.find((row) => row.key === 'conifer_cover')
+  assert(requirement)
+  assert(JSON.stringify(requirement.allowed_scales) === JSON.stringify(['broad_3000m']))
+  assert(requirement.freshness_policy === 'static_context_ok')
+
+  const conifer = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M09-dense-conifer-cover',
+  )
+  assert(conifer)
+  assert(conifer.alignment === 'calibrated_proxy')
+  assert(/40% to <70%/i.test(conifer.study_variable))
+  assert(/>=70%/i.test(conifer.study_variable))
+  assert(/Annual NLCD Evergreen Forest/i.test(conifer.permitted_use))
+  assert(/Tree Canopy Cover/i.test(conifer.permitted_use))
+  assert(/Mixed Forest \(43\).*other/i.test(conifer.permitted_use))
+  assert(/broad_3000m/i.test(conifer.permitted_use))
+  assert(/KyFromAbove imagery/i.test(conifer.permitted_use))
+  assert(/calibrated proxy/i.test(conifer.limitations.join(' ')))
+  assert(/open-conifer.*not locally image-validated/i.test(conifer.limitations.join(' ')))
+
+  const fidelity = deerRelationshipStudyFidelityStatus(relationship)
+  assert(!fidelity.blocker_ids.includes('FW-M09-dense-conifer-cover'))
+  assert(fidelity.status === 'context_only')
+  assert(fidelity.context_only_ids.includes('FW-M10-winter-solar-context'))
 })
 
 Deno.test('completed mast products are reconciled without promoting regional survey state to property mast abundance', () => {
