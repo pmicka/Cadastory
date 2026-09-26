@@ -104,13 +104,14 @@ Current neutral products that may feed future science-backed deer terms:
 - Batch 5A `mast-capacity-v1`: production 28-species BIGMAP capacity context with modeled capacity kept separate from annual production;
 - Batch 5B `mast-resource-context-v1`: production exact-year KDFWR statewide/regional annual mast proxy with no prior-year carry-forward and optional local observations kept separate;
 - `horizontal-visibility-context-v1`: production neutral physical visibility/obstruction; not a Gallina concealment substitute;
+- `managed-food-feature-context-v1`: production static operator-configured food-plot/managed-forage polygons with reusable geometry, year-specific management state, and explicit known-absence inventory semantics; supplemental feeders/mineral attractants remain separate point observations;
 - roads/trails/buildings and other access geometry already available elsewhere in Farm Watch/Scout.
 
 Important **active** gaps are now restricted to measurements that fit the intended low-maintenance operating model:
 
 - calibrated woody-canopy and low-height concealment measurements where one-time/static calibration is defensible;
 - potential-path agriculture remains active; snow/winter severity, dense-conifer availability, road context, building density, multiscale forest context, exact 1/9 km² analytical scales, the explicit extreme-event gate, and the M47 six-class habitat-distance context are now production-validated;
-- stand-vulnerability and managed food/water feature context only where bounded one-time/static configuration is practical;
+- stand-vulnerability and managed water feature context only where bounded one-time/static configuration is practical; managed-food feature context is now production-resolved;
 - parcel-scale usable water persistence / ephemeral water state, with Batch 7 still pending production deployment.
 
 The following scientifically valid gaps are **parked for the 2026 season** rather than treated as active engineering blockers:
@@ -733,6 +734,7 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 | Fine vegetation structure | moderate-to-strong mechanism evidence; state-specific | strong neutral structure inputs | derive/validate neutral visibility/concealment metric before biological labeling |
 | Mast | strong direct evidence | production substrate complete; 2026 exact-year annual component awaits KDFWR publication | Batch 5A capacity + Batch 5B regional annual proxy are reconciled; property mast abundance remains unknown unless separately observed |
 | Crop resource state | strong | neutral HLS/seasonal substrate available, deer relationship input parked for 2026 | current field crop identity/stage/harvest remains scientifically required but is not an active engineering target this season |
+| Managed food plots / forage | direct mapped-feature requirement in hunting-risk studies | production static-configured; Flat Creek 2026 explicitly confirmed none | no active engineering blocker; reuse configured polygons by year and keep feeders/mineral attractants separate |
 | Woody browse | meaningful winter evidence | unavailable for the cited relationship | parked; do not substitute LiDAR/greenness for palatable twig density |
 | Hunting pressure | strong conditional evidence | scientifically unresolved and parked for 2026 | no repeated hunt/activity logging requirement; module must abstain when pressure is unknown |
 | Roads/trails/human footprint | context dependent | Tier 1 road/building neutral context production-validated | retain neutral geometry/context; never assign a standalone road/building deer sign |
