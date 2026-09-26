@@ -210,6 +210,11 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     scales: ['field','property','local_500m'],
     evidence_states: ['available','known','unavailable'],
   },
+  'managed-water-source-context': {
+    status: 'production_static_configured',
+    scales: ['point','property','local_500m'],
+    evidence_states: ['available','known','unavailable'],
+  },
   'surface-water-state': {
     status: 'implemented_pending_deployment',
     scales: ['property','local_500m','landscape_1500m'],
@@ -1108,7 +1113,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     module_family:'water_hydrology_context',
     response_variable:'water-source visitation frequency',
     required_inputs:[
-      req('water_state',['surface-water-state'],['property','local_500m','landscape_1500m'],['available','known']),
+      req('water_state',['managed-water-source-context','surface-water-state'],['point','property','local_500m','landscape_1500m'],['available','known']),
       req('recent_precipitation',['seasonal-state'],['property','regional'],['available','known','proxy']),
     ],
     biological_state_gates:gate({seasons:['summer'],required_explicit_dimensions:['season']}),
@@ -1124,7 +1129,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     output_kind:'mechanism_context',
     limitations:['Semiarid artificial-water context; no universal central-Kentucky water attraction rule.'],
     study_measurements:[
-      measurement('FW-M48-usable-water-source','water_state','available stock-pond/trough water source','Study visitation response was measured at known artificial water sources; mapped hydrography or regional discharge alone is not equivalent.','unsupported','required','No water-visitation relationship activation until current usable water-source presence is known.'),
+      measurement('FW-M48-usable-water-source','water_state','available stock-pond/trough water source','Study visitation response was measured at known artificial water sources; mapped hydrography or regional discharge alone is not equivalent.','derived_equivalent','required','Production managed-water-source-context reproduces stable artificial-source identity plus explicit dated/year-scoped usable-water state; exact-date surface-water observations remain an alternate direct-observation path.',['A configured source with unknown usability does not satisfy the measurement.','Mapped hydrography, drainage geometry, precipitation, drought, or off-property discharge cannot promote a source to known usable water.']),
       measurement('FW-M49-recent-rainfall','recent_precipitation','recent rainfall preceding water-source visitation','Study visitation frequency was related to recent rainfall.','calibrated_proxy','required','QPE or other gridded precipitation may serve only as a documented rainfall proxy with freshness and spatial uncertainty retained.'),
     ],
     value_constraints:[
