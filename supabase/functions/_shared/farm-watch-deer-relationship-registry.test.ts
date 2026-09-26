@@ -333,6 +333,14 @@ Deno.test('production Tier 1 context measurements are promoted without biologica
     'FW-M45-extreme-hurricane-event',
   ))
   assert(deerRelationshipStudyFidelityStatus(storm).status === 'module_eligible')
+  const activeEventConstraint = storm.value_constraints.find(
+    (row) => row.id === 'FW-C06-extreme-event-active',
+  )
+  assert(activeEventConstraint)
+  assert(activeEventConstraint.binding_key === 'extreme_event')
+  assert(activeEventConstraint.field === 'applicability_state')
+  assert(activeEventConstraint.operator === 'equals')
+  assert(JSON.stringify(activeEventConstraint.values) === JSON.stringify(['active_extreme_event']))
 })
 
 Deno.test('numeric coefficients are rejected when coefficient transfer is not authorized', () => {

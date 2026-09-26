@@ -7,10 +7,13 @@ on:
       - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts'
       - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
       - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-science-evaluator.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-science-evaluator.test.ts'
       - 'supabase/functions/_shared/farm-watch-diel-biological-state.ts'
       - 'supabase/functions/_shared/farm-watch-diel-biological-state.test.ts'
       - 'docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md'
       - 'docs/FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_CONTEXT_V1.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
       - '.github/workflows/farm-watch-deer-relationship-registry-ci.yml'
@@ -32,11 +35,15 @@ jobs:
         run: deno check supabase/functions/_shared/farm-watch-deer-relationship-registry.ts
       - name: Check measurement resolution decisions
         run: deno check supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts
+      - name: Check registry-driven deer evaluator
+        run: deno check supabase/functions/_shared/farm-watch-deer-science-evaluator.ts
       - name: Check Batch 3 registry consumer
         run: deno check supabase/functions/_shared/farm-watch-diel-biological-state.ts
       - name: Test relationship registry and ledger coverage
         run: deno test --allow-read supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts
       - name: Test measurement resolution coverage
         run: deno test supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts
+      - name: Test registry-driven deer evaluator
+        run: deno test supabase/functions/_shared/farm-watch-deer-science-evaluator.test.ts
       - name: Regression test Batch 3 biological state
         run: deno test supabase/functions/_shared/farm-watch-diel-biological-state.test.ts

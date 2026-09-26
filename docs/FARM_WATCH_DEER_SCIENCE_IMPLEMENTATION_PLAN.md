@@ -820,9 +820,11 @@ A resolution decision does not itself unblock a deer relationship. Registry alig
 
 # Batch 10 — First deer-science evaluation modules
 
+Status: registry-driven evaluator implemented as a source-controlled candidate on 2026-09-26; individual relationships still activate, abstain, or remain blocked strictly according to their current registry gates and evidence.
+
 Priority: P0 after required inputs.
 
-Implement modules independently.
+The implementation uses one generic registry executor rather than duplicating each study contract in ad hoc module code. Module families remain independent in output.
 
 ## 10A — thermal-resource tradeoff
 
@@ -901,6 +903,8 @@ Use conservatively. Riparian selection during dispersal and semiarid water visit
 
 # Batch 11 — `deer-science-context-v1`
 
+Status: implementation candidate complete on 2026-09-26; private-endpoint integration is source-controlled but production deployment remains a separate explicit action.
+
 Priority: first production deer-model milestone.
 
 ## Input
@@ -946,6 +950,25 @@ without those becoming “82/100 deer score.”
 Owner-facing output can support maps where authorized. Viewer restrictions on fine structure must still apply to downstream products as required.
 
 The output should explain why a module fired and what would change it.
+
+### v1 evaluator implementation
+
+`farm-watch-deer-science-evaluator-v1` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
+
+- `active`;
+- `not_applicable`;
+- `insufficient_input`;
+- `blocked_measurement_alignment`.
+
+It enforces biological gates, source-study measurement fidelity, required product key/state/scale bindings, value constraints, coefficient-transfer status, and blocked-assumption boundaries. A known biological mismatch or known-false value constraint is kept distinct from an unknown required input.
+
+The private Farm Watch integration accepts optional explicit scenario dimensions and retains unknown dimensions as unknown. Source-aligned M36 road focal context is resolved on demand only for a juvenile-male dispersal scenario that can reach FW-R18.
+
+FW-R22 additionally carries an explicit active-extreme-event value constraint, preventing a healthy no-event state from being mistaken for an active Hurricane Irma relationship.
+
+No relationship is promoted merely because the generic evaluator exists. Parked or unresolved source measurements continue to abstain.
+
+See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V1.md`.
 
 ---
 

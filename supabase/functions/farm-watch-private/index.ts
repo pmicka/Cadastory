@@ -11,6 +11,11 @@ import {
 import {
   FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS,
 } from '../_shared/farm-watch-deer-measurement-resolution.ts'
+import {
+  buildDeerEvaluatorEvidenceFromFarmWatch,
+  evaluateDeerScienceContext,
+  type FarmWatchDeerScienceScenario,
+} from '../_shared/farm-watch-deer-science-evaluator.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -101,6 +106,68 @@ function boundedSlug(value: string | null): string | null {
   if (!value) return DEFAULT_PROPERTY_SLUG
   const normalized = value.trim().toLowerCase()
   return /^[a-z0-9][a-z0-9-]{0,79}$/.test(normalized) ? normalized : null
+}
+
+const DEER_SEX_VALUES = ['male','female','unknown'] as const
+const DEER_AGE_VALUES = ['juvenile','yearling','adult','unknown'] as const
+const DEER_MOVEMENT_VALUES = ['resident','dispersal','unknown'] as const
+const DEER_REPRODUCTIVE_VALUES = [
+  'unknown','nonbreeding','estrus','pregnant','parturition','lactation',
+] as const
+
+type DeerScenarioRequest = {
+  sex: typeof DEER_SEX_VALUES[number]
+  age_class: typeof DEER_AGE_VALUES[number]
+  movement_state: typeof DEER_MOVEMENT_VALUES[number]
+  individual_reproductive_state: typeof DEER_REPRODUCTIVE_VALUES[number]
+}
+
+function enumQueryValue<T extends readonly string[]>(
+  url: URL,
+  key: string,
+  values: T,
+  fallback: T[number],
+): T[number] | null {
+  const raw = url.searchParams.get(key)
+  if (raw == null || raw === '') return fallback
+  const normalized = raw.trim().toLowerCase()
+  return values.includes(normalized as T[number])
+    ? normalized as T[number]
+    : null
+}
+
+function requestedDeerScenario(url: URL): DeerScenarioRequest | null {
+  const sex = enumQueryValue(url, 'deer_sex', DEER_SEX_VALUES, 'unknown')
+  const age = enumQueryValue(url, 'deer_age_class', DEER_AGE_VALUES, 'unknown')
+  const movement = enumQueryValue(
+    url,
+    'deer_movement_state',
+    DEER_MOVEMENT_VALUES,
+    'unknown',
+  )
+  const reproductive = enumQueryValue(
+    url,
+    'deer_reproductive_state',
+    DEER_REPRODUCTIVE_VALUES,
+    'unknown',
+  )
+  if (!sex || !age || !movement || !reproductive) return null
+  return {
+    sex,
+    age_class: age,
+    movement_state: movement,
+    individual_reproductive_state: reproductive,
+  }
+}
+
+function requestedDeerTimestamp(url: URL) {
+  const raw = url.searchParams.get('at')
+  if (!raw) return new Date()
+  if (raw.length > 48) return null
+  const parsed = new Date(raw)
+  if (!Number.isFinite(parsed.getTime())) return null
+  const year = parsed.getUTCFullYear()
+  return year >= 2000 && year <= 2100 ? parsed : null
 }
 
 type Center = { lat: number; lon: number; basis: string; matched_address?: string }
@@ -358,37 +425,81 @@ function calendarDatePlusDays(value: string, days: number): string {
   return date.toISOString().slice(0, 10)
 }
 
-async function readDeerContext(slug: string, now = new Date()) {
+async function readDeerContext(
+  slug: string,
+  now: Date,
+  scenario: DeerScenarioRequest,
+) {
   const asOfDate = louisvilleCalendarDate(now)
   const at = now.toISOString()
 
-  const { data, error } = await admin.rpc('farm_watch_resolve_deer_context_v1_internal', {
-    p_slug: slug,
-    p_as_of_date: asOfDate,
-    p_at: at,
-  })
+  const [contextRead, biologicalRead] = await Promise.all([
+    admin.rpc('farm_watch_resolve_deer_context_v1_internal', {
+      p_slug: slug,
+      p_as_of_date: asOfDate,
+      p_at: at,
+    }),
+    admin.rpc('farm_watch_resolve_deer_biological_state_v1_internal', {
+      p_slug: slug,
+      p_at: at,
+      p_sex: scenario.sex,
+      p_age_class: scenario.age_class,
+      p_movement_state: scenario.movement_state,
+      p_individual_reproductive_state: scenario.individual_reproductive_state,
+    }),
+  ])
 
-  if (error) {
-    console.error('farm_watch_resolve_deer_context_v1_internal failed', error.message)
-    return {
-      status: 'unavailable',
-      as_of_date: asOfDate,
-      at,
-      component_status: {
-        seasonal_state: 'unavailable',
-        diel_photoperiod: 'unavailable',
-        deer_biological_state: 'unavailable',
-        field_phenology: 'unavailable',
-      },
-      seasonal_state: null,
-      diel_photoperiod: null,
-      deer_biological_state: null,
-      field_phenology: null,
-      interpretation_boundary: 'Review-only deer context is temporarily unavailable. No scoring or behavioral inference is performed.',
-    }
+  if (contextRead.error) {
+    console.error(
+      'farm_watch_resolve_deer_context_v1_internal failed',
+      contextRead.error.message,
+    )
+  }
+  if (biologicalRead.error) {
+    console.error(
+      'farm_watch_resolve_deer_biological_state_v1_internal failed',
+      biologicalRead.error.message,
+    )
   }
 
-  return data
+  const base = contextRead.error || !contextRead.data
+    ? {
+        status: 'unavailable',
+        as_of_date: asOfDate,
+        at,
+        component_status: {
+          seasonal_state: 'unavailable',
+          diel_photoperiod: 'unavailable',
+          deer_biological_state: 'unavailable',
+          field_phenology: 'unavailable',
+        },
+        seasonal_state: null,
+        diel_photoperiod: null,
+        deer_biological_state: null,
+        field_phenology: null,
+        interpretation_boundary:
+          'Review-only deer context is temporarily unavailable. No scoring or behavioral inference is performed.',
+      }
+    : contextRead.data
+
+  const biological = biologicalRead.error || !biologicalRead.data
+    ? {
+        status: 'unavailable',
+        at,
+        context: null,
+        reason: 'requested_biological_scenario_unavailable',
+      }
+    : biologicalRead.data
+
+  return {
+    ...base,
+    deer_biological_state: biological,
+    component_status: {
+      ...(base?.component_status || {}),
+      deer_biological_state: biological?.status || 'unavailable',
+    },
+    requested_biological_scenario: scenario,
+  }
 }
 
 function deerScienceReadinessSummary() {
@@ -647,6 +758,12 @@ Deno.serve(async (req: Request) => {
   const slug = boundedSlug(requestUrl.searchParams.get('property'))
   if (!slug) return json({ error: 'invalid property selector' }, 400, origin)
 
+  const deerScenarioRequest = requestedDeerScenario(requestUrl)
+  const deerNow = requestedDeerTimestamp(requestUrl)
+  if (!deerScenarioRequest || !deerNow) {
+    return json({ error: 'invalid deer scenario selector' }, 400, origin)
+  }
+
   const { data: property, error: propertyError } = await admin.rpc('farm_watch_get_property_v1_internal', {
     p_slug: slug,
   })
@@ -772,11 +889,10 @@ Deno.serve(async (req: Request) => {
     }
   }
 
-  const deerNow = new Date()
   const deerAsOfDate = louisvilleCalendarDate(deerNow)
   const tomorrowDate = calendarDatePlusDays(deerAsOfDate, 1)
   const [deerContext, deerEvidenceStack, tomorrowDiel] = await Promise.all([
-    readDeerContext(slug, deerNow),
+    readDeerContext(slug, deerNow, deerScenarioRequest),
     readDeerEvidenceStack(slug, deerAsOfDate),
     readDielPhotoperiod(slug, tomorrowDate),
   ])
@@ -785,6 +901,61 @@ Deno.serve(async (req: Request) => {
     deerContext?.diel_photoperiod,
     tomorrowDiel,
   )
+
+  const biologicalContext = deerContext?.deer_biological_state?.context
+  const evaluatorScenario: FarmWatchDeerScienceScenario = {
+    property_slug: slug,
+    state_code: String(property.state_code || '').toUpperCase(),
+    at: deerNow.toISOString(),
+    sex: deerScenarioRequest.sex,
+    age_class: deerScenarioRequest.age_class,
+    movement_state: deerScenarioRequest.movement_state,
+    individual_reproductive_state:
+      deerScenarioRequest.individual_reproductive_state,
+    season: String(biologicalContext?.season || 'unknown'),
+    diel_period: String(biologicalContext?.diel?.solar_phase || 'unknown'),
+    regional_reproductive_context: String(
+      biologicalContext?.regional_reproductive_context?.phase || 'unavailable',
+    ),
+  }
+
+  let roadFocalContext: any = { status: 'unavailable' }
+  if (
+    evaluatorScenario.sex === 'male' &&
+    evaluatorScenario.age_class === 'juvenile' &&
+    evaluatorScenario.movement_state === 'dispersal'
+  ) {
+    const roadRead = await admin.rpc(
+      'farm_watch_resolve_road_focal_context_v1_internal',
+      { p_slug: slug, p_lon: null, p_lat: null },
+    )
+    if (roadRead.error) {
+      console.error(
+        'farm_watch_resolve_road_focal_context_v1_internal failed',
+        roadRead.error.message,
+      )
+    } else if (roadRead.data) {
+      roadFocalContext = roadRead.data
+    }
+  }
+
+  const evaluatorEvidence = buildDeerEvaluatorEvidenceFromFarmWatch({
+    scenario: evaluatorScenario,
+    deer_context: deerContext,
+    deer_evidence_stack: deerEvidenceStack,
+    managed_food_feature_context:
+      deerEvidenceStack?.managed_food_feature_context,
+    managed_water_source_context:
+      deerEvidenceStack?.managed_water_source_context,
+    hydrology: hydrologyError || !hydrology
+      ? { status: 'unavailable' }
+      : hydrology,
+    road_focal_context: roadFocalContext,
+  })
+  const deerScienceContext = evaluateDeerScienceContext({
+    scenario: evaluatorScenario,
+    evidence: evaluatorEvidence,
+  })
 
   let center = storedCenter(property)
   if (!center) {
@@ -835,6 +1006,7 @@ Deno.serve(async (req: Request) => {
     deer_context: deerContext,
     hunting_daylight_planning: daylightPlanning,
     deer_evidence_stack: deerEvidenceStack,
+    deer_science_context: deerScienceContext,
     access: {
       scope: 'private',
       account_role: normalizedAccountRole,

@@ -3,6 +3,9 @@ const migration = [
   await Deno.readTextFile('supabase/migrations/20260923223500_expose_study_vegetation_height_in_deer_evidence_stack_v1.sql'),
 ].join('\n')
 const edge = await Deno.readTextFile('supabase/functions/farm-watch-private/index.ts')
+const evaluator = await Deno.readTextFile(
+  'supabase/functions/_shared/farm-watch-deer-science-evaluator.ts',
+)
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
@@ -74,5 +77,41 @@ assert(
   edge.includes("surface_water_state: { status: 'unavailable' }"),
   'private edge evidence-stack fallback is incomplete',
 )
+
+for (const required of [
+  'deer-science-context-v1',
+  'farm-watch-deer-science-evaluator-v1',
+  'evaluateDeerRelationship',
+  'evaluateDeerScienceContext',
+  'buildDeerEvaluatorEvidenceFromFarmWatch',
+  'blocked_measurement_alignment',
+  'value_constraint_not_satisfied',
+  'biological_state_unknown',
+  'coefficient_synthesis_performed: false',
+  'behavioral_probability_inferred: false',
+]) assert(evaluator.includes(required), 'missing deer evaluator invariant: ' + required)
+
+for (const required of [
+  'requestedDeerScenario',
+  "'deer_sex'",
+  "'deer_age_class'",
+  "'deer_movement_state'",
+  "'deer_reproductive_state'",
+  "url.searchParams.get('at')",
+  "admin.rpc('farm_watch_resolve_deer_biological_state_v1_internal'",
+  "admin.rpc(\n      'farm_watch_resolve_road_focal_context_v1_internal'",
+  'evaluateDeerScienceContext',
+  'deer_science_context: deerScienceContext',
+]) assert(edge.includes(required), 'private edge is missing deer evaluator binding: ' + required)
+
+for (const forbidden of [
+  'deer_score',
+  'habitat_score',
+  'bedding_score',
+  'movement_score',
+  'water_preference_score',
+]) {
+  assert(!evaluator.includes(forbidden), 'forbidden deer evaluator scoring semantic: ' + forbidden)
+}
 
 console.log('Farm Watch UI evidence-stack invariants passed')

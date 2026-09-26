@@ -226,3 +226,30 @@ It does not implement:
 - a universal deer score.
 
 Those remain Batch 10+ work and must consume this registry rather than recreate scientific rules in ad hoc code.
+
+## Registry consumer — Deer Science Context v1
+
+As of 2026-09-26, the first generic registry consumer is implemented in
+`farm-watch-deer-science-evaluator.ts`.
+
+The evaluator does not duplicate relationship rules. It reads this registry and enforces, in order:
+
+- biological/scenario gates;
+- required study-measurement fidelity;
+- product key, evidence-state, and scale bindings;
+- study-specific value constraints;
+- coefficient-transfer disposition;
+- relationship output kind and direction.
+
+The consumer distinguishes known non-applicability from missing information. For example:
+
+- a resident adult does not inherit a juvenile-male dispersal relationship;
+- a juvenile male whose movement state is unknown yields insufficient input rather than an assumed dispersal state;
+- Flat Creek's explicit absence of managed artificial water fails FW-C05 and therefore cannot activate FW-R23;
+- a healthy current extreme-event poll with no qualifying property intersection fails FW-C06 and therefore cannot activate FW-R22.
+
+`FW-C06-extreme-event-active` requires
+`extreme_event.applicability_state = active_extreme_event`. This closes the prior contract gap where an authoritative known no-event state could otherwise satisfy only the generic product/evidence-state requirement.
+
+The evaluator remains non-synthetic: no universal score or probability is produced, and no numeric coefficient appears unless this registry separately authorizes its transfer.
+
