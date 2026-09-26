@@ -97,7 +97,7 @@ for (const required of [
   "'deer_age_class'",
   "'deer_movement_state'",
   "'deer_reproductive_state'",
-  "requestUrl.searchParams.get('at')",
+  "url.searchParams.get('at')",
   "admin.rpc('farm_watch_resolve_deer_biological_state_v1_internal'",
   "admin.rpc(\n      'farm_watch_resolve_road_focal_context_v1_internal'",
   'evaluateDeerScienceContext',
