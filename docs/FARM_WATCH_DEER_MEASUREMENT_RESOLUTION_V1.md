@@ -47,9 +47,9 @@ Machine posture values:
 - `parked_2026_individual_state` — scientifically preserved, but individual identity/state differentiation is not reliably captured this season;
 - `parked_2026_manual_or_noncore` — scientifically preserved, but the measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or a study-specific variable that is not operationally available.
 
-Current posture counts across the 28 blocked measurements:
+Current posture counts across the 27 blocked measurements:
 
-- **10 active**
+- **9 active**
 - **3 parked — individual state**
 - **15 parked — manual/non-core**
 
@@ -117,7 +117,6 @@ Sullivan et al. and later hunting-risk studies depend on observed or recorded hu
 | FW-M01 | Black-globe operative temperature at 0.5 m | Physical operative-temperature model using air temperature, wind, radiation, terrain/canopy context | P1 | Black-globe logger comparison across sun/shade and vegetation classes |
 | FW-M04 | Woody canopy line-intercept percent | Remote woody-canopy percent from high-resolution imagery/TCC | P1 | Compare against line-intercept measurements |
 | FW-M05 | Movement-defined activity periods | Local deer-activity-period proxy from independent detections | P2 | Estimate/validate local diel activity curves; solar phase alone is insufficient |
-| FW-M09 | Dense conifer cover | Forest type + canopy closure | P2 | Validate conifer class and closure against imagery/field observations |
 | FW-M11 | Gallina directional 2 m concealment profile | Virtual cover-board from terrain + height-specific vegetation + woody continuity + seasonal foliage | P0 | Segmented 2 m target, 15 m distance, directional field observations; holdout validation |
 | FW-M13 | Gallina 0–50 / 50–100 cm concealment | Same virtual cover-board, preserving low strata separately | P0 | Validate each low stratum independently |
 | FW-M26 | Stand-specific hunter vulnerability zone | Seasonal terrain/vegetation viewshed from each stand | P0 | Laser/rangefinder visibility spot checks by bearing; leaf-on/off validation |
@@ -162,7 +161,6 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 - **FW-M11 / FW-M13 — Gallina concealment:** optional calibrated one-time/static configuration path; no bedding-site intrusion is required.
 - **FW-M26 — stand vulnerability zone:** optional calibrated one-time/static stand viewshed path.
 - **FW-M04 — woody canopy:** autonomous/static spatial measurement once calibration is bounded.
-- **FW-M09 — dense conifer cover:** autonomous/static spatial classification once validation is bounded.
 
 ### Active autonomous spatial/environmental work
 
@@ -171,7 +169,7 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 - **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
 - **FW-M56 — agriculture along simulated potential dispersal paths**
 
-The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M08, FW-M24, FW-M35, FW-M36, FW-M39, FW-M45, and FW-M47 are no longer listed here because their production exit gates passed on 2026-09-25.
+The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M08, FW-M09, FW-M24, FW-M35, FW-M36, FW-M39, FW-M45, and FW-M47 are no longer listed here because their production exit gates passed on 2026-09-25.
 
 The six `remain_unavailable` measurements continue to force abstention. Their inclusion in parked D means there is also no 2026 effort to find weak substitutes.
 
@@ -192,7 +190,36 @@ The Minnesota WSI arithmetic is reproduced only as **source provenance/context**
 
 The initial Flat Creek production sample on 2026-09-25 returned 0 cm NOHRSC snow. Because the local day was still in progress, the daily record correctly remained `partial` with minimum temperature pending. The WSI context was `not_applicable` because September is outside its November-May source window.
 
-FW-M08 is therefore no longer a blocked measurement. FW-R03 remains blocked independently on **FW-M09 dense-conifer cover**, so completing M08 does not activate the northern winter-cover relationship.
+FW-M08 is therefore no longer a blocked measurement. M08 by itself did not activate the northern winter-cover relationship; FW-M09 was resolved separately below.
+
+### FW-M09 production resolution — 2026-09-25
+
+FW-M09 has been production-resolved as `conifer-cover-context-v1` with a **calibrated-proxy** disposition.
+
+The source study's vegetation measurement was not generic canopy density. Leaf-off color-infrared aerial photography was used to delineate stands, assign dominant tree species, and classify conifer canopy closure. The source closure classes were open conifer <40%, moderately dense conifer 40% to <70%, and dense conifer ≥70%. The fitted availability categories were moderately dense conifer, dense conifer, and `other`; `other` included open conifer, openings, and hardwoods.
+
+Farm Watch reproduces that class structure with a conservative national source substitution:
+
+- Annual NLCD Evergreen Forest (42) supplies the conifer-dominant type mask;
+- NLCD Tree Canopy Cover supplies modeled percent canopy closure;
+- Annual NLCD Mixed Forest (43) remains `other` rather than being promoted to conifer;
+- the exact <40 / 40–<70 / ≥70% thresholds are retained.
+
+The latest common year across the two source families is used so type and canopy closure are not silently drawn from different years. Initial production validation used matched 2024 land cover + 2024 TCC.
+
+The relationship-binding availability scale is the current barrier-aware `broad_3000m` domain. At Flat Creek this domain is 21.394 km², within the cited study-site area range. Smaller property/500 m/1.5 km summaries remain neutral diagnostics.
+
+Initial Flat Creek broad-domain availability was:
+
+- moderately dense conifer: **0.0421%**;
+- dense conifer: **2.3345%**;
+- other: **97.6235%**.
+
+Bounded transient QA against 2024 KyFromAbove Phase 3 RGB imagery supported the conservative classification: sampled dense cells corresponded to compact evergreen patches, Mixed Forest cells were visibly heterogeneous, and the rare moderate cells occupied edge/partially closed evergreen settings. No open-conifer source cell occurred in the Flat Creek broad domain, so that class was not locally image-validated.
+
+The source substitution remains `calibrated_proxy`, not `derived_equivalent`, because the 30 m national classification/model is not the source air-photo stand interpretation and the moderate class is edge-sensitive.
+
+FW-M09 is no longer a blocked measurement. With FW-M08 and FW-M09 resolved, FW-R03 has no remaining **required measurement-alignment blocker**, but it remains `context_only` because FW-M10 winter solar/thermal exposure is context-only. No Minnesota response coefficient, dense-cover preference, bedding label, or Kentucky winter threshold is transferred.
 
 ### FW-M43 method-definition correction — 2026-09-25
 
