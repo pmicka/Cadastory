@@ -12,7 +12,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 Deno.test('every currently blocked deer study measurement has exactly one resolution decision', () => {
   assert(validateDeerMeasurementResolutionDecisions())
   const blocked = blockedDeerStudyMeasurements()
-  assert(blocked.length === 28, 'expected 28 blocked study measurements')
+  assert(blocked.length === 27, 'expected 27 blocked study measurements')
   assert(FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.length === blocked.length)
   const decisionIds = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS
     .map((row) => row.measurement_id)
@@ -29,7 +29,7 @@ Deno.test('measurement resolution portfolio preserves the three explicit disposi
     { reproduce: 0, calibrated_proxy: 0, remain_unavailable: 0 },
   )
   assert(counts.reproduce === 14)
-  assert(counts.calibrated_proxy === 8)
+  assert(counts.calibrated_proxy === 7)
   assert(counts.remain_unavailable === 6)
 })
 
@@ -64,6 +64,12 @@ Deno.test('production M08 snow/winter severity context leaves the blocked resolu
   assert(getDeerMeasurementResolutionDecision('FW-M08-snow-depth-severity') === null)
 })
 
+Deno.test('production M09 conifer-cover proxy leaves the blocked resolution queue', () => {
+  const blocked = blockedDeerStudyMeasurements()
+  assert(!blocked.some((row) => row.id === 'FW-M09-dense-conifer-cover'))
+  assert(getDeerMeasurementResolutionDecision('FW-M09-dense-conifer-cover') === null)
+})
+
 Deno.test('completed Batch 5 mast annual state leaves the blocked resolution queue as a regional calibrated proxy', () => {
   const blocked = blockedDeerStudyMeasurements()
   const mast = getDeerMeasurementResolutionDecision('FW-M17-annual-mast-fall')
@@ -83,7 +89,7 @@ Deno.test('2026 operating posture parks individual-state and manual/non-core mea
       parked_2026_manual_or_noncore: 0,
     },
   )
-  assert(counts.active === 10)
+  assert(counts.active === 9)
   assert(counts.parked_2026_individual_state === 3)
   assert(counts.parked_2026_manual_or_noncore === 15)
 
