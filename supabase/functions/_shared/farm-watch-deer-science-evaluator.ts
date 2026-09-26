@@ -160,7 +160,7 @@ function evaluateBiologicalGate(
 
   for (const [dimension, actual, allowed] of checks) {
     if (!allowed?.length || !knownDimension(actual)) continue
-    if (!allowed.includes(actual as never)) {
+    if (!(allowed as readonly string[]).includes(actual)) {
       mismatches.push({ dimension, actual, allowed: [...allowed] })
     }
   }
