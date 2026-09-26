@@ -216,7 +216,7 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     evidence_states: ['available','known','unavailable'],
   },
   'surface-water-state': {
-    status: 'implemented_pending_deployment',
+    status: 'production',
     scales: ['property','local_500m','landscape_1500m'],
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
