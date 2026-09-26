@@ -4,6 +4,13 @@ import {
   farmWatchPresentationCapabilities,
   normalizeFarmWatchAccountRole,
 } from '../_shared/farm-watch-presentation-policy.ts'
+import {
+  FARM_WATCH_DEER_RELATIONSHIPS,
+  deerRelationshipStudyFidelityStatus,
+} from '../_shared/farm-watch-deer-relationship-registry.ts'
+import {
+  FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS,
+} from '../_shared/farm-watch-deer-measurement-resolution.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -384,25 +391,133 @@ async function readDeerContext(slug: string, now = new Date()) {
   return data
 }
 
-async function readDeerEvidenceStack(slug: string, asOfDate = louisvilleCalendarDate(new Date())) {
-  const { data, error } = await admin.rpc('farm_watch_get_deer_evidence_stack_v1_internal', {
-    p_slug: slug,
-    p_as_of_date: asOfDate,
-  })
+function deerScienceReadinessSummary() {
+  const active = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS
+    .filter((row) => row.operational_posture === 'active')
+    .map((row) => {
+      const bindings = FARM_WATCH_DEER_RELATIONSHIPS.flatMap((relationship) =>
+        relationship.study_measurements
+          .filter((measurement) => measurement.id === row.measurement_id)
+          .map((measurement) => ({
+            relationship_id: relationship.relationship_id,
+            relationship_title: relationship.title,
+            study_variable: measurement.study_variable,
+          }))
+      )
+      return {
+        measurement_id: row.measurement_id,
+        study_variable: bindings[0]?.study_variable || row.measurement_id,
+        disposition: row.disposition,
+        target_product: row.target_product,
+        priority: row.priority,
+        relationship_ids: bindings.map((binding) => binding.relationship_id),
+        relationship_titles: bindings.map((binding) => binding.relationship_title),
+        validation: row.validation,
+        operational_note: row.operational_note,
+      }
+    })
 
-  if (error) {
-    console.error('farm_watch_get_deer_evidence_stack_v1_internal failed', error.message)
-    return {
-      status: 'unavailable',
-      schema: 'deer-evidence-stack-v1',
-      as_of_date: asOfDate,
-      products: {},
-      surface_water_state: { status: 'unavailable' },
-      interpretation_boundary:
-        'Neutral evidence inventory is temporarily unavailable. No scoring or behavioral inference is performed.',
-    }
+  const parkedIndividual = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.filter(
+    (row) => row.operational_posture === 'parked_2026_individual_state',
+  )
+  const parkedManual = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.filter(
+    (row) => row.operational_posture === 'parked_2026_manual_or_noncore',
+  )
+
+  const fidelityRows = FARM_WATCH_DEER_RELATIONSHIPS.map((relationship) => ({
+    relationship_id: relationship.relationship_id,
+    title: relationship.title,
+    module_family: relationship.module_family,
+    ...deerRelationshipStudyFidelityStatus(relationship),
+  }))
+  const fidelityCounts = fidelityRows.reduce(
+    (counts, row) => {
+      counts[row.status] += 1
+      return counts
+    },
+    {
+      module_eligible: 0,
+      context_only: 0,
+      blocked_measurement_alignment: 0,
+    },
+  )
+
+  return {
+    schema: 'deer-science-readiness-v1',
+    status: active.length ? 'field_calibration_remaining' : 'no_active_measurement_work',
+    blocked_measurement_count: FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.length,
+    active_measurement_count: active.length,
+    active_measurements: active,
+    parked_measurement_count: parkedIndividual.length + parkedManual.length,
+    parked_counts: {
+      individual_state: parkedIndividual.length,
+      manual_or_noncore: parkedManual.length,
+    },
+    relationship_fidelity_counts: fidelityCounts,
+    interpretation_boundary:
+      'Science-contract readiness only. Relationship fidelity does not establish current property applicability, individual deer state, coefficient transfer, or a deer-use prediction.',
   }
-  return data
+}
+
+async function readDeerEvidenceStack(slug: string, asOfDate = louisvilleCalendarDate(new Date())) {
+  const [stackRead, managedFoodRead, managedWaterRead] = await Promise.all([
+    admin.rpc('farm_watch_get_deer_evidence_stack_v1_internal', {
+      p_slug: slug,
+      p_as_of_date: asOfDate,
+    }),
+    admin.rpc('farm_watch_get_managed_food_feature_context_v1_internal', {
+      p_slug: slug,
+      p_as_of_date: asOfDate,
+    }),
+    admin.rpc('farm_watch_get_managed_water_source_context_v1_internal', {
+      p_slug: slug,
+      p_as_of_date: asOfDate,
+    }),
+  ])
+
+  if (stackRead.error) {
+    console.error('farm_watch_get_deer_evidence_stack_v1_internal failed', stackRead.error.message)
+  }
+  if (managedFoodRead.error) {
+    console.error('farm_watch_get_managed_food_feature_context_v1_internal failed', managedFoodRead.error.message)
+  }
+  if (managedWaterRead.error) {
+    console.error('farm_watch_get_managed_water_source_context_v1_internal failed', managedWaterRead.error.message)
+  }
+
+  const base = stackRead.error || !stackRead.data
+    ? {
+        status: 'unavailable',
+        schema: 'deer-evidence-stack-v1',
+        as_of_date: asOfDate,
+        products: {},
+        surface_water_state: { status: 'unavailable' },
+        interpretation_boundary:
+          'Neutral evidence inventory is temporarily unavailable. No scoring or behavioral inference is performed.',
+      }
+    : stackRead.data
+
+  return {
+    ...base,
+    managed_food_feature_context: managedFoodRead.error || !managedFoodRead.data
+      ? {
+          status: 'unavailable',
+          schema: 'managed-food-feature-context-v1',
+          as_of_date: asOfDate,
+          inventory_status: 'unknown',
+        }
+      : managedFoodRead.data,
+    managed_water_source_context: managedWaterRead.error || !managedWaterRead.data
+      ? {
+          status: 'unavailable',
+          schema: 'managed-water-source-context-v1',
+          as_of_date: asOfDate,
+          inventory_status: 'unknown',
+          current_presence_state: 'managed_source_state_unknown',
+        }
+      : managedWaterRead.data,
+    science_readiness: deerScienceReadinessSummary(),
+  }
 }
 
 async function readDielPhotoperiod(slug: string, solarDate: string) {
