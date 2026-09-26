@@ -12,7 +12,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 Deno.test('every currently blocked deer study measurement has exactly one resolution decision', () => {
   assert(validateDeerMeasurementResolutionDecisions())
   const blocked = blockedDeerStudyMeasurements()
-  assert(blocked.length === 27, 'expected 27 blocked study measurements')
+  assert(blocked.length === 25, 'expected 25 blocked study measurements')
   assert(FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.length === blocked.length)
   const decisionIds = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS
     .map((row) => row.measurement_id)
@@ -28,7 +28,7 @@ Deno.test('measurement resolution portfolio preserves the three explicit disposi
     },
     { reproduce: 0, calibrated_proxy: 0, remain_unavailable: 0 },
   )
-  assert(counts.reproduce === 14)
+  assert(counts.reproduce === 12)
   assert(counts.calibrated_proxy === 7)
   assert(counts.remain_unavailable === 6)
 })
@@ -89,7 +89,7 @@ Deno.test('2026 operating posture parks individual-state and manual/non-core mea
       parked_2026_manual_or_noncore: 0,
     },
   )
-  assert(counts.active === 9)
+  assert(counts.active === 7)
   assert(counts.parked_2026_individual_state === 3)
   assert(counts.parked_2026_manual_or_noncore === 15)
 
@@ -159,11 +159,11 @@ Deno.test('low hunting pressure is reproduced as explicit effort and not a unive
   assert(/universal.*threshold/i.test(decision.rationale + ' ' + decision.implementation_boundary))
 })
 
-Deno.test('hunting food relationships bind to explicit managed food features', () => {
+Deno.test('production managed-food context closes M29 and M32 measurement blockers', () => {
+  const blocked = blockedDeerStudyMeasurements()
   for (const id of ['FW-M29-food-opportunity','FW-M32-abundant-food-risk']) {
-    const decision = getDeerMeasurementResolutionDecision(id)
-    assert(decision?.disposition === 'reproduce')
-    assert(decision?.target_product === 'managed-food-feature-context')
+    assert(!blocked.some((row) => row.id === id), id)
+    assert(getDeerMeasurementResolutionDecision(id) === null, id)
   }
 })
 
