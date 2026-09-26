@@ -141,6 +141,7 @@ The first production deer output should be a vector of evidence-backed module re
 | `mast-resource-context-v1` | annual/seasonal resource proxy | USFS TreeMap/BIGMAP + Kentucky mast survey | build |
 | `horizontal-visibility-context-v1` | gridded physical | LiDAR + terrain | build |
 | `surface-water-state-v1` | dated physical/proxy | 3DHP/NWI + DEM + QPE/soil moisture + observations | build |
+| `managed-food-feature-context-v1` | static/year-scoped configured resource geometry | explicit owner-configured food plots/managed forage + year-specific state | production |
 | `human-activity-context-v1` | event/state | explicit owner/operator observations | build |
 | `diel-photoperiod-context-v1` | deterministic state | date/time/location solar geometry | production |
 

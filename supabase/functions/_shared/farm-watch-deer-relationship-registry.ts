@@ -205,6 +205,11 @@ export const FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG = Object.freeze({
     scales: ['property','local_500m','landscape_1500m'],
     evidence_states: ['available','known','proxy','stale','unavailable'],
   },
+  'managed-food-feature-context': {
+    status: 'production_static_configured',
+    scales: ['field','property','local_500m'],
+    evidence_states: ['available','known','unavailable'],
+  },
   'surface-water-state': {
     status: 'implemented_pending_deployment',
     scales: ['property','local_500m','landscape_1500m'],
@@ -847,7 +852,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     response_variable:'fine-scale habitat selection',
     required_inputs:[
       req('human_activity',['human-activity-context'],['event_local','local_500m'],['available','known']),
-      req('resource_state',['field-phenology-context','browse-resource-context'],['field','local_500m'],['available','known','proxy']),
+      req('resource_state',['managed-food-feature-context'],['field','property','local_500m'],['available','known']),
       req('diel_state',['diel-photoperiod-context'],['property']),
       req('biological_state',['deer-biological-state'],['individual_scenario']),
     ],
@@ -865,7 +870,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     limitations:['Reported magnitude is not a transferable Kentucky multiplier.'],
     study_measurements:[
       measurement('FW-M28-daily-hunter-activity','human_activity','daily hunter-use intensity / hunter-selected space','Study compared adult-male selection against contemporaneous hunter activity and hunter-selected landscape characteristics.','unsupported','required','No relationship activation until hunter-use intensity is represented rather than inferred from season or stand geometry.'),
-      measurement('FW-M29-food-opportunity','resource_state','food-resource opportunity','Study documented time-dependent use of food resources under hunting risk.','mechanism_context_only','required','Field phenology/browse layers are related resource context but not yet a study-aligned food-availability measurement.'),
+      measurement('FW-M29-food-opportunity','resource_state','food-resource opportunity','Study documented time-dependent use of food plots under hunting risk.','derived_equivalent','required','Production managed-food-feature-context reproduces explicit food-plot/managed-forage geometry plus year-specific current/absent management state. Confirmed-none is retained as known absence rather than missing data.',['Does not infer forage chemistry, nutritional quality, deer attraction, or feeder effects.']),
       measurement('FW-M30-risk-diel-period','diel_state','day versus night risk context','Study contrast depended on hunting-risk availability by time of day.','mechanism_context_only','context_only','Solar phase provides timing context but does not by itself establish hunting risk.'),
     ],
   }),
@@ -878,7 +883,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     response_variable:'sex- and time-specific cover/resource selection',
     required_inputs:[
       req('human_activity',['human-activity-context'],['event_local','local_500m'],['available','known']),
-      req('resource_state',['field-phenology-context','browse-resource-context'],['field','local_500m'],['available','known','proxy']),
+      req('resource_state',['managed-food-feature-context'],['field','property','local_500m'],['available','known']),
       req('biological_state',['deer-biological-state'],['individual_scenario']),
       req('diel_state',['diel-photoperiod-context'],['property']),
     ],
@@ -896,7 +901,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     limitations:['No sex-neutral collapse is authorized.'],
     study_measurements:[
       measurement('FW-M31-frequent-hunt-risk','human_activity','frequency/intensity of hunted areas','Study contrasted adult male and female use of areas hunted more frequently.','unsupported','required','No sex-specific risk tradeoff activation until hunting frequency/intensity is measured.'),
-      measurement('FW-M32-abundant-food-risk','resource_state','abundant food within risky areas','Study female/male contrast depended on risky areas containing abundant food resources.','unsupported','required','Generic field presence or vegetation greenness cannot substitute for abundant food availability.'),
+      measurement('FW-M32-abundant-food-risk','resource_state','forage-rich risky areas represented by mapped food plots / study-relevant managed cover','Study female/male contrast depended on risky areas containing mapped food plots or study-relevant cover types rather than remotely inferred forage chemistry.','derived_equivalent','required','Production managed-food-feature-context preserves explicit polygon class, cover type when known, and year-specific management state; it may represent known absence but does not claim measured nutrient abundance.',['Supplemental feeders and mineral attractants remain separate point observations and do not satisfy this measurement.']),
     ],
   }),
   record({

@@ -19,10 +19,10 @@ A resolution decision is about **input measurement fidelity**, not biological tr
 
 ## Portfolio
 
-The current blocked set contains 30 required study measurements:
+The current blocked set contains 25 required study measurements:
 
-- **16 reproduce**
-- **8 calibrated proxy**
+- **12 reproduce**
+- **7 calibrated proxy**
 - **6 remain unavailable**
 
 Resolved since this contract was created:
@@ -31,6 +31,7 @@ Resolved since this contract was created:
 - **FW-M17 — annual mast fall / production:** Batch 5A + 5B now provide production mast capacity plus exact-year KDFWR statewide/regional mast state. The registry promotes FW-M17 from `unsupported` to `calibrated_proxy` **only at the authoritative regional-survey scope**. This does not establish property mast abundance, does not authorize prior-year carry-forward, and does not make the modeled capacity layer annual production.
 - **FW-M24 — building/development density:** production `human-footprint-context-v1` supplies the FEMA USA Structures count/density over the exact 10.36 km² Delisle landscape area and now records live service edit dates, local feature production/imagery vintage coverage, the source's >450 sq ft inventory threshold, and explicit unquantified spatial completeness. It remains `derived_equivalent`; no claim of census-complete building capture is made.
 - **FW-M36 — road landscape context:** production `human-footprint-context-v1` preserves canonical road geometry and `road-focal-context-v1` now supplies an on-demand 10 m distance-to-nearest-road grid with mean 30/90/270 m focal extraction. This closes the physical measurement path while recording the OSM-for-TIGER source substitution; the measurement remains `derived_equivalent` and assigns no road-response sign.
+- **FW-M29 / FW-M32 — managed food feature geometry:** production `managed-food-feature-context-v1` now stores stable operator-configured food-plot/managed-forage polygons separately from year-specific management state, with an explicit per-year inventory state so `confirmed_none` is a known absence rather than missing data. Both measurements are promoted to `derived_equivalent`; supplemental feeders and mineral attractants remain separate point observations.
 - **FW-M39 — D16 study scales:** production `multiscale-cover-context-v1` supplies exact 1 km² and 9 km² analytical windows; promoted to `derived_equivalent`. North Dakota hunting-unit geometry remains untransferred.
 - **FW-M45 — extreme hurricane event:** production `extreme-weather-event-context-v1` supplies an authoritative NWS tropical/extreme-wind event + footprint + time gate. The v2 source-health contract returns `not_applicable` only after a fresh successful jurisdiction poll, and fails closed on stale/failed polling or unresolved qualifying alert geometry; ordinary weather remains excluded. The measurement remains `derived_equivalent`.
 - **FW-M35 — multiscale forest landscape context:** `multiscale-forest-context-v1` reproduces 10 m tree-class forest proportion and built-excluded internal forest-edge density at 30/90/270 m. The open Sentinel-2 annual LULC classifier is a documented substitution for the study Dynamic World 2015–2019 composite; no forest-response sign or Stephens coefficient transfers.
@@ -47,9 +48,9 @@ Machine posture values:
 - `parked_2026_individual_state` — scientifically preserved, but individual identity/state differentiation is not reliably captured this season;
 - `parked_2026_manual_or_noncore` — scientifically preserved, but the measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or a study-specific variable that is not operationally available.
 
-Current posture counts across the 27 blocked measurements:
+Current posture counts across the 25 blocked measurements:
 
-- **9 active**
+- **7 active**
 - **3 parked — individual state**
 - **15 parked — manual/non-core**
 
@@ -92,9 +93,7 @@ These remain scientifically explicit, but no 2026 implementation effort should b
 | FW-M20 | Corn stage / harvest | Represent explicit field-level tasseling/silking or harvested state; direct/accepted observation first | P0 | Raw HLS trajectory alone cannot promote crop stage |
 | FW-M25 | Dated stand hunt | Record actual stand-specific hunt sessions with start/end time | P0 | Hunting season or stand presence is not a hunt event |
 | FW-M28 | Daily hunter activity | Derive hunter use/intensity from known sessions and access activity | P0 | Off-property or unlogged activity remains unknown |
-| FW-M29 | Food opportunity in adult-male hunting study | Bind to explicit food-plot / managed-food feature geometry and current management state | P1 | Generic vegetation greenness is not the study resource |
 | FW-M31 | Frequent hunting risk | Derive event frequency / hunter-hours over explicit windows | P0 | Stand presence does not imply hunting frequency |
-| FW-M32 | Forage-rich risky areas | Bind to explicit mapped food plots / study-relevant cover types | P1 | Does not claim measured nutrient abundance |
 | FW-M33 | Low hunting pressure | Represent quantitative hunter effort density and compare with source context | P0 | Do not invent a universal low/high threshold |
 | FW-M43 | AVI species-specific overstorey composition (“intact deciduous forest” shorthand) | Reproduce point-extracted percent overstorey composition for the source tree-species family, or keep unresolved until a defensible source-equivalent species-composition method exists | P2 | Generic Trees/TCC, broad deciduous class, edge density or fragmentation is not equivalent; does not make the rest of FW-D17 available |
 | FW-M48 | Usable water source | Represent current stock-pond/trough availability by managed-source inventory or dated observation | P1 | Hydrography/gauge context cannot prove usable source presence |
@@ -164,7 +163,6 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 
 ### Active autonomous spatial/environmental work
 
-- **FW-M29 / FW-M32 — explicit managed-food feature geometry**
 - **FW-M43 — AVI species-specific overstorey composition (“intact deciduous forest” shorthand)**
 - **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
 - **FW-M56 — agriculture along simulated potential dispersal paths**
@@ -220,6 +218,25 @@ Bounded transient QA against 2024 KyFromAbove Phase 3 RGB imagery supported the 
 The source substitution remains `calibrated_proxy`, not `derived_equivalent`, because the 30 m national classification/model is not the source air-photo stand interpretation and the moderate class is edge-sensitive.
 
 FW-M09 is no longer a blocked measurement. With FW-M08 and FW-M09 resolved, FW-R03 has no remaining **required measurement-alignment blocker**, but it remains `context_only` because FW-M10 winter solar/thermal exposure is context-only. No Minnesota response coefficient, dense-cover preference, bedding label, or Kentucky winter threshold is transferred.
+
+### FW-M29 / FW-M32 production resolution — 2026-09-25
+
+FW-M29 and FW-M32 are production-resolved as `managed-food-feature-context-v1`.
+
+The product is deliberately configuration-first rather than a chemistry or remote-sensing model:
+
+- stable polygons are stored once for `food_plot`, `managed_forage_area`, or `study_relevant_managed_cover`;
+- year-specific feature state is stored separately as `active`, `inactive`, or `unknown`;
+- a property/year inventory explicitly distinguishes `confirmed_none`, `configured`, and `unknown`;
+- the internal reader returns known absence when the inventory is explicitly empty rather than treating zero polygons as missing data.
+
+Flat Creek is configured as `confirmed_none` for 2026 because the owner confirmed there are no food plots or managed forage areas on the property this year.
+
+The existing deer feeder is separately documented as a large corn `supplemental_feed_point`. The salt block identified on 2026-09-25 is separately documented as a `mineral_attractant_point` at the existing three-way canonical trail junction `[-84.8850346, 38.3234328]`, whose trail topology was independently verified as three incident segments. Neither point is promoted into a managed-food polygon, and the verification screenshot is not persisted.
+
+Both study measurements are promoted to `derived_equivalent` because Farm Watch now reproduces the mapped managed-food feature form and current/absent seasonal state. This does **not** claim forage chemistry, nutrient abundance, deer attraction, or feeder/mineral effects.
+
+The downstream hunting-risk relationships remain blocked for their independent human-activity requirements: FW-R15 still requires FW-M28 daily hunter activity, and FW-R16 still requires FW-M31 frequent-hunt risk.
 
 ### FW-M43 method-definition correction — 2026-09-25
 
