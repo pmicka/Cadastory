@@ -593,3 +593,20 @@ Deno.test('Batch 9 remains a relationship contract and does not produce a univer
     assert(!encoded.includes(forbidden))
   }
 })
+
+
+Deno.test('R08 crepuscular mechanism context is limited to civil twilight', () => {
+  const row = getDeerRelationship('FW-R08-reproductive-diel-movement-context')
+  assert(row)
+  assert(
+    JSON.stringify(row.biological_state_gates.diel_periods) ===
+      JSON.stringify(['morning_civil_twilight','evening_civil_twilight']),
+  )
+  assert(
+    row.biological_state_gates.required_explicit_dimensions.includes(
+      'diel_period',
+    ),
+  )
+  assert(row.output_kind === 'mechanism_context')
+  assert(deerRelationshipStudyFidelityStatus(row).status === 'context_only')
+})
