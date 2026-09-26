@@ -1,6 +1,8 @@
 const migration = [
   await Deno.readTextFile('supabase/migrations/20260923012000_add_farm_watch_deer_evidence_stack_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260923223500_expose_study_vegetation_height_in_deer_evidence_stack_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260925161000_expose_deer_tier1_context_in_evidence_stack_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260926104500_restore_farm_watch_deer_evidence_stack_study_height_v1.sql'),
 ].join('\n')
 const edge = await Deno.readTextFile('supabase/functions/farm-watch-private/index.ts')
 const evaluator = await Deno.readTextFile(
@@ -45,6 +47,19 @@ assert(
   !/grant execute on function public\.farm_watch_get_deer_evidence_stack_v1_internal[\s\S]{0,120}\b(anon|authenticated)\b/i.test(migration),
   'public wrapper must remain service-role only',
 )
+
+for (const rpc of [
+  'farm_watch_get_managed_food_feature_context_v1_internal',
+  'farm_watch_get_managed_water_source_context_v1_internal',
+]) {
+  assert(
+    migration.includes(`create or replace function public.${rpc}(`) &&
+    migration.includes(`revoke all on function public.${rpc}(text,date)`) &&
+    migration.includes(`grant execute on function public.${rpc}(text,date)`) &&
+    migration.includes('to service_role'),
+    'private managed-context PostgREST wrapper is missing: ' + rpc,
+  )
+}
 
 for (const forbidden of [
   'deer_score',
