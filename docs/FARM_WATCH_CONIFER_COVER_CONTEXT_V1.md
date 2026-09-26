@@ -83,6 +83,8 @@ The worker downloads aligned nearest-neighbor 30 m rasters once over the current
 
 The product records both exact polygon area and center-sampled raster area. Landscape-domain identity is part of persistence identity; a domain change makes the stored product stale.
 
+Deterministic identity includes the property boundary, landscape-domain identity, common source year, source-service metadata hashes, exported raster hashes, classification contract, and normalized scientific context. The top-level retrieval timestamp is stored as provenance but is excluded from the content hash. Consecutive unchanged production refreshes were verified to retain the same identity while `retrieved_at` advanced.
+
 The deer relationship registry binds M09 at `broad_3000m`. Property, 500 m, and 1.5 km outputs are diagnostic physical context.
 
 ## Evidence state
@@ -104,7 +106,7 @@ Validation property: `validation-property-01` / Flat Creek Test Property.
 
 Production identity:
 
-`a39be9acd584c5e95f4e8e506594802385bf3314e7271f6ef114de9737b3ce67`
+`3a01b1c88aa92769ebf37955c1c8b7be99844af374b3f9224934868c7936840a`
 
 Common source year: **2024**.
 
