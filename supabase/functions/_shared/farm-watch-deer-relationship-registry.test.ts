@@ -167,6 +167,32 @@ Deno.test('completed mast products are reconciled without promoting regional sur
   ))
 })
 
+Deno.test('M29 and M32 use explicit managed-food configuration rather than generic greenness', () => {
+  const product = FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['managed-food-feature-context']
+  assert(product)
+  assert(product.status === 'production_static_configured')
+  assert(product.evidence_states.includes('known'))
+
+  for (const [relationshipId, measurementId, remainingBlocker] of [
+    ['FW-R15-adult-male-hunter-space-time','FW-M29-food-opportunity','FW-M28-daily-hunter-activity'],
+    ['FW-R16-sex-risk-food-tradeoff','FW-M32-abundant-food-risk','FW-M31-frequent-hunt-risk'],
+  ] as const) {
+    const relationship = getDeerRelationship(relationshipId)
+    assert(relationship)
+    const resource = relationship.required_inputs.find((row) => row.key === 'resource_state')
+    assert(resource)
+    assert(JSON.stringify(resource.product_keys) === JSON.stringify(['managed-food-feature-context']))
+    assert(resource.allowed_evidence_states.includes('known'))
+
+    const measurement = relationship.study_measurements.find((row) => row.id === measurementId)
+    assert(measurement)
+    assert(measurement.alignment === 'derived_equivalent')
+    assert(/managed-food-feature-context/i.test(measurement.permitted_use))
+    assert(!deerRelationshipStudyFidelityStatus(relationship).blocker_ids.includes(measurementId))
+    assert(deerRelationshipStudyFidelityStatus(relationship).blocker_ids.includes(remainingBlocker))
+  }
+})
+
 Deno.test('production Tier 1 context measurements are promoted without biological overreach', () => {
   assert(
     FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['human-footprint-context'].status ===
