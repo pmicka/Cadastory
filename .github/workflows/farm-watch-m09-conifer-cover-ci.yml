@@ -1,0 +1,70 @@
+name: Farm Watch M09 conifer cover CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-conifer-cover-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-conifer-cover-contract.test.ts'
+      - 'supabase/functions/farm-watch-conifer-cover-context/index.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
+      - 'supabase/migrations/20260926000405_add_farm_watch_m09_conifer_cover_context_v1.sql'
+      - 'docs/FARM_WATCH_CONIFER_COVER_CONTEXT_V1.md'
+      - 'docs/FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
+      - '.github/workflows/farm-watch-m09-conifer-cover-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/functions/_shared/farm-watch-conifer-cover-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-conifer-cover-contract.test.ts'
+      - 'supabase/functions/farm-watch-conifer-cover-context/index.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
+      - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
+      - 'supabase/migrations/20260926000405_add_farm_watch_m09_conifer_cover_context_v1.sql'
+      - 'docs/FARM_WATCH_CONIFER_COVER_CONTEXT_V1.md'
+      - '.github/workflows/farm-watch-m09-conifer-cover-ci.yml'
+
+jobs:
+  m09-conifer-cover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check M09 contract
+        run: deno check supabase/functions/_shared/farm-watch-conifer-cover-contract.ts
+      - name: Test M09 contract
+        run: deno test supabase/functions/_shared/farm-watch-conifer-cover-contract.test.ts
+      - name: Check M09 worker
+        run: deno check supabase/functions/farm-watch-conifer-cover-context/index.ts
+      - name: Test deer measurement resolution
+        run: deno test supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts
+      - name: Test deer relationship registry
+        run: deno test --allow-read supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts
+      - name: Check M09 science boundaries
+        run: |
+          set -euo pipefail
+          contract='supabase/functions/_shared/farm-watch-conifer-cover-contract.ts'
+          worker='supabase/functions/farm-watch-conifer-cover-context/index.ts'
+          migration='supabase/migrations/20260926000405_add_farm_watch_m09_conifer_cover_context_v1.sql'
+          registry='supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
+          grep -q "moderateMinimumPercent: 40" "$contract"
+          grep -q "denseMinimumPercent: 70" "$contract"
+          grep -q "measurementAlignment: 'calibrated_proxy'" "$contract"
+          grep -q "landcoverValue !== p.evergreenLandcoverValue" "$contract"
+          grep -q "commonSourceYear" "$worker"
+          grep -q "mixed_forest_treatment" "$worker"
+          grep -q "farm_watch_validate_materialization_worker_v1_internal" "$worker"
+          grep -q "deer_inference_performed: false" "$worker"
+          grep -q "coefficient_transfer_performed: false" "$worker"
+          grep -q "scoring_performed: false" "$worker"
+          grep -q "broad_3000m" "$registry"
+          grep -q "production_calibrated_proxy" "$registry"
+          grep -q "Mixed Forest (43)" "$registry"
+          grep -q "property_conifer_cover_context_v1" "$migration"
