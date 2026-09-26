@@ -30,6 +30,16 @@ export const FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT = Object.freeze({
 export type FarmWatchDeerScienceRelationshipStatus =
   typeof FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.statusVocabulary[number]
 
+export const FARM_WATCH_DEER_DECISION_RELEVANCE = Object.freeze([
+  'directional_signal',
+  'mechanism_context',
+  'negative_constraint',
+  'abstained',
+] as const)
+
+export type FarmWatchDeerDecisionRelevance =
+  typeof FARM_WATCH_DEER_DECISION_RELEVANCE[number]
+
 export type FarmWatchDeerEvaluatorEvidence = {
   product_key: DeerRelationshipProductKey
   evidence_state: DeerRelationshipEvidenceState
@@ -331,6 +341,37 @@ function evaluateConstraints(
   })
 }
 
+function activeDecisionRelevance(relationship: DeerRelationshipRecord): {
+  decision_relevance: FarmWatchDeerDecisionRelevance
+  decision_actionable: boolean
+} {
+  if (
+    relationship.output_kind === 'quantitative_relative_selection' ||
+    relationship.output_kind === 'ordinal_directional'
+  ) {
+    return {
+      decision_relevance: 'directional_signal',
+      decision_actionable: true,
+    }
+  }
+  if (relationship.output_kind === 'mechanism_context') {
+    return {
+      decision_relevance: 'mechanism_context',
+      decision_actionable: false,
+    }
+  }
+  if (relationship.output_kind === 'negative_constraint') {
+    return {
+      decision_relevance: 'negative_constraint',
+      decision_actionable: false,
+    }
+  }
+  return {
+    decision_relevance: 'abstained',
+    decision_actionable: false,
+  }
+}
+
 function activeResult(
   relationship: DeerRelationshipRecord,
   fidelity: ReturnType<typeof deerRelationshipStudyFidelityStatus>,
@@ -358,6 +399,10 @@ export function evaluateDeerRelationship(args: {
   const gate = evaluateBiologicalGate(relationship, scenario)
   const inputEvaluation = evaluateInputs(relationship, evidence)
   const constraints = evaluateConstraints(relationship, inputEvaluation.selected)
+  const abstainedDecision = {
+    decision_relevance: 'abstained' as const,
+    decision_actionable: false,
+  }
 
   const base = {
     relationship_id: relationship.relationship_id,
@@ -406,6 +451,7 @@ export function evaluateDeerRelationship(args: {
     return {
       ...base,
       status: 'not_applicable' as const,
+      ...abstainedDecision,
       reason_codes: ['registry_not_applicable'],
       result: null,
     }
@@ -415,6 +461,7 @@ export function evaluateDeerRelationship(args: {
     return {
       ...base,
       status: 'not_applicable' as const,
+      ...abstainedDecision,
       reason_codes: ['biological_gate_mismatch'],
       result: null,
     }
@@ -423,6 +470,7 @@ export function evaluateDeerRelationship(args: {
     return {
       ...base,
       status: 'insufficient_input' as const,
+      ...abstainedDecision,
       reason_codes: ['biological_state_unknown'],
       result: null,
     }
@@ -432,6 +480,7 @@ export function evaluateDeerRelationship(args: {
     return {
       ...base,
       status: 'blocked_measurement_alignment' as const,
+      ...abstainedDecision,
       reason_codes: ['required_measurement_alignment_blocked'],
       result: null,
     }
@@ -444,6 +493,7 @@ export function evaluateDeerRelationship(args: {
     return {
       ...base,
       status: 'blocked_measurement_alignment' as const,
+      ...abstainedDecision,
       reason_codes: ['context_only_measurement_cannot_emit_requested_output_kind'],
       result: null,
     }
@@ -456,6 +506,7 @@ export function evaluateDeerRelationship(args: {
     return {
       ...base,
       status: 'insufficient_input' as const,
+      ...abstainedDecision,
       reason_codes: ['required_product_input_unavailable'],
       result: null,
     }
@@ -466,6 +517,7 @@ export function evaluateDeerRelationship(args: {
     return {
       ...base,
       status: 'not_applicable' as const,
+      ...abstainedDecision,
       reason_codes: ['value_constraint_not_satisfied'],
       result: null,
     }
@@ -477,6 +529,7 @@ export function evaluateDeerRelationship(args: {
     return {
       ...base,
       status: 'insufficient_input' as const,
+      ...abstainedDecision,
       reason_codes: ['value_constraint_unresolved'],
       result: null,
     }
@@ -485,6 +538,7 @@ export function evaluateDeerRelationship(args: {
   return {
     ...base,
     status: 'active' as const,
+    ...activeDecisionRelevance(relationship),
     reason_codes: [],
     result: activeResult(relationship, fidelity),
   }
@@ -544,6 +598,18 @@ export function evaluateDeerScienceContext(args: {
       return out
     }, {} as Record<FarmWatchDeerScienceRelationshipStatus, number>)
 
+  const decision_relevance_counts = FARM_WATCH_DEER_DECISION_RELEVANCE
+    .reduce((out, relevance) => {
+      out[relevance] = evaluations.filter(
+        (row) => row.decision_relevance === relevance,
+      ).length
+      return out
+    }, {} as Record<FarmWatchDeerDecisionRelevance, number>)
+
+  const decision_actionable_relationship_ids = evaluations
+    .filter((row) => row.decision_actionable)
+    .map((row) => row.relationship_id)
+
   return {
     schema: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.outputSchemaVersion,
     method: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.algorithmVersion,
@@ -564,13 +630,20 @@ export function evaluateDeerScienceContext(args: {
     },
     status: counts.active > 0 ? 'available' : 'abstained',
     counts,
+    decision_relevance_counts,
+    decision_actionable_relationship_count:
+      decision_actionable_relationship_ids.length,
+    decision_actionable_relationship_ids,
+    evaluator_active_relationship_ids: evaluations
+      .filter((row) => row.status === 'active')
+      .map((row) => row.relationship_id),
     modules,
     relationships: evaluations,
     scoring_performed: false,
     coefficient_synthesis_performed: false,
     behavioral_probability_inferred: false,
     interpretation_boundary:
-      'Registry-driven property/date/scenario evaluation only. Active relationships preserve published form, gates, evidence state, scale, value constraints, and transfer limits. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
+      'Registry-driven property/date/scenario evaluation only. Evaluator-active is not synonymous with decision-actionable: only active quantitative/ordinal directional outputs are classified as directional signals; mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
   }
 }
 
