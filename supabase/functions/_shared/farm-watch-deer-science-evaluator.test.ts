@@ -84,6 +84,42 @@ Deno.test('known biological mismatch is not applicable rather than missing input
   assert(row.reason_codes.includes('biological_gate_mismatch'))
 })
 
+Deno.test('R08 does not emit crepuscular context at night', () => {
+  const row = evaluateDeerRelationship({
+    relationship: relationship('FW-R08-reproductive-diel-movement-context'),
+    scenario: scenario({ diel_period: 'night' }),
+    evidence: [
+      evidence('deer-biological-state', 'available', ['individual_scenario']),
+      evidence('diel-photoperiod-context', 'available', ['property']),
+    ],
+  })
+  assert(row.status === 'not_applicable')
+  assert(row.reason_codes.includes('biological_gate_mismatch'))
+  const mismatch = row.biological_gate.mismatches.find(
+    (item) => item.dimension === 'diel_period',
+  )
+  assert(mismatch)
+  assert(mismatch.allowed.includes('morning_civil_twilight'))
+  assert(mismatch.allowed.includes('evening_civil_twilight'))
+  assert(row.decision_relevance === 'abstained')
+  assert(row.decision_actionable === false)
+})
+
+Deno.test('R08 may emit mechanism context only during the transparent civil-twilight proxy', () => {
+  const row = evaluateDeerRelationship({
+    relationship: relationship('FW-R08-reproductive-diel-movement-context'),
+    scenario: scenario({ diel_period: 'morning_civil_twilight' }),
+    evidence: [
+      evidence('deer-biological-state', 'available', ['individual_scenario']),
+      evidence('diel-photoperiod-context', 'available', ['property']),
+    ],
+  })
+  assert(row.status === 'active')
+  assert(row.decision_relevance === 'mechanism_context')
+  assert(row.decision_actionable === false)
+  assert(row.result?.output_kind === 'mechanism_context')
+})
+
 Deno.test('study-fidelity blocker cannot be bypassed with otherwise explicit scenario', () => {
   const row = evaluateDeerRelationship({
     relationship: relationship('FW-R01-summer-thermal-resource-tradeoff'),
@@ -191,6 +227,8 @@ Deno.test('juvenile-male dispersal path relationship activates only with explici
   assert(row.result?.direction === 'interaction')
   assert(row.coefficient_transfer.status === 'not_supported')
   assert(row.coefficient_transfer.numeric_parameters.length === 0)
+  assert(row.decision_relevance === 'directional_signal')
+  assert(row.decision_actionable === true)
 })
 
 Deno.test('juvenile-male dispersal terrain relationship emits conditional mechanism context, never a ridge/road sign', () => {
@@ -213,6 +251,8 @@ Deno.test('juvenile-male dispersal terrain relationship emits conditional mechan
   assert(row.result?.direction === 'conditional')
   assert(row.blocked_universal_assumptions.includes('ridge_generic_corridor'))
   assert(row.blocked_universal_assumptions.includes('roads_generic_selection'))
+  assert(row.decision_relevance === 'mechanism_context')
+  assert(row.decision_actionable === false)
 })
 
 Deno.test('negative constraints remain first-class evaluator outputs', () => {
@@ -225,6 +265,8 @@ Deno.test('negative constraints remain first-class evaluator outputs', () => {
   assert(row.result?.output_kind === 'negative_constraint')
   assert(row.result?.direction === 'null_constraint')
   assert(row.blocked_universal_assumptions.includes('moon_phase_generic_movement'))
+  assert(row.decision_relevance === 'negative_constraint')
+  assert(row.decision_actionable === false)
 })
 
 Deno.test('science context remains a relationship vector without synthesized score or probability', () => {
@@ -239,6 +281,13 @@ Deno.test('science context remains a relationship vector without synthesized sco
   })
   assert(result.status === 'available')
   assert(result.counts.active === 3)
+  assert(result.decision_relevance_counts.directional_signal === 0)
+  assert(result.decision_relevance_counts.mechanism_context === 0)
+  assert(result.decision_relevance_counts.negative_constraint === 3)
+  assert(result.decision_relevance_counts.abstained === 0)
+  assert(result.decision_actionable_relationship_count === 0)
+  assert(result.decision_actionable_relationship_ids.length === 0)
+  assert(result.evaluator_active_relationship_ids.length === 3)
   assert(result.scoring_performed === false)
   assert(result.coefficient_synthesis_performed === false)
   assert(result.behavioral_probability_inferred === false)

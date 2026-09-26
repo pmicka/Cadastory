@@ -40,6 +40,20 @@ Omitted biological dimensions remain `unknown`.
 
 The evaluator never fills an unknown biological dimension from a generic calendar heuristic. The existing Kentucky regional breeding context remains population-level timing evidence only.
 
+
+## Evaluator-active versus decision relevance
+
+An `active` registry relationship is not automatically a directional decision signal.
+
+Each relationship now carries one of four decision-relevance classes:
+
+- `directional_signal`: active quantitative or ordinal directional output;
+- `mechanism_context`: active explanatory or conditional context;
+- `negative_constraint`: active guardrail that blocks an unsupported generic rule;
+- `abstained`: not applicable, insufficient input, or measurement blocked.
+
+Only `directional_signal` sets `decision_actionable=true`. The context also exposes separate evaluator-status and decision-relevance counts.
+
 ## Evaluation order
 
 Each registry relationship is evaluated in this order:
@@ -154,6 +168,10 @@ A relationship whose registry says `coefficient_transfer.status=not_supported` e
 The output is therefore a vector of independently gated scientific relationships, not an arbitrary weighted overlay.
 
 ## Flat Creek consequences
+
+### R08 diel hardening
+
+FW-R08 now accepts only `morning_civil_twilight` and `evening_civil_twilight`. Civil twilight remains a transparent time-of-day proxy rather than a measurement-equivalent copy of the source activity-period windows. At `night` or `day`, the relationship is not applicable.
 
 ### Managed water
 

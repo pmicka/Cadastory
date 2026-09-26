@@ -653,7 +653,10 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
       req('biological_state',['deer-biological-state'],['individual_scenario']),
       req('diel_state',['diel-photoperiod-context'],['property']),
     ],
-    biological_state_gates:gate({required_explicit_dimensions:['diel_period']}),
+    biological_state_gates:gate({
+      diel_periods:['morning_civil_twilight','evening_civil_twilight'],
+      required_explicit_dimensions:['diel_period'],
+    }),
     spatial_scale:{relationship_scales:['property','regional'],notes:'Context relationship; no transferred movement-rate coefficient.'},
     temporal_scale:'diel and reproductive phases',
     relationship_form:'crepuscular movement pattern only; sex/reproductive movement differences require separate state-specific relationships',
