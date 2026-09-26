@@ -53,9 +53,21 @@ for (const forbidden of [
 
 assert(
   edge.includes("admin.rpc('farm_watch_get_deer_evidence_stack_v1_internal'") &&
+  edge.includes("admin.rpc('farm_watch_get_managed_food_feature_context_v1_internal'") &&
+  edge.includes("admin.rpc('farm_watch_get_managed_water_source_context_v1_internal'") &&
   edge.includes('deer_evidence_stack: deerEvidenceStack'),
-  'private edge response is not wired to the evidence stack',
+  'private edge response is not wired to the current technical evidence stack',
 )
+
+for (const required of [
+  'deer-science-readiness-v1',
+  'FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS',
+  'deerRelationshipStudyFidelityStatus',
+  'managed_food_feature_context',
+  'managed_water_source_context',
+  'field_calibration_remaining',
+  'Science-contract readiness only',
+]) assert(edge.includes(required), 'missing technical deer-readiness invariant: ' + required)
 
 assert(
   edge.includes("status: 'unavailable'") &&
