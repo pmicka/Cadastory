@@ -193,6 +193,37 @@ Deno.test('M29 and M32 use explicit managed-food configuration rather than gener
   }
 })
 
+Deno.test('M48 accepts static managed-water configuration without weakening direct-observation boundaries', () => {
+  const product = FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['managed-water-source-context']
+  assert(product)
+  assert(product.status === 'production_static_configured')
+  assert(product.evidence_states.includes('known'))
+
+  const relationship = getDeerRelationship('FW-R23-water-rainfall-context')
+  assert(relationship)
+  const requirement = relationship.required_inputs.find((row) => row.key === 'water_state')
+  assert(requirement)
+  assert(requirement.product_keys.includes('managed-water-source-context'))
+  assert(requirement.product_keys.includes('surface-water-state'))
+
+  const measurement = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M48-usable-water-source',
+  )
+  assert(measurement)
+  assert(measurement.alignment === 'derived_equivalent')
+  assert(/managed-water-source-context/i.test(measurement.permitted_use))
+  assert(!deerRelationshipStudyFidelityStatus(relationship).blocker_ids.includes(
+    'FW-M48-usable-water-source',
+  ))
+
+  const constraint = relationship.value_constraints.find(
+    (row) => row.id === 'FW-C05-water-present',
+  )
+  assert(constraint)
+  assert(constraint.values.includes('observed_present'))
+  assert(constraint.values.includes('known_managed_source_present'))
+})
+
 Deno.test('production Tier 1 context measurements are promoted without biological overreach', () => {
   assert(
     FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG['human-footprint-context'].status ===

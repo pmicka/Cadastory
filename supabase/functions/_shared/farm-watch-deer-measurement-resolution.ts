@@ -57,7 +57,9 @@ const PARKED_2026_MANUAL_OR_NONCORE_IDS = new Set([
   'FW-M41-d16-winter-food',
   'FW-M42-human-footprint-composition',
   'FW-M44-wolf-occurrence',
+  'FW-M43-intact-deciduous-forest',
   'FW-M53-male-reproductive-phase',
+  'FW-M56-potential-path-agriculture',
 ])
 
 function operationalPosture(measurementId: string): {
@@ -304,16 +306,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     false,
     'The source used a camera-derived monthly wolf-occurrence model as a specific predator-risk covariate. Substituting coyotes, generic predator habitat, or absence assumptions would be a different biological relationship.',
     'Leave this source relationship unavailable for the current Flat Creek implementation. A different predator relationship requires its own evidence ledger entry.',
-  ),
-  decision(
-    'FW-M48-usable-water-source',
-    'reproduce',
-    'surface-water-state',
-    'P1',
-    true,
-    'Current usable stock-pond/trough presence can be represented directly by explicit managed-source inventory or dated operator observation. This is preferable to inventing availability from mapped hydrography.',
-    'Mapped lake/stream geometry or regional gauge data cannot satisfy current usable-source presence.',
-    ['Require dated present/absent state and stable feature identity for managed sources'],
   ),
   decision(
     'FW-M51-maternal-age-category',

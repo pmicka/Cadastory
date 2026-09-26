@@ -1,6 +1,6 @@
 # Farm Watch Surface Water State v1
 
-Status: implemented, pending production deployment  
+Status: production-deployed 2026-09-26  
 Validation property: `validation-property-01`  
 Deer-science dependencies: FW-D15, FW-D19
 
@@ -107,7 +107,7 @@ Unlinked water observations remain location evidence in the snapshot without rew
 
 ## Stored product
 
-The planned production table is:
+The production table is:
 
 `farm_watch.property_surface_water_state_v1`
 
@@ -136,9 +136,21 @@ The identity binds:
 
 A boundary change or contract version change invalidates the stored snapshot on read.
 
-## Validation-property pre-deployment expectation
+## Validation-property production validation
 
-Current live source inspection on 2026-09-22 shows why this separation is necessary.
+Production migration was applied on 2026-09-26 and a snapshot was materialized for 2026-09-25. The snapshot returned `status=available`.
+
+The production summary contains:
+
+- 176 mapped hydrology features in the configured cache;
+- 0 mapped features intersecting the selected parcel;
+- 51 mapped-persistent, 27 mapped-seasonal, 6 mapped-temporary, and 92 mapped-unknown-persistence features;
+- 12 conditioned-D8 flow traces retained strictly as drainage geometry;
+- 0 exact-date operator water observations.
+
+This confirms that the neutral product is operational while preserving the distinction between nearby mapped water and an actually usable on-property source.
+
+The earlier source inspection on 2026-09-22 showed why this separation is necessary.
 
 No cached authoritative 3DHP/NWI feature currently intersects the selected parcel.
 
@@ -160,7 +172,7 @@ The new table and internal functions are service-role only.
 
 No anonymous or authenticated-user table/RPC access is introduced.
 
-The migration defines a validation-property cron refresh at 14:10 UTC, immediately after the existing 14:05 UTC Seasonal State snapshot. This preserves the dated upstream identity instead of independently reimplementing its collectors.
+The deployed migration defines a validation-property cron refresh at 14:10 UTC, immediately after the existing 14:05 UTC Seasonal State snapshot. This preserves the dated upstream identity instead of independently reimplementing its collectors.
 
 ## Evidence boundary
 

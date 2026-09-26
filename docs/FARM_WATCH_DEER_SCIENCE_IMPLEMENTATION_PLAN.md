@@ -140,8 +140,9 @@ The first production deer output should be a vector of evidence-backed module re
 | `field-phenology-context-v1` | dated field state | CDL/CSB + NASA HLS L30/S30 + NASS regional context | production observation substrate; classifier pending |
 | `mast-resource-context-v1` | annual/seasonal resource proxy | USFS TreeMap/BIGMAP + Kentucky mast survey | build |
 | `horizontal-visibility-context-v1` | gridded physical | LiDAR + terrain | build |
-| `surface-water-state-v1` | dated physical/proxy | 3DHP/NWI + DEM + QPE/soil moisture + observations | build |
+| `surface-water-state-v1` | dated physical/proxy | 3DHP/NWI + DEM + QPE/soil moisture + observations | production |
 | `managed-food-feature-context-v1` | static/year-scoped configured resource geometry | explicit owner-configured food plots/managed forage + year-specific state | production |
+| `managed-water-source-context-v1` | static/year-scoped configured managed-water geometry/state | explicit owner-configured stock pond/trough/tank + usable-water state | production-capable |
 | `human-activity-context-v1` | event/state | explicit owner/operator observations | build |
 | `diel-photoperiod-context-v1` | deterministic state | date/time/location solar geometry | production |
 
@@ -587,7 +588,7 @@ A deer module can later consume a physical visibility metric with known scale an
 # Batch 7 — Surface-water availability / persistence context
 
 Priority: P1/P2  
-Status: implemented in source as `surface-water-state-v1`; production migration intentionally pending explicit deployment authorization.  
+Status: production-deployed and validation-property snapshot materialized 2026-09-26.  
 Ledger dependencies: FW-D15, D19; water evidence remains weaker/context-specific.
 
 Implementation:
@@ -601,6 +602,8 @@ Implementation:
 - current 3DHP attributes do not establish perennial/intermittent status, so 3DHP persistence remains `mapped_unknown_persistence` rather than being invented;
 - explicit NWI water-regime attributes support mapped persistent/seasonal/temporary classes without being promoted to current water presence;
 - v1 retains raw dated wetness context and deliberately does not invent a generic wet/dry threshold.
+- production validation for 2026-09-25 returned `available`: 176 mapped hydrology features in the configured cache, zero parcel intersections, 12 conditioned-D8 traces retained as geometry-only, and zero exact-date operator water observations;
+- a separate `managed-water-source-context-v1` static configuration path now represents known stock-pond/trough/tank usability without pretending mapped hydrography proves a usable artificial source.
 
 ## Objective
 
@@ -1099,7 +1102,7 @@ The original scientific priority labels remain below for provenance, but the 202
 11. horizontal visibility;
 12. bounded one-time/static property configuration where useful;
 13. mast module after exact-year annual state is available; localized hunting-risk remains parked unless explicit activity evidence is intentionally added;
-14. surface-water state.
+14. field-calibration work only where it materially unlocks active relationships; Surface Water State and static managed food/water configuration are complete infrastructure.
 
 ## P2 — quantitative sophistication
 

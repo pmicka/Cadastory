@@ -19,9 +19,9 @@ A resolution decision is about **input measurement fidelity**, not biological tr
 
 ## Portfolio
 
-The current blocked set contains 25 required study measurements:
+The current blocked set contains 24 required study measurements:
 
-- **12 reproduce**
+- **11 reproduce**
 - **7 calibrated proxy**
 - **6 remain unavailable**
 
@@ -32,6 +32,7 @@ Resolved since this contract was created:
 - **FW-M24 — building/development density:** production `human-footprint-context-v1` supplies the FEMA USA Structures count/density over the exact 10.36 km² Delisle landscape area and now records live service edit dates, local feature production/imagery vintage coverage, the source's >450 sq ft inventory threshold, and explicit unquantified spatial completeness. It remains `derived_equivalent`; no claim of census-complete building capture is made.
 - **FW-M36 — road landscape context:** production `human-footprint-context-v1` preserves canonical road geometry and `road-focal-context-v1` now supplies an on-demand 10 m distance-to-nearest-road grid with mean 30/90/270 m focal extraction. This closes the physical measurement path while recording the OSM-for-TIGER source substitution; the measurement remains `derived_equivalent` and assigns no road-response sign.
 - **FW-M29 / FW-M32 — managed food feature geometry:** production `managed-food-feature-context-v1` now stores stable operator-configured food-plot/managed-forage polygons separately from year-specific management state, with an explicit per-year inventory state so `confirmed_none` is a known absence rather than missing data. Both measurements are promoted to `derived_equivalent`; supplemental feeders and mineral attractants remain separate point observations.
+- **FW-M48 — usable managed water source:** production-capable `managed-water-source-context-v1` now separates stable stock-pond/trough/tank geometry from explicit year/date-scoped usable-water state. M48 is promoted to `derived_equivalent`. A configured source with unknown usability does not satisfy the measurement, and mapped hydrography/weather never promotes a source to usable water.
 - **FW-M39 — D16 study scales:** production `multiscale-cover-context-v1` supplies exact 1 km² and 9 km² analytical windows; promoted to `derived_equivalent`. North Dakota hunting-unit geometry remains untransferred.
 - **FW-M45 — extreme hurricane event:** production `extreme-weather-event-context-v1` supplies an authoritative NWS tropical/extreme-wind event + footprint + time gate. The v2 source-health contract returns `not_applicable` only after a fresh successful jurisdiction poll, and fails closed on stale/failed polling or unresolved qualifying alert geometry; ordinary weather remains excluded. The measurement remains `derived_equivalent`.
 - **FW-M35 — multiscale forest landscape context:** `multiscale-forest-context-v1` reproduces 10 m tree-class forest proportion and built-excluded internal forest-edge density at 30/90/270 m. The open Sentinel-2 annual LULC classifier is a documented substitution for the study Dynamic World 2015–2019 composite; no forest-response sign or Stephens coefficient transfers.
@@ -48,11 +49,11 @@ Machine posture values:
 - `parked_2026_individual_state` — scientifically preserved, but individual identity/state differentiation is not reliably captured this season;
 - `parked_2026_manual_or_noncore` — scientifically preserved, but the measurement would require repeated manual user input, a calibration/technology stack outside the intended operating model, or a study-specific variable that is not operationally available.
 
-Current posture counts across the 25 blocked measurements:
+Current posture counts across the 24 blocked measurements:
 
-- **7 active**
+- **4 active**
 - **3 parked — individual state**
-- **15 parked — manual/non-core**
+- **17 parked — manual/non-core**
 
 Parking does **not** weaken the science contract. Parked measurements still cause abstention wherever the relationship requires them; they simply no longer appear as active engineering work for the 2026 season.
 
@@ -79,8 +80,10 @@ These are parked because Farm Watch will not rely on repeated individual identif
 - FW-M40 — complete D16 escape-cover bundle;
 - FW-M41 — residual winter cropland food;
 - FW-M42 — oil-sands human-footprint composition;
+- FW-M43 — AVI species-specific overstorey composition for the boreal cumulative-effects relationship;
 - FW-M44 — wolf occurrence;
-- FW-M53 — individual male rut/post-rut phase.
+- FW-M53 — individual male rut/post-rut phase;
+- FW-M56 — agriculture along source-style simulated dispersal paths.
 
 These remain scientifically explicit, but no 2026 implementation effort should be spent manufacturing substitutes or asking for recurring manual data entry.
 
@@ -96,7 +99,6 @@ These remain scientifically explicit, but no 2026 implementation effort should b
 | FW-M31 | Frequent hunting risk | Derive event frequency / hunter-hours over explicit windows | P0 | Stand presence does not imply hunting frequency |
 | FW-M33 | Low hunting pressure | Represent quantitative hunter effort density and compare with source context | P0 | Do not invent a universal low/high threshold |
 | FW-M43 | AVI species-specific overstorey composition (“intact deciduous forest” shorthand) | Reproduce point-extracted percent overstorey composition for the source tree-species family, or keep unresolved until a defensible source-equivalent species-composition method exists | P2 | Generic Trees/TCC, broad deciduous class, edge density or fragmentation is not equivalent; does not make the rest of FW-D17 available |
-| FW-M48 | Usable water source | Represent current stock-pond/trough availability by managed-source inventory or dated observation | P1 | Hydrography/gauge context cannot prove usable source presence |
 | FW-M51 | Maternal age category | Preserve explicit fawn/yearling/adult maternal-age scenarios | P1 | Do not transfer Illinois conception dates |
 | FW-M54 | Female parturition phase | Preserve explicit pre-parturition / parturition / post-parturition scenarios | P1 | Unknown state remains unknown |
 | FW-M56 | Agriculture along potential dispersal paths | Reproduce source-style simulated potential paths and agricultural exposure along them | P2 | Simple landscape agriculture percentage cannot substitute |
@@ -161,11 +163,7 @@ Priority labels remain useful for scientific sequencing, but the operating postu
 - **FW-M26 — stand vulnerability zone:** optional calibrated one-time/static stand viewshed path.
 - **FW-M04 — woody canopy:** autonomous/static spatial measurement once calibration is bounded.
 
-### Active autonomous spatial/environmental work
-
-- **FW-M43 — AVI species-specific overstorey composition (“intact deciduous forest” shorthand)**
-- **FW-M48 — usable managed-water-source state only where stable source inventory can be configured without recurring field input**
-- **FW-M56 — agriculture along simulated potential dispersal paths**
+There is no remaining autonomous/non-field measurement blocker in the active 2026 queue.
 
 The parked B/D measurements remain in their scientific disposition tables above for provenance, but they are not part of this active queue. FW-M08, FW-M09, FW-M24, FW-M35, FW-M36, FW-M39, FW-M45, and FW-M47 are no longer listed here because their production exit gates passed on 2026-09-25.
 
@@ -237,6 +235,30 @@ The existing deer feeder is separately documented as a large corn `supplemental_
 Both study measurements are promoted to `derived_equivalent` because Farm Watch now reproduces the mapped managed-food feature form and current/absent seasonal state. This does **not** claim forage chemistry, nutrient abundance, deer attraction, or feeder/mineral effects.
 
 The downstream hunting-risk relationships remain blocked for their independent human-activity requirements: FW-R15 still requires FW-M28 daily hunter activity, and FW-R16 still requires FW-M31 frequent-hunt risk.
+
+### FW-M48 production resolution — 2026-09-26
+
+FW-M48 is production-resolved at the measurement-contract level by `managed-water-source-context-v1`.
+
+The new configuration path stores stable managed artificial-water geometry once for stock ponds, troughs, tanks, or another explicitly managed source, then stores usability separately by year and optional date range. Its current-presence vocabulary distinguishes `known_managed_source_present`, `known_managed_source_absent`, and unresolved state.
+
+This closes the engineering gap without weakening the source study. A source is usable only when its configured state explicitly says so. Generic hydrography, D8 drainage, precipitation, drought, or off-property stream discharge cannot satisfy M48. Exact-date `surface_water_presence` observations remain an alternate direct-observation path.
+
+Flat Creek has no managed-water inventory assertion yet. The product therefore remains unknown for the property until the owner supplies an existing known source/state; no field trip is required if that information is already known.
+
+### FW-M43 2026 parking decision — 2026-09-26
+
+M43 remains scientifically unresolved but is no longer active 2026 engineering work. The Darlington et al. cumulative-effects relationship also requires FW-M42 oil-sands industrial human-footprint composition and FW-M44 camera-derived wolf occurrence, both intentionally unavailable for Flat Creek. Reproducing the source AVI overstorey-species composition alone therefore cannot activate the relationship.
+
+Farm Watch must not substitute a generic deciduous class, canopy cover, fragmentation, or edge metric. Revisit M43 only if a future relationship can actually use source-equivalent species composition or the broader FW-D17 applicability changes.
+
+### FW-M56 2026 parking decision — 2026-09-26
+
+M56 remains scientifically reproducible in principle but is parked as non-core for 2026 rather than approximated.
+
+Gilbertson et al. generated source-style potential dispersal paths from fitted dispersal-state movement behavior: telemetry was regularized to 4-hour fixes, a hidden Markov model identified the dispersal state, average dispersal-state movement parameters were used to simulate 100 trajectories per individual, each path began at a randomly selected used location within that individual's pre-dispersal range, and each simulated path contained 11 four-hour steps. Agricultural exposure was then summarized along those paths.
+
+The paper publishes the simulation form and cites public R code at Zenodo DOI `10.5281/zenodo.7200058`, but the underlying deer telemetry is restricted. Farm Watch does not currently possess the individual pre-dispersal ranges or a defensible target-population replacement for the fitted dispersal-state movement parameters. Property-center starts or generic step distributions would change the source variable, so no pseudo-equivalent is built merely to clear the queue.
 
 ### FW-M43 method-definition correction — 2026-09-25
 
