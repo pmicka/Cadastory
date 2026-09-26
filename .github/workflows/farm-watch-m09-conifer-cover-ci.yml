@@ -11,6 +11,7 @@ on:
       - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.ts'
       - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
       - 'supabase/migrations/20260926000405_add_farm_watch_m09_conifer_cover_context_v1.sql'
+      - 'supabase/migrations/20260926001450_stabilize_farm_watch_m09_conifer_identity_v1.sql'
       - 'docs/FARM_WATCH_CONIFER_COVER_CONTEXT_V1.md'
       - 'docs/FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
@@ -53,6 +54,7 @@ jobs:
           contract='supabase/functions/_shared/farm-watch-conifer-cover-contract.ts'
           worker='supabase/functions/farm-watch-conifer-cover-context/index.ts'
           migration='supabase/migrations/20260926000405_add_farm_watch_m09_conifer_cover_context_v1.sql'
+          identity_migration='supabase/migrations/20260926001450_stabilize_farm_watch_m09_conifer_identity_v1.sql'
           registry='supabase/functions/_shared/farm-watch-deer-relationship-registry.ts'
           grep -q "moderateMinimumPercent: 40" "$contract"
           grep -q "denseMinimumPercent: 70" "$contract"
@@ -68,3 +70,4 @@ jobs:
           grep -q "production_calibrated_proxy" "$registry"
           grep -q "Mixed Forest (43)" "$registry"
           grep -q "property_conifer_cover_context_v1" "$migration"
+          grep -q "p_context - 'retrieved_at'" "$identity_migration"
