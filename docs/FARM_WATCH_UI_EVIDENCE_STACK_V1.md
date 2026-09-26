@@ -83,3 +83,29 @@ For FW-R01/FW-D01:
 - FW-M02 is `derived_equivalent`;
 - negative-clamped cells remain unavailable for scientific height use;
 - FW-D01 remains blocked by operative temperature, forage index, woody canopy, and activity-period fidelity.
+
+
+## Technical-view catch-up — 2026-09-25
+
+The private Farm Watch response now augments the neutral evidence inventory with three technical-only presentation inputs:
+
+- `managed-food-feature-context-v1`, including explicit known-absence semantics for a configured property/year;
+- `managed-water-source-context-v1`, including explicit known-absence semantics for managed artificial water;
+- `deer-science-readiness-v1`, derived from the canonical relationship registry and measurement-resolution contract rather than browser-maintained status lists.
+
+The science-readiness summary exposes:
+
+- the currently active measurement-calibration queue;
+- parked measurement counts by operating posture;
+- relationship study-fidelity counts (`module_eligible`, `context_only`, and `blocked_measurement_alignment`).
+
+This is a technical readiness/status surface only. It does not evaluate current property applicability, biological-state gates, relationship value constraints, coefficient transfer, or deer use.
+
+For Flat Creek 2026, the technical UI may therefore distinguish:
+
+- managed forage: confirmed absent;
+- managed artificial water: confirmed absent;
+- supplemental feed/mineral attractant point observations: factual operator evidence, separate from managed-food and managed-water configuration;
+- remaining active science work: field calibration only.
+
+The guided viewer remains unchanged in this unit.
