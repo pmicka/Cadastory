@@ -239,16 +239,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     ['Derive hunter-hours and spatial use only from known events/paths'],
   ),
   decision(
-    'FW-M29-food-opportunity',
-    'reproduce',
-    'managed-food-feature-context',
-    'P1',
-    true,
-    'The cited adult-male hunting study specifically identified food plots as a resource whose selection changed between day and night. Food-plot polygons are observable managed features and do not require a generic nutritional-quality proxy.',
-    'Tighten the relationship binding from generic resource state to explicit food-plot/managed-food geometry where the source study did so.',
-    ['Require mapped feature provenance and active/current management state where relevant'],
-  ),
-  decision(
     'FW-M31-frequent-hunt-risk',
     'reproduce',
     'human-activity-context',
@@ -257,16 +247,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     'Frequency/intensity of hunted areas can be calculated directly from dated hunting events tied to stands/zones.',
     'Use explicit event counts/hunter-hours over a declared window; do not infer frequency from stand presence.',
     ['Test frequency windows against the source relationship period definitions'],
-  ),
-  decision(
-    'FW-M32-abundant-food-risk',
-    'reproduce',
-    'managed-food-feature-context',
-    'P1',
-    true,
-    'In the source sex-risk study the risky forage-rich areas were represented by food plots/cover types, not by remotely inferred crude protein or biomass chemistry. Those mapped managed features can be reproduced directly.',
-    'Bind to explicit food-plot/cover-type geometry instead of generic vegetation greenness.',
-    ['Preserve cover type and season state; do not claim measured nutrient abundance'],
   ),
   decision(
     'FW-M33-low-hunting-pressure',
