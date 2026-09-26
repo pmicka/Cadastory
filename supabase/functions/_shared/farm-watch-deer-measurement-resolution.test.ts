@@ -12,7 +12,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 Deno.test('every currently blocked deer study measurement has exactly one resolution decision', () => {
   assert(validateDeerMeasurementResolutionDecisions())
   const blocked = blockedDeerStudyMeasurements()
-  assert(blocked.length === 25, 'expected 25 blocked study measurements')
+  assert(blocked.length === 24, 'expected 24 blocked study measurements')
   assert(FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.length === blocked.length)
   const decisionIds = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS
     .map((row) => row.measurement_id)
@@ -28,7 +28,7 @@ Deno.test('measurement resolution portfolio preserves the three explicit disposi
     },
     { reproduce: 0, calibrated_proxy: 0, remain_unavailable: 0 },
   )
-  assert(counts.reproduce === 12)
+  assert(counts.reproduce === 11)
   assert(counts.calibrated_proxy === 7)
   assert(counts.remain_unavailable === 6)
 })
@@ -89,9 +89,9 @@ Deno.test('2026 operating posture parks individual-state and manual/non-core mea
       parked_2026_manual_or_noncore: 0,
     },
   )
-  assert(counts.active === 7)
+  assert(counts.active === 4)
   assert(counts.parked_2026_individual_state === 3)
-  assert(counts.parked_2026_manual_or_noncore === 15)
+  assert(counts.parked_2026_manual_or_noncore === 17)
 
   for (const id of [
     'FW-M15-hunsaker-male-age',
@@ -117,7 +117,9 @@ Deno.test('2026 operating posture parks individual-state and manual/non-core mea
     'FW-M41-d16-winter-food',
     'FW-M42-human-footprint-composition',
     'FW-M44-wolf-occurrence',
+    'FW-M43-intact-deciduous-forest',
     'FW-M53-male-reproductive-phase',
+    'FW-M56-potential-path-agriculture',
   ]) {
     const row = getDeerMeasurementResolutionDecision(id)
     assert(row?.operational_posture === 'parked_2026_manual_or_noncore', id)
@@ -165,6 +167,12 @@ Deno.test('production managed-food context closes M29 and M32 measurement blocke
     assert(!blocked.some((row) => row.id === id), id)
     assert(getDeerMeasurementResolutionDecision(id) === null, id)
   }
+})
+
+Deno.test('production managed-water context closes M48 measurement blocker', () => {
+  const blocked = blockedDeerStudyMeasurements()
+  assert(!blocked.some((row) => row.id === 'FW-M48-usable-water-source'))
+  assert(getDeerMeasurementResolutionDecision('FW-M48-usable-water-source') === null)
 })
 
 Deno.test('FW-M43 requires species-specific overstorey composition rather than generic forest structure', () => {
