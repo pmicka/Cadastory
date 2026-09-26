@@ -109,7 +109,7 @@ Current neutral products that may feed future science-backed deer terms:
 Important **active** gaps are now restricted to measurements that fit the intended low-maintenance operating model:
 
 - calibrated woody-canopy and low-height concealment measurements where one-time/static calibration is defensible;
-- potential-path agriculture remains active; snow/winter severity, road context, building density, multiscale forest context, exact 1/9 km² analytical scales, the explicit extreme-event gate, and the M47 six-class habitat-distance context are now production-validated;
+- potential-path agriculture remains active; snow/winter severity, dense-conifer availability, road context, building density, multiscale forest context, exact 1/9 km² analytical scales, the explicit extreme-event gate, and the M47 six-class habitat-distance context are now production-validated;
 - stand-vulnerability and managed food/water feature context only where bounded one-time/static configuration is practical;
 - parcel-scale usable water persistence / ephemeral water state, with Batch 7 still pending production deployment.
 
@@ -190,9 +190,15 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 **Farm Watch M08 production mapping — 2026-09-25:** `snow-winter-severity-context-v1` keeps the daily variables first-class. NOAA/NWS/NOHRSC National Snow Analysis supplies a daily property-targeted assimilated snow-depth estimate; the existing NOAA/NCEP HRRR f00 archive supplies a local-calendar-day modeled minimum temperature when at least 75% of expected hourly analyses are present. Minnesota WSI arithmetic is retained only as source provenance/context and no severity category is assigned.
 
-**Measurement-fidelity note:** NOHRSC snow is modeled/observationally assimilated rather than an on-property ruler measurement, and the HRRR minimum is an hourly-analysis approximation to a daily minimum. Generic canopy density or edge/patch structure still must not substitute for the separate study dense-conifer cover class.
+**Recovered M09 measurement — 2026-09-25:** The source vegetation measurement used leaf-off color-infrared aerial photography to delineate stands, assign dominant tree species, and classify conifer canopy closure. Open conifer was <40% closure, moderately dense conifer 40% to <70%, and dense conifer ≥70%. The fitted availability categories were moderately dense conifer, dense conifer, and other; other included open conifer, openings, and hardwoods.
 
-**Boundary:** Northern severe-winter system. M08 does not authorize a generic “dense conifer = winter bedding” rule, a cold-weather movement multiplier, a Minnesota WSI severity category for Kentucky, or any transferred coefficient. FW-R03 remains blocked until FW-M09 dense-conifer cover is aligned.
+**Farm Watch M09 production mapping — 2026-09-25:** `conifer-cover-context-v1` uses matched-year Annual NLCD Evergreen Forest (42) as a conservative conifer-dominant mask and NLCD Tree Canopy Cover as modeled percent closure. Mixed Forest (43) is retained in other rather than being promoted to conifer. The exact source closure thresholds are preserved. The product summarizes property, 500 m, 1.5 km, and 3 km domains, with FW-R03 binding conifer availability at `broad_3000m`. Flat Creek's broad domain is ~21.394 km², within the source study-site area range. Initial broad-domain availability was 0.0421% moderately dense conifer, 2.3345% dense conifer, and 97.6235% other.
+
+**M09 validation note:** Representative 2024 source cells were checked transiently against high-resolution KyFromAbove Phase 3 RGB imagery without persisting imagery. Dense samples corresponded to compact evergreen patches, Mixed Forest samples were visibly heterogeneous, and the rare moderate samples were edge/partially closed evergreen cases. No open-conifer cell occurred in the Flat Creek broad domain. The result supports `calibrated_proxy`, not `derived_equivalent`.
+
+**Measurement-fidelity note:** NOHRSC snow is modeled/observationally assimilated rather than an on-property ruler measurement, the HRRR minimum is an hourly-analysis approximation to a daily minimum, and M09's 30 m national land-cover/TCC combination is not the source air-photo dominant-species protocol. Generic canopy density or edge/patch structure still does not substitute for conifer availability.
+
+**Boundary:** Northern severe-winter system. M08/M09 do not authorize a generic “dense conifer = winter bedding” rule, a cold-weather movement multiplier, a Minnesota WSI severity category for Kentucky, or any transferred coefficient. The required M08/M09 measurement blockers are resolved, but FW-R03 remains `context_only` because FW-M10 winter solar/thermal context is not measurement-equivalent.
 
 ---
 
