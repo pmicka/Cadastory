@@ -118,7 +118,7 @@ as $$
       extensions.st_asgeojson(f.geometry,7)::jsonb as geometry_geojson
     from farm_watch.property_managed_food_features_v1 f
     join property p on p.id=f.property_id
-    left join farm_watch.property_managed_food_feature_state_v1 s
+    join farm_watch.property_managed_food_feature_state_v1 s
       on s.feature_id=f.id
      and s.season_year=extract(year from p_as_of_date)::integer
     where f.active
