@@ -105,19 +105,22 @@ Current neutral products that may feed future science-backed deer terms:
 - Batch 5B `mast-resource-context-v1`: production exact-year KDFWR statewide/regional annual mast proxy with no prior-year carry-forward and optional local observations kept separate;
 - `horizontal-visibility-context-v1`: production neutral physical visibility/obstruction; not a Gallina concealment substitute;
 - `managed-food-feature-context-v1`: production static operator-configured food-plot/managed-forage polygons with reusable geometry, year-specific management state, and explicit known-absence inventory semantics; supplemental feeders/mineral attractants remain separate point observations;
+- `surface-water-state-v1`: production dated neutral hydrology/wetness context preserving mapped persistence, deterministic drainage geometry, dated proxies, and exact-date observations without inferring usable water;
+- `managed-water-source-context-v1`: production static configuration path for stable stock-pond/trough/tank geometry plus explicit year/date-scoped usable-water state; an unconfigured property remains unknown;
 - roads/trails/buildings and other access geometry already available elsewhere in Farm Watch/Scout.
 
-Important **active** gaps are now restricted to measurements that fit the intended low-maintenance operating model:
+Important **active** gaps are now restricted to the field-calibration measurements that cannot be closed autonomously:
 
-- calibrated woody-canopy and low-height concealment measurements where one-time/static calibration is defensible;
-- potential-path agriculture remains active; snow/winter severity, dense-conifer availability, road context, building density, multiscale forest context, exact 1/9 km² analytical scales, the explicit extreme-event gate, and the M47 six-class habitat-distance context are now production-validated;
-- stand-vulnerability and managed water feature context only where bounded one-time/static configuration is practical; managed-food feature context is now production-resolved;
-- parcel-scale usable water persistence / ephemeral water state, with Batch 7 still pending production deployment.
+- calibrated woody-canopy line-intercept alignment (FW-M04);
+- calibrated Gallina directional concealment / low-strata alignment (FW-M11 / FW-M13);
+- calibrated stand-specific visibility/vulnerability geometry (FW-M26).
+
+Managed food and managed-water configuration paths are production-capable, and Surface Water State v1 is production-deployed. M43 species-specific boreal overstorey composition and M56 source-style dispersal-path agriculture remain scientifically explicit but are parked for 2026 rather than approximated.
 
 The following scientifically valid gaps are **parked for the 2026 season** rather than treated as active engineering blockers:
 
 - individual-state differentiation requiring reliable individual identity: male age category, maternal age, and female parturition phase;
-- repeated/manual or non-core inputs: operative-temperature field calibration, movement-defined activity periods, current field crop identity/stage/harvest, explicit hunting sessions/effort, residual winter crop food, forage chemistry, browse/twig density, CRP-complete D16 escape cover, oil-sands footprint composition, wolf occurrence, and individual male rut/post-rut phase.
+- repeated/manual or non-core inputs: operative-temperature field calibration, movement-defined activity periods, current field crop identity/stage/harvest, explicit hunting sessions/effort, residual winter crop food, forage chemistry, browse/twig density, CRP-complete D16 escape cover, oil-sands footprint composition, source AVI overstorey composition for the otherwise-inapplicable boreal cumulative-effects relationship, wolf occurrence, source-style potential-dispersal-path agriculture, and individual male rut/post-rut phase.
 
 Parking changes implementation posture only. Relationships that require parked measurements still abstain; no proxy is promoted merely to make them fire.
 
@@ -738,7 +741,7 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 | Woody browse | meaningful winter evidence | unavailable for the cited relationship | parked; do not substitute LiDAR/greenness for palatable twig density |
 | Hunting pressure | strong conditional evidence | scientifically unresolved and parked for 2026 | no repeated hunt/activity logging requirement; module must abstain when pressure is unknown |
 | Roads/trails/human footprint | context dependent | Tier 1 road/building neutral context production-validated | retain neutral geometry/context; never assign a standalone road/building deer sign |
-| Water | limited/context-specific | neutral surface-water state implemented, pending production deployment | preserve mapped persistence vs current observed presence; retain drought/precip/gauge/soil proxies and do not infer generic deer water preference |
+| Water | limited/context-specific | Surface Water State v1 production-deployed; managed artificial-water source configuration production-capable | usable-source state still requires explicit configured/observed presence; mapped persistence, drought/precip/gauge/soil proxies do not imply deer water preference |
 | Snow/winter severity | strong northern evidence | production neutral source-substituted daily snow/minimum-temperature context | retain raw physical variables; Minnesota WSI is provenance only and no Kentucky severity category transfers |
 | Extreme storm/flood | direct event evidence | explicit Tier 1 tropical/extreme-wind event gate + M47 six-class habitat-distance context production-validated | ordinary weather remains excluded; retain explicit event gating and no Florida coefficient transfer |
 | Moon phase | negative evidence | computable but should not be used | none; keep blocked |
