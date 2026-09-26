@@ -150,16 +150,6 @@ export const FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS:
     ['Estimate local diel detection/activity curves from independent observations', 'Hold out observations when defining period boundaries'],
   ),
   decision(
-    'FW-M09-dense-conifer-cover',
-    'calibrated_proxy',
-    'conifer-cover-context',
-    'P2',
-    true,
-    'The source manually classified dominant conifer stands and canopy-closure classes, with dense cover defined as at least 70% closure. Public forest-type/land-cover data plus TCC can approximate this, but species/forest-type errors at 30 m matter.',
-    'Use explicit conifer/evergreen forest type plus canopy closure; generic canopy density is insufficient.',
-    ['Spot-check forest type and closure with leaf-on/leaf-off imagery or field observations before use'],
-  ),
-  decision(
     'FW-M11-gallina-concealment-profile',
     'calibrated_proxy',
     'low-height-concealment-context',
