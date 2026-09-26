@@ -251,7 +251,10 @@ export const FARM_WATCH_DEER_BLOCKED_UNIVERSAL_ASSUMPTIONS = Object.freeze([
   'open_hunting_season_equals_current_pressure',
 ] as const)
 
-type ProductKey = keyof typeof FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG
+export type DeerRelationshipProductKey =
+  keyof typeof FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG
+
+type ProductKey = DeerRelationshipProductKey
 
 export type DeerRelationshipInputRequirement = {
   key: string
@@ -1102,6 +1105,16 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
           'Annual NLCD 71 is a prairie analogue; pasture/hay and cultivated crops are intentionally excluded.',
           'NWI PFO1* and PEM* preserve forested broad-leaved-deciduous wetland versus emergent wetland physiognomy.',
         ],
+      ),
+    ],
+    value_constraints:[
+      valueConstraint(
+        'FW-C06-extreme-event-active',
+        'extreme_event',
+        'applicability_state',
+        'equals',
+        ['active_extreme_event'],
+        'FW-D18 is an extreme-event-only relationship; a healthy source state with no qualifying property-intersecting event is explicitly not applicable.'
       ),
     ],
   }),
