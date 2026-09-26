@@ -68,6 +68,7 @@ type InputEvaluation = {
   key: string
   status: 'satisfied' | 'missing_or_incompatible'
   match: 'any' | 'all'
+  freshness_policy: 'current_required' | 'state_explicit' | 'static_context_ok'
   allowed_product_keys: DeerRelationshipProductKey[]
   allowed_evidence_states: DeerRelationshipEvidenceState[]
   allowed_scales: DeerRelationshipScale[]
@@ -78,12 +79,14 @@ type InputEvaluation = {
     evidence_class?: string | null
     source_status?: string | null
     identity_sha256?: string | null
+    as_of?: string | null
   }>
   offered: Array<{
     product_key: DeerRelationshipProductKey
     evidence_state: DeerRelationshipEvidenceState
     scales: DeerRelationshipScale[]
     source_status?: string | null
+    as_of?: string | null
   }>
 }
 
@@ -246,6 +249,7 @@ function evaluateInputs(
       key: requirement.key,
       status: satisfied ? 'satisfied' : 'missing_or_incompatible',
       match: requirement.match,
+      freshness_policy: requirement.freshness_policy,
       allowed_product_keys: [...requirement.product_keys],
       allowed_evidence_states: [...requirement.allowed_evidence_states],
       allowed_scales: [...requirement.allowed_scales],
@@ -256,12 +260,14 @@ function evaluateInputs(
         evidence_class: candidate.evidence_class,
         source_status: candidate.source_status,
         identity_sha256: candidate.identity_sha256,
+        as_of: candidate.as_of,
       })),
       offered: offered.map((candidate) => ({
         product_key: candidate.product_key,
         evidence_state: candidate.evidence_state,
         scales: [...candidate.scales],
         source_status: candidate.source_status,
+        as_of: candidate.as_of,
       })),
     }
   })
@@ -373,7 +379,22 @@ export function evaluateDeerRelationship(args: {
       numeric_parameters: [...relationship.coefficient_transfer.numeric_parameters],
     },
     fidelity,
-    biological_gate: gate,
+    biological_gate: {
+      ...gate,
+      required_explicit_dimensions: [
+        ...relationship.biological_state_gates.required_explicit_dimensions,
+      ],
+      allowed: {
+        sex: relationship.biological_state_gates.sex,
+        age_class: relationship.biological_state_gates.age_class,
+        movement_state: relationship.biological_state_gates.movement_state,
+        reproductive_state: relationship.biological_state_gates.reproductive_state,
+        seasons: relationship.biological_state_gates.seasons,
+        diel_periods: relationship.biological_state_gates.diel_periods,
+        regional_reproductive_context:
+          relationship.biological_state_gates.regional_reproductive_context,
+      },
+    },
     inputs: inputEvaluation.rows,
     value_constraints: constraints,
     limitations: [...relationship.limitations],
