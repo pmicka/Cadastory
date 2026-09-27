@@ -1,45 +1,47 @@
 # Scout by Cadastory
 
-Scout by Cadastory is an **evidence-driven data and systems project for opportunity discovery and operational planning**.
+**Evidence-driven geospatial data and systems work for opportunity discovery and operational planning.**
 
-The project combines public and geospatial data, relational storage, APIs, evidence/provenance rules, authorization boundaries, and user-facing workflows. The initial operating context is commercial drone and exterior-service work; the repository also contains **Farm Watch**, a property-focused decision-support surface built around explicit scientific evidence and interpretation boundaries.
+> Active development · independent project · AI-assisted implementation directed and validated by the project owner
 
-This is an independent project with **AI-assisted implementation directed and validated by the project owner**. The emphasis is on problem framing, requirements, architecture, source selection, evidence quality, testing, privacy/authorization, and whether the resulting system is operationally useful.
+Scout combines public and geospatial data, relational storage, APIs, evidence/provenance rules, authorization boundaries, and user-facing workflows. The initial operating context is commercial drone and exterior-service work; the repository also contains **Farm Watch**, a property-focused decision-support surface built around explicit scientific evidence and interpretation boundaries.
+
+The project is less about producing a single model or dashboard than building a system that can answer operational questions without losing track of **where evidence came from, how fresh it is, what it actually supports, and who is allowed to see or act on it**.
 
 ## What this repository demonstrates
 
-- Translating operational questions into product and system requirements
-- Designing relational and geospatial data models
-- Integrating heterogeneous public-data sources and APIs
-- Preserving source provenance, confidence, freshness, and interpretation limits
-- Building protected application and model-facing interfaces
-- Testing authorization, exposure, and evidence contracts
-- Iteratively validating and debugging database, ingestion, backend, and presentation behavior
+| Area | Examples |
+| --- | --- |
+| **Business / systems analysis** | Problem framing, requirements, workflows, acceptance criteria, implementation decisions |
+| **Data architecture** | Relational + geospatial modeling, heterogeneous public-data integration, provenance and freshness |
+| **Application architecture** | Protected APIs, Edge Functions, model-facing interfaces, authorization boundaries |
+| **Quality / controls** | CI, contract checks, evidence ledgers, privacy/exposure rules, regression validation |
+| **Product judgment** | Separating usable operational signals from unsupported conclusions; preserving uncertainty |
 
 ## Architecture at a glance
 
-The repository includes:
-
-- **PostgreSQL / PostGIS + Supabase** for relational and geospatial persistence
-- **TypeScript / Deno Edge Functions** for protected application and tool interfaces
-- **Python ingestion and processing scripts** for external datasets
-- **GitHub Actions / CI** for repeatable validation and controlled data workflows
-- **MCP-oriented tool and presentation contracts** for model-facing access
-- Durable documentation and evidence ledgers for scientific and architectural decisions
+- **PostgreSQL / PostGIS + Supabase** — relational and geospatial persistence
+- **TypeScript / Deno Edge Functions** — protected application and tool interfaces
+- **Python** — ingestion and processing of external datasets
+- **GitHub Actions / CI** — repeatable validation and controlled data workflows
+- **MCP-oriented contracts** — model-facing tools and presentation surfaces
+- **Evidence ledgers + architecture doctrine** — durable constraints around provenance, interpretation, privacy, and system evolution
 
 The design deliberately separates **what the data supports** from stronger conclusions the system is not justified in making. Missing evidence is not treated as proof, and domain-specific interpretations are gated by documented evidence and transferability constraints.
 
-## Repository structure
+## Repository map
 
-- `database/` — database-side implementation and supporting assets
-- `docs/` — architecture, evidence, science, and implementation documentation
-- `scripts/` — ingestion, processing, and operational utilities
-- `supabase/` — Edge Functions and protected application/tool surfaces
-- `.github/` — CI and controlled workflow definitions
+```text
+database/   database-side implementation and supporting assets
+docs/       architecture, evidence, science, and implementation documentation
+scripts/    ingestion, processing, and operational utilities
+supabase/   Edge Functions and protected application/tool surfaces
+.github/    CI and controlled workflow definitions
+```
 
 ## Farm Watch
 
-Farm Watch extends the same evidence-first architecture into property and land-context analysis. Current work includes terrain, LiDAR-derived structure, environmental context, hydrology, managed features, and a registry-driven deer-science evaluator.
+Farm Watch applies the same evidence-first architecture to property and land-context analysis. Current work includes terrain, LiDAR-derived structure, environmental context, hydrology, managed features, and a registry-driven deer-science evaluator.
 
 Its evidence ledgers are intentionally conservative: neutral physical measurements do not silently become claims about habitat quality, animal behavior, causation, or land-use outcomes. Biological relationships retain their population, season, movement-state, and transferability constraints.
 
