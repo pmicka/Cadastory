@@ -1019,25 +1019,19 @@ async function claimDynamicBuild(
   workerId: string,
 ) {
   const spec = productSpec(key)
-  const resolved = await authoritativeExternalSourceSignature(
-    slug,
-    spec.productKind,
-    sourceSignature,
-  )
   const { data, error } = await admin.rpc('farm_watch_claim_materialization_build_v1_internal', {
     p_slug: slug,
     p_product_kind: spec.productKind,
     p_algorithm_version: spec.algorithmVersion,
     p_output_schema_version: spec.outputSchemaVersion,
-    p_source_signature: resolved.sourceSignature,
+    p_source_signature: sourceSignature,
     p_worker_id: workerId,
     p_lease_seconds: 1800,
   })
   if (error) throw new Error('dynamic materialization claim failed: ' + error.message)
   return data ? {
     ...data,
-    source_signature: resolved.sourceSignature,
-    external_source_observations: resolved.observations,
+    source_signature: sourceSignature,
   } : data
 }
 
