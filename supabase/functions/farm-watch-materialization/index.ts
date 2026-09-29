@@ -100,8 +100,7 @@ import {
   normalizeFarmWatchAccountRole,
 } from '../_shared/farm-watch-presentation-policy.ts'
 import {
-  appendFarmWatchExternalIdentitySignature,
-  resolveFarmWatchExternalSourceIdentities,
+  resolveFarmWatchExternalSourceSignatureForProperty,
 } from '../_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
@@ -337,44 +336,13 @@ async function authoritativeExternalSourceSignature(
   productKind: string,
   sourceSignature: string,
 ) {
-  const { data: dependencyKeys, error: dependencyError } = await admin.rpc(
-    'farm_watch_get_materialization_external_dependencies_v1_internal',
-    { p_product_kind: productKind },
-  )
-  if (dependencyError) {
-    throw new Error('external dependency registry read failed: ' + dependencyError.message)
-  }
-  const keys = Array.isArray(dependencyKeys)
-    ? dependencyKeys.map(String).filter(Boolean)
-    : []
-  if (!keys.length) {
-    return { sourceSignature, observations: [] as any[] }
-  }
-
-  const { data: context, error: contextError } = await admin.rpc(
-    'farm_watch_get_materialization_identity_context_v1_internal',
-    { p_slug: slug },
-  )
-  if (contextError) {
-    throw new Error('materialization identity context read failed: ' + contextError.message)
-  }
-  if (context?.status !== 'available' || !context?.boundary_geojson) {
-    throw new Error('materialization identity boundary is unavailable')
-  }
-
-  const observations = await resolveFarmWatchExternalSourceIdentities({
-    boundary: context.boundary_geojson,
-    dependencyKeys: keys,
+  return resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind,
+    sourceSignature,
   })
-  return {
-    sourceSignature: appendFarmWatchExternalIdentitySignature(
-      sourceSignature,
-      observations,
-    ),
-    observations,
-  }
 }
-
 function validateTerrainArtifact(value: any) {
   const grid = value?.grid
   const contours = value?.contours
