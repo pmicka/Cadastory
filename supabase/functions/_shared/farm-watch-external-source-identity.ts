@@ -279,15 +279,18 @@ async function arcgisSamples(
   }, fetchImpl)
   const samples = Array.isArray(payload?.samples) ? payload.samples : []
   const byIndex = new Map<number, any>()
-  for (const sample of samples) {
-    const index = Number(sample?.locationId)
-    if (Number.isInteger(index) && index >= 0 && index < points.length) {
+  samples.forEach((sample: any, ordinal: number) => {
+    const locationId = Number(sample?.locationId)
+    const index = Number.isInteger(locationId) && locationId >= 0 && locationId < points.length
+      ? locationId
+      : ordinal < points.length ? ordinal : -1
+    if (index >= 0) {
       byIndex.set(index, stableValue({
         value: sample?.value ?? null,
         attributes: sample?.attributes ?? null,
       }))
     }
-  }
+  })
   return points.map((point, index) => ({
     point,
     sample: byIndex.get(index) ?? null,
@@ -406,6 +409,12 @@ async function providerObservedArcgis(args: {
         args.sampleGrid,
         args.fetchImpl,
       )
+      if (
+        args.requireSamples &&
+        !samples.some((row: any) => row?.sample && row.sample.value != null)
+      ) {
+        throw new Error('bounded source sample probe returned no values')
+      }
     } catch (error) {
       if (args.requireSamples) throw error
     }
