@@ -418,7 +418,7 @@ function crossValidatedProfileModel(records: any[], gridWidth: number) {
       share_64_plus: row.shares[4] || 0,
       entropy: normalizedBandEntropy(row.shares) || 0,
       profile_spread: bandProfileSpread(row.shares) || 0,
-    },
+    } as Record<string, number>,
   })).filter((row) =>
     Number.isFinite(row.y) &&
     featureNames.every((name) => Number.isFinite(row.features[name]))
@@ -705,7 +705,7 @@ function crossValidatedTreeProfileModel(records: any[], gridWidth: number) {
   const rows = records.map((row) => ({
     index: row.index,
     y: row.leafScore,
-    features: profileBaseFeatures(row),
+    features: profileBaseFeatures(row) as Record<string, number>,
   })).filter((row) =>
     Number.isFinite(row.y) &&
     PROFILE_BASE_FEATURES.every((name) => Number.isFinite(row.features[name]))
@@ -1322,7 +1322,7 @@ function buildSynthesis(physical: any, leaf: any, nullSeed: string) {
   const overstory = records.filter(
     (row) => row.upperShare >= FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.minimumUpperShare,
   )
-  const fullProfile = crossValidatedProfileModel(records, Number(physicalGrid.width))
+  const fullProfile: any = crossValidatedProfileModel(records, Number(physicalGrid.width))
   if (fullProfile.status !== 'available') {
     throw new Error('full vertical-profile cross-validation is unavailable')
   }
