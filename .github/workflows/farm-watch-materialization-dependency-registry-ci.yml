@@ -1,0 +1,26 @@
+name: Farm Watch materialization dependency registry CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/migrations/*materialization_dependency_registry*.sql'
+      - 'supabase/migrations/*materialization_dependency_manifest*.sql'
+      - 'scripts/check-farm-watch-materialization-dependency-registry.ts'
+      - 'docs/FARM_WATCH_MATERIALIZATION_DEPENDENCY_MANIFEST_V1.md'
+      - '.github/workflows/farm-watch-materialization-dependency-registry-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-registry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check canonical materialization dependency registry
+        run: deno run --allow-read scripts/check-farm-watch-materialization-dependency-registry.ts
