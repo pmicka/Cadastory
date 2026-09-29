@@ -65,6 +65,18 @@ assert(
   'external dependency resolver must cover exactly eight unique P0.2 slots',
 )
 
+if (Deno.args.includes('--bigmap-diagnostic')) {
+  const url = 'https://data.fs.usda.gov/geodata/rastergateway/bigmap/'
+  const response = await fetch(url)
+  const html = await response.text()
+  console.log('BIGMAP_GATEWAY_STATUS=' + response.status)
+  for (const code of ['0400','0802','0833']) {
+    const index = html.indexOf(code)
+    console.log('BIGMAP_GATEWAY_SNIPPET_' + code + '=' +
+      (index >= 0 ? html.slice(Math.max(0, index - 500), index + 1500) : 'NOT_FOUND'))
+  }
+}
+
 if (Deno.args.includes('--live')) {
   // Bounded validation geometry covering the Flat Creek validation-property area.
   // The resolver itself expands only as required by each product contract.
