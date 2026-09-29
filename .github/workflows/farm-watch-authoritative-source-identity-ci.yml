@@ -1,0 +1,48 @@
+name: Farm Watch authoritative source identity CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-external-source-identity.ts'
+      - 'supabase/functions/farm-watch-materialization/index.ts'
+      - 'supabase/functions/farm-watch-private/index.ts'
+      - 'supabase/functions/farm-watch-leaf-off-worker/index.ts'
+      - 'supabase/functions/farm-watch-lidar-worker/index.ts'
+      - 'supabase/functions/farm-watch-landscape-structure-worker/index.ts'
+      - 'supabase/functions/farm-watch-study-vegetation-height-worker/index.ts'
+      - 'supabase/functions/farm-watch-mast-capacity-worker/index.ts'
+      - 'supabase/functions/farm-watch-structure-synthesis-worker/index.ts'
+      - 'supabase/migrations/*authoritative_external_source_identity*.sql'
+      - 'scripts/check-farm-watch-external-source-identities.ts'
+      - 'docs/FARM_WATCH_MATERIALIZATION_DEPENDENCY_MANIFEST_V1.md'
+      - '.github/workflows/farm-watch-authoritative-source-identity-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check source identity resolver
+        run: deno check supabase/functions/_shared/farm-watch-external-source-identity.ts
+      - name: Check affected protected workers
+        run: |
+          deno check supabase/functions/farm-watch-materialization/index.ts
+          deno check supabase/functions/farm-watch-private/index.ts
+          deno check supabase/functions/farm-watch-leaf-off-worker/index.ts
+          deno check supabase/functions/farm-watch-lidar-worker/index.ts
+          deno check supabase/functions/farm-watch-landscape-structure-worker/index.ts
+          deno check supabase/functions/farm-watch-study-vegetation-height-worker/index.ts
+          deno check supabase/functions/farm-watch-mast-capacity-worker/index.ts
+          deno check supabase/functions/farm-watch-structure-synthesis-worker/index.ts
+      - name: Check deterministic source identity contract
+        run: deno run --allow-read scripts/check-farm-watch-external-source-identities.ts
+      - name: Probe authoritative external sources
+        run: deno run --allow-net --allow-read scripts/check-farm-watch-external-source-identities.ts --live
