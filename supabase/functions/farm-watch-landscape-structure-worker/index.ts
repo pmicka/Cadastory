@@ -18,6 +18,9 @@ import {
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
 import { sha256Hex } from '../_shared/farm-watch-terrain.ts'
+import {
+  resolveFarmWatchExternalSourceSignatureForProperty,
+} from '../_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -86,17 +89,24 @@ async function landscapeDomain(slug: string) {
   return data
 }
 
-function sourceSignatureForDomain(domain: any) {
-  return landscapeStructureSourceSignature({
+async function sourceSignatureForDomain(slug: string, domain: any) {
+  const baseSourceSignature = landscapeStructureSourceSignature({
     landscapeDomainIdentitySha256: String(domain.identity.identity_sha256),
     landscapeDomainAlgorithmVersion: String(domain.identity.algorithm_version || ''),
     lidarSourceContractSignature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+  })
+  return resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.productKind,
+    sourceSignature: baseSourceSignature,
   })
 }
 
 async function claimLandscapeStructure(slug: string, identity: any) {
   const domain = await landscapeDomain(slug)
-  const sourceSignature = sourceSignatureForDomain(domain)
+  const source = await sourceSignatureForDomain(slug, domain)
+  const sourceSignature = source.sourceSignature
   const workerId = [
     'github-actions-landscape-structure',
     identity.run_id || 'run',
@@ -139,6 +149,8 @@ async function claimLandscapeStructure(slug: string, identity: any) {
     landscape_domain_identity: domain.identity,
     input_signature_sha256: claim.input_signature_sha256,
     source_signature_sha256: claim.source_signature_sha256,
+    source_signature: sourceSignature,
+    external_source_observations: source.observations,
     center: await propertyCenter(slug),
     contract: {
       schema: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.outputSchemaVersion,
@@ -189,7 +201,8 @@ async function completeLandscapeStructure(slug: string, body: any) {
   }
 
   const domain = await landscapeDomain(slug)
-  const expectedSourceSignature = sourceSignatureForDomain(domain)
+  const source = await sourceSignatureForDomain(slug, domain)
+  const expectedSourceSignature = source.sourceSignature
   if (
     String(artifact?.domain?.identity_sha256 || '') !==
       String(domain.identity.identity_sha256 || '')
@@ -259,6 +272,7 @@ async function completeLandscapeStructure(slug: string, body: any) {
   }
   const sourceProvenance = {
     source_signature: expectedSourceSignature,
+    external_source_observations: source.observations,
     processing_source_fingerprint_sha256: sampledSourceSha256,
     processing_source_fingerprint: fingerprint,
     landscape_domain_identity: domain.identity,
