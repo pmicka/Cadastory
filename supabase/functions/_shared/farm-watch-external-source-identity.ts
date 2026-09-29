@@ -36,8 +36,7 @@ export type FarmWatchExternalSourceObservation = {
 }
 
 const USER_AGENT = 'Cadastory-Farm-Watch-Source-Identity/1.0 (+https://pmicka.com)'
-const ARCGIS_ITEM_SEARCH = 'https://www.arcgis.com/sharing/rest/search'
-const ARCGIS_ITEM_ROOT = 'https://www.arcgis.com/sharing/rest/content/items/'
+const ARCGIS_ONLINE_ROOT = 'https://www.arcgis.com'
 const TCC_ARCGIS_ITEM_ID = '8f6ea42df79f4c4186239cbd42852f14'
 const SOURCE_TIMEOUT_MS = 20_000
 
@@ -329,13 +328,14 @@ async function arcgisPortalItem(
   fetchImpl: typeof fetch,
   fixedItemId: string | null = null,
   fallbackTitle: string | null = null,
+  portalRoot: string = ARCGIS_ONLINE_ROOT,
 ) {
   let itemId = fixedItemId || String(service?.serviceItemId || '').trim()
   if (!itemId) {
     try {
       const query = 'url:"' + serviceUrl + '"'
       const search = await getJson(
-        ARCGIS_ITEM_SEARCH + '?f=json&num=10&q=' + encodeURIComponent(query),
+        portalRoot.replace(/\/$/, '') + '/sharing/rest/search?f=json&num=10&q=' + encodeURIComponent(query),
         fetchImpl,
       )
       const rows = Array.isArray(search?.results) ? search.results : []
@@ -347,7 +347,7 @@ async function arcgisPortalItem(
     if (!itemId && fallbackTitle) {
       try {
         const search = await getJson(
-          ARCGIS_ITEM_SEARCH + '?f=json&num=20&q=' +
+          portalRoot.replace(/\/$/, '') + '/sharing/rest/search?f=json&num=20&q=' +
             encodeURIComponent('title:"' + fallbackTitle + '"'),
           fetchImpl,
         )
@@ -364,7 +364,10 @@ async function arcgisPortalItem(
   }
   if (!itemId) return null
   try {
-    const item = await getJson(ARCGIS_ITEM_ROOT + itemId + '?f=json', fetchImpl)
+    const item = await getJson(
+      portalRoot.replace(/\/$/, '') + '/sharing/rest/content/items/' + itemId + '?f=json',
+      fetchImpl,
+    )
     return stableValue({
       id: item?.id ?? itemId,
       owner: item?.owner ?? null,
@@ -392,6 +395,7 @@ async function providerObservedArcgis(args: {
   imageProbe?: boolean
   fixedItemId?: string | null
   portalSearchTitle?: string | null
+  portalRoot?: string | null
   requireCatalog?: boolean
   requireSamples?: boolean
   fetchImpl: typeof fetch
@@ -404,6 +408,7 @@ async function providerObservedArcgis(args: {
     args.fetchImpl,
     args.fixedItemId || null,
     args.portalSearchTitle || null,
+    args.portalRoot || ARCGIS_ONLINE_ROOT,
   )
   let catalog: any[] | null = null
   let samples: any[] | null = null
@@ -675,6 +680,7 @@ async function resolveOne(
         serviceUrl: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
         bbox: null,
         portalSearchTitle: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceProduct,
+        portalRoot: 'https://usfs.maps.arcgis.com',
         fetchImpl,
       })
       const portalItem = (source.evidence as any)?.portal_item
