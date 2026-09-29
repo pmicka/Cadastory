@@ -43,6 +43,24 @@ For each product the UI can receive:
 
 Raw private artifact paths are not exposed by this inventory.
 
+## Dependency-aware freshness
+
+Materialization retention and evidence freshness are separate concerns.
+
+The evidence stack now resolves each materialized product against the current product contract and the identities of the dependencies that produced it. An artifact is reported as `available` only when the applicable checks still match, including:
+
+- current algorithm and output-schema contract;
+- ordinary materialization expiration;
+- current landscape/domain or upstream materialization identity and artifact checksum where the product depends on them;
+- the requested calendar date for date-bound solar exposure;
+- the requested exact timestamp and currently admissible HRRR analysis identity, valid time, source-index checksum, and selected-record checksum for thermal exposure.
+
+A retained artifact that no longer matches those dependencies is reported as `stale` with explicit `freshness_reason_codes`. It is not deleted or rewritten. The same retained artifact can still be `available` for an exact historical date/time when its bound dependencies match that historical request.
+
+The private Farm Watch response uses the exact timestamp-aware reader so the deer-science evaluator receives freshness state for the same scenario time it is evaluating. Date-only compatibility reads remain supported; current-date reads resolve at current time and historical date-only reads use local noon as the deterministic timestamp convention.
+
+This rule is generalized across the materialized evidence dependency graph rather than implemented as a thermal/HRRR exception.
+
 ## Surface Water State
 
 The reader also exposes the exact-date `surface-water-state-v1` snapshot when Batch 7 is deployed and materialized.

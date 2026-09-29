@@ -3,6 +3,8 @@ const migration = [
   await Deno.readTextFile('supabase/migrations/20260923223500_expose_study_vegetation_height_in_deer_evidence_stack_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260925161000_expose_deer_tier1_context_in_evidence_stack_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260926104500_restore_farm_watch_deer_evidence_stack_study_height_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260929201015_farm_watch_dependency_aware_materialization_freshness_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260929201051_farm_watch_dependency_aware_evidence_stack_freshness_v1.sql'),
 ].join('\n')
 const edge = await Deno.readTextFile('supabase/functions/farm-watch-private/index.ts')
 const evaluator = await Deno.readTextFile(
@@ -31,6 +33,10 @@ for (const required of [
   "'not_deployed'",
   "'not_materialized'",
   'Neutral Farm Watch evidence inventory for UI review',
+  'dependency-aware-materialization-v1',
+  'farm_watch_get_current_materialization_ref_v1_internal',
+  'calendar_date_mismatch',
+  'meteorological_forcing_identity_sha256',
 ]) assert(migration.includes(required), 'missing evidence-stack invariant: ' + required)
 
 assert(
@@ -61,6 +67,18 @@ for (const rpc of [
   )
 }
 
+
+assert(
+  migration.includes('farm_watch_get_deer_evidence_stack_at_v1_internal') &&
+  migration.includes("when 'solar-exposure-context'") &&
+  migration.includes("when 'thermal-exposure-context'") &&
+  migration.includes("when 'horizontal-visibility-context'") &&
+  migration.includes("when 'mast-capacity'") &&
+  migration.includes("'contract_version_mismatch'") &&
+  migration.includes("'meteorological_forcing_time_changed'"),
+  'dependency-aware freshness coverage is incomplete',
+)
+
 for (const forbidden of [
   'deer_score',
   'habitat_score',
@@ -70,11 +88,12 @@ for (const forbidden of [
 ]) assert(!migration.includes(forbidden), 'forbidden UI scoring semantic: ' + forbidden)
 
 assert(
-  edge.includes("admin.rpc('farm_watch_get_deer_evidence_stack_v1_internal'") &&
+  edge.includes("admin.rpc('farm_watch_get_deer_evidence_stack_at_v1_internal'") &&
+  edge.includes('p_as_of_at: asOfAt') &&
   edge.includes("admin.rpc('farm_watch_get_managed_food_feature_context_v1_internal'") &&
   edge.includes("admin.rpc('farm_watch_get_managed_water_source_context_v1_internal'") &&
   edge.includes('deer_evidence_stack: deerEvidenceStack'),
-  'private edge response is not wired to the current technical evidence stack',
+  'private edge response is not wired to the exact-time dependency-aware evidence stack',
 )
 
 for (const required of [

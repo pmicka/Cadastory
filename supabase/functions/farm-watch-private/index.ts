@@ -570,11 +570,15 @@ function deerScienceReadinessSummary() {
   }
 }
 
-async function readDeerEvidenceStack(slug: string, asOfDate = louisvilleCalendarDate(new Date())) {
+async function readDeerEvidenceStack(
+  slug: string,
+  asOfDate = louisvilleCalendarDate(new Date()),
+  asOfAt = new Date().toISOString(),
+) {
   const [stackRead, managedFoodRead, managedWaterRead] = await Promise.all([
-    admin.rpc('farm_watch_get_deer_evidence_stack_v1_internal', {
+    admin.rpc('farm_watch_get_deer_evidence_stack_at_v1_internal', {
       p_slug: slug,
-      p_as_of_date: asOfDate,
+      p_as_of_at: asOfAt,
     }),
     admin.rpc('farm_watch_get_managed_food_feature_context_v1_internal', {
       p_slug: slug,
@@ -587,7 +591,7 @@ async function readDeerEvidenceStack(slug: string, asOfDate = louisvilleCalendar
   ])
 
   if (stackRead.error) {
-    console.error('farm_watch_get_deer_evidence_stack_v1_internal failed', stackRead.error.message)
+    console.error('farm_watch_get_deer_evidence_stack_at_v1_internal failed', stackRead.error.message)
   }
   if (managedFoodRead.error) {
     console.error('farm_watch_get_managed_food_feature_context_v1_internal failed', managedFoodRead.error.message)
@@ -893,7 +897,7 @@ Deno.serve(async (req: Request) => {
   const tomorrowDate = calendarDatePlusDays(deerAsOfDate, 1)
   const [deerContext, deerEvidenceStack, tomorrowDiel] = await Promise.all([
     readDeerContext(slug, deerNow, deerScenarioRequest),
-    readDeerEvidenceStack(slug, deerAsOfDate),
+    readDeerEvidenceStack(slug, deerAsOfDate, deerNow.toISOString()),
     readDielPhotoperiod(slug, tomorrowDate),
   ])
   const daylightPlanning = huntingDaylightPlanning(
