@@ -3,8 +3,8 @@ const migration = [
   await Deno.readTextFile('supabase/migrations/20260923223500_expose_study_vegetation_height_in_deer_evidence_stack_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260925161000_expose_deer_tier1_context_in_evidence_stack_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260926104500_restore_farm_watch_deer_evidence_stack_study_height_v1.sql'),
-  await Deno.readTextFile('supabase/migrations/20260929201000_farm_watch_dependency_aware_materialization_freshness_v1.sql'),
-  await Deno.readTextFile('supabase/migrations/20260929202000_farm_watch_dependency_aware_evidence_stack_freshness_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260929201015_farm_watch_dependency_aware_materialization_freshness_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260929201051_farm_watch_dependency_aware_evidence_stack_freshness_v1.sql'),
 ].join('\n')
 const edge = await Deno.readTextFile('supabase/functions/farm-watch-private/index.ts')
 const evaluator = await Deno.readTextFile(
