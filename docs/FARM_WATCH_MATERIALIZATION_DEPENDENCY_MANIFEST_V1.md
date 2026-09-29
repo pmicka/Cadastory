@@ -121,7 +121,7 @@ The provider-observation strategies are:
 | USGS 3DEP | service publication/metadata + intersecting source catalog + bounded deterministic sample grid |
 | 2024 Phase 3 RGB/IR | exact configured acquisition/tile catalog records + bounded content probe for both services |
 | 2019 Phase 2 RGB/IR | exact configured acquisition/tile catalog records + bounded content probe for both services |
-| FIA BIGMAP 2018 | fixed-product service/portal metadata + exact expected mast-species raster catalog |
+| FIA BIGMAP 2018 | authoritative ArcGIS Online item revision for the fixed 2018 product; expected mast-species set remains part of the Farm Watch product contract |
 
 The observation timestamp itself is not part of the identity. Repeating a probe against an unchanged provider must therefore produce the same identity.
 
