@@ -299,7 +299,10 @@ begin
       'status',coalesce(v_ref->>'status','unavailable'),
       'identity_sha256',v_ref#>>'{materialization,identity_sha256}',
       'artifact_sha256',v_ref#>>'{materialization,artifact_sha256}',
-      'product_kind',p_dependency->>'product_kind'
+      'product_kind',p_dependency->>'product_kind',
+      'dependency_manifest_identity_sha256',v_ref#>>'{dependency_manifest,identity_sha256}',
+      'authoritative_external_resolution_complete',
+        v_ref#>'{dependency_manifest,authoritative_external_resolution_complete}'
     ));
   elsif v_kind='temporal' and p_dependency->>'resolver'='calendar-date-v1' then
     v_current := jsonb_build_object(
@@ -395,6 +398,10 @@ begin
       v_all_available := false;
     end if;
     if v_current->>'kind'='external' and v_current->>'resolution_status'='contract_only' then
+      v_contract_only_external := true;
+    elsif v_current->>'kind'='materialization'
+      and coalesce((v_current->>'authoritative_external_resolution_complete')::boolean,false)=false
+    then
       v_contract_only_external := true;
     end if;
   end loop;
@@ -537,6 +544,28 @@ begin
   from jsonb_array_elements(v_registry->'products');
   if v_count <> 14 then
     raise exception 'materialization dependency registry expected 14 products, found %',v_count;
+  end if;
+
+  select count(*) into v_missing
+  from (values
+    ('terrain-analysis'),
+    ('lidar-source-coverage'),
+    ('lidar-physical-structure'),
+    ('leaf-off-woody-structure'),
+    ('structure-complementarity'),
+    ('landscape-structure-context'),
+    ('study-aligned-vegetation-height-context'),
+    ('terrain-form-permeability'),
+    ('spatial-edge-patch-context'),
+    ('solar-terrain-context'),
+    ('solar-exposure-context'),
+    ('thermal-exposure-context'),
+    ('horizontal-visibility-context'),
+    ('mast-capacity')
+  ) expected(product_kind)
+  where farm_watch.farm_watch_materialization_dependency_contract_v1(expected.product_kind) is null;
+  if v_missing <> 0 then
+    raise exception 'canonical materialization dependency registry is missing a required product';
   end if;
 
   select count(*) into v_missing
