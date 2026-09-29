@@ -676,6 +676,7 @@ export async function resolveFarmWatchExternalSourceIdentities(args: {
   boundary: any
   dependencyKeys: string[]
   fetchImpl?: typeof fetch
+  requireAll?: boolean
 }) {
   const fetchImpl = args.fetchImpl || fetch
   const keys = [...new Set(args.dependencyKeys)]
@@ -688,7 +689,7 @@ export async function resolveFarmWatchExternalSourceIdentities(args: {
     keys.map((key) => resolveOne(key, args.boundary, fetchImpl, cache)),
   )
   const unavailable = observations.filter((row) => row.status !== 'available')
-  if (unavailable.length) {
+  if (args.requireAll !== false && unavailable.length) {
     throw new Error(
       'external source identity unavailable: ' +
       unavailable.map((row) => row.key + '=' + (row.error || row.status)).join('; '),
@@ -815,6 +816,7 @@ export async function resolveFarmWatchAllExternalSourceOverridesForProperty(args
     boundary: context.boundary_geojson,
     dependencyKeys: keys,
     fetchImpl: args.fetchImpl,
+    requireAll: false,
   })
   return {
     observations,
