@@ -1,0 +1,738 @@
+import {
+  buildLidarSourceArtifact,
+  sha256Hex,
+} from './farm-watch-lidar-source.ts'
+import { FARM_WATCH_TERRAIN_PRODUCT } from './farm-watch-terrain-contract.ts'
+import { FARM_WATCH_LEAF_OFF_PRODUCT } from './farm-watch-leaf-off-contract.ts'
+import { FARM_WATCH_SOLAR_TERRAIN_PRODUCT } from './farm-watch-solar-exposure-contract.ts'
+import {
+  FARM_WATCH_MAST_CAPACITY_GROUPS,
+  FARM_WATCH_MAST_CAPACITY_PRODUCT,
+} from './farm-watch-mast-capacity-contract.ts'
+
+export const FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS = Object.freeze([
+  'external:kyfromabove-phase3-dem',
+  'external:kyfromabove-lidar-stac',
+  'external:kyfromabove-phase3-copc',
+  'external:kyfromabove-phase3-imagery-2024',
+  'external:kyfromabove-phase2-imagery-2019',
+  'external:nlcd-tcc-v2025-6',
+  'external:usgs-3dep-dynamic',
+  'external:fia-bigmap-2018-species-biomass',
+] as const)
+
+export type FarmWatchExternalDependencyKey =
+  typeof FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS[number]
+
+export type FarmWatchExternalSourceObservation = {
+  key: FarmWatchExternalDependencyKey
+  status: 'available' | 'unavailable'
+  authoritative: boolean
+  resolution_status: string
+  identity_sha256?: string
+  observed_at: string
+  evidence: Record<string, unknown>
+  error?: string
+}
+
+const USER_AGENT = 'Cadastory-Farm-Watch-Source-Identity/1.0 (+https://pmicka.com)'
+const ARCGIS_ITEM_SEARCH = 'https://www.arcgis.com/sharing/rest/search'
+const ARCGIS_ITEM_ROOT = 'https://www.arcgis.com/sharing/rest/content/items/'
+const TCC_ARCGIS_ITEM_ID = '8f6ea42df79f4c4186239cbd42852f14'
+const SOURCE_TIMEOUT_MS = 20_000
+
+function finite(value: unknown): number | null {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function stableValue(value: any): any {
+  if (Array.isArray(value)) return value.map(stableValue)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.keys(value).sort().map((key) => [key, stableValue(value[key])]),
+    )
+  }
+  if (typeof value === 'number' && !Number.isFinite(value)) return null
+  return value
+}
+
+function stableJson(value: unknown) {
+  return JSON.stringify(stableValue(value))
+}
+
+function geometryCoordinates(value: any, out: Array<[number, number]> = []) {
+  if (!Array.isArray(value)) return out
+  if (
+    value.length >= 2 &&
+    Number.isFinite(Number(value[0])) &&
+    Number.isFinite(Number(value[1]))
+  ) {
+    out.push([Number(value[0]), Number(value[1])])
+    return out
+  }
+  for (const child of value) geometryCoordinates(child, out)
+  return out
+}
+
+export function farmWatchGeometryBbox(geometry: any): [number, number, number, number] {
+  const rows = geometryCoordinates(geometry?.coordinates)
+  if (!rows.length) throw new Error('external-source identity boundary is empty')
+  const xs = rows.map((row) => row[0])
+  const ys = rows.map((row) => row[1])
+  return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]
+}
+
+function expandBboxMeters(
+  bbox: [number, number, number, number],
+  meters: number,
+): [number, number, number, number] {
+  const [west, south, east, north] = bbox
+  const latitude = (south + north) / 2
+  const latDegrees = meters / 111_320
+  const lonDegrees = meters / Math.max(1, 111_320 * Math.cos(latitude * Math.PI / 180))
+  return [west - lonDegrees, south - latDegrees, east + lonDegrees, north + latDegrees]
+}
+
+function bboxPolygon(bbox: [number, number, number, number]) {
+  const [west, south, east, north] = bbox
+  return {
+    type: 'Polygon',
+    coordinates: [[
+      [west, south],
+      [east, south],
+      [east, north],
+      [west, north],
+      [west, south],
+    ]],
+  }
+}
+
+function gridPoints(
+  bbox: [number, number, number, number],
+  size: number,
+): Array<[number, number]> {
+  const [west, south, east, north] = bbox
+  const out: Array<[number, number]> = []
+  for (let row = 0; row < size; row += 1) {
+    const lat = south + (north - south) * (row + 0.5) / size
+    for (let col = 0; col < size; col += 1) {
+      const lon = west + (east - west) * (col + 0.5) / size
+      out.push([lon, lat])
+    }
+  }
+  return out
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  fetchImpl: typeof fetch = fetch,
+) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), SOURCE_TIMEOUT_MS)
+  try {
+    return await fetchImpl(url, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        'user-agent': USER_AGENT,
+        ...(init.headers || {}),
+      },
+    })
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
+async function postFormJson(
+  url: string,
+  params: Record<string, string>,
+  fetchImpl: typeof fetch,
+) {
+  const body = new URLSearchParams(params)
+  const response = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/x-www-form-urlencoded; charset=UTF-8',
+    },
+    body: body.toString(),
+  }, fetchImpl)
+  const text = await response.text()
+  if (!response.ok) throw new Error('source request returned ' + response.status)
+  let payload: any
+  try {
+    payload = JSON.parse(text)
+  } catch {
+    throw new Error('source request did not return JSON')
+  }
+  if (payload?.error) throw new Error(String(payload.error?.message || 'source request failed'))
+  return payload
+}
+
+async function getJson(
+  url: string,
+  fetchImpl: typeof fetch,
+) {
+  const response = await fetchWithTimeout(url, {
+    headers: { accept: 'application/json' },
+  }, fetchImpl)
+  const text = await response.text()
+  if (!response.ok) throw new Error('source request returned ' + response.status)
+  try {
+    const payload = JSON.parse(text)
+    if (payload?.error) throw new Error(String(payload.error?.message || 'source request failed'))
+    return payload
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('source request failed')) throw error
+    throw new Error('source request did not return JSON')
+  }
+}
+
+function serviceMetadataSubset(payload: any) {
+  return stableValue({
+    name: payload?.name ?? null,
+    serviceDescription: payload?.serviceDescription ?? null,
+    description: payload?.description ?? null,
+    copyrightText: payload?.copyrightText ?? null,
+    serviceDataType: payload?.serviceDataType ?? null,
+    serviceSourceType: payload?.serviceSourceType ?? null,
+    extent: payload?.extent ?? payload?.fullExtent ?? null,
+    pixelSizeX: finite(payload?.pixelSizeX),
+    pixelSizeY: finite(payload?.pixelSizeY),
+    meanPixelSize: finite(payload?.meanPixelSize),
+    datasetFormat: payload?.datasetFormat ?? null,
+    bandCount: finite(payload?.bandCount),
+    bandNames: payload?.bandNames ?? null,
+    pixelType: payload?.pixelType ?? null,
+    minValues: payload?.minValues ?? null,
+    maxValues: payload?.maxValues ?? null,
+    meanValues: payload?.meanValues ?? null,
+    stdvValues: payload?.stdvValues ?? null,
+    capabilities: payload?.capabilities ?? null,
+    serviceItemId: payload?.serviceItemId ?? null,
+    fields: Array.isArray(payload?.fields)
+      ? payload.fields.map((field: any) => ({
+        name: field?.name ?? null,
+        type: field?.type ?? null,
+        alias: field?.alias ?? null,
+      }))
+      : [],
+  })
+}
+
+async function serviceMetadata(
+  serviceUrl: string,
+  fetchImpl: typeof fetch,
+) {
+  try {
+    return await postFormJson(serviceUrl, { f: 'json' }, fetchImpl)
+  } catch {
+    return await getJson(serviceUrl + '?f=json', fetchImpl)
+  }
+}
+
+async function arcgisCatalog(
+  serviceUrl: string,
+  bbox: [number, number, number, number] | null,
+  where: string,
+  outFields: string,
+  fetchImpl: typeof fetch,
+) {
+  const params: Record<string, string> = {
+    f: 'json',
+    where,
+    outFields,
+    returnGeometry: 'false',
+    orderByFields: 'OBJECTID',
+  }
+  if (bbox) {
+    params.geometryType = 'esriGeometryEnvelope'
+    params.geometry = bbox.join(',')
+    params.inSR = '4326'
+    params.spatialRel = 'esriSpatialRelIntersects'
+  }
+  const payload = await postFormJson(serviceUrl.replace(/\/$/, '') + '/query', params, fetchImpl)
+  const rows = Array.isArray(payload?.features)
+    ? payload.features.map((feature: any) => stableValue(feature?.attributes || {}))
+    : []
+  return rows.sort((a: any, b: any) =>
+    String(a?.OBJECTID ?? a?.objectid ?? a?.Name ?? a?.name ?? '').localeCompare(
+      String(b?.OBJECTID ?? b?.objectid ?? b?.Name ?? b?.name ?? ''),
+    )
+  )
+}
+
+async function arcgisSamples(
+  serviceUrl: string,
+  bbox: [number, number, number, number],
+  size: number,
+  fetchImpl: typeof fetch,
+) {
+  const points = gridPoints(bbox, size)
+  const payload = await postFormJson(serviceUrl.replace(/\/$/, '') + '/getSamples', {
+    f: 'json',
+    geometryType: 'esriGeometryMultipoint',
+    geometry: JSON.stringify({ points, spatialReference: { wkid: 4326 } }),
+    returnFirstValueOnly: 'true',
+  }, fetchImpl)
+  const samples = Array.isArray(payload?.samples) ? payload.samples : []
+  const byIndex = new Map<number, any>()
+  for (const sample of samples) {
+    const index = Number(sample?.locationId)
+    if (Number.isInteger(index) && index >= 0 && index < points.length) {
+      byIndex.set(index, stableValue({
+        value: sample?.value ?? null,
+        attributes: sample?.attributes ?? null,
+      }))
+    }
+  }
+  return points.map((point, index) => ({
+    point,
+    sample: byIndex.get(index) ?? null,
+  }))
+}
+
+async function arcgisImageProbe(
+  serviceUrl: string,
+  bbox: [number, number, number, number],
+  fetchImpl: typeof fetch,
+) {
+  const url = new URL(serviceUrl.replace(/\/$/, '') + '/exportImage')
+  url.searchParams.set('bbox', bbox.join(','))
+  url.searchParams.set('bboxSR', '4326')
+  url.searchParams.set('imageSR', '4326')
+  url.searchParams.set('size', '96,96')
+  url.searchParams.set('adjustAspectRatio', 'false')
+  url.searchParams.set('format', 'png32')
+  url.searchParams.set('interpolation', 'RSP_BilinearInterpolation')
+  url.searchParams.set('f', 'image')
+  const response = await fetchWithTimeout(url.toString(), {
+    headers: { accept: 'image/png,image/*' },
+  }, fetchImpl)
+  if (!response.ok) throw new Error('image probe returned ' + response.status)
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (!bytes.byteLength) throw new Error('image probe returned an empty body')
+  return {
+    sha256: await sha256Hex(bytes),
+    size_bytes: bytes.byteLength,
+  }
+}
+
+async function arcgisPortalItem(
+  serviceUrl: string,
+  service: any,
+  fetchImpl: typeof fetch,
+  fixedItemId: string | null = null,
+) {
+  let itemId = fixedItemId || String(service?.serviceItemId || '').trim()
+  if (!itemId) {
+    try {
+      const query = 'url:"' + serviceUrl + '"'
+      const search = await getJson(
+        ARCGIS_ITEM_SEARCH + '?f=json&num=10&q=' + encodeURIComponent(query),
+        fetchImpl,
+      )
+      const rows = Array.isArray(search?.results) ? search.results : []
+      const exact = rows.find((row: any) => String(row?.url || '').replace(/\/$/, '') === serviceUrl.replace(/\/$/, ''))
+      itemId = String(exact?.id || '')
+    } catch {
+      itemId = ''
+    }
+  }
+  if (!itemId) return null
+  try {
+    const item = await getJson(ARCGIS_ITEM_ROOT + itemId + '?f=json', fetchImpl)
+    return stableValue({
+      id: item?.id ?? itemId,
+      owner: item?.owner ?? null,
+      title: item?.title ?? null,
+      type: item?.type ?? null,
+      created: item?.created ?? null,
+      modified: item?.modified ?? null,
+      size: item?.size ?? null,
+      url: item?.url ?? null,
+      typeKeywords: item?.typeKeywords ?? null,
+      access: item?.access ?? null,
+    })
+  } catch {
+    return null
+  }
+}
+
+async function providerObservedArcgis(args: {
+  key: FarmWatchExternalDependencyKey
+  serviceUrl: string
+  bbox: [number, number, number, number] | null
+  where?: string
+  outFields?: string
+  sampleGrid?: number
+  imageProbe?: boolean
+  fixedItemId?: string | null
+  requireCatalog?: boolean
+  requireSamples?: boolean
+  fetchImpl: typeof fetch
+}) {
+  const service = await serviceMetadata(args.serviceUrl, args.fetchImpl).catch(() => null)
+  const metadata = service ? serviceMetadataSubset(service) : null
+  const portalItem = await arcgisPortalItem(
+    args.serviceUrl,
+    service,
+    args.fetchImpl,
+    args.fixedItemId || null,
+  )
+  let catalog: any[] | null = null
+  let samples: any[] | null = null
+  let imageProbe: any = null
+  if (args.where || args.bbox) {
+    try {
+      catalog = await arcgisCatalog(
+        args.serviceUrl,
+        args.bbox,
+        args.where || '1=1',
+        args.outFields || '*',
+        args.fetchImpl,
+      )
+    } catch (error) {
+      if (args.requireCatalog) throw error
+    }
+  }
+  if (args.sampleGrid && args.bbox) {
+    try {
+      samples = await arcgisSamples(
+        args.serviceUrl,
+        args.bbox,
+        args.sampleGrid,
+        args.fetchImpl,
+      )
+    } catch (error) {
+      if (args.requireSamples) throw error
+    }
+  }
+  if (args.imageProbe && args.bbox) {
+    imageProbe = await arcgisImageProbe(args.serviceUrl, args.bbox, args.fetchImpl)
+  }
+  if (!metadata && !portalItem && !catalog && !samples && !imageProbe) {
+    throw new Error('authoritative source observation is unavailable')
+  }
+  const evidence = stableValue({
+    strategy: 'arcgis-provider-observation-v1',
+    service_url: args.serviceUrl,
+    service_metadata: metadata,
+    portal_item: portalItem,
+    catalog,
+    samples,
+    image_probe: imageProbe,
+    probe_bbox: args.bbox,
+  })
+  return {
+    identity_sha256: await sha256Hex(stableJson(evidence)),
+    evidence,
+    resolution_status: portalItem
+      ? 'provider_item_and_bounded_observation'
+      : 'provider_bounded_observation',
+  }
+}
+
+async function resolveStacAndCopc(
+  boundary: any,
+  fetchImpl: typeof fetch,
+) {
+  const expanded = expandBboxMeters(farmWatchGeometryBbox(boundary), 650)
+  const probeBoundary = bboxPolygon(expanded)
+  const result = await buildLidarSourceArtifact(probeBoundary, fetchImpl)
+  const processingItems = (result.artifact?.collections || [])
+    .flatMap((collection: any) => collection?.processing_items || [])
+    .filter((item: any) => item?.primary_asset_href)
+    .sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)))
+  const validators = []
+  for (const item of processingItems) {
+    const href = String(item.primary_asset_href)
+    const response = await fetchWithTimeout(href, { method: 'HEAD' }, fetchImpl)
+    if (!response.ok) throw new Error('COPC object validator returned ' + response.status)
+    const row: any = {
+      id: String(item.id || ''),
+      asset_identity: String(item.primary_asset_identity || href.split('?')[0]),
+      etag: response.headers.get('etag'),
+      last_modified: response.headers.get('last-modified'),
+      content_length: response.headers.get('content-length'),
+      version_id: response.headers.get('x-amz-version-id'),
+      checksum_sha256: response.headers.get('x-amz-checksum-sha256'),
+    }
+    if (!row.version_id && !row.checksum_sha256 && !row.etag) {
+      const range = await fetchWithTimeout(href, {
+        headers: { range: 'bytes=0-65535', accept: 'application/octet-stream' },
+      }, fetchImpl)
+      if (!range.ok && range.status !== 206) {
+        throw new Error('COPC object has no strong validator and range probe failed')
+      }
+      row.range_probe_sha256 = await sha256Hex(new Uint8Array(await range.arrayBuffer()))
+    }
+    validators.push(stableValue(row))
+  }
+  if (!processingItems.length) throw new Error('LiDAR source observation found no usable COPC assets')
+  const stacEvidence = stableValue({
+    strategy: 'stac-selected-item-snapshot-v1',
+    expanded_bbox: expanded,
+    sampled_source_sha256: result.sampledSourceSha256,
+    collections: (result.artifact?.collections || []).map((collection: any) => ({
+      id: collection?.id,
+      processing_items: (collection?.processing_items || []).map((item: any) => ({
+        id: item?.id,
+        bbox: item?.bbox,
+        datetime: item?.datetime,
+        created: item?.created,
+        updated: item?.updated,
+        pc_count: item?.pc_count,
+        pc_density: item?.pc_density,
+        primary_asset_key: item?.primary_asset_key,
+        primary_asset_identity: item?.primary_asset_identity,
+      })),
+    })),
+  })
+  const copcEvidence = stableValue({
+    strategy: 'copc-object-validator-v1',
+    expanded_bbox: expanded,
+    validators,
+  })
+  return {
+    stac: {
+      identity_sha256: await sha256Hex(stableJson(stacEvidence)),
+      evidence: stacEvidence,
+      resolution_status: 'provider_catalog_snapshot',
+    },
+    copc: {
+      identity_sha256: await sha256Hex(stableJson(copcEvidence)),
+      evidence: copcEvidence,
+      resolution_status: 'provider_object_validator',
+    },
+  }
+}
+
+function mastSpeciesCodes() {
+  return FARM_WATCH_MAST_CAPACITY_PRODUCT.groupOrder.flatMap((group) =>
+    FARM_WATCH_MAST_CAPACITY_GROUPS[group].map((row) => row.spcd)
+  )
+}
+
+async function resolveOne(
+  key: FarmWatchExternalDependencyKey,
+  boundary: any,
+  fetchImpl: typeof fetch,
+  cache: Map<string, any>,
+): Promise<FarmWatchExternalSourceObservation> {
+  const observedAt = new Date().toISOString()
+  try {
+    if (
+      key === 'external:kyfromabove-lidar-stac' ||
+      key === 'external:kyfromabove-phase3-copc'
+    ) {
+      let pair = cache.get('lidar')
+      if (!pair) {
+        pair = await resolveStacAndCopc(boundary, fetchImpl)
+        cache.set('lidar', pair)
+      }
+      const source = key.endsWith('lidar-stac') ? pair.stac : pair.copc
+      return {
+        key,
+        status: 'available',
+        authoritative: true,
+        resolution_status: source.resolution_status,
+        identity_sha256: source.identity_sha256,
+        observed_at: observedAt,
+        evidence: source.evidence,
+      }
+    }
+
+    const propertyBbox = farmWatchGeometryBbox(boundary)
+    if (key === 'external:kyfromabove-phase3-dem') {
+      const source = await providerObservedArcgis({
+        key,
+        serviceUrl: FARM_WATCH_TERRAIN_PRODUCT.sourceUrl,
+        bbox: expandBboxMeters(propertyBbox, 3200),
+        outFields: 'OBJECTID,Name,MinPS,MaxPS,LowPS,HighPS,Category,Tag,GroupName,ProductName,CenterX,CenterY,ZOrder',
+        sampleGrid: 7,
+        requireCatalog: true,
+        requireSamples: true,
+        fetchImpl,
+      })
+      return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
+    }
+
+    if (key === 'external:nlcd-tcc-v2025-6') {
+      const source = await providerObservedArcgis({
+        key,
+        serviceUrl: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopySourceUrl,
+        bbox: expandBboxMeters(propertyBbox, 3200),
+        outFields: '*',
+        sampleGrid: 7,
+        fixedItemId: TCC_ARCGIS_ITEM_ID,
+        requireSamples: true,
+        fetchImpl,
+      })
+      return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
+    }
+
+    if (key === 'external:usgs-3dep-dynamic') {
+      const source = await providerObservedArcgis({
+        key,
+        serviceUrl: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.demFallbackSourceUrl,
+        bbox: expandBboxMeters(propertyBbox, 3200),
+        outFields: 'OBJECTID,Name,Category,Dataset_ID,Best,DEM_Type,Source,VerticalDatum,AcquisitionDate,URL,Metadata,pubdate,title,Resolution_X,Resolution_Y',
+        sampleGrid: 5,
+        requireCatalog: true,
+        requireSamples: true,
+        fetchImpl,
+      })
+      return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
+    }
+
+    if (
+      key === 'external:kyfromabove-phase3-imagery-2024' ||
+      key === 'external:kyfromabove-phase2-imagery-2019'
+    ) {
+      const wanted = key.includes('phase3')
+        ? FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-phase3')
+        : FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-franklin-2019')
+      if (!wanted) throw new Error('fixed imagery contract is unavailable')
+      const bbox = expandBboxMeters(propertyBbox, 650)
+      const where = "Name='" + String(wanted.sourceTile).replaceAll("'", "''") + "'"
+      const [rgb, ir] = await Promise.all([
+        providerObservedArcgis({
+          key,
+          serviceUrl: wanted.imageryUrl,
+          bbox,
+          where,
+          outFields: '*',
+          imageProbe: true,
+          requireCatalog: true,
+          fetchImpl,
+        }),
+        providerObservedArcgis({
+          key,
+          serviceUrl: wanted.infraredUrl,
+          bbox,
+          where,
+          outFields: '*',
+          imageProbe: true,
+          requireCatalog: true,
+          fetchImpl,
+        }),
+      ])
+      const evidence = stableValue({
+        strategy: 'fixed-imagery-pair-provider-observation-v1',
+        source_id: wanted.id,
+        source_tile: wanted.sourceTile,
+        acquisition_date: wanted.acquisitionDate,
+        rgb: rgb.evidence,
+        infrared: ir.evidence,
+      })
+      return {
+        key,
+        status: 'available',
+        authoritative: true,
+        resolution_status: 'provider_catalog_and_content_probe',
+        identity_sha256: await sha256Hex(stableJson(evidence)),
+        observed_at: observedAt,
+        evidence,
+      }
+    }
+
+    if (key === 'external:fia-bigmap-2018-species-biomass') {
+      const codes = mastSpeciesCodes()
+      const where = 'category=1 AND spcd IN (' + codes.join(',') + ')'
+      const source = await providerObservedArcgis({
+        key,
+        serviceUrl: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
+        bbox: null,
+        where,
+        outFields: 'objectid,spcd,common_name,genus,species,name',
+        requireCatalog: true,
+        fetchImpl,
+      })
+      const catalog = (source.evidence as any)?.catalog || []
+      if (catalog.length !== codes.length) {
+        throw new Error('BIGMAP authoritative catalog does not contain the expected mast species set')
+      }
+      return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
+    }
+
+    throw new Error('unsupported external dependency key')
+  } catch (error) {
+    return {
+      key,
+      status: 'unavailable',
+      authoritative: false,
+      resolution_status: 'provider_observation_failed',
+      observed_at: observedAt,
+      evidence: {},
+      error: error instanceof Error ? error.message : String(error),
+    }
+  }
+}
+
+export async function resolveFarmWatchExternalSourceIdentities(args: {
+  boundary: any
+  dependencyKeys: string[]
+  fetchImpl?: typeof fetch
+}) {
+  const fetchImpl = args.fetchImpl || fetch
+  const keys = [...new Set(args.dependencyKeys)]
+    .filter((value): value is FarmWatchExternalDependencyKey =>
+      (FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS as readonly string[]).includes(value)
+    )
+    .sort()
+  const cache = new Map<string, any>()
+  const observations = await Promise.all(
+    keys.map((key) => resolveOne(key, args.boundary, fetchImpl, cache)),
+  )
+  const unavailable = observations.filter((row) => row.status !== 'available')
+  if (unavailable.length) {
+    throw new Error(
+      'external source identity unavailable: ' +
+      unavailable.map((row) => row.key + '=' + (row.error || row.status)).join('; '),
+    )
+  }
+  return observations
+}
+
+export function farmWatchExternalIdentitySignatureKey(key: string) {
+  return 'external_identity_' +
+    String(key || '').replace(/^external:/, '').toLowerCase().replace(/[^a-z0-9]+/g, '_')
+}
+
+export function appendFarmWatchExternalIdentitySignature(
+  sourceSignature: string,
+  observations: FarmWatchExternalSourceObservation[],
+) {
+  const base = String(sourceSignature || '').trim()
+  if (!base) throw new Error('materialization source signature is required')
+  const tokens = observations
+    .slice()
+    .sort((a, b) => a.key.localeCompare(b.key))
+    .map((row) => {
+      if (
+        row.status !== 'available' ||
+        row.authoritative !== true ||
+        !/^[0-9a-f]{64}$/.test(String(row.identity_sha256 || ''))
+      ) throw new Error('external source identity is not authoritative: ' + row.key)
+      return farmWatchExternalIdentitySignatureKey(row.key) + '=' + row.identity_sha256
+    })
+  return tokens.length ? base + '|' + tokens.join('|') : base
+}
+
+export function farmWatchExternalIdentityOverrides(
+  observations: FarmWatchExternalSourceObservation[],
+) {
+  return Object.fromEntries(observations.map((row) => [
+    row.key,
+    {
+      status: row.status,
+      authoritative: row.authoritative,
+      resolution_status: row.resolution_status,
+      identity_sha256: row.identity_sha256 || null,
+      observed_at: row.observed_at,
+    },
+  ]))
+}
