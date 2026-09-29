@@ -106,20 +106,49 @@ P0.1 tests cover direct and transitive invalidation, including:
 
 No Flat Creek rows or external source data need to be edited for these tests.
 
-## P0.2 handoff
+## P0.2 authoritative external-source identities
 
-P0.2 should implement the external identity resolvers in blast-radius order:
+P0.2 supplies live provider-observation identities for every external slot declared by P0.1. The observation happens **before** the materialization read/claim decision, and the resulting identity hash is appended to the materialization source signature. This means an unexpired artifact cannot be reused when the provider observation no longer matches the identity recorded at build time.
 
-1. KyFromAbove LiDAR STAC / COPC;
-2. KyFromAbove Phase 3 DEM;
-3. NLCD TCC;
-4. USGS 3DEP fallback;
-5. fixed acquisition imagery and BIGMAP 2018.
+The provider-observation strategies are:
 
-Each resolver should prefer an immutable authoritative provider revision or release identity. Where none exists, use the smallest deterministic provider probe capable of detecting an in-place source change. Do not redownload full scientific rasters merely to prove freshness.
+| External slot | P0.2 identity strategy |
+| --- | --- |
+| KyFromAbove LiDAR STAC | bounded selected-item snapshot over the validation/property support area |
+| KyFromAbove Phase 3 COPC | selected asset object validators: version/checksum/ETag where exposed, with bounded byte-range hash fallback |
+| KyFromAbove Phase 3 DEM | ArcGIS provider metadata + intersecting catalog records + bounded deterministic sample grid over the widest required support |
+| NLCD TCC | ArcGIS portal/service metadata + bounded deterministic sample grid |
+| USGS 3DEP | service publication/metadata + intersecting source catalog + bounded deterministic sample grid |
+| 2024 Phase 3 RGB/IR | exact configured acquisition/tile catalog records + bounded content probe for both services |
+| 2019 Phase 2 RGB/IR | exact configured acquisition/tile catalog records + bounded content probe for both services |
+| FIA BIGMAP 2018 | fixed-product service/portal metadata + exact expected mast-species raster catalog |
 
-When P0.2 promotes an external slot from `contract_only`, the artifact's recorded dependency binding must also preserve the authoritative identity that was current at build time. That is what permits a later provider change to invalidate the retained artifact without destroying historical reproducibility.
+The observation timestamp itself is not part of the identity. Repeating a probe against an unchanged provider must therefore produce the same identity.
 
-## Interpretation boundary
+New artifacts preserve both the identity token in their source signature and the bounded provider observation in source provenance. The identity token is what participates in cache/reuse decisions; the retained observation makes later changes auditable.
 
-This architecture governs whether a stored derivative corresponds to its declared inputs. It does not establish that the derivative is scientifically valid for deer inference, that a literature relationship transfers to Flat Creek, or that an available evidence product predicts deer use.
+Pre-P0.2 artifacts do not contain provider-observation tokens. When a live P0.2 identity is supplied, those artifacts compare against the old contract-only fallback and therefore fail closed as stale. They must be rematerialized before they can again become current.
+
+The exact-time deer evidence reader resolves all eight provider slots once for the request and passes them as dependency overrides into the canonical recursive freshness resolver. A provider outage marks only products that directly or transitively depend on that provider as unavailable/stale; unrelated evidence remains resolvable.
+
+Protected materialization workers use the same shared resolver before claim and again before completion. If a provider changes during a long-running build, completion is rejected rather than publishing an artifact against a stale dependency identity.
+
+## External-source probing boundary
+
+P0.2 does not periodically mirror full upstream scientific datasets merely to determine freshness. Each identity resolver uses the smallest authoritative or bounded observation that can reveal a scientifically meaningful provider change for the data Farm Watch actually consumes.
+
+These probes are freshness evidence, not new ecological measurements. They do not change the interpretation of DEM, canopy, LiDAR, imagery, 3DEP, or BIGMAP data.
+
+The external resolver is deliberately fail-closed for materialization reuse/build. If a required provider cannot be observed, Farm Watch does not silently fall back to the old artifact solely because its retention expiration is still in the future.
+
+## Verification
+
+The P0.2 regression contract requires:
+
+- all eight external slots resolve to non-`contract_only` identities in the bounded live-provider check;
+- immediate repeated observations are identity-stable when providers have not changed;
+- changing a provider identity invalidates the directly dependent product;
+- the P0.1 recursive manifest propagates that invalidation to descendants;
+- old artifacts lacking provider-observation tokens become stale when authoritative identities are supplied;
+- service-role/private authorization boundaries remain unchanged.
+
