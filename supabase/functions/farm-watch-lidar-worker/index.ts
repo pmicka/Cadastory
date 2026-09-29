@@ -17,6 +17,9 @@ import {
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
 import { sha256Hex } from '../_shared/farm-watch-terrain.ts'
+import {
+  resolveFarmWatchExternalSourceSignatureForProperty,
+} from '../_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -66,12 +69,18 @@ function validSha256(value: unknown) {
 }
 
 async function readSourcePlanState(slug: string) {
+  const source = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
+    sourceSignature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+  })
   const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
     p_slug: slug,
     p_product_kind: FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
     p_algorithm_version: FARM_WATCH_LIDAR_SOURCE_PRODUCT.algorithmVersion,
     p_output_schema_version: FARM_WATCH_LIDAR_SOURCE_PRODUCT.outputSchemaVersion,
-    p_source_signature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+    p_source_signature: source.sourceSignature,
   })
   if (error) throw new Error('LiDAR source-plan state unavailable: ' + error.message)
   return data
@@ -125,13 +134,21 @@ async function sourceContext(slug: string) {
     throw new Error('Phase 3 source coverage is incomplete or unresolved')
   }
 
-  const sourceSignature = lidarPhysicalSourceSignature(stored.artifact, stored.sha256)
+  const baseSourceSignature = lidarPhysicalSourceSignature(stored.artifact, stored.sha256)
+  const resolved = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.productKind,
+    sourceSignature: baseSourceSignature,
+  })
+  const sourceSignature = resolved.sourceSignature
   return {
     sourceState: state,
     sourceArtifact: stored.artifact,
     sourceArtifactSha256: stored.sha256,
     sourceSignature,
     sourceDescriptor: lidarPhysicalSourceDescriptor(stored.artifact, stored.sha256),
+    externalSourceObservations: resolved.observations,
     phase3,
     processingItems,
   }
@@ -181,6 +198,7 @@ async function claimPhysical(slug: string, identity: any) {
     input_signature_sha256: claim.input_signature_sha256,
     source_plan_artifact_sha256: source.sourceArtifactSha256,
     source_descriptor: source.sourceDescriptor,
+    external_source_observations: source.externalSourceObservations || [],
     phase3: {
       coverage: source.phase3.coverage,
       processing_items: source.processingItems,
