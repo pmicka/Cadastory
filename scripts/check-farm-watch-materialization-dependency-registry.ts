@@ -33,7 +33,6 @@ const expectedProducts = [
   'leaf-off-woody-structure',
   'structure-complementarity',
   'landscape-structure-context',
-  'study-aligned-vegetation-height-context',
   'terrain-form-permeability',
   'spatial-edge-patch-context',
   'solar-terrain-context',
