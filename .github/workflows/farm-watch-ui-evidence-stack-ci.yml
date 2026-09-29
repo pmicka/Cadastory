@@ -5,6 +5,8 @@ on:
     paths:
       - 'supabase/functions/farm-watch-private/index.ts'
       - 'supabase/migrations/*deer_evidence_stack*.sql'
+      - 'supabase/migrations/*materialization_dependency_registry*.sql'
+      - 'supabase/migrations/*materialization_dependency_manifest*.sql'
       - 'scripts/check-farm-watch-ui-evidence-stack.ts'
       - 'docs/FARM_WATCH_UI_EVIDENCE_STACK_V1.md'
       - '.github/workflows/farm-watch-ui-evidence-stack-ci.yml'
