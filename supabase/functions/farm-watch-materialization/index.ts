@@ -643,6 +643,7 @@ async function spatialPatternDependencies(slug: string, includeResourceGeometry 
     structureIdentity,
     structureArtifactSha256,
     sourceSignature,
+    externalSourceObservations: resolved.observations,
   }
 }
 
@@ -772,6 +773,7 @@ async function solarTerrainDependencies(slug: string, includeArtifacts = false) 
     terrainArtifact,
     spatialArtifact,
     sourceSignature,
+    externalSourceObservations: resolved.observations,
   }
 }
 
@@ -1239,6 +1241,7 @@ async function uploadNeutralPrimitive(args: {
   artifactPath: (propertyId: string, inputSignature: string, artifactSha256: string) => string
   maxArtifactBytes?: number
   storageEncoding?: 'identity' | 'gzip'
+  externalSourceObservations?: any[]
 }) {
   const spec = productSpec(args.key)
   const jsonBytes = new TextEncoder().encode(JSON.stringify(args.artifact))
@@ -1281,6 +1284,7 @@ async function uploadNeutralPrimitive(args: {
       ...(args.artifact.source_provenance || {}),
       source_signature: args.sourceSignature,
       source_signature_sha256: args.claim.source_signature_sha256,
+      external_source_observations: args.externalSourceObservations || [],
       storage_encoding: args.storageEncoding || 'identity',
       completed_at: completedAt.toISOString(),
     },
@@ -1338,6 +1342,7 @@ async function buildTerrainFormMaterialization(slug: string, workerId: string) {
       sampledSourceSha256,
       key: FARM_WATCH_TERRAIN_FORM_PRODUCT.key,
       sourceSignature,
+      externalSourceObservations: resolved.observations,
       limitations: FARM_WATCH_TERRAIN_FORM_LIMITATIONS,
       refreshDays: FARM_WATCH_TERRAIN_FORM_PRODUCT.refreshDays,
       artifactPath: terrainFormArtifactPath,
@@ -1390,6 +1395,7 @@ async function buildSpatialPatternMaterialization(slug: string, workerId: string
       sampledSourceSha256,
       key: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
+      externalSourceObservations: deps.externalSourceObservations,
       limitations: FARM_WATCH_SPATIAL_PATTERN_LIMITATIONS,
       refreshDays: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.refreshDays,
       artifactPath: spatialPatternArtifactPath,
@@ -1431,6 +1437,7 @@ async function buildSolarTerrainMaterialization(slug: string, workerId: string) 
       sampledSourceSha256: built.sampledSourceSha256,
       key: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
+      externalSourceObservations: deps.externalSourceObservations,
       limitations: FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS,
       refreshDays: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.refreshDays,
       artifactPath: solarTerrainArtifactPath,
