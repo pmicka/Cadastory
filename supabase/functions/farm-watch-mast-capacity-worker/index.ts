@@ -13,6 +13,9 @@ import {
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
 import { sha256Hex } from '../_shared/farm-watch-terrain.ts'
+import {
+  resolveFarmWatchExternalSourceSignatureForProperty,
+} from '../_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -204,10 +207,17 @@ async function landscapeDomain(slug: string) {
 
 async function claim(slug: string, identity: any) {
   const domain = await landscapeDomain(slug)
-  const sourceSignature = mastCapacitySourceSignature({
+  const baseSourceSignature = mastCapacitySourceSignature({
     landscapeDomainIdentitySha256: String(domain.identity.identity_sha256),
     landscapeDomainAlgorithmVersion: String(domain.identity.algorithm_version || ''),
   })
+  const source = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_MAST_CAPACITY_PRODUCT.productKind,
+    sourceSignature: baseSourceSignature,
+  })
+  const sourceSignature = source.sourceSignature
   const workerId = [
     'github-actions-mast-capacity',
     identity.run_id || 'run',
@@ -246,6 +256,8 @@ async function claim(slug: string, identity: any) {
     property_slug: claim.property_slug,
     input_signature_sha256: claim.input_signature_sha256,
     source_signature_sha256: claim.source_signature_sha256,
+    source_signature: sourceSignature,
+    external_source_observations: source.observations,
     property_boundary_geojson: claim.boundary_geojson,
     zones: {
       local_500m: domain.zones.local_500m,
@@ -292,10 +304,17 @@ async function complete(slug: string, body: any, identity: any) {
     String(domain.identity.identity_sha256 || '')
   ) throw new Error('mast capacity artifact domain identity is stale')
 
-  const expectedSourceSignature = mastCapacitySourceSignature({
+  const baseSourceSignature = mastCapacitySourceSignature({
     landscapeDomainIdentitySha256: String(domain.identity.identity_sha256),
     landscapeDomainAlgorithmVersion: String(domain.identity.algorithm_version || ''),
   })
+  const source = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_MAST_CAPACITY_PRODUCT.productKind,
+    sourceSignature: baseSourceSignature,
+  })
+  const expectedSourceSignature = source.sourceSignature
   const build = await readBuild(buildId)
   if (
     build.product_kind !== FARM_WATCH_MAST_CAPACITY_PRODUCT.productKind ||
@@ -339,6 +358,8 @@ async function complete(slug: string, body: any, identity: any) {
   const sourceProvenance = {
     ...(artifact.source_provenance || {}),
     landscape_domain_identity: domain.identity,
+    source_signature: expectedSourceSignature,
+    external_source_observations: source.observations,
     github_workflow: identity,
     completed_at: completedAt.toISOString(),
   }
