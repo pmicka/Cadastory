@@ -147,7 +147,8 @@ async function studyVegetationHeightQaContext(slug: string) {
 
 async function claimStudyVegetationHeight(slug: string, identity: any) {
   const domain = await landscapeDomain(slug)
-  const sourceSignature = sourceSignatureForDomain(domain)
+  const source = await sourceSignatureForDomain(slug, domain)
+  const sourceSignature = source.sourceSignature
   const workerId = [
     'github-actions-study-vegetation-height',
     identity.run_id || 'run',
