@@ -328,6 +328,7 @@ async function arcgisPortalItem(
   service: any,
   fetchImpl: typeof fetch,
   fixedItemId: string | null = null,
+  fallbackTitle: string | null = null,
 ) {
   let itemId = fixedItemId || String(service?.serviceItemId || '').trim()
   if (!itemId) {
@@ -342,6 +343,23 @@ async function arcgisPortalItem(
       itemId = String(exact?.id || '')
     } catch {
       itemId = ''
+    }
+    if (!itemId && fallbackTitle) {
+      try {
+        const search = await getJson(
+          ARCGIS_ITEM_SEARCH + '?f=json&num=20&q=' +
+            encodeURIComponent('title:"' + fallbackTitle + '"'),
+          fetchImpl,
+        )
+        const rows = Array.isArray(search?.results) ? search.results : []
+        const exact = rows.find((row: any) =>
+          String(row?.title || '') === fallbackTitle &&
+          (!row?.url || String(row.url).replace(/\/$/, '') === serviceUrl.replace(/\/$/, ''))
+        ) || rows.find((row: any) => String(row?.title || '') === fallbackTitle)
+        itemId = String(exact?.id || '')
+      } catch {
+        itemId = ''
+      }
     }
   }
   if (!itemId) return null
@@ -373,6 +391,7 @@ async function providerObservedArcgis(args: {
   sampleGrid?: number
   imageProbe?: boolean
   fixedItemId?: string | null
+  portalSearchTitle?: string | null
   requireCatalog?: boolean
   requireSamples?: boolean
   fetchImpl: typeof fetch
@@ -384,6 +403,7 @@ async function providerObservedArcgis(args: {
     service,
     args.fetchImpl,
     args.fixedItemId || null,
+    args.portalSearchTitle || null,
   )
   let catalog: any[] | null = null
   let samples: any[] | null = null
@@ -650,21 +670,33 @@ async function resolveOne(
 
     if (key === 'external:fia-bigmap-2018-species-biomass') {
       const codes = mastSpeciesCodes()
-      const where = 'category=1 AND spcd IN (' + codes.join(',') + ')'
       const source = await providerObservedArcgis({
         key,
         serviceUrl: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
         bbox: null,
-        where,
-        outFields: 'objectid,spcd,common_name,genus,species,name',
-        requireCatalog: true,
+        portalSearchTitle: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceProduct,
         fetchImpl,
       })
-      const catalog = (source.evidence as any)?.catalog || []
-      if (catalog.length !== codes.length) {
-        throw new Error('BIGMAP authoritative catalog does not contain the expected mast species set')
+      const portalItem = (source.evidence as any)?.portal_item
+      if (!portalItem?.id || !portalItem?.modified) {
+        throw new Error('BIGMAP ArcGIS Online item revision is unavailable')
       }
-      return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
+      const evidence = stableValue({
+        strategy: 'fixed-bigmap-portal-item-revision-v1',
+        portal_item: portalItem,
+        source_product: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceProduct,
+        source_data_year: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceDataYear,
+        expected_species_codes: codes,
+      })
+      return {
+        key,
+        status: 'available',
+        authoritative: true,
+        resolution_status: 'provider_portal_item_revision',
+        identity_sha256: await sha256Hex(stableJson(evidence)),
+        observed_at: observedAt,
+        evidence,
+      }
     }
 
     throw new Error('unsupported external dependency key')
