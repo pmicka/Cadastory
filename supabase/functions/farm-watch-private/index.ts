@@ -16,6 +16,9 @@ import {
   evaluateDeerScienceContext,
   type FarmWatchDeerScienceScenario,
 } from '../_shared/farm-watch-deer-science-evaluator.ts'
+import {
+  resolveFarmWatchAllExternalSourceOverridesForProperty,
+} from '../_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -575,10 +578,15 @@ async function readDeerEvidenceStack(
   asOfDate = louisvilleCalendarDate(new Date()),
   asOfAt = new Date().toISOString(),
 ) {
+  const external = await resolveFarmWatchAllExternalSourceOverridesForProperty({
+    admin,
+    slug,
+  })
   const [stackRead, managedFoodRead, managedWaterRead] = await Promise.all([
     admin.rpc('farm_watch_get_deer_evidence_stack_at_v1_internal', {
       p_slug: slug,
       p_as_of_at: asOfAt,
+      p_dependency_overrides: external.overrides,
     }),
     admin.rpc('farm_watch_get_managed_food_feature_context_v1_internal', {
       p_slug: slug,
@@ -607,10 +615,14 @@ async function readDeerEvidenceStack(
         as_of_date: asOfDate,
         products: {},
         surface_water_state: { status: 'unavailable' },
+        external_source_observations: external.observations,
         interpretation_boundary:
           'Neutral evidence inventory is temporarily unavailable. No scoring or behavioral inference is performed.',
       }
-    : stackRead.data
+    : {
+        ...stackRead.data,
+        external_source_observations: external.observations,
+      }
 
   return {
     ...base,
