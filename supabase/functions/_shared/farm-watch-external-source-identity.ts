@@ -736,3 +736,88 @@ export function farmWatchExternalIdentityOverrides(
     },
   ]))
 }
+
+
+async function rpcValue(admin: any, fn: string, args: Record<string, unknown>) {
+  const { data, error } = await admin.rpc(fn, args)
+  if (error) throw new Error(fn + ' failed: ' + error.message)
+  return data
+}
+
+export async function resolveFarmWatchExternalSourceSignatureForProperty(args: {
+  admin: any
+  slug: string
+  productKind: string
+  sourceSignature: string
+  fetchImpl?: typeof fetch
+}) {
+  const dependencyKeys = await rpcValue(
+    args.admin,
+    'farm_watch_get_materialization_external_dependencies_v1_internal',
+    { p_product_kind: args.productKind },
+  )
+  const keys = Array.isArray(dependencyKeys)
+    ? dependencyKeys.map(String).filter(Boolean)
+    : []
+  if (!keys.length) {
+    return {
+      sourceSignature: args.sourceSignature,
+      observations: [] as FarmWatchExternalSourceObservation[],
+    }
+  }
+
+  const context = await rpcValue(
+    args.admin,
+    'farm_watch_get_materialization_identity_context_v1_internal',
+    { p_slug: args.slug },
+  )
+  if (context?.status !== 'available' || !context?.boundary_geojson) {
+    throw new Error('materialization identity boundary is unavailable')
+  }
+  const observations = await resolveFarmWatchExternalSourceIdentities({
+    boundary: context.boundary_geojson,
+    dependencyKeys: keys,
+    fetchImpl: args.fetchImpl,
+  })
+  return {
+    sourceSignature: appendFarmWatchExternalIdentitySignature(
+      args.sourceSignature,
+      observations,
+    ),
+    observations,
+  }
+}
+
+export async function resolveFarmWatchAllExternalSourceOverridesForProperty(args: {
+  admin: any
+  slug: string
+  fetchImpl?: typeof fetch
+}) {
+  const [dependencyKeys, context] = await Promise.all([
+    rpcValue(
+      args.admin,
+      'farm_watch_get_all_external_dependencies_v1_internal',
+      {},
+    ),
+    rpcValue(
+      args.admin,
+      'farm_watch_get_materialization_identity_context_v1_internal',
+      { p_slug: args.slug },
+    ),
+  ])
+  if (context?.status !== 'available' || !context?.boundary_geojson) {
+    throw new Error('materialization identity boundary is unavailable')
+  }
+  const keys = Array.isArray(dependencyKeys)
+    ? dependencyKeys.map(String).filter(Boolean)
+    : []
+  const observations = await resolveFarmWatchExternalSourceIdentities({
+    boundary: context.boundary_geojson,
+    dependencyKeys: keys,
+    fetchImpl: args.fetchImpl,
+  })
+  return {
+    observations,
+    overrides: farmWatchExternalIdentityOverrides(observations),
+  }
+}
