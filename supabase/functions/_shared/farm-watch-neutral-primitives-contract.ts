@@ -1,3 +1,5 @@
+import { FARM_WATCH_TCC_SOURCE } from './farm-watch-tcc-contract.ts'
+
 export const FARM_WATCH_TERRAIN_FORM_PRODUCT = Object.freeze({
   key: 'terrain-form-permeability',
   productKind: 'terrain-form-permeability',
@@ -95,9 +97,10 @@ export const FARM_WATCH_SPATIAL_PATTERN_PRODUCT = Object.freeze({
   artifactBucket: 'farm-watch-derived',
   artifactFormat: 'farm-watch-spatial-edge-patch-context-json-v1',
   artifactMimeType: 'application/json',
-  canopySourceUrl: 'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_EDW_NLCD_TCC_CONUS/ImageServer',
-  canopyYear: 2025,
-  canopyProductVersion: 'v2025-6',
+  canopySourceUrl: FARM_WATCH_TCC_SOURCE.sourceUrl,
+  canopyYear: FARM_WATCH_TCC_SOURCE.year,
+  canopyProductVersion: FARM_WATCH_TCC_SOURCE.productVersion,
+  canopyCatalogName: FARM_WATCH_TCC_SOURCE.catalogName,
   canopyCellMeters: 30,
   canopyClassBreaks: Object.freeze([20, 60]),
   structureCellMeters: 5,
@@ -134,6 +137,8 @@ export function spatialPatternSourceSignature(args: {
     'landscape_structure_identity_sha256=' + structureIdentity,
     'landscape_structure_artifact_sha256=' + structureArtifact,
     'canopy_source=nlcd-tcc-v2025-6',
+    'canopy_catalog_name=' + FARM_WATCH_SPATIAL_PATTERN_PRODUCT.canopyCatalogName,
+    'canopy_mosaic_selection=exact_name',
     'canopy_year=' + FARM_WATCH_SPATIAL_PATTERN_PRODUCT.canopyYear,
     'canopy_cell_m=' + FARM_WATCH_SPATIAL_PATTERN_PRODUCT.canopyCellMeters,
     'canopy_class_breaks=' + FARM_WATCH_SPATIAL_PATTERN_PRODUCT.canopyClassBreaks.join(','),
