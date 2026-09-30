@@ -7,6 +7,8 @@ import { FARM_WATCH_GITHUB_OIDC_AUDIENCE } from '../supabase/functions/_shared/g
 
 const EDGE_URL =
   'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/farm-watch-lidar-worker'
+const MATERIALIZATION_EDGE_URL =
+  'https://ufpkjaadmmpmeogzhrcq.supabase.co/functions/v1/farm-watch-materialization'
 const LAZ_PERF_VERSION = '0.0.7'
 const LAZ_PERF_ASSET_BASE =
   'https://cdn.jsdelivr.net/npm/laz-perf@' + LAZ_PERF_VERSION + '/lib/'
@@ -420,6 +422,36 @@ async function freshOidcToken() {
   const payload = await response.json()
   if (!payload?.value) throw new Error('GitHub OIDC token response was empty')
   return String(payload.value)
+}
+
+async function ensureCurrentLidarSourceCoverage() {
+  const token = await freshOidcToken()
+  const response = await fetch(MATERIALIZATION_EDGE_URL, {
+    method: 'POST',
+    headers: {
+      authorization: 'Bearer ' + token,
+      'content-type': 'application/json',
+      accept: 'application/json',
+    },
+    body: JSON.stringify({
+      property: propertySlug,
+      product: 'lidar-source-coverage',
+      operation: 'build',
+    }),
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(
+      payload?.detail || payload?.error ||
+      ('LiDAR source coverage refresh returned ' + response.status)
+    )
+  }
+  if (String(payload?.status || '') !== 'available') {
+    throw new Error(
+      'LiDAR source coverage refresh did not produce an available materialization'
+    )
+  }
+  return payload
 }
 
 async function workerRequest(body: any) {
@@ -1551,6 +1583,13 @@ export async function qaStudyAlignedVegetationHeightProfiles(args: {
 }
 
 async function main() {
+  const sourceCoverage = await ensureCurrentLidarSourceCoverage()
+  console.log(JSON.stringify({
+    status: 'source_coverage_ready',
+    materialization_id: sourceCoverage?.materialization?.id || null,
+    artifact_sha256: sourceCoverage?.materialization?.artifact_sha256 || null,
+  }, null, 2))
+
   const claim = await workerRequest({ operation: 'claim' })
   if (claim?.action === 'reuse') {
     console.log(JSON.stringify({ status: 'reused', build: claim.build || null }, null, 2))

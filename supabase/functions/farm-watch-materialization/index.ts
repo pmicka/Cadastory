@@ -125,6 +125,7 @@ const DEFAULT_PROPERTY_SLUG = 'validation-property-01'
 const ALLOWED_MATERIALIZATION_WORKFLOW_REFS = new Set([
   'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main',
   'pmicka/Cadastory/.github/workflows/farm-watch-horizontal-visibility.yml@refs/heads/main',
+  'pmicka/Cadastory/.github/workflows/farm-watch-lidar-physical.yml@refs/heads/main',
 ])
 
 type ProductKey = 'terrain' | 'lidar-source-coverage' | 'lidar-physical-structure' | 'leaf-off-structure' | 'structure-complementarity' | 'landscape-structure-context' | 'terrain-form-permeability' | 'spatial-edge-patch-context' | 'solar-terrain-context' | 'solar-exposure-context' | 'thermal-exposure-context' | 'horizontal-visibility-context'

@@ -11,6 +11,9 @@ import {
   buildTerrainArtifact,
   sha256Hex,
 } from '../supabase/functions/_shared/farm-watch-terrain.ts'
+import {
+  resolveFarmWatchExternalSourceSignatureForProperty,
+} from '../supabase/functions/_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SERVICE_KEY =
@@ -57,6 +60,13 @@ async function failBuild(buildId: string, leaseToken: string, error: unknown) {
   if (failError) console.error('Failed to record build failure:', failError.message)
 }
 
+const authoritativeSource = await resolveFarmWatchExternalSourceSignatureForProperty({
+  admin,
+  slug: propertySlug,
+  productKind: FARM_WATCH_TERRAIN_PRODUCT.productKind,
+  sourceSignature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+})
+
 const { data: claim, error: claimError } = await admin.rpc(
   'farm_watch_claim_materialization_build_v1_internal',
   {
@@ -64,7 +74,7 @@ const { data: claim, error: claimError } = await admin.rpc(
     p_product_kind: FARM_WATCH_TERRAIN_PRODUCT.productKind,
     p_algorithm_version: FARM_WATCH_TERRAIN_PRODUCT.algorithmVersion,
     p_output_schema_version: FARM_WATCH_TERRAIN_PRODUCT.outputSchemaVersion,
-    p_source_signature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+    p_source_signature: authoritativeSource.sourceSignature,
     p_worker_id: workerId,
     p_lease_seconds: leaseSeconds,
   },
@@ -143,8 +153,9 @@ try {
   const sourceProvenance = {
     source_slug: FARM_WATCH_TERRAIN_PRODUCT.sourceSlug,
     source_url: FARM_WATCH_TERRAIN_PRODUCT.sourceUrl,
-    source_signature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+    source_signature: authoritativeSource.sourceSignature,
     source_signature_sha256: claim.source_signature_sha256,
+    external_source_observations: authoritativeSource.observations,
     source_revision_status: FARM_WATCH_TERRAIN_PRODUCT.sourceRevisionStatus,
     sampled_source_sha256: sampledSourceSha256,
     operation: 'ImageServer/getSamples',
