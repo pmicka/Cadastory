@@ -600,21 +600,28 @@ async function resolveStacAndCopc(
   }
   if (!processingItems.length) throw new Error('LiDAR source observation found no usable COPC assets')
   const stacEvidence = stableValue({
-    strategy: 'stac-selected-item-snapshot-v1',
+    strategy: 'stac-selected-item-snapshot-v2',
     expanded_bbox: expanded,
     sampled_source_sha256: result.sampledSourceSha256,
     collections: (result.artifact?.collections || []).map((collection: any) => ({
       id: collection?.id,
+      search: collection?.search || null,
       processing_items: (collection?.processing_items || []).map((item: any) => ({
         id: item?.id,
         bbox: item?.bbox,
+        geometry: item?.geometry,
         datetime: item?.datetime,
+        start_datetime: item?.start_datetime,
+        end_datetime: item?.end_datetime,
         created: item?.created,
         updated: item?.updated,
         pc_count: item?.pc_count,
         pc_density: item?.pc_density,
+        pc_type: item?.pc_type,
+        pc_encoding: item?.pc_encoding,
         primary_asset_key: item?.primary_asset_key,
         primary_asset_identity: item?.primary_asset_identity,
+        primary_asset_type: item?.primary_asset_type,
       })),
     })),
   })
@@ -627,7 +634,7 @@ async function resolveStacAndCopc(
     stac: {
       identity_sha256: await sha256Hex(stableJson(stacEvidence)),
       evidence: stacEvidence,
-      resolution_status: 'provider_catalog_snapshot',
+      resolution_status: 'provider_complete_catalog_geometry_snapshot',
     },
     copc: {
       identity_sha256: await sha256Hex(stableJson(copcEvidence)),
