@@ -5,6 +5,7 @@ const migration = [
   await Deno.readTextFile('supabase/migrations/20260926104500_restore_farm_watch_deer_evidence_stack_study_height_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260929201015_farm_watch_dependency_aware_materialization_freshness_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260929201051_farm_watch_dependency_aware_evidence_stack_freshness_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260930024059_farm_watch_fail_closed_reader_semantics_v1.sql'),
 ].join('\n')
 const edge = await Deno.readTextFile('supabase/functions/farm-watch-private/index.ts')
 const evaluator = await Deno.readTextFile(
@@ -37,6 +38,8 @@ for (const required of [
   'farm_watch_get_current_materialization_ref_v1_internal',
   'calendar_date_mismatch',
   'meteorological_forcing_identity_sha256',
+  'authoritative_external_observation_required:',
+  'farm_watch_assert_fail_closed_reader_semantics_v1',
 ]) assert(migration.includes(required), 'missing evidence-stack invariant: ' + required)
 
 assert(
