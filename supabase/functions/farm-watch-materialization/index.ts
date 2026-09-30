@@ -102,6 +102,9 @@ import {
 import {
   resolveFarmWatchExternalSourceSignatureForProperty,
 } from '../_shared/farm-watch-external-source-identity.ts'
+import {
+  recheckFarmWatchMaterializationIdentity,
+} from '../_shared/farm-watch-materialization-completion.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -1097,13 +1100,6 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
       claim.boundary_geojson,
       claim.stated_acres == null ? null : Number(claim.stated_acres),
     )
-    const completionExternalSourceObservations =
-      await assertAuthoritativeExternalSourceSignatureCurrent(
-        slug,
-        FARM_WATCH_TERRAIN_PRODUCT.productKind,
-        String(claim.base_source_signature || FARM_WATCH_TERRAIN_SOURCE_SIGNATURE),
-        String(claim.source_signature || ''),
-      )
     const bytes = new TextEncoder().encode(JSON.stringify(artifact))
     const artifactSha256 = await sha256Hex(bytes)
     const path = terrainArtifactPath(
@@ -1119,6 +1115,21 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
         upsert: true,
       })
     if (uploadError) throw new Error(`terrain artifact upload failed: ${uploadError.message}`)
+
+    const completionIdentity = await recheckFarmWatchMaterializationIdentity({
+      productKind: FARM_WATCH_TERRAIN_PRODUCT.productKind,
+      expectedSourceSignature: String(claim.source_signature || ''),
+      resolveCurrent: async () => {
+        const observations = await assertAuthoritativeExternalSourceSignatureCurrent(
+          slug,
+          FARM_WATCH_TERRAIN_PRODUCT.productKind,
+          String(claim.base_source_signature || FARM_WATCH_TERRAIN_SOURCE_SIGNATURE),
+          String(claim.source_signature || ''),
+        )
+        return { sourceSignature: claim.source_signature, externalSourceObservations: observations }
+      },
+    })
+    const completionExternalSourceObservations = completionIdentity.externalSourceObservations || []
 
     const completedAt = new Date()
     const expiresAt = new Date(
@@ -1189,13 +1200,6 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
   try {
     const startedAt = performance.now()
     const { artifact, sampledSourceSha256 } = await buildLidarSourceArtifact(claim.boundary_geojson)
-    const completionExternalSourceObservations =
-      await assertAuthoritativeExternalSourceSignatureCurrent(
-        slug,
-        FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
-        String(claim.base_source_signature || FARM_WATCH_LIDAR_SOURCE_SIGNATURE),
-        String(claim.source_signature || ''),
-      )
     const bytes = new TextEncoder().encode(JSON.stringify(artifact))
     const artifactSha256 = await sha256Hex(bytes)
     const path = lidarSourceArtifactPath(
@@ -1211,6 +1215,21 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
         upsert: true,
       })
     if (uploadError) throw new Error(`LiDAR source artifact upload failed: ${uploadError.message}`)
+
+    const completionIdentity = await recheckFarmWatchMaterializationIdentity({
+      productKind: FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
+      expectedSourceSignature: String(claim.source_signature || ''),
+      resolveCurrent: async () => {
+        const observations = await assertAuthoritativeExternalSourceSignatureCurrent(
+          slug,
+          FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
+          String(claim.base_source_signature || FARM_WATCH_LIDAR_SOURCE_SIGNATURE),
+          String(claim.source_signature || ''),
+        )
+        return { sourceSignature: claim.source_signature, externalSourceObservations: observations }
+      },
+    })
+    const completionExternalSourceObservations = completionIdentity.externalSourceObservations || []
 
     const completedAt = new Date()
     const expiresAt = new Date(
@@ -1279,18 +1298,10 @@ async function uploadNeutralPrimitive(args: {
   maxArtifactBytes?: number
   storageEncoding?: 'identity' | 'gzip'
   externalSourceObservations?: any[]
+  recheckDependencies?: () => Promise<{ sourceSignature?: unknown; externalSourceObservations?: unknown[] }>
 }) {
   const spec = productSpec(args.key)
   let completionExternalSourceObservations = args.externalSourceObservations || []
-  if (args.slug && args.baseSourceSignature) {
-    completionExternalSourceObservations =
-      await assertAuthoritativeExternalSourceSignatureCurrent(
-        args.slug,
-        spec.productKind,
-        args.baseSourceSignature,
-        args.sourceSignature,
-      )
-  }
   const jsonBytes = new TextEncoder().encode(JSON.stringify(args.artifact))
   const bytes = args.storageEncoding === 'gzip' ? await gzipBytes(jsonBytes) : jsonBytes
   const maxArtifactBytes = args.maxArtifactBytes ?? 10 * 1024 * 1024
@@ -1313,6 +1324,31 @@ async function uploadNeutralPrimitive(args: {
       upsert: true,
     })
   if (uploadError) throw new Error('neutral primitive artifact upload failed: ' + uploadError.message)
+
+  if (args.slug && args.baseSourceSignature) {
+    const current = await recheckFarmWatchMaterializationIdentity({
+      productKind: spec.productKind,
+      expectedSourceSignature: args.sourceSignature,
+      resolveCurrent: async () => {
+        const observations = await assertAuthoritativeExternalSourceSignatureCurrent(
+          args.slug!,
+          spec.productKind,
+          args.baseSourceSignature!,
+          args.sourceSignature,
+        )
+        return { sourceSignature: args.sourceSignature, externalSourceObservations: observations }
+      },
+    })
+    completionExternalSourceObservations = current.externalSourceObservations || []
+  }
+  if (args.recheckDependencies) {
+    const current = await recheckFarmWatchMaterializationIdentity({
+      productKind: spec.productKind,
+      expectedSourceSignature: args.sourceSignature,
+      resolveCurrent: args.recheckDependencies,
+    })
+    completionExternalSourceObservations = current.externalSourceObservations || completionExternalSourceObservations
+  }
 
   const completedAt = new Date()
   const expiresAt = new Date(
@@ -1392,6 +1428,22 @@ async function buildTerrainFormMaterialization(slug: string, workerId: string) {
       key: FARM_WATCH_TERRAIN_FORM_PRODUCT.key,
       sourceSignature,
       externalSourceObservations: resolved.observations,
+      recheckDependencies: async () => {
+        const current = await neutralPrimitiveBaseDependencies(slug)
+        const currentBaseSourceSignature = terrainFormSourceSignature({
+          landscapeDomainIdentitySha256: current.domainIdentity!,
+          landscapePhysicalIdentitySha256: current.physicalIdentity!,
+        })
+        const currentResolved = await authoritativeExternalSourceSignature(
+          slug,
+          FARM_WATCH_TERRAIN_FORM_PRODUCT.productKind,
+          currentBaseSourceSignature,
+        )
+        return {
+          sourceSignature: currentResolved.sourceSignature,
+          externalSourceObservations: currentResolved.observations,
+        }
+      },
       limitations: FARM_WATCH_TERRAIN_FORM_LIMITATIONS,
       refreshDays: FARM_WATCH_TERRAIN_FORM_PRODUCT.refreshDays,
       artifactPath: terrainFormArtifactPath,
@@ -1447,6 +1499,13 @@ async function buildSpatialPatternMaterialization(slug: string, workerId: string
       key: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
       externalSourceObservations: deps.externalSourceObservations,
+      recheckDependencies: async () => {
+        const current = await spatialPatternDependencies(slug, false)
+        return {
+          sourceSignature: current.sourceSignature,
+          externalSourceObservations: current.externalSourceObservations,
+        }
+      },
       limitations: FARM_WATCH_SPATIAL_PATTERN_LIMITATIONS,
       refreshDays: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.refreshDays,
       artifactPath: spatialPatternArtifactPath,
@@ -1491,6 +1550,13 @@ async function buildSolarTerrainMaterialization(slug: string, workerId: string) 
       key: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
       externalSourceObservations: deps.externalSourceObservations,
+      recheckDependencies: async () => {
+        const current = await solarTerrainDependencies(slug, false)
+        return {
+          sourceSignature: current.sourceSignature,
+          externalSourceObservations: current.externalSourceObservations,
+        }
+      },
       limitations: FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS,
       refreshDays: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.refreshDays,
       artifactPath: solarTerrainArtifactPath,
@@ -1534,6 +1600,10 @@ async function buildSolarExposureMaterialization(
       sampledSourceSha256: built.sampledSourceSha256,
       key: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
+      recheckDependencies: async () => {
+        const current = await solarExposureDependencies(slug, deps.solarDate, false)
+        return { sourceSignature: current.sourceSignature }
+      },
       limitations: FARM_WATCH_SOLAR_EXPOSURE_LIMITATIONS,
       refreshDays: FARM_WATCH_SOLAR_EXPOSURE_PRODUCT.refreshDays,
       artifactPath: solarExposureArtifactPath,
@@ -1583,6 +1653,10 @@ async function buildThermalExposureMaterialization(
       sampledSourceSha256: built.sampledSourceSha256,
       key: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
+      recheckDependencies: async () => {
+        const current = await thermalExposureDependencies(slug, deps.requestedAt, false)
+        return { sourceSignature: current.sourceSignature }
+      },
       limitations: FARM_WATCH_THERMAL_EXPOSURE_LIMITATIONS,
       refreshDays: FARM_WATCH_THERMAL_EXPOSURE_PRODUCT.refreshDays,
       artifactPath: thermalExposureArtifactPath,
@@ -1630,6 +1704,10 @@ async function buildHorizontalVisibilityMaterialization(slug: string, workerId: 
       sampledSourceSha256: built.sampledSourceSha256,
       key: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
+      recheckDependencies: async () => {
+        const current = await horizontalVisibilityDependencies(slug, false)
+        return { sourceSignature: current.sourceSignature }
+      },
       limitations: FARM_WATCH_HORIZONTAL_VISIBILITY_LIMITATIONS,
       refreshDays: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.refreshDays,
       artifactPath: horizontalVisibilityArtifactPath,
@@ -1712,6 +1790,10 @@ async function completeHorizontalVisibilityMaterialization(slug: string, body: a
     sampledSourceSha256,
     key: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.key,
     sourceSignature: deps.sourceSignature,
+    recheckDependencies: async () => {
+      const current = await horizontalVisibilityDependencies(slug, false)
+      return { sourceSignature: current.sourceSignature }
+    },
     limitations: FARM_WATCH_HORIZONTAL_VISIBILITY_LIMITATIONS,
     refreshDays: FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT.refreshDays,
     artifactPath: horizontalVisibilityArtifactPath,
