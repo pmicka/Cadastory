@@ -26,6 +26,7 @@ export const FARM_WATCH_LEAF_OFF_PRODUCT = Object.freeze({
       infraredUrl:
         'https://kyraster.ky.gov/arcgis/rest/services/ImageServices/Ky_KYAPED_Phase3_3IN_IR/ImageServer',
       sourceTile: 'N071E278_2024_Season1',
+      providerCatalogName: 'N071E278_2024_Season1_3IN_cog',
       acquisitionDate: '2024-02-14',
       acquisitionTimestamp: '2024-02-14T11:00:27-05:00',
       acquisitionNote:
@@ -42,6 +43,7 @@ export const FARM_WATCH_LEAF_OFF_PRODUCT = Object.freeze({
       infraredUrl:
         'https://kyraster.ky.gov/arcgis/rest/services/ImageServices/Ky_KYAPED_Phase2_6IN_IR/ImageServer',
       sourceTile: 'N071E278_2019',
+      providerCatalogName: 'N071E278_2019',
       acquisitionDate: '2019-03-27',
       acquisitionTimestamp: null,
       acquisitionNote:
@@ -57,10 +59,14 @@ export const FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE = [
   'phase3_rgb=Ky_KYAPED_Phase3_3IN_WGS84WM',
   'phase3_ir=Ky_KYAPED_Phase3_3IN_IR',
   'phase3_tile=N071E278_2024_Season1',
+  'phase3_provider_catalog_name=N071E278_2024_Season1_3IN_cog',
+  'phase3_mosaic_selection=Name_exact',
   'phase3_acquisition=2024-02-14T11:00:27-05:00',
   'phase2_rgb=Ky_KYAPED_Phase2_6IN_WGS84WM',
   'phase2_ir=Ky_KYAPED_Phase2_6IN_IR',
   'phase2_tile=N071E278_2019',
+  'phase2_provider_catalog_name=N071E278_2019',
+  'phase2_mosaic_selection=Name_exact',
   'phase2_acquisition=2019-03-27',
   'dem=Ky_DEM_KYAPED_2FT_Phase3_WGS84WM',
   'export_image_srid=3857',
@@ -75,11 +81,24 @@ export const FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE = [
   'provider_revision=unresolved',
 ].join('|')
 
+export function leafOffSourceCatalogWhere(source: any) {
+  const name = String(source?.providerCatalogName || '').trim()
+  if (!name) throw new Error('leaf-off provider catalog name is unavailable')
+  return "Name = '" + name.replaceAll("'", "''") + "'"
+}
+
+export function leafOffSourceMosaicRule(source: any) {
+  return {
+    mosaicMethod: 'esriMosaicNorthwest',
+    where: leafOffSourceCatalogWhere(source),
+  }
+}
+
 export const FARM_WATCH_LEAF_OFF_LIMITATIONS = Object.freeze([
   'This is experimental horizontal woody-pattern context derived from leaf-off aerial texture. It complements LiDAR vertical structure but does not measure understory density, stem density, regeneration, species, habitat quality, management condition, or animal use.',
   '2019 and 2024 observations are independently normalized. Their transfer diagnostic describes recurring spatial rank structure; disagreement is not classified as vegetation change.',
   'Phase 3 observation support uses documented solar geometry and false-color support. The 2019 source frame time basis is unresolved, so solar hillshade is intentionally not inferred for that acquisition.',
-  'The upstream imagery and DEM services do not expose immutable revision identifiers in this contract. Source freshness is therefore bounded by the materialization rebuild interval and per-raster content hashes.',
+  'RGB and infrared inputs are pinned to the configured provider catalog item by exact Name mosaic selection. Provider in-place changes remain freshness-sensitive through the authoritative catalog/sample identity and per-raster content hashes.',
   'Field verification is required before ecological interpretation beyond the supported horizontal spatial-organization use.',
 ])
 
