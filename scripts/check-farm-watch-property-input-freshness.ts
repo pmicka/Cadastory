@@ -1,5 +1,5 @@
 const migration = await Deno.readTextFile(
-  'supabase/migrations/20260930030145_farm_watch_property_input_freshness_v1.sql',
+  'supabase/migrations/20260930030941_farm_watch_property_input_freshness_v1.sql',
 )
 const manifestDoc = await Deno.readTextFile(
   'docs/FARM_WATCH_MATERIALIZATION_DEPENDENCY_MANIFEST_V1.md',
