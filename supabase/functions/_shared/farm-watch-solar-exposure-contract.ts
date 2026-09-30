@@ -14,6 +14,7 @@ export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
   supportCellMeters: 30,
   canopyYear: 2025,
   canopyProductVersion: 'v2025-6',
+  canopyCatalogName: 'nlcd_tcc_conus_wgs84_v2025_6_20250101_20251231',
   canopySourceUrl:
     'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_EDW_NLCD_TCC_CONUS/ImageServer',
   demSourceUrl:
@@ -23,6 +24,18 @@ export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
   demFallbackMetersToFeet: 3.280839895013123,
   refreshDays: 30,
 })
+
+export function solarCanopyCatalogWhere() {
+  const name = FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopyCatalogName
+  return "name = '" + String(name).replaceAll("'", "''") + "'"
+}
+
+export function solarCanopyMosaicRule() {
+  return {
+    mosaicMethod: 'esriMosaicNorthwest',
+    where: solarCanopyCatalogWhere(),
+  }
+}
 
 export const FARM_WATCH_SOLAR_EXPOSURE_PRODUCT = Object.freeze({
   key: 'solar-exposure-context',
@@ -100,6 +113,8 @@ export function solarTerrainSourceSignature(args: {
     'horizon_search_radius_m=' + p.horizonSearchRadiusMeters,
     'horizon_ray_step_m=' + p.horizonRayStepMeters,
     'canopy_source=nlcd-tcc-' + p.canopyProductVersion,
+    'canopy_catalog_name=' + p.canopyCatalogName,
+    'canopy_mosaic_selection=exact_name',
     'canopy_year=' + p.canopyYear,
     'local_target_cell_m=' + p.localCellMeters,
     'landscape_target_cell_m=' + p.landscapeCellMeters,
