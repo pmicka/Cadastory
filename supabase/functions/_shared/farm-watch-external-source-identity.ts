@@ -8,7 +8,11 @@ import {
   leafOffSourceCatalogWhere,
   leafOffSourceMosaicRule,
 } from './farm-watch-leaf-off-contract.ts'
-import { FARM_WATCH_SOLAR_TERRAIN_PRODUCT } from './farm-watch-solar-exposure-contract.ts'
+import {
+  FARM_WATCH_SOLAR_TERRAIN_PRODUCT,
+  solarCanopyCatalogWhere,
+  solarCanopyMosaicRule,
+} from './farm-watch-solar-exposure-contract.ts'
 import {
   FARM_WATCH_MAST_CAPACITY_GROUPS,
   FARM_WATCH_MAST_CAPACITY_PRODUCT,
@@ -700,21 +704,26 @@ async function resolveOne(
         key,
         serviceUrl: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopySourceUrl,
         bbox: expandBboxMeters(propertyBbox, 3200),
-        where: 'beginyear = ' + FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopyYear,
+        where: solarCanopyCatalogWhere(),
         outFields: '*',
         sampleGrid: 7,
         sampleExtra: {
-          mosaicRule: JSON.stringify({
-            mosaicMethod: 'esriMosaicNorthwest',
-            where: 'beginyear = ' + FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopyYear,
-          }),
+          mosaicRule: JSON.stringify(solarCanopyMosaicRule()),
         },
         fixedItemId: TCC_ARCGIS_ITEM_ID,
         requireCatalog: true,
+        expectedCatalogCount: 1,
         requireSamples: true,
         fetchImpl,
       })
-      return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
+      return {
+        key,
+        status: 'available',
+        authoritative: true,
+        observed_at: observedAt,
+        ...source,
+        resolution_status: 'provider_fixed_catalog_item_and_complete_sample',
+      }
     }
 
     if (key === 'external:usgs-3dep-dynamic') {
