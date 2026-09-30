@@ -458,6 +458,7 @@ async function providerObservedArcgis(args: {
   portalSearchTitle?: string | null
   portalRoot?: string | null
   requireCatalog?: boolean
+  expectedCatalogCount?: number | null
   requireSamples?: boolean
   fetchImpl: typeof fetch
 }) {
@@ -472,19 +473,36 @@ async function providerObservedArcgis(args: {
     args.portalRoot || ARCGIS_ONLINE_ROOT,
   )
   let catalog: any[] | null = null
+  let catalogObservation: any = null
   let samples: any[] | null = null
+  let sampleObservation: any = null
   let imageProbe: any = null
   if (args.where || args.bbox) {
     try {
-      catalog = await arcgisCatalog(
+      const observedCatalog = await arcgisCatalog(
         args.serviceUrl,
         args.bbox,
         args.where || '1=1',
         args.outFields || '*',
         args.fetchImpl,
       )
+      catalog = observedCatalog.rows
+      catalogObservation = {
+        page_count: observedCatalog.page_count,
+        returned_record_count: observedCatalog.rows.length,
+        complete: observedCatalog.complete,
+      }
       if (args.requireCatalog && (catalog?.length ?? 0) === 0) {
         throw new Error('bounded source catalog probe returned no records')
+      }
+      if (
+        args.expectedCatalogCount != null &&
+        catalog.length !== args.expectedCatalogCount
+      ) {
+        throw new Error(
+          'bounded source catalog selection returned ' +
+          catalog.length + ' records; expected ' + args.expectedCatalogCount,
+        )
       }
     } catch (error) {
       if (args.requireCatalog) throw error
@@ -492,18 +510,25 @@ async function providerObservedArcgis(args: {
   }
   if (args.sampleGrid && args.bbox) {
     try {
-      samples = await arcgisSamples(
+      const observedSamples = await arcgisSamples(
         args.serviceUrl,
         args.bbox,
         args.sampleGrid,
         args.sampleExtra || {},
         args.fetchImpl,
       )
-      if (
-        args.requireSamples &&
-        !samples.some((row: any) => row?.sample && row.sample.value != null)
-      ) {
-        throw new Error('bounded source sample probe returned no values')
+      samples = observedSamples.rows
+      sampleObservation = {
+        requested_count: observedSamples.requested_count,
+        returned_count: observedSamples.returned_count,
+        complete: observedSamples.complete,
+      }
+      if (args.requireSamples && !observedSamples.complete) {
+        throw new Error(
+          'bounded source sample probe incomplete: returned ' +
+          observedSamples.returned_count + ' of ' +
+          observedSamples.requested_count,
+        )
       }
     } catch (error) {
       if (args.requireSamples) throw error
@@ -521,7 +546,9 @@ async function providerObservedArcgis(args: {
     service_metadata: metadata,
     portal_item: portalItem,
     catalog,
+    catalog_observation: catalogObservation,
     samples,
+    sample_observation: sampleObservation,
     image_probe: imageProbe,
     probe_bbox: args.bbox,
   })
