@@ -425,7 +425,7 @@ async function providerObservedArcgis(args: {
         args.outFields || '*',
         args.fetchImpl,
       )
-      if (args.requireCatalog && !catalog.length) {
+      if (args.requireCatalog && (catalog?.length ?? 0) === 0) {
         throw new Error('bounded source catalog probe returned no records')
       }
     } catch (error) {
