@@ -234,11 +234,17 @@ STAC identity now includes selected-item footprint geometry in addition to bbox,
 
 Bounded ArcGIS catalog queries now follow `exceededTransferLimit` using result offsets. The observation retains page count and returned record count and rejects stalled, duplicate, or ambiguity-at-page-limit responses.
 
-When a source contract requires bounded raster samples, every requested deterministic probe point must be represented in the response. Returning one or a subset of samples is no longer sufficient to declare the observation authoritative.
+When a source contract requires bounded raster samples, the observation records requested count, returned count, coverage fraction, and the contract's minimum accepted coverage. Returning one arbitrary sample is no longer sufficient to declare the observation authoritative.
+
+Selection-specific coverage rules match the data actually consumed:
+
+- fixed leaf-off imagery probes the same property + 10 m analysis extent used by the builder and requires complete deterministic sample coverage under the exact fixed mosaic;
+- fixed NLCD TCC requires complete deterministic sample coverage under the exact v2025-6 mosaic;
+- Phase 3 DEM and USGS 3DEP probes cover the full solar support extent and require at least 90% deterministic sample coverage, because legitimate provider no-data is allowed and the solar builder already treats 3DEP as fallback for missing Phase 3 DEM support.
 
 Unknown external dependency keys are rejected rather than silently omitted.
 
-These are freshness completeness rules. They do not claim that sparse bounded samples are a cryptographic digest of every raster pixel.
+These are freshness completeness rules. They distinguish provider response/selection completeness from legitimate raster no-data; they do not claim that bounded samples are a cryptographic digest of every raster pixel.
 
 ### Fixed historical leaf-off imagery
 
