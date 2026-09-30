@@ -19,7 +19,18 @@ function arg(name: string, fallback: string | null = null) {
 }
 
 const propertySlug = arg('--property', 'validation-property-01')!
-const solarDate = requireSolarDate(arg('--date', new Date().toISOString().slice(0, 10))!)
+function louisvilleCalendarDate(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Kentucky/Louisville',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date)
+  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]))
+  return `${value.year}-${value.month}-${value.day}`
+}
+
+const solarDate = requireSolarDate(arg('--date', louisvilleCalendarDate())!)
 
 async function freshOidcToken() {
   const requestUrl = Deno.env.get('ACTIONS_ID_TOKEN_REQUEST_URL') || ''
