@@ -378,7 +378,14 @@ assert(
 assert(
   terrainMaterializer.includes('resolveFarmWatchExternalSourceSignatureForProperty') &&
   terrainMaterializer.includes('p_source_signature: authoritativeSource.sourceSignature') &&
-  terrainMaterializer.includes('external_source_observations: authoritativeSource.observations'),
+  terrainMaterializer.includes(
+    'external_source_observations: completionSource.observations',
+  ) &&
+  terrainMaterializer.includes('recheckFarmWatchMaterializationIdentity({') &&
+  terrainMaterializer.indexOf('.upload(artifactPath, artifactBytes') <
+    terrainMaterializer.indexOf('recheckFarmWatchMaterializationIdentity({') &&
+  terrainMaterializer.indexOf('recheckFarmWatchMaterializationIdentity({') <
+    terrainMaterializer.indexOf('farm_watch_complete_materialization_build_v1_internal'),
   'terrain CLI can bypass authoritative DEM identity binding',
 )
 
