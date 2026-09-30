@@ -12,6 +12,9 @@ import {
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
 import { sha256Hex } from '../_shared/farm-watch-terrain.ts'
+import {
+  resolveFarmWatchExternalSourceSignatureForProperty,
+} from '../_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -79,6 +82,12 @@ async function propertyCenter(slug: string) {
 }
 
 async function claimLeafOff(slug: string, identity: any) {
+  const source = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_LEAF_OFF_PRODUCT.productKind,
+    sourceSignature: FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
+  })
   const workerId = [
     'github-actions-leaf-off',
     identity.run_id || 'run',
@@ -92,7 +101,7 @@ async function claimLeafOff(slug: string, identity: any) {
       p_product_kind: FARM_WATCH_LEAF_OFF_PRODUCT.productKind,
       p_algorithm_version: FARM_WATCH_LEAF_OFF_PRODUCT.algorithmVersion,
       p_output_schema_version: FARM_WATCH_LEAF_OFF_PRODUCT.outputSchemaVersion,
-      p_source_signature: FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
+      p_source_signature: source.sourceSignature,
       p_worker_id: workerId,
       p_lease_seconds: 3600,
     },
@@ -118,6 +127,8 @@ async function claimLeafOff(slug: string, identity: any) {
     boundary_sha256: claim.boundary_sha256,
     boundary_geojson: claim.boundary_geojson,
     input_signature_sha256: claim.input_signature_sha256,
+    source_signature: source.sourceSignature,
+    external_source_observations: source.observations,
     center: await propertyCenter(slug),
     contract: {
       schema: FARM_WATCH_LEAF_OFF_PRODUCT.outputSchemaVersion,
@@ -139,12 +150,18 @@ async function completeLeafOff(slug: string, body: any) {
     throw new Error('leaf-off artifact failed contract validation')
   }
 
+  const source = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_LEAF_OFF_PRODUCT.productKind,
+    sourceSignature: FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
+  })
   const build = await readBuild(buildId)
   if (
     build.product_kind !== FARM_WATCH_LEAF_OFF_PRODUCT.productKind ||
     build.algorithm_version !== FARM_WATCH_LEAF_OFF_PRODUCT.algorithmVersion ||
     build.output_schema_version !== FARM_WATCH_LEAF_OFF_PRODUCT.outputSchemaVersion ||
-    build.source_signature !== FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE ||
+    build.source_signature !== source.sourceSignature ||
     build.status !== 'processing' ||
     String(build.lease_token) !== leaseToken
   ) {
@@ -205,7 +222,8 @@ async function completeLeafOff(slug: string, body: any) {
     artifact_size_bytes: bytes.byteLength,
   }
   const sourceProvenance = {
-    source_signature: FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
+    source_signature: source.sourceSignature,
+    external_source_observations: source.observations,
     processing_source_fingerprint_sha256: sampledSourceSha256,
     processing_source_fingerprint: fingerprint,
     github_workflow: body?.workflow_provenance || null,

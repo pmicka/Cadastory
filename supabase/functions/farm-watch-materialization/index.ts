@@ -99,6 +99,9 @@ import {
   materializationPresentationMode,
   normalizeFarmWatchAccountRole,
 } from '../_shared/farm-watch-presentation-policy.ts'
+import {
+  resolveFarmWatchExternalSourceSignatureForProperty,
+} from '../_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -328,6 +331,35 @@ function productSpec(key: ProductKey) {
   }
 }
 
+async function authoritativeExternalSourceSignature(
+  slug: string,
+  productKind: string,
+  sourceSignature: string,
+) {
+  return resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind,
+    sourceSignature,
+  })
+}
+
+async function assertAuthoritativeExternalSourceSignatureCurrent(
+  slug: string,
+  productKind: string,
+  baseSourceSignature: string,
+  expectedSourceSignature: string,
+) {
+  const current = await authoritativeExternalSourceSignature(
+    slug,
+    productKind,
+    baseSourceSignature,
+  )
+  if (current.sourceSignature !== expectedSourceSignature) {
+    throw new Error('external source identity changed during materialization build')
+  }
+  return current.observations
+}
 function validateTerrainArtifact(value: any) {
   const grid = value?.grid
   const contours = value?.contours
@@ -386,12 +418,17 @@ async function readStaticState(
   key: ProductKey,
 ) {
   const spec = productSpec(key)
+  const resolved = await authoritativeExternalSourceSignature(
+    slug,
+    spec.productKind,
+    String(spec.sourceSignature || ''),
+  )
   const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
     p_slug: slug,
     p_product_kind: spec.productKind,
     p_algorithm_version: spec.algorithmVersion,
     p_output_schema_version: spec.outputSchemaVersion,
-    p_source_signature: spec.sourceSignature,
+    p_source_signature: resolved.sourceSignature,
   })
   if (error) throw new Error(`materialization state read failed: ${error.message}`)
   return data
@@ -422,8 +459,14 @@ async function readLidarPhysicalState(slug: string) {
     throw new Error('LiDAR physical source plan is unavailable')
   }
 
-  const sourceSignature = lidarPhysicalSourceSignature(sourceArtifact, sourceArtifactSha256)
+  const baseSourceSignature = lidarPhysicalSourceSignature(sourceArtifact, sourceArtifactSha256)
   const spec = productSpec(FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.key)
+  const resolved = await authoritativeExternalSourceSignature(
+    slug,
+    spec.productKind,
+    baseSourceSignature,
+  )
+  const sourceSignature = resolved.sourceSignature
   const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
     p_slug: slug,
     p_product_kind: spec.productKind,
@@ -489,12 +532,18 @@ async function readLandscapeStructureState(slug: string) {
       materialization: null,
     }
   }
-  const sourceSignature = landscapeStructureSourceSignature({
+  const baseSourceSignature = landscapeStructureSourceSignature({
     landscapeDomainIdentitySha256: domainIdentity,
     landscapeDomainAlgorithmVersion: String(domain?.identity?.algorithm_version || ''),
     lidarSourceContractSignature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
   })
   const spec = productSpec(FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.key)
+  const resolved = await authoritativeExternalSourceSignature(
+    slug,
+    spec.productKind,
+    baseSourceSignature,
+  )
+  const sourceSignature = resolved.sourceSignature
   const { data, error } = await admin.rpc('farm_watch_get_materialization_v1_internal', {
     p_slug: slug,
     p_product_kind: spec.productKind,
@@ -557,11 +606,20 @@ async function readDynamicState(slug: string, key: ProductKey, sourceSignature: 
 
 async function readTerrainFormState(slug: string) {
   const deps = await neutralPrimitiveBaseDependencies(slug)
-  const sourceSignature = terrainFormSourceSignature({
+  const baseSourceSignature = terrainFormSourceSignature({
     landscapeDomainIdentitySha256: deps.domainIdentity!,
     landscapePhysicalIdentitySha256: deps.physicalIdentity!,
   })
-  return readDynamicState(slug, FARM_WATCH_TERRAIN_FORM_PRODUCT.key, sourceSignature)
+  const resolved = await authoritativeExternalSourceSignature(
+    slug,
+    FARM_WATCH_TERRAIN_FORM_PRODUCT.productKind,
+    baseSourceSignature,
+  )
+  return readDynamicState(
+    slug,
+    FARM_WATCH_TERRAIN_FORM_PRODUCT.key,
+    resolved.sourceSignature,
+  )
 }
 
 async function spatialPatternDependencies(slug: string, includeResourceGeometry = false) {
@@ -582,20 +640,28 @@ async function spatialPatternDependencies(slug: string, includeResourceGeometry 
     !structureArtifactSha256
   ) throw new Error('current local landscape structure materialization is unavailable')
 
-  const sourceSignature = spatialPatternSourceSignature({
+  const baseSourceSignature = spatialPatternSourceSignature({
     landscapeDomainIdentitySha256: base.domainIdentity!,
     landscapePhysicalIdentitySha256: base.physicalIdentity!,
     resourceEdgeIdentitySha256: resource.identity!,
     landscapeStructureIdentitySha256: structureIdentity,
     landscapeStructureArtifactSha256: structureArtifactSha256,
   })
+  const resolved = await authoritativeExternalSourceSignature(
+    slug,
+    FARM_WATCH_SPATIAL_PATTERN_PRODUCT.productKind,
+    baseSourceSignature,
+  )
+  const sourceSignature = resolved.sourceSignature
   return {
     ...base,
     resource,
     structureState,
     structureIdentity,
     structureArtifactSha256,
+    baseSourceSignature,
     sourceSignature,
+    externalSourceObservations: resolved.observations,
   }
 }
 
@@ -688,12 +754,18 @@ async function solarTerrainDependencies(slug: string, includeArtifacts = false) 
     !spatialArtifactSha256
   ) throw new Error('current solar terrain dependencies are unavailable')
 
-  const sourceSignature = solarTerrainSourceSignature({
+  const baseSourceSignature = solarTerrainSourceSignature({
     terrainMaterializationIdentitySha256: terrainIdentity,
     terrainArtifactSha256,
     spatialPatternMaterializationIdentitySha256: spatialIdentity,
     spatialPatternArtifactSha256: spatialArtifactSha256,
   })
+  const resolved = await authoritativeExternalSourceSignature(
+    slug,
+    FARM_WATCH_SOLAR_TERRAIN_PRODUCT.productKind,
+    baseSourceSignature,
+  )
+  const sourceSignature = resolved.sourceSignature
 
   let terrainArtifact: any = null
   let spatialArtifact: any = null
@@ -718,7 +790,9 @@ async function solarTerrainDependencies(slug: string, includeArtifacts = false) 
     spatialArtifactSha256,
     terrainArtifact,
     spatialArtifact,
+    baseSourceSignature,
     sourceSignature,
+    externalSourceObservations: resolved.observations,
   }
 }
 
@@ -905,17 +979,27 @@ async function claimBuild(
   workerId: string,
 ) {
   const spec = productSpec(key)
+  const resolved = await authoritativeExternalSourceSignature(
+    slug,
+    spec.productKind,
+    String(spec.sourceSignature || ''),
+  )
   const { data, error } = await admin.rpc('farm_watch_claim_materialization_build_v1_internal', {
     p_slug: slug,
     p_product_kind: spec.productKind,
     p_algorithm_version: spec.algorithmVersion,
     p_output_schema_version: spec.outputSchemaVersion,
-    p_source_signature: spec.sourceSignature,
+    p_source_signature: resolved.sourceSignature,
     p_worker_id: workerId,
     p_lease_seconds: 900,
   })
   if (error) throw new Error(`materialization claim failed: ${error.message}`)
-  return data
+  return data ? {
+    ...data,
+    source_signature: resolved.sourceSignature,
+    base_source_signature: String(spec.sourceSignature || ''),
+    external_source_observations: resolved.observations,
+  } : data
 }
 
 async function claimDynamicBuild(
@@ -935,7 +1019,10 @@ async function claimDynamicBuild(
     p_lease_seconds: 1800,
   })
   if (error) throw new Error('dynamic materialization claim failed: ' + error.message)
-  return data
+  return data ? {
+    ...data,
+    source_signature: sourceSignature,
+  } : data
 }
 
 async function failBuild(buildId: string, leaseToken: string, error: unknown) {
@@ -1009,6 +1096,13 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
       claim.boundary_geojson,
       claim.stated_acres == null ? null : Number(claim.stated_acres),
     )
+    const completionExternalSourceObservations =
+      await assertAuthoritativeExternalSourceSignatureCurrent(
+        slug,
+        FARM_WATCH_TERRAIN_PRODUCT.productKind,
+        String(claim.base_source_signature || FARM_WATCH_TERRAIN_SOURCE_SIGNATURE),
+        String(claim.source_signature || ''),
+      )
     const bytes = new TextEncoder().encode(JSON.stringify(artifact))
     const artifactSha256 = await sha256Hex(bytes)
     const path = terrainArtifactPath(
@@ -1055,8 +1149,9 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
       sourceProvenance: {
         source_slug: FARM_WATCH_TERRAIN_PRODUCT.sourceSlug,
         source_url: FARM_WATCH_TERRAIN_PRODUCT.sourceUrl,
-        source_signature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+        source_signature: claim.source_signature || FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
         source_signature_sha256: claim.source_signature_sha256,
+        external_source_observations: completionExternalSourceObservations,
         source_revision_status: FARM_WATCH_TERRAIN_PRODUCT.sourceRevisionStatus,
         sampled_source_sha256: sampledSourceSha256,
         operation: 'ImageServer/getSamples',
@@ -1093,6 +1188,13 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
   try {
     const startedAt = performance.now()
     const { artifact, sampledSourceSha256 } = await buildLidarSourceArtifact(claim.boundary_geojson)
+    const completionExternalSourceObservations =
+      await assertAuthoritativeExternalSourceSignatureCurrent(
+        slug,
+        FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
+        String(claim.base_source_signature || FARM_WATCH_LIDAR_SOURCE_SIGNATURE),
+        String(claim.source_signature || ''),
+      )
     const bytes = new TextEncoder().encode(JSON.stringify(artifact))
     const artifactSha256 = await sha256Hex(bytes)
     const path = lidarSourceArtifactPath(
@@ -1138,9 +1240,10 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
       sourceProvenance: {
         source_slug: 'kyfromabove-lidar-stac',
         source_url: FARM_WATCH_LIDAR_SOURCE_PRODUCT.stacRoot,
-        source_signature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+        source_signature: claim.source_signature || FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
         source_signature_sha256: claim.source_signature_sha256,
-        source_revision_status: 'provider_catalog_revision_unresolved',
+        source_revision_status: 'provider_observed_authoritative_v1',
+        external_source_observations: completionExternalSourceObservations,
         sampled_source_sha256: sampledSourceSha256,
         operation: 'STAC POST /search',
         requested_at: completedAt.toISOString(),
@@ -1162,6 +1265,8 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
 }
 
 async function uploadNeutralPrimitive(args: {
+  slug?: string
+  baseSourceSignature?: string
   claim: any
   artifact: any
   sampledSourceSha256: string
@@ -1172,8 +1277,19 @@ async function uploadNeutralPrimitive(args: {
   artifactPath: (propertyId: string, inputSignature: string, artifactSha256: string) => string
   maxArtifactBytes?: number
   storageEncoding?: 'identity' | 'gzip'
+  externalSourceObservations?: any[]
 }) {
   const spec = productSpec(args.key)
+  let completionExternalSourceObservations = args.externalSourceObservations || []
+  if (args.slug && args.baseSourceSignature) {
+    completionExternalSourceObservations =
+      await assertAuthoritativeExternalSourceSignatureCurrent(
+        args.slug,
+        spec.productKind,
+        args.baseSourceSignature,
+        args.sourceSignature,
+      )
+  }
   const jsonBytes = new TextEncoder().encode(JSON.stringify(args.artifact))
   const bytes = args.storageEncoding === 'gzip' ? await gzipBytes(jsonBytes) : jsonBytes
   const maxArtifactBytes = args.maxArtifactBytes ?? 10 * 1024 * 1024
@@ -1214,6 +1330,7 @@ async function uploadNeutralPrimitive(args: {
       ...(args.artifact.source_provenance || {}),
       source_signature: args.sourceSignature,
       source_signature_sha256: args.claim.source_signature_sha256,
+      external_source_observations: completionExternalSourceObservations,
       storage_encoding: args.storageEncoding || 'identity',
       completed_at: completedAt.toISOString(),
     },
@@ -1234,10 +1351,16 @@ async function uploadNeutralPrimitive(args: {
 
 async function buildTerrainFormMaterialization(slug: string, workerId: string) {
   const deps = await neutralPrimitiveBaseDependencies(slug)
-  const sourceSignature = terrainFormSourceSignature({
+  const baseSourceSignature = terrainFormSourceSignature({
     landscapeDomainIdentitySha256: deps.domainIdentity!,
     landscapePhysicalIdentitySha256: deps.physicalIdentity!,
   })
+  const resolved = await authoritativeExternalSourceSignature(
+    slug,
+    FARM_WATCH_TERRAIN_FORM_PRODUCT.productKind,
+    baseSourceSignature,
+  )
+  const sourceSignature = resolved.sourceSignature
   const claim = await claimDynamicBuild(
     slug,
     FARM_WATCH_TERRAIN_FORM_PRODUCT.key,
@@ -1260,11 +1383,14 @@ async function buildTerrainFormMaterialization(slug: string, workerId: string) {
       landscapePhysicalIdentitySha256: deps.physicalIdentity!,
     })
     await uploadNeutralPrimitive({
+      slug,
+      baseSourceSignature,
       claim,
       artifact,
       sampledSourceSha256,
       key: FARM_WATCH_TERRAIN_FORM_PRODUCT.key,
       sourceSignature,
+      externalSourceObservations: resolved.observations,
       limitations: FARM_WATCH_TERRAIN_FORM_LIMITATIONS,
       refreshDays: FARM_WATCH_TERRAIN_FORM_PRODUCT.refreshDays,
       artifactPath: terrainFormArtifactPath,
@@ -1312,11 +1438,14 @@ async function buildSpatialPatternMaterialization(slug: string, workerId: string
       landscapeStructureArtifact: structurePayload.artifact,
     })
     await uploadNeutralPrimitive({
+      slug,
+      baseSourceSignature: deps.baseSourceSignature,
       claim,
       artifact,
       sampledSourceSha256,
       key: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
+      externalSourceObservations: deps.externalSourceObservations,
       limitations: FARM_WATCH_SPATIAL_PATTERN_LIMITATIONS,
       refreshDays: FARM_WATCH_SPATIAL_PATTERN_PRODUCT.refreshDays,
       artifactPath: spatialPatternArtifactPath,
@@ -1353,11 +1482,14 @@ async function buildSolarTerrainMaterialization(slug: string, workerId: string) 
       spatialPatternArtifactSha256: deps.spatialArtifactSha256!,
     })
     await uploadNeutralPrimitive({
+      slug,
+      baseSourceSignature: deps.baseSourceSignature,
       claim,
       artifact: built.artifact,
       sampledSourceSha256: built.sampledSourceSha256,
       key: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.key,
       sourceSignature: deps.sourceSignature,
+      externalSourceObservations: deps.externalSourceObservations,
       limitations: FARM_WATCH_SOLAR_TERRAIN_LIMITATIONS,
       refreshDays: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.refreshDays,
       artifactPath: solarTerrainArtifactPath,

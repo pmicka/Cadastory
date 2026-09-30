@@ -26,6 +26,9 @@ import {
   FARM_WATCH_GITHUB_OIDC_AUDIENCE,
   verifyFarmWatchGitHubActionsOidc,
 } from '../_shared/github-actions-oidc.ts'
+import {
+  resolveFarmWatchExternalSourceSignatureForProperty,
+} from '../_shared/farm-watch-external-source-identity.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -118,20 +121,33 @@ async function downloadArtifact(state: any) {
 }
 
 async function resolveDependencies(slug: string) {
+  const sourcePlanSignature = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
+    sourceSignature: FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+  })
   const sourceState = await readState(
     slug,
     FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
     FARM_WATCH_LIDAR_SOURCE_PRODUCT.algorithmVersion,
     FARM_WATCH_LIDAR_SOURCE_PRODUCT.outputSchemaVersion,
-    FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
+    sourcePlanSignature.sourceSignature,
   )
   if (sourceState?.status !== 'available') throw new Error('current LiDAR source plan is unavailable')
   const sourcePayload = await downloadArtifact(sourceState)
 
-  const physicalSourceSignature = lidarPhysicalSourceSignature(
+  const physicalBaseSourceSignature = lidarPhysicalSourceSignature(
     sourcePayload.artifact,
     sourcePayload.artifact_sha256,
   )
+  const physicalSource = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.productKind,
+    sourceSignature: physicalBaseSourceSignature,
+  })
+  const physicalSourceSignature = physicalSource.sourceSignature
   const physicalState = await readState(
     slug,
     FARM_WATCH_LIDAR_PHYSICAL_PRODUCT.productKind,
@@ -141,12 +157,18 @@ async function resolveDependencies(slug: string) {
   )
   if (physicalState?.status !== 'available') throw new Error('current LiDAR physical structure is unavailable')
 
+  const leafSource = await resolveFarmWatchExternalSourceSignatureForProperty({
+    admin,
+    slug,
+    productKind: FARM_WATCH_LEAF_OFF_PRODUCT.productKind,
+    sourceSignature: FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
+  })
   const leafState = await readState(
     slug,
     FARM_WATCH_LEAF_OFF_PRODUCT.productKind,
     FARM_WATCH_LEAF_OFF_PRODUCT.algorithmVersion,
     FARM_WATCH_LEAF_OFF_PRODUCT.outputSchemaVersion,
-    FARM_WATCH_LEAF_OFF_SOURCE_SIGNATURE,
+    leafSource.sourceSignature,
   )
   if (leafState?.status !== 'available') throw new Error('current leaf-off structure is unavailable')
 
@@ -396,7 +418,7 @@ function crossValidatedProfileModel(records: any[], gridWidth: number) {
       share_64_plus: row.shares[4] || 0,
       entropy: normalizedBandEntropy(row.shares) || 0,
       profile_spread: bandProfileSpread(row.shares) || 0,
-    },
+    } as Record<string, number>,
   })).filter((row) =>
     Number.isFinite(row.y) &&
     featureNames.every((name) => Number.isFinite(row.features[name]))
@@ -683,7 +705,7 @@ function crossValidatedTreeProfileModel(records: any[], gridWidth: number) {
   const rows = records.map((row) => ({
     index: row.index,
     y: row.leafScore,
-    features: profileBaseFeatures(row),
+    features: profileBaseFeatures(row) as Record<string, number>,
   })).filter((row) =>
     Number.isFinite(row.y) &&
     PROFILE_BASE_FEATURES.every((name) => Number.isFinite(row.features[name]))
@@ -1300,7 +1322,7 @@ function buildSynthesis(physical: any, leaf: any, nullSeed: string) {
   const overstory = records.filter(
     (row) => row.upperShare >= FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.minimumUpperShare,
   )
-  const fullProfile = crossValidatedProfileModel(records, Number(physicalGrid.width))
+  const fullProfile: any = crossValidatedProfileModel(records, Number(physicalGrid.width))
   if (fullProfile.status !== 'available') {
     throw new Error('full vertical-profile cross-validation is unavailable')
   }
