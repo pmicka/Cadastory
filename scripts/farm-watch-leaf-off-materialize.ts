@@ -4,6 +4,7 @@ import { Buffer } from 'node:buffer'
 import { PNG } from 'npm:pngjs@7.0.0'
 import {
   FARM_WATCH_LEAF_OFF_PRODUCT,
+  leafOffSourceCatalogWhere,
   leafOffSourceMosaicRule,
 } from '../supabase/functions/_shared/farm-watch-leaf-off-contract.ts'
 import { FARM_WATCH_GITHUB_OIDC_AUDIENCE } from '../supabase/functions/_shared/github-actions-oidc.ts'
@@ -944,7 +945,8 @@ export async function buildLeafOffSourceProduct(
     source_id: source.id,
     source_tile: source.sourceTile,
     acquisition_date: source.acquisitionDate,
-    provider_catalog_name: source.providerCatalogName,
+    provider_reference_catalog_name: source.providerReferenceCatalogName,
+    provider_catalog_where: leafOffSourceCatalogWhere(source),
     mosaic_rule: fixedImageryMosaicRule,
     imagery: {
       service: source.imageryUrl,
