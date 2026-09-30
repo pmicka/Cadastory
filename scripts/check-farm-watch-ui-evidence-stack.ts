@@ -6,7 +6,7 @@ const migration = [
   await Deno.readTextFile('supabase/migrations/20260929201015_farm_watch_dependency_aware_materialization_freshness_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260929201051_farm_watch_dependency_aware_evidence_stack_freshness_v1.sql'),
   await Deno.readTextFile('supabase/migrations/20260930025013_farm_watch_fail_closed_reader_semantics_v1.sql'),
-  await Deno.readTextFile('supabase/migrations/20260930030145_farm_watch_property_input_freshness_v1.sql'),
+  await Deno.readTextFile('supabase/migrations/20260930030941_farm_watch_property_input_freshness_v1.sql'),
 ].join('\n')
 const edge = await Deno.readTextFile('supabase/functions/farm-watch-private/index.ts')
 const evaluator = await Deno.readTextFile(
