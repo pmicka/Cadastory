@@ -755,7 +755,7 @@ async function resolveOne(
         authoritative: true,
         observed_at: observedAt,
         ...source,
-        resolution_status: 'provider_fixed_catalog_item_and_complete_sample',
+        resolution_status: 'provider_fixed_acquisition_catalog_and_complete_sample',
       }
     }
 
@@ -801,7 +801,6 @@ async function resolveOne(
           sampleGrid: 5,
           sampleExtra,
           requireCatalog: true,
-          expectedCatalogCount: 1,
           requireSamples: true,
           fetchImpl,
         }),
@@ -814,16 +813,16 @@ async function resolveOne(
           sampleGrid: 5,
           sampleExtra,
           requireCatalog: true,
-          expectedCatalogCount: 1,
           requireSamples: true,
           fetchImpl,
         }),
       ])
       const evidence = stableValue({
-        strategy: 'fixed-imagery-pair-provider-selection-v2',
+        strategy: 'fixed-imagery-acquisition-provider-selection-v3',
         source_id: wanted.id,
         configured_reference_tile: wanted.sourceTile,
-        provider_catalog_name: wanted.providerCatalogName,
+        provider_reference_catalog_name: wanted.providerReferenceCatalogName,
+        provider_catalog_where: where,
         configured_acquisition_date: wanted.acquisitionDate,
         consumed_mosaic_rule: mosaicRule,
         rgb: rgb.evidence,
