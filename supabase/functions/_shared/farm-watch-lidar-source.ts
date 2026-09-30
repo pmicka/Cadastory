@@ -23,6 +23,7 @@ export const FARM_WATCH_LIDAR_SOURCE_SIGNATURE = [
   'collections=laz-phase3,laz-phase2',
   'search=POST:/search',
   'limit=100',
+  'pagination=follow-rel-next-and-verify-reported-count',
   'selection=all-intersecting-usable-item-footprints',
   'coverage_sample_grid=41x41',
   'provider_revision=unresolved',
@@ -260,23 +261,116 @@ function coveragePlan(boundary: any, items: any[]) {
   }
 }
 
-async function searchCollection(collectionId: string, bbox: number[], fetchImpl: typeof fetch = fetch) {
-  const response = await fetchImpl(FARM_WATCH_LIDAR_SOURCE_PRODUCT.stacRoot + 'search', {
+type StacSearchPage = {
+  href: string
+  method: 'GET' | 'POST'
+  body: Record<string, unknown> | null
+}
+
+function stacNextPage(payload: any, baseBody: Record<string, unknown>): StacSearchPage | null {
+  const link = Array.isArray(payload?.links)
+    ? payload.links.find((row: any) => String(row?.rel || '').toLowerCase() === 'next')
+    : null
+  if (!link?.href) return null
+  const href = new URL(
+    String(link.href),
+    FARM_WATCH_LIDAR_SOURCE_PRODUCT.stacRoot,
+  ).toString()
+  const method = String(link.method || 'GET').toUpperCase() === 'POST'
+    ? 'POST'
+    : 'GET'
+  const body = method === 'POST'
+    ? {
+      ...baseBody,
+      ...(link.body && typeof link.body === 'object' ? link.body : {}),
+    }
+    : null
+  return { href, method, body }
+}
+
+function stacMatchedCount(payload: any) {
+  for (const value of [
+    payload?.numberMatched,
+    payload?.context?.matched,
+    payload?.context?.numberMatched,
+  ]) {
+    const n = Number(value)
+    if (Number.isFinite(n) && n >= 0) return n
+  }
+  return null
+}
+
+async function searchCollection(
+  collectionId: string,
+  bbox: number[],
+  fetchImpl: typeof fetch = fetch,
+) {
+  const baseBody: Record<string, unknown> = {
+    collections: [collectionId],
+    bbox,
+    limit: FARM_WATCH_LIDAR_SOURCE_PRODUCT.searchLimit,
+  }
+  let page: StacSearchPage | null = {
+    href: FARM_WATCH_LIDAR_SOURCE_PRODUCT.stacRoot + 'search',
     method: 'POST',
-    headers: {
-      accept: 'application/geo+json, application/json',
-      'content-type': 'application/json',
-      'user-agent': 'Cadastory-Farm-Watch-Materializer/1.0',
-    },
-    body: JSON.stringify({
-      collections: [collectionId],
-      bbox,
-      limit: FARM_WATCH_LIDAR_SOURCE_PRODUCT.searchLimit,
-    }),
-  })
-  if (!response.ok) throw new Error(`LiDAR STAC search returned ${response.status}`)
-  const payload = await response.json()
-  return Array.isArray(payload?.features) ? payload.features : []
+    body: baseBody,
+  }
+  const features: any[] = []
+  const pageFingerprints = new Set<string>()
+  let pageCount = 0
+  let matchedCount: number | null = null
+
+  while (page) {
+    pageCount += 1
+    if (pageCount > 100) throw new Error('LiDAR STAC pagination exceeded bounded page limit')
+
+    const pageKey = page.method + '|' + page.href + '|' + JSON.stringify(page.body || null)
+    if (pageFingerprints.has(pageKey)) throw new Error('LiDAR STAC pagination loop detected')
+    pageFingerprints.add(pageKey)
+
+    const response = await fetchImpl(page.href, {
+      method: page.method,
+      headers: {
+        accept: 'application/geo+json, application/json',
+        ...(page.method === 'POST'
+          ? { 'content-type': 'application/json' }
+          : {}),
+        'user-agent': 'Cadastory-Farm-Watch-Materializer/1.0',
+      },
+      ...(page.method === 'POST'
+        ? { body: JSON.stringify(page.body || baseBody) }
+        : {}),
+    })
+    if (!response.ok) throw new Error(`LiDAR STAC search returned ${response.status}`)
+    const payload = await response.json()
+    const rows = Array.isArray(payload?.features) ? payload.features : []
+    features.push(...rows)
+
+    const reportedMatched = stacMatchedCount(payload)
+    if (reportedMatched !== null) {
+      if (matchedCount !== null && matchedCount !== reportedMatched) {
+        throw new Error('LiDAR STAC matched-count changed during pagination')
+      }
+      matchedCount = reportedMatched
+    }
+
+    page = stacNextPage(payload, baseBody)
+  }
+
+  if (matchedCount !== null && features.length < matchedCount) {
+    throw new Error(
+      'LiDAR STAC pagination incomplete: returned ' +
+      features.length + ' of ' + matchedCount,
+    )
+  }
+
+  return {
+    features,
+    page_count: pageCount,
+    reported_matched_count: matchedCount,
+    returned_feature_count: features.length,
+    pagination_complete: true,
+  }
 }
 
 export async function sha256Hex(value: string | Uint8Array) {
@@ -318,13 +412,19 @@ export async function buildLidarSourceArtifact(
   }
   const collections = []
   for (const collection of requestedCollections) {
-    const features = await searchCollection(collection.id, bbox, fetchImpl)
-    const items = features.map(itemSummary)
+    const search = await searchCollection(collection.id, bbox, fetchImpl)
+    const items = search.features.map(itemSummary)
     const coverage = coveragePlan(boundary, items)
     collections.push({
       id: collection.id,
       label: collection.label,
       matched_item_count: items.length,
+      search: {
+        page_count: search.page_count,
+        reported_matched_count: search.reported_matched_count,
+        returned_feature_count: search.returned_feature_count,
+        pagination_complete: search.pagination_complete,
+      },
       coverage,
       processing_items: coverage.processing_items,
       items,
@@ -342,14 +442,23 @@ export async function buildLidarSourceArtifact(
   }
   const sampledSourceSha256 = await sha256Hex(JSON.stringify(collections.map((collection) => ({
     id: collection.id,
+    search: collection.search,
     items: collection.processing_items.map((item: any) => ({
       id: item.id,
+      bbox: item.bbox,
+      geometry: item.geometry,
+      datetime: item.datetime,
+      start_datetime: item.start_datetime,
+      end_datetime: item.end_datetime,
+      created: item.created,
       updated: item.updated,
       pc_count: item.pc_count,
       pc_density: item.pc_density,
+      pc_type: item.pc_type,
+      pc_encoding: item.pc_encoding,
       primary_asset_key: item.primary_asset_key,
       primary_asset_identity: item.primary_asset_identity,
-      bbox: item.bbox,
+      primary_asset_type: item.primary_asset_type,
     })),
   }))))
 
