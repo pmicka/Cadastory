@@ -319,9 +319,10 @@ const phase3 = FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-
 const phase2 = FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-franklin-2019')!
 assert(
   leafOffSourceCatalogWhere(phase3) ===
-    "Name = 'N071E278_2024_Season1_3IN_cog'" &&
-  leafOffSourceCatalogWhere(phase2) === "Name = 'N071E278_2019'",
-  'fixed historical imagery catalog selection is not exact',
+    "Category = 1 AND Name LIKE 'N%_2024_Season1_3IN_cog'" &&
+  leafOffSourceCatalogWhere(phase2) ===
+    "Category = 1 AND Name LIKE 'N%_2019'",
+  'fixed historical imagery acquisition selection is not exact',
 )
 assert(
   leafOffSourceMosaicRule(phase3).where === leafOffSourceCatalogWhere(phase3) &&
@@ -392,7 +393,7 @@ assert(
   externalResolver.includes('geometry: item?.geometry') &&
   externalResolver.includes('SOLAR_DEM_IDENTITY_SUPPORT_METERS') &&
   externalResolver.includes('expectedCatalogCount: 1') &&
-  externalResolver.includes('fixed-imagery-pair-provider-selection-v2'),
+  externalResolver.includes('fixed-imagery-acquisition-provider-selection-v3'),
   'external resolver is missing source-selection fidelity invariants',
 )
 assert(
