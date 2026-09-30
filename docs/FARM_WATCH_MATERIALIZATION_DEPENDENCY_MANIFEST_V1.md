@@ -119,8 +119,8 @@ The provider-observation strategies are:
 | KyFromAbove Phase 3 DEM | ArcGIS provider metadata + intersecting catalog records + bounded deterministic sample grid over the widest required support |
 | NLCD TCC | ArcGIS portal/service metadata + bounded deterministic sample grid |
 | USGS 3DEP | service publication/metadata + intersecting source catalog + bounded deterministic sample grid |
-| 2024 Phase 3 RGB/IR | exact configured acquisition/tile catalog records + bounded content probe for both services |
-| 2019 Phase 2 RGB/IR | exact configured acquisition/tile catalog records + bounded content probe for both services |
+| 2024 Phase 3 RGB/IR | complete intersecting provider catalog + bounded RGB/IR samples from the phase-specific ImageServers using the same default mosaic rule the worker consumes; configured acquisition/tile retained as reference metadata |
+| 2019 Phase 2 RGB/IR | complete intersecting provider catalog + bounded RGB/IR samples from the phase-specific ImageServers using the same default mosaic rule the worker consumes; configured acquisition/tile retained as reference metadata |
 | FIA BIGMAP 2018 | Forest Service Raster Gateway published SHA-256 checksums for every mast-species raster consumed by the fixed 2018 product; expected mast-species set remains part of the Farm Watch product contract |
 
 The observation timestamp itself is not part of the identity. Repeating a probe against an unchanged provider must therefore produce the same identity.
