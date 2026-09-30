@@ -4,6 +4,7 @@ import {
   FARM_WATCH_SPATIAL_PATTERN_PRODUCT,
   FARM_WATCH_TERRAIN_FORM_PRODUCT,
 } from '../supabase/functions/_shared/farm-watch-neutral-primitives-contract.ts'
+import { FARM_WATCH_TERRAIN_PRODUCT } from '../supabase/functions/_shared/farm-watch-terrain-contract.ts'
 import { FARM_WATCH_GITHUB_OIDC_AUDIENCE } from '../supabase/functions/_shared/github-actions-oidc.ts'
 
 const EDGE_URL =
@@ -25,9 +26,10 @@ const products = requestedProduct === 'all'
 
 for (const product of products) {
   if (
+    product !== FARM_WATCH_TERRAIN_PRODUCT.key &&
     product !== FARM_WATCH_TERRAIN_FORM_PRODUCT.key &&
     product !== FARM_WATCH_SPATIAL_PATTERN_PRODUCT.key
-  ) throw new Error('unsupported neutral primitive product: ' + product)
+  ) throw new Error('unsupported Farm Watch materialization product: ' + product)
 }
 
 async function freshOidcToken() {
