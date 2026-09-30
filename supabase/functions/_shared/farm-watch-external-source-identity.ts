@@ -648,20 +648,19 @@ async function resolveOne(
         : FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-franklin-2019')
       if (!wanted) throw new Error('fixed imagery contract is unavailable')
       const bbox = expandBboxMeters(propertyBbox, 650)
-      const where = "Name='" + String(wanted.sourceTile).replaceAll("'", "''") + "'"
-      const exactTileMosaicRule = JSON.stringify({
-        mosaicMethod: 'esriMosaicNorthwest',
-        where,
-      })
+      // The existing leaf-off worker consumes each phase-specific ImageServer
+      // with its default mosaic rule. Bind freshness to the complete
+      // intersecting provider catalog plus bounded samples from that same
+      // default mosaic rather than assuming the configured reference tile is
+      // exposed through a particular catalog field name.
       const [rgb, ir] = await Promise.all([
         providerObservedArcgis({
           key,
           serviceUrl: wanted.imageryUrl,
           bbox,
-          where,
+          where: '1=1',
           outFields: '*',
           sampleGrid: 5,
-          sampleExtra: { mosaicRule: exactTileMosaicRule },
           requireCatalog: true,
           requireSamples: true,
           fetchImpl,
@@ -670,10 +669,9 @@ async function resolveOne(
           key,
           serviceUrl: wanted.infraredUrl,
           bbox,
-          where,
+          where: '1=1',
           outFields: '*',
           sampleGrid: 5,
-          sampleExtra: { mosaicRule: exactTileMosaicRule },
           requireCatalog: true,
           requireSamples: true,
           fetchImpl,
@@ -682,8 +680,9 @@ async function resolveOne(
       const evidence = stableValue({
         strategy: 'fixed-imagery-pair-provider-observation-v1',
         source_id: wanted.id,
-        source_tile: wanted.sourceTile,
-        acquisition_date: wanted.acquisitionDate,
+        configured_reference_tile: wanted.sourceTile,
+        configured_acquisition_date: wanted.acquisitionDate,
+        consumed_mosaic_rule: 'service_default',
         rgb: rgb.evidence,
         infrared: ir.evidence,
       })
