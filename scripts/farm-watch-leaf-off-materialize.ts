@@ -4,6 +4,8 @@ import { Buffer } from 'node:buffer'
 import { PNG } from 'npm:pngjs@7.0.0'
 import {
   FARM_WATCH_LEAF_OFF_PRODUCT,
+  leafOffSourceCatalogWhere,
+  leafOffSourceMosaicRule,
 } from '../supabase/functions/_shared/farm-watch-leaf-off-contract.ts'
 import { FARM_WATCH_GITHUB_OIDC_AUDIENCE } from '../supabase/functions/_shared/github-actions-oidc.ts'
 
@@ -203,6 +205,7 @@ async function fetchRaster(
   bounds: any,
   dimensions: any,
   renderingRule: any = null,
+  mosaicRule: any = null,
 ) {
   const url = new URL(baseUrl + '/exportImage')
   url.searchParams.set('bbox', [bounds.west, bounds.south, bounds.east, bounds.north].join(','))
@@ -214,6 +217,7 @@ async function fetchRaster(
   url.searchParams.set('interpolation', 'RSP_BilinearInterpolation')
   url.searchParams.set('f', 'image')
   if (renderingRule) url.searchParams.set('renderingRule', JSON.stringify(renderingRule))
+  if (mosaicRule) url.searchParams.set('mosaicRule', JSON.stringify(mosaicRule))
 
   let lastError: Error | null = null
   for (let attempt = 1; attempt <= 3; attempt += 1) {
@@ -872,9 +876,10 @@ export async function buildLeafOffSourceProduct(
     ? fetchRaster(FARM_WATCH_LEAF_OFF_PRODUCT.demUrl, bounds, terrainDimensions, hillshadeRule(sun))
     : Promise.resolve(null)
 
+  const fixedImageryMosaicRule = leafOffSourceMosaicRule(source)
   const [imagery, infrared, slope, hillshade] = await Promise.all([
-    fetchRaster(source.imageryUrl, bounds, imageryDimensions),
-    fetchRaster(source.infraredUrl, bounds, imageryDimensions),
+    fetchRaster(source.imageryUrl, bounds, imageryDimensions, null, fixedImageryMosaicRule),
+    fetchRaster(source.infraredUrl, bounds, imageryDimensions, null, fixedImageryMosaicRule),
     fetchRaster(FARM_WATCH_LEAF_OFF_PRODUCT.demUrl, bounds, terrainDimensions, slopeEncodingRule()),
     hillshadePromise,
   ])
@@ -940,6 +945,9 @@ export async function buildLeafOffSourceProduct(
     source_id: source.id,
     source_tile: source.sourceTile,
     acquisition_date: source.acquisitionDate,
+    provider_reference_catalog_name: source.providerReferenceCatalogName,
+    provider_catalog_where: leafOffSourceCatalogWhere(source),
+    mosaic_rule: fixedImageryMosaicRule,
     imagery: {
       service: source.imageryUrl,
       export_request: imagery.request_url,

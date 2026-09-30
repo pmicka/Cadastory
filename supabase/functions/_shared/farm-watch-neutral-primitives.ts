@@ -4,6 +4,7 @@ import {
   FARM_WATCH_SPATIAL_PATTERN_PRODUCT,
   FARM_WATCH_TERRAIN_FORM_PRODUCT,
 } from './farm-watch-neutral-primitives-contract.ts'
+import { farmWatchTccMosaicRule } from './farm-watch-tcc-contract.ts'
 import {
   pointInPolygonGeometry,
   sha256Hex,
@@ -895,10 +896,7 @@ export async function buildSpatialPatternArtifact(args:{
     buildMetricGrid(args.localGeometry,FARM_WATCH_SPATIAL_PATTERN_PRODUCT.canopyCellMeters),
     FARM_WATCH_SPATIAL_PATTERN_PRODUCT.canopySourceUrl,
     {
-      mosaicRule:JSON.stringify({
-        mosaicMethod:'esriMosaicNorthwest',
-        where:'beginyear = ' + FARM_WATCH_SPATIAL_PATTERN_PRODUCT.canopyYear,
-      }),
+      mosaicRule:JSON.stringify(farmWatchTccMosaicRule()),
     },
     fetchImpl,
   )

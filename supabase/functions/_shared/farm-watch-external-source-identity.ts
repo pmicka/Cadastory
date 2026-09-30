@@ -3,8 +3,17 @@ import {
   sha256Hex,
 } from './farm-watch-lidar-source.ts'
 import { FARM_WATCH_TERRAIN_PRODUCT } from './farm-watch-terrain-contract.ts'
-import { FARM_WATCH_LEAF_OFF_PRODUCT } from './farm-watch-leaf-off-contract.ts'
-import { FARM_WATCH_SOLAR_TERRAIN_PRODUCT } from './farm-watch-solar-exposure-contract.ts'
+import { FARM_WATCH_TERRAIN_FORM_PRODUCT } from './farm-watch-neutral-primitives-contract.ts'
+import {
+  FARM_WATCH_LEAF_OFF_PRODUCT,
+  leafOffSourceCatalogWhere,
+  leafOffSourceMosaicRule,
+} from './farm-watch-leaf-off-contract.ts'
+import {
+  FARM_WATCH_SOLAR_TERRAIN_PRODUCT,
+  solarCanopyCatalogWhere,
+  solarCanopyMosaicRule,
+} from './farm-watch-solar-exposure-contract.ts'
 import {
   FARM_WATCH_MAST_CAPACITY_GROUPS,
   FARM_WATCH_MAST_CAPACITY_PRODUCT,
@@ -39,6 +48,10 @@ const USER_AGENT = 'Cadastory-Farm-Watch-Source-Identity/1.0 (+https://pmicka.co
 const ARCGIS_ONLINE_ROOT = 'https://www.arcgis.com'
 const TCC_ARCGIS_ITEM_ID = '8f6ea42df79f4c4186239cbd42852f14'
 const SOURCE_TIMEOUT_MS = 20_000
+const SOLAR_DEM_IDENTITY_SUPPORT_METERS =
+  FARM_WATCH_TERRAIN_FORM_PRODUCT.landscapeDomainMeters +
+  FARM_WATCH_SOLAR_TERRAIN_PRODUCT.horizonSearchRadiusMeters +
+  2 * FARM_WATCH_SOLAR_TERRAIN_PRODUCT.supportCellMeters
 
 function finite(value: unknown): number | null {
   const n = Number(value)
@@ -239,28 +252,78 @@ async function arcgisCatalog(
   outFields: string,
   fetchImpl: typeof fetch,
 ) {
-  const params: Record<string, string> = {
+  const baseParams: Record<string, string> = {
     f: 'json',
     where,
     outFields,
     returnGeometry: 'false',
     orderByFields: 'OBJECTID',
+    resultRecordCount: '1000',
   }
   if (bbox) {
-    params.geometryType = 'esriGeometryEnvelope'
-    params.geometry = bbox.join(',')
-    params.inSR = '4326'
-    params.spatialRel = 'esriSpatialRelIntersects'
+    baseParams.geometryType = 'esriGeometryEnvelope'
+    baseParams.geometry = bbox.join(',')
+    baseParams.inSR = '4326'
+    baseParams.spatialRel = 'esriSpatialRelIntersects'
   }
-  const payload = await postFormJson(serviceUrl.replace(/\/$/, '') + '/query', params, fetchImpl)
-  const rows = Array.isArray(payload?.features)
-    ? payload.features.map((feature: any) => stableValue(feature?.attributes || {}))
-    : []
-  return rows.sort((a: any, b: any) =>
-    String(a?.OBJECTID ?? a?.objectid ?? a?.Name ?? a?.name ?? '').localeCompare(
-      String(b?.OBJECTID ?? b?.objectid ?? b?.Name ?? b?.name ?? ''),
+
+  const rows: any[] = []
+  let resultOffset = 0
+  let pageCount = 0
+  while (true) {
+    pageCount += 1
+    if (pageCount > 100) {
+      throw new Error('bounded source catalog pagination exceeded page limit')
+    }
+    const payload = await postFormJson(
+      serviceUrl.replace(/\/$/, '') + '/query',
+      {
+        ...baseParams,
+        resultOffset: String(resultOffset),
+      },
+      fetchImpl,
     )
+    const pageRows = Array.isArray(payload?.features)
+      ? payload.features.map((feature: any) =>
+        stableValue(feature?.attributes || {})
+      )
+      : []
+    rows.push(...pageRows)
+
+    if (payload?.exceededTransferLimit !== true) {
+      if (pageRows.length >= Number(baseParams.resultRecordCount)) {
+        throw new Error(
+          'bounded source catalog completeness is unproven at the page limit',
+        )
+      }
+      break
+    }
+    if (!pageRows.length) {
+      throw new Error('bounded source catalog pagination stalled')
+    }
+    resultOffset += pageRows.length
+  }
+
+  const rowKeys = rows.map((row: any) =>
+    String(row?.OBJECTID ?? row?.objectid ?? row?.Name ?? row?.name ?? '')
   )
+  if (new Set(rowKeys).size !== rowKeys.length) {
+    throw new Error('bounded source catalog pagination returned duplicate records')
+  }
+
+  return {
+    rows: rows.sort((a: any, b: any) =>
+      String(
+        a?.OBJECTID ?? a?.objectid ?? a?.Name ?? a?.name ?? '',
+      ).localeCompare(
+        String(
+          b?.OBJECTID ?? b?.objectid ?? b?.Name ?? b?.name ?? '',
+        ),
+      )
+    ),
+    page_count: pageCount,
+    complete: true,
+  }
 }
 
 async function arcgisSamples(
@@ -271,20 +334,30 @@ async function arcgisSamples(
   fetchImpl: typeof fetch,
 ) {
   const points = gridPoints(bbox, size)
-  const payload = await postFormJson(serviceUrl.replace(/\/$/, '') + '/getSamples', {
-    f: 'json',
-    geometryType: 'esriGeometryMultipoint',
-    geometry: JSON.stringify({ points, spatialReference: { wkid: 4326 } }),
-    returnFirstValueOnly: 'true',
-    ...extra,
-  }, fetchImpl)
+  const payload = await postFormJson(
+    serviceUrl.replace(/\/$/, '') + '/getSamples',
+    {
+      f: 'json',
+      geometryType: 'esriGeometryMultipoint',
+      geometry: JSON.stringify({
+        points,
+        spatialReference: { wkid: 4326 },
+      }),
+      returnFirstValueOnly: 'true',
+      ...extra,
+    },
+    fetchImpl,
+  )
   const samples = Array.isArray(payload?.samples) ? payload.samples : []
   const byIndex = new Map<number, any>()
   samples.forEach((sample: any, ordinal: number) => {
     const locationId = Number(sample?.locationId)
-    const index = Number.isInteger(locationId) && locationId >= 0 && locationId < points.length
-      ? locationId
-      : ordinal < points.length ? ordinal : -1
+    const index =
+      Number.isInteger(locationId) &&
+        locationId >= 0 &&
+        locationId < points.length
+        ? locationId
+        : ordinal < points.length ? ordinal : -1
     if (index >= 0) {
       byIndex.set(index, stableValue({
         value: sample?.value ?? null,
@@ -292,10 +365,16 @@ async function arcgisSamples(
       }))
     }
   })
-  return points.map((point, index) => ({
+  const rows = points.map((point, index) => ({
     point,
     sample: byIndex.get(index) ?? null,
   }))
+  return {
+    rows,
+    requested_count: points.length,
+    returned_count: byIndex.size,
+    complete: byIndex.size === points.length,
+  }
 }
 
 async function arcgisImageProbe(
@@ -400,7 +479,9 @@ async function providerObservedArcgis(args: {
   portalSearchTitle?: string | null
   portalRoot?: string | null
   requireCatalog?: boolean
+  expectedCatalogCount?: number | null
   requireSamples?: boolean
+  minimumSampleCoverage?: number
   fetchImpl: typeof fetch
 }) {
   const service = await serviceMetadata(args.serviceUrl, args.fetchImpl).catch(() => null)
@@ -414,19 +495,36 @@ async function providerObservedArcgis(args: {
     args.portalRoot || ARCGIS_ONLINE_ROOT,
   )
   let catalog: any[] | null = null
+  let catalogObservation: any = null
   let samples: any[] | null = null
+  let sampleObservation: any = null
   let imageProbe: any = null
   if (args.where || args.bbox) {
     try {
-      catalog = await arcgisCatalog(
+      const observedCatalog = await arcgisCatalog(
         args.serviceUrl,
         args.bbox,
         args.where || '1=1',
         args.outFields || '*',
         args.fetchImpl,
       )
+      catalog = observedCatalog.rows
+      catalogObservation = {
+        page_count: observedCatalog.page_count,
+        returned_record_count: observedCatalog.rows.length,
+        complete: observedCatalog.complete,
+      }
       if (args.requireCatalog && (catalog?.length ?? 0) === 0) {
         throw new Error('bounded source catalog probe returned no records')
+      }
+      if (
+        args.expectedCatalogCount != null &&
+        catalog.length !== args.expectedCatalogCount
+      ) {
+        throw new Error(
+          'bounded source catalog selection returned ' +
+          catalog.length + ' records; expected ' + args.expectedCatalogCount,
+        )
       }
     } catch (error) {
       if (args.requireCatalog) throw error
@@ -434,18 +532,39 @@ async function providerObservedArcgis(args: {
   }
   if (args.sampleGrid && args.bbox) {
     try {
-      samples = await arcgisSamples(
+      const observedSamples = await arcgisSamples(
         args.serviceUrl,
         args.bbox,
         args.sampleGrid,
         args.sampleExtra || {},
         args.fetchImpl,
       )
+      samples = observedSamples.rows
+      const sampleCoverage = observedSamples.requested_count
+        ? observedSamples.returned_count / observedSamples.requested_count
+        : 0
+      const minimumSampleCoverage = Math.max(
+        0,
+        Math.min(1, args.minimumSampleCoverage ?? 1),
+      )
+      sampleObservation = {
+        requested_count: observedSamples.requested_count,
+        returned_count: observedSamples.returned_count,
+        complete: observedSamples.complete,
+        coverage_fraction: sampleCoverage,
+        minimum_coverage_fraction: minimumSampleCoverage,
+        coverage_requirement_met: sampleCoverage >= minimumSampleCoverage,
+      }
       if (
         args.requireSamples &&
-        !samples.some((row: any) => row?.sample && row.sample.value != null)
+        sampleCoverage < minimumSampleCoverage
       ) {
-        throw new Error('bounded source sample probe returned no values')
+        throw new Error(
+          'bounded source sample coverage incomplete: returned ' +
+          observedSamples.returned_count + ' of ' +
+          observedSamples.requested_count +
+          '; minimum_fraction=' + minimumSampleCoverage,
+        )
       }
     } catch (error) {
       if (args.requireSamples) throw error
@@ -463,7 +582,9 @@ async function providerObservedArcgis(args: {
     service_metadata: metadata,
     portal_item: portalItem,
     catalog,
+    catalog_observation: catalogObservation,
     samples,
+    sample_observation: sampleObservation,
     image_probe: imageProbe,
     probe_bbox: args.bbox,
   })
@@ -515,21 +636,28 @@ async function resolveStacAndCopc(
   }
   if (!processingItems.length) throw new Error('LiDAR source observation found no usable COPC assets')
   const stacEvidence = stableValue({
-    strategy: 'stac-selected-item-snapshot-v1',
+    strategy: 'stac-selected-item-snapshot-v2',
     expanded_bbox: expanded,
     sampled_source_sha256: result.sampledSourceSha256,
     collections: (result.artifact?.collections || []).map((collection: any) => ({
       id: collection?.id,
+      search: collection?.search || null,
       processing_items: (collection?.processing_items || []).map((item: any) => ({
         id: item?.id,
         bbox: item?.bbox,
+        geometry: item?.geometry,
         datetime: item?.datetime,
+        start_datetime: item?.start_datetime,
+        end_datetime: item?.end_datetime,
         created: item?.created,
         updated: item?.updated,
         pc_count: item?.pc_count,
         pc_density: item?.pc_density,
+        pc_type: item?.pc_type,
+        pc_encoding: item?.pc_encoding,
         primary_asset_key: item?.primary_asset_key,
         primary_asset_identity: item?.primary_asset_identity,
+        primary_asset_type: item?.primary_asset_type,
       })),
     })),
   })
@@ -542,7 +670,7 @@ async function resolveStacAndCopc(
     stac: {
       identity_sha256: await sha256Hex(stableJson(stacEvidence)),
       evidence: stacEvidence,
-      resolution_status: 'provider_catalog_snapshot',
+      resolution_status: 'provider_complete_catalog_geometry_snapshot',
     },
     copc: {
       identity_sha256: await sha256Hex(stableJson(copcEvidence)),
@@ -593,11 +721,12 @@ async function resolveOne(
       const source = await providerObservedArcgis({
         key,
         serviceUrl: FARM_WATCH_TERRAIN_PRODUCT.sourceUrl,
-        bbox: expandBboxMeters(propertyBbox, 3200),
+        bbox: expandBboxMeters(propertyBbox, SOLAR_DEM_IDENTITY_SUPPORT_METERS),
         outFields: 'OBJECTID,Name,MinPS,MaxPS,LowPS,HighPS,Category,Tag,GroupName,ProductName,CenterX,CenterY,ZOrder',
         sampleGrid: 7,
         requireCatalog: true,
         requireSamples: true,
+        minimumSampleCoverage: 0.9,
         fetchImpl,
       })
       return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
@@ -608,32 +737,38 @@ async function resolveOne(
         key,
         serviceUrl: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopySourceUrl,
         bbox: expandBboxMeters(propertyBbox, 3200),
-        where: 'beginyear = ' + FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopyYear,
+        where: solarCanopyCatalogWhere(),
         outFields: '*',
         sampleGrid: 7,
         sampleExtra: {
-          mosaicRule: JSON.stringify({
-            mosaicMethod: 'esriMosaicNorthwest',
-            where: 'beginyear = ' + FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopyYear,
-          }),
+          mosaicRule: JSON.stringify(solarCanopyMosaicRule()),
         },
         fixedItemId: TCC_ARCGIS_ITEM_ID,
         requireCatalog: true,
+        expectedCatalogCount: 1,
         requireSamples: true,
         fetchImpl,
       })
-      return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
+      return {
+        key,
+        status: 'available',
+        authoritative: true,
+        observed_at: observedAt,
+        ...source,
+        resolution_status: 'provider_fixed_acquisition_catalog_and_complete_sample',
+      }
     }
 
     if (key === 'external:usgs-3dep-dynamic') {
       const source = await providerObservedArcgis({
         key,
         serviceUrl: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.demFallbackSourceUrl,
-        bbox: expandBboxMeters(propertyBbox, 3200),
+        bbox: expandBboxMeters(propertyBbox, SOLAR_DEM_IDENTITY_SUPPORT_METERS),
         outFields: 'OBJECTID,Name,Category,Dataset_ID,Best,DEM_Type,Source,VerticalDatum,AcquisitionDate,URL,Metadata,pubdate,title,Resolution_X,Resolution_Y',
         sampleGrid: 5,
         requireCatalog: true,
         requireSamples: true,
+        minimumSampleCoverage: 0.9,
         fetchImpl,
       })
       return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
@@ -647,20 +782,24 @@ async function resolveOne(
         ? FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-phase3')
         : FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-franklin-2019')
       if (!wanted) throw new Error('fixed imagery contract is unavailable')
-      const bbox = expandBboxMeters(propertyBbox, 650)
-      // The existing leaf-off worker consumes each phase-specific ImageServer
-      // with its default mosaic rule. Bind freshness to the complete
-      // intersecting provider catalog plus bounded samples from that same
-      // default mosaic rather than assuming the configured reference tile is
-      // exposed through a particular catalog field name.
+      const bbox = expandBboxMeters(
+        propertyBbox,
+        FARM_WATCH_LEAF_OFF_PRODUCT.analysisPadMeters,
+      )
+      const where = leafOffSourceCatalogWhere(wanted)
+      const mosaicRule = leafOffSourceMosaicRule(wanted)
+      const sampleExtra = {
+        mosaicRule: JSON.stringify(mosaicRule),
+      }
       const [rgb, ir] = await Promise.all([
         providerObservedArcgis({
           key,
           serviceUrl: wanted.imageryUrl,
           bbox,
-          where: '1=1',
+          where,
           outFields: '*',
           sampleGrid: 5,
+          sampleExtra,
           requireCatalog: true,
           requireSamples: true,
           fetchImpl,
@@ -669,20 +808,23 @@ async function resolveOne(
           key,
           serviceUrl: wanted.infraredUrl,
           bbox,
-          where: '1=1',
+          where,
           outFields: '*',
           sampleGrid: 5,
+          sampleExtra,
           requireCatalog: true,
           requireSamples: true,
           fetchImpl,
         }),
       ])
       const evidence = stableValue({
-        strategy: 'fixed-imagery-pair-provider-observation-v1',
+        strategy: 'fixed-imagery-acquisition-provider-selection-v3',
         source_id: wanted.id,
         configured_reference_tile: wanted.sourceTile,
+        provider_reference_catalog_name: wanted.providerReferenceCatalogName,
+        provider_catalog_where: where,
         configured_acquisition_date: wanted.acquisitionDate,
-        consumed_mosaic_rule: 'service_default',
+        consumed_mosaic_rule: mosaicRule,
         rgb: rgb.evidence,
         infrared: ir.evidence,
       })
@@ -690,7 +832,7 @@ async function resolveOne(
         key,
         status: 'available',
         authoritative: true,
-        resolution_status: 'provider_catalog_and_bounded_sample',
+        resolution_status: 'provider_fixed_catalog_item_and_complete_sample',
         identity_sha256: await sha256Hex(stableJson(evidence)),
         observed_at: observedAt,
         evidence,
@@ -758,7 +900,16 @@ export async function resolveFarmWatchExternalSourceIdentities(args: {
   requireAll?: boolean
 }) {
   const fetchImpl = args.fetchImpl || fetch
-  const keys = [...new Set(args.dependencyKeys)]
+  const requestedKeys = [...new Set(args.dependencyKeys.map(String))]
+  const unknownKeys = requestedKeys.filter((value) =>
+    !(FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS as readonly string[]).includes(value)
+  )
+  if (unknownKeys.length) {
+    throw new Error(
+      'unsupported external dependency key(s): ' + unknownKeys.sort().join(', '),
+    )
+  }
+  const keys = requestedKeys
     .filter((value): value is FarmWatchExternalDependencyKey =>
       (FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS as readonly string[]).includes(value)
     )
