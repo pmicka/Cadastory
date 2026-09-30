@@ -213,3 +213,67 @@ P0.4 intentionally does **not** bind display name, address, access scope, arbitr
 
 Regression coverage verifies matching property inputs remain current, while synthetic boundary hash, stated acreage, boundary SRID, and missing-binding changes invalidate the candidate. Production validation additionally exercises the real reader inside a rollback-only transaction so no Flat Creek property edit persists.
 
+## P0.5 external source selection fidelity and completeness
+
+P0.5 tightens external-source identity so the provider observation describes the same bounded source selection the materializer actually consumes.
+
+### LiDAR STAC
+
+The KyFromAbove STAC selection now follows provider `rel=next` pagination instead of assuming one page of at most 100 items. The observation records page count, provider-reported matched count when available, returned feature count, and explicit pagination completeness.
+
+The resolver fails closed when:
+
+- provider-reported matched count does not equal the returned item count;
+- item identities repeat across pages;
+- a pagination loop is detected;
+- the first page reaches the configured search limit while the provider supplies neither a next page nor a matched-count completeness signal.
+
+STAC identity now includes selected-item footprint geometry in addition to bbox, time/revision fields, point-cloud metadata, and stable asset identity. A provider correction that changes an item's actual footprint while preserving its item ID and bbox therefore changes the source identity.
+
+### ArcGIS catalog and sample completeness
+
+Bounded ArcGIS catalog queries now follow `exceededTransferLimit` using result offsets. The observation retains page count and returned record count and rejects stalled, duplicate, or ambiguity-at-page-limit responses.
+
+When a source contract requires bounded raster samples, every requested deterministic probe point must be represented in the response. Returning one or a subset of samples is no longer sufficient to declare the observation authoritative.
+
+Unknown external dependency keys are rejected rather than silently omitted.
+
+These are freshness completeness rules. They do not claim that sparse bounded samples are a cryptographic digest of every raster pixel.
+
+### Fixed historical leaf-off imagery
+
+The 2019 and 2024 leaf-off products are now tied to the exact provider catalog items represented by the product contract:
+
+- Phase 2 2019: `N071E278_2019`
+- Phase 3 2024 Season 1: `N071E278_2024_Season1_3IN_cog`
+
+Both RGB and infrared `exportImage` requests use the same exact-name mosaic rule that the authoritative identity resolver uses. The configured user-facing tile/acquisition metadata remains intact, while `providerCatalogName` records the actual catalog selector.
+
+The resolver requires exactly one matching RGB catalog record and exactly one matching infrared catalog record and complete bounded samples under that same mosaic rule. A newer statewide imagery acquisition does not invalidate these intentionally fixed historical products; a change to the selected fixed catalog item or its sampled content does.
+
+### Exact NLCD TCC release selection
+
+The spatial-pattern canopy builder, solar-terrain landscape canopy extension, and external identity resolver now consume a single shared TCC selection contract.
+
+The fixed source is:
+
+`nlcd_tcc_conus_wgs84_v2025_6_20250101_20251231`
+
+The mosaic rule selects that exact catalog name rather than the broader `beginyear=2025` set. This preserves the intentionally pinned v2025-6 product semantics and prevents a future same-year catalog addition from silently changing the raster consumed by only one part of the pipeline.
+
+### Solar DEM and 3DEP observation extent
+
+DEM/3DEP freshness observations now cover the maximum support that `solar-terrain-context` can consume, derived from existing product contracts:
+
+`landscape domain radius + horizon search radius + 2 × support cell size`
+
+Under the current contracts this is 1,500 m + 3,000 m + 60 m = 4,560 m around the property boundary.
+
+This replaces the previous fixed 3,200 m probe that could omit terrain used by the horizon calculation.
+
+### Remaining limits
+
+P0.5 does not convert bounded source observations into whole-dataset byte guarantees. COPC object identity still depends on provider validators or the documented bounded range fallback. DEM/TCC/3DEP raster identities still combine provider metadata/catalog selection with deterministic bounded samples.
+
+BIGMAP archive-to-consumed-raster equivalence is unchanged and remains a separate P0 issue. Completion-time identity rechecks that are still missing in synthesis/legacy paths are also outside this unit.
+
