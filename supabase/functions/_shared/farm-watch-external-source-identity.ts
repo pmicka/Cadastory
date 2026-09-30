@@ -3,6 +3,7 @@ import {
   sha256Hex,
 } from './farm-watch-lidar-source.ts'
 import { FARM_WATCH_TERRAIN_PRODUCT } from './farm-watch-terrain-contract.ts'
+import { FARM_WATCH_TERRAIN_FORM_PRODUCT } from './farm-watch-neutral-primitives-contract.ts'
 import {
   FARM_WATCH_LEAF_OFF_PRODUCT,
   leafOffSourceCatalogWhere,
@@ -48,7 +49,9 @@ const ARCGIS_ONLINE_ROOT = 'https://www.arcgis.com'
 const TCC_ARCGIS_ITEM_ID = '8f6ea42df79f4c4186239cbd42852f14'
 const SOURCE_TIMEOUT_MS = 20_000
 const SOLAR_DEM_IDENTITY_SUPPORT_METERS =
-  1500 + FARM_WATCH_SOLAR_TERRAIN_PRODUCT.horizonSearchRadiusMeters + 60
+  FARM_WATCH_TERRAIN_FORM_PRODUCT.landscapeDomainMeters +
+  FARM_WATCH_SOLAR_TERRAIN_PRODUCT.horizonSearchRadiusMeters +
+  2 * FARM_WATCH_SOLAR_TERRAIN_PRODUCT.supportCellMeters
 
 function finite(value: unknown): number | null {
   const n = Number(value)
