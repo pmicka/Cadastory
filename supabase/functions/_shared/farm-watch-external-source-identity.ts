@@ -245,28 +245,64 @@ async function arcgisCatalog(
   outFields: string,
   fetchImpl: typeof fetch,
 ) {
-  const params: Record<string, string> = {
+  const baseParams: Record<string, string> = {
     f: 'json',
     where,
     outFields,
     returnGeometry: 'false',
     orderByFields: 'OBJECTID',
+    resultRecordCount: '1000',
   }
   if (bbox) {
-    params.geometryType = 'esriGeometryEnvelope'
-    params.geometry = bbox.join(',')
-    params.inSR = '4326'
-    params.spatialRel = 'esriSpatialRelIntersects'
+    baseParams.geometryType = 'esriGeometryEnvelope'
+    baseParams.geometry = bbox.join(',')
+    baseParams.inSR = '4326'
+    baseParams.spatialRel = 'esriSpatialRelIntersects'
   }
-  const payload = await postFormJson(serviceUrl.replace(/\/$/, '') + '/query', params, fetchImpl)
-  const rows = Array.isArray(payload?.features)
-    ? payload.features.map((feature: any) => stableValue(feature?.attributes || {}))
-    : []
-  return rows.sort((a: any, b: any) =>
-    String(a?.OBJECTID ?? a?.objectid ?? a?.Name ?? a?.name ?? '').localeCompare(
-      String(b?.OBJECTID ?? b?.objectid ?? b?.Name ?? b?.name ?? ''),
+
+  const rows: any[] = []
+  let resultOffset = 0
+  let pageCount = 0
+  while (true) {
+    pageCount += 1
+    if (pageCount > 100) {
+      throw new Error('bounded source catalog pagination exceeded page limit')
+    }
+    const payload = await postFormJson(
+      serviceUrl.replace(/\/$/, '') + '/query',
+      {
+        ...baseParams,
+        resultOffset: String(resultOffset),
+      },
+      fetchImpl,
     )
-  )
+    const pageRows = Array.isArray(payload?.features)
+      ? payload.features.map((feature: any) =>
+        stableValue(feature?.attributes || {})
+      )
+      : []
+    rows.push(...pageRows)
+
+    if (payload?.exceededTransferLimit !== true) break
+    if (!pageRows.length) {
+      throw new Error('bounded source catalog pagination stalled')
+    }
+    resultOffset += pageRows.length
+  }
+
+  return {
+    rows: rows.sort((a: any, b: any) =>
+      String(
+        a?.OBJECTID ?? a?.objectid ?? a?.Name ?? a?.name ?? '',
+      ).localeCompare(
+        String(
+          b?.OBJECTID ?? b?.objectid ?? b?.Name ?? b?.name ?? '',
+        ),
+      )
+    ),
+    page_count: pageCount,
+    complete: true,
+  }
 }
 
 async function arcgisSamples(
@@ -277,20 +313,30 @@ async function arcgisSamples(
   fetchImpl: typeof fetch,
 ) {
   const points = gridPoints(bbox, size)
-  const payload = await postFormJson(serviceUrl.replace(/\/$/, '') + '/getSamples', {
-    f: 'json',
-    geometryType: 'esriGeometryMultipoint',
-    geometry: JSON.stringify({ points, spatialReference: { wkid: 4326 } }),
-    returnFirstValueOnly: 'true',
-    ...extra,
-  }, fetchImpl)
+  const payload = await postFormJson(
+    serviceUrl.replace(/\/$/, '') + '/getSamples',
+    {
+      f: 'json',
+      geometryType: 'esriGeometryMultipoint',
+      geometry: JSON.stringify({
+        points,
+        spatialReference: { wkid: 4326 },
+      }),
+      returnFirstValueOnly: 'true',
+      ...extra,
+    },
+    fetchImpl,
+  )
   const samples = Array.isArray(payload?.samples) ? payload.samples : []
   const byIndex = new Map<number, any>()
   samples.forEach((sample: any, ordinal: number) => {
     const locationId = Number(sample?.locationId)
-    const index = Number.isInteger(locationId) && locationId >= 0 && locationId < points.length
-      ? locationId
-      : ordinal < points.length ? ordinal : -1
+    const index =
+      Number.isInteger(locationId) &&
+        locationId >= 0 &&
+        locationId < points.length
+        ? locationId
+        : ordinal < points.length ? ordinal : -1
     if (index >= 0) {
       byIndex.set(index, stableValue({
         value: sample?.value ?? null,
@@ -298,10 +344,16 @@ async function arcgisSamples(
       }))
     }
   })
-  return points.map((point, index) => ({
+  const rows = points.map((point, index) => ({
     point,
     sample: byIndex.get(index) ?? null,
   }))
+  return {
+    rows,
+    requested_count: points.length,
+    returned_count: byIndex.size,
+    complete: byIndex.size === points.length,
+  }
 }
 
 async function arcgisImageProbe(
