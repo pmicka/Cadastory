@@ -181,3 +181,35 @@ Regression coverage includes:
 
 P0.3 does not address base-property boundary/acreage binding, source-selection completeness, fixed-imagery pinning, solar support extent, BIGMAP archive-to-consumed-raster equivalence, or the remaining completion-time drift gaps. Those remain separate P0 findings.
 
+## P0.4 base-property input freshness
+
+P0.4 binds the canonical current property inputs into every materialization freshness decision.
+
+The materialization claim path already derives its deterministic input identity from the active property boundary plus stated acreage. Before P0.4, the reader compared product/dependency/source freshness but did not universally compare those base property inputs back to the retained artifact. A boundary or stated-acreage edit could therefore leave an older artifact eligible if its other dependencies still matched.
+
+The canonical dependency manifest now includes a `property_input_state` for every product. That state contains:
+
+- the current property boundary hash;
+- the current stated acreage;
+- the current boundary SRID;
+- a deterministic property-input identity hash.
+
+For each retained candidate, the reader compares that state against the binding recorded when the artifact was claimed:
+
+- materialization `boundary_sha256`;
+- build `deterministic_inputs.stated_acres`;
+- build `deterministic_inputs.boundary_srid`.
+
+Any mismatch fails closed before ordinary dependency comparison. Exact reason codes are:
+
+- `property_boundary_changed`;
+- `property_stated_acres_changed`;
+- `property_boundary_srid_changed`;
+- `recorded_property_input_binding_missing:...` when an older artifact lacks a required property binding.
+
+The property state also participates in the canonical dependency-manifest identity, so a property-input change changes the manifest itself and propagates through downstream materialization dependencies.
+
+P0.4 intentionally does **not** bind display name, address, access scope, arbitrary metadata, or `updated_at`; those fields were not deterministic scientific inputs to the materialization claim identity. The scope is the same base-property state already used to decide cache/build reuse.
+
+Regression coverage verifies matching property inputs remain current, while synthetic boundary hash, stated acreage, boundary SRID, and missing-binding changes invalidate the candidate. Production validation additionally exercises the real reader inside a rollback-only transaction so no Flat Creek property edit persists.
+
