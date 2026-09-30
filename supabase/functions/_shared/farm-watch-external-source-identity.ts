@@ -685,7 +685,7 @@ async function resolveOne(
       const source = await providerObservedArcgis({
         key,
         serviceUrl: FARM_WATCH_TERRAIN_PRODUCT.sourceUrl,
-        bbox: expandBboxMeters(propertyBbox, 3200),
+        bbox: expandBboxMeters(propertyBbox, SOLAR_DEM_IDENTITY_SUPPORT_METERS),
         outFields: 'OBJECTID,Name,MinPS,MaxPS,LowPS,HighPS,Category,Tag,GroupName,ProductName,CenterX,CenterY,ZOrder',
         sampleGrid: 7,
         requireCatalog: true,
@@ -721,7 +721,7 @@ async function resolveOne(
       const source = await providerObservedArcgis({
         key,
         serviceUrl: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.demFallbackSourceUrl,
-        bbox: expandBboxMeters(propertyBbox, 3200),
+        bbox: expandBboxMeters(propertyBbox, SOLAR_DEM_IDENTITY_SUPPORT_METERS),
         outFields: 'OBJECTID,Name,Category,Dataset_ID,Best,DEM_Type,Source,VerticalDatum,AcquisitionDate,URL,Metadata,pubdate,title,Resolution_X,Resolution_Y',
         sampleGrid: 5,
         requireCatalog: true,
@@ -740,20 +740,22 @@ async function resolveOne(
         : FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-franklin-2019')
       if (!wanted) throw new Error('fixed imagery contract is unavailable')
       const bbox = expandBboxMeters(propertyBbox, 650)
-      // The existing leaf-off worker consumes each phase-specific ImageServer
-      // with its default mosaic rule. Bind freshness to the complete
-      // intersecting provider catalog plus bounded samples from that same
-      // default mosaic rather than assuming the configured reference tile is
-      // exposed through a particular catalog field name.
+      const where = leafOffSourceCatalogWhere(wanted)
+      const mosaicRule = leafOffSourceMosaicRule(wanted)
+      const sampleExtra = {
+        mosaicRule: JSON.stringify(mosaicRule),
+      }
       const [rgb, ir] = await Promise.all([
         providerObservedArcgis({
           key,
           serviceUrl: wanted.imageryUrl,
           bbox,
-          where: '1=1',
+          where,
           outFields: '*',
           sampleGrid: 5,
+          sampleExtra,
           requireCatalog: true,
+          expectedCatalogCount: 1,
           requireSamples: true,
           fetchImpl,
         }),
@@ -761,20 +763,23 @@ async function resolveOne(
           key,
           serviceUrl: wanted.infraredUrl,
           bbox,
-          where: '1=1',
+          where,
           outFields: '*',
           sampleGrid: 5,
+          sampleExtra,
           requireCatalog: true,
+          expectedCatalogCount: 1,
           requireSamples: true,
           fetchImpl,
         }),
       ])
       const evidence = stableValue({
-        strategy: 'fixed-imagery-pair-provider-observation-v1',
+        strategy: 'fixed-imagery-pair-provider-selection-v2',
         source_id: wanted.id,
         configured_reference_tile: wanted.sourceTile,
+        provider_catalog_name: wanted.providerCatalogName,
         configured_acquisition_date: wanted.acquisitionDate,
-        consumed_mosaic_rule: 'service_default',
+        consumed_mosaic_rule: mosaicRule,
         rgb: rgb.evidence,
         infrared: ir.evidence,
       })
@@ -782,7 +787,7 @@ async function resolveOne(
         key,
         status: 'available',
         authoritative: true,
-        resolution_status: 'provider_catalog_and_bounded_sample',
+        resolution_status: 'provider_fixed_catalog_item_and_complete_sample',
         identity_sha256: await sha256Hex(stableJson(evidence)),
         observed_at: observedAt,
         evidence,
