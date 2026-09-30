@@ -287,11 +287,25 @@ async function arcgisCatalog(
       : []
     rows.push(...pageRows)
 
-    if (payload?.exceededTransferLimit !== true) break
+    if (payload?.exceededTransferLimit !== true) {
+      if (pageRows.length >= Number(baseParams.resultRecordCount)) {
+        throw new Error(
+          'bounded source catalog completeness is unproven at the page limit',
+        )
+      }
+      break
+    }
     if (!pageRows.length) {
       throw new Error('bounded source catalog pagination stalled')
     }
     resultOffset += pageRows.length
+  }
+
+  const rowKeys = rows.map((row: any) =>
+    String(row?.OBJECTID ?? row?.objectid ?? row?.Name ?? row?.name ?? '')
+  )
+  if (new Set(rowKeys).size !== rowKeys.length) {
+    throw new Error('bounded source catalog pagination returned duplicate records')
   }
 
   return {
