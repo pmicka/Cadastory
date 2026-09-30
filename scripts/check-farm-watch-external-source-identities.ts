@@ -13,6 +13,11 @@ import {
   leafOffSourceCatalogWhere,
   leafOffSourceMosaicRule,
 } from '../supabase/functions/_shared/farm-watch-leaf-off-contract.ts'
+import {
+  FARM_WATCH_TCC_SOURCE,
+  farmWatchTccCatalogWhere,
+  farmWatchTccMosaicRule,
+} from '../supabase/functions/_shared/farm-watch-tcc-contract.ts'
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message)
@@ -324,6 +329,15 @@ assert(
   'fixed imagery resolver and builder mosaic selection can drift',
 )
 
+assert(
+  FARM_WATCH_TCC_SOURCE.catalogName ===
+    'nlcd_tcc_conus_wgs84_v2025_6_20250101_20251231' &&
+  farmWatchTccCatalogWhere() ===
+    "name = 'nlcd_tcc_conus_wgs84_v2025_6_20250101_20251231'" &&
+  farmWatchTccMosaicRule().where === farmWatchTccCatalogWhere(),
+  'shared TCC contract does not pin the exact v2025-6 catalog item',
+)
+
 const materializationEdge = await Deno.readTextFile(
   'supabase/functions/farm-watch-materialization/index.ts',
 )
@@ -338,6 +352,15 @@ const terrainMaterializer = await Deno.readTextFile(
 )
 const externalResolver = await Deno.readTextFile(
   'supabase/functions/_shared/farm-watch-external-source-identity.ts',
+)
+const neutralPrimitives = await Deno.readTextFile(
+  'supabase/functions/_shared/farm-watch-neutral-primitives.ts',
+)
+const solarExposure = await Deno.readTextFile(
+  'supabase/functions/_shared/farm-watch-solar-exposure.ts',
+)
+const tccContract = await Deno.readTextFile(
+  'supabase/functions/_shared/farm-watch-tcc-contract.ts',
 )
 assert(
   materializationEdge.includes(
@@ -371,6 +394,20 @@ assert(
   externalResolver.includes('expectedCatalogCount: 1') &&
   externalResolver.includes('fixed-imagery-pair-provider-selection-v2'),
   'external resolver is missing source-selection fidelity invariants',
+)
+assert(
+  neutralPrimitives.includes('farmWatchTccMosaicRule()') &&
+  solarExposure.includes('solarCanopyMosaicRule()') &&
+  tccContract.includes('nlcd_tcc_conus_wgs84_v2025_6_20250101_20251231') &&
+  tccContract.includes('farmWatchTccCatalogWhere') &&
+  tccContract.includes('farmWatchTccMosaicRule'),
+  'TCC builder/read identity selection is not centralized on the exact release',
+)
+assert(
+  externalResolver.includes('FARM_WATCH_TERRAIN_FORM_PRODUCT.landscapeDomainMeters') &&
+  externalResolver.includes('FARM_WATCH_SOLAR_TERRAIN_PRODUCT.horizonSearchRadiusMeters') &&
+  externalResolver.includes('2 * FARM_WATCH_SOLAR_TERRAIN_PRODUCT.supportCellMeters'),
+  'solar DEM/3DEP identity support is not derived from the consumed support extent',
 )
 
 if (Deno.args.includes('--bigmap-diagnostic')) {
