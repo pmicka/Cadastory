@@ -267,6 +267,7 @@ async function arcgisSamples(
   serviceUrl: string,
   bbox: [number, number, number, number],
   size: number,
+  extra: Record<string, string>,
   fetchImpl: typeof fetch,
 ) {
   const points = gridPoints(bbox, size)
@@ -275,6 +276,7 @@ async function arcgisSamples(
     geometryType: 'esriGeometryMultipoint',
     geometry: JSON.stringify({ points, spatialReference: { wkid: 4326 } }),
     returnFirstValueOnly: 'true',
+    ...extra,
   }, fetchImpl)
   const samples = Array.isArray(payload?.samples) ? payload.samples : []
   const byIndex = new Map<number, any>()
@@ -392,6 +394,7 @@ async function providerObservedArcgis(args: {
   where?: string
   outFields?: string
   sampleGrid?: number
+  sampleExtra?: Record<string, string>
   imageProbe?: boolean
   fixedItemId?: string | null
   portalSearchTitle?: string | null
@@ -422,6 +425,9 @@ async function providerObservedArcgis(args: {
         args.outFields || '*',
         args.fetchImpl,
       )
+      if (args.requireCatalog && !catalog.length) {
+        throw new Error('bounded source catalog probe returned no records')
+      }
     } catch (error) {
       if (args.requireCatalog) throw error
     }
@@ -432,6 +438,7 @@ async function providerObservedArcgis(args: {
         args.serviceUrl,
         args.bbox,
         args.sampleGrid,
+        args.sampleExtra || {},
         args.fetchImpl,
       )
       if (
@@ -476,8 +483,9 @@ async function resolveStacAndCopc(
   const expanded = expandBboxMeters(farmWatchGeometryBbox(boundary), 650)
   const probeBoundary = bboxPolygon(expanded)
   const result = await buildLidarSourceArtifact(probeBoundary, fetchImpl)
-  const processingItems = (result.artifact?.collections || [])
-    .flatMap((collection: any) => collection?.processing_items || [])
+  const phase3Collection = (result.artifact?.collections || [])
+    .find((collection: any) => collection?.id === 'laz-phase3')
+  const processingItems = (phase3Collection?.processing_items || [])
     .filter((item: any) => item?.primary_asset_href)
     .sort((a: any, b: any) => String(a.id).localeCompare(String(b.id)))
   const validators = []
@@ -562,11 +570,12 @@ async function resolveOne(
       key === 'external:kyfromabove-lidar-stac' ||
       key === 'external:kyfromabove-phase3-copc'
     ) {
-      let pair = cache.get('lidar')
-      if (!pair) {
-        pair = await resolveStacAndCopc(boundary, fetchImpl)
-        cache.set('lidar', pair)
+      let pairPromise = cache.get('lidar')
+      if (!pairPromise) {
+        pairPromise = resolveStacAndCopc(boundary, fetchImpl)
+        cache.set('lidar', pairPromise)
       }
+      const pair = await pairPromise
       const source = key.endsWith('lidar-stac') ? pair.stac : pair.copc
       return {
         key,
@@ -599,9 +608,17 @@ async function resolveOne(
         key,
         serviceUrl: FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopySourceUrl,
         bbox: expandBboxMeters(propertyBbox, 3200),
+        where: 'beginyear = ' + FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopyYear,
         outFields: '*',
         sampleGrid: 7,
+        sampleExtra: {
+          mosaicRule: JSON.stringify({
+            mosaicMethod: 'esriMosaicNorthwest',
+            where: 'beginyear = ' + FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopyYear,
+          }),
+        },
         fixedItemId: TCC_ARCGIS_ITEM_ID,
+        requireCatalog: true,
         requireSamples: true,
         fetchImpl,
       })
@@ -632,6 +649,10 @@ async function resolveOne(
       if (!wanted) throw new Error('fixed imagery contract is unavailable')
       const bbox = expandBboxMeters(propertyBbox, 650)
       const where = "Name='" + String(wanted.sourceTile).replaceAll("'", "''") + "'"
+      const exactTileMosaicRule = JSON.stringify({
+        mosaicMethod: 'esriMosaicNorthwest',
+        where,
+      })
       const [rgb, ir] = await Promise.all([
         providerObservedArcgis({
           key,
@@ -639,8 +660,10 @@ async function resolveOne(
           bbox,
           where,
           outFields: '*',
-          imageProbe: true,
+          sampleGrid: 5,
+          sampleExtra: { mosaicRule: exactTileMosaicRule },
           requireCatalog: true,
+          requireSamples: true,
           fetchImpl,
         }),
         providerObservedArcgis({
@@ -649,8 +672,10 @@ async function resolveOne(
           bbox,
           where,
           outFields: '*',
-          imageProbe: true,
+          sampleGrid: 5,
+          sampleExtra: { mosaicRule: exactTileMosaicRule },
           requireCatalog: true,
+          requireSamples: true,
           fetchImpl,
         }),
       ])
@@ -666,7 +691,7 @@ async function resolveOne(
         key,
         status: 'available',
         authoritative: true,
-        resolution_status: 'provider_catalog_and_content_probe',
+        resolution_status: 'provider_catalog_and_bounded_sample',
         identity_sha256: await sha256Hex(stableJson(evidence)),
         observed_at: observedAt,
         evidence,
@@ -674,31 +699,39 @@ async function resolveOne(
     }
 
     if (key === 'external:fia-bigmap-2018-species-biomass') {
-      const codes = mastSpeciesCodes()
-      const source = await providerObservedArcgis({
-        key,
-        serviceUrl: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceService,
-        bbox: null,
-        portalSearchTitle: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceProduct,
-        portalRoot: 'https://usfs.maps.arcgis.com',
-        fetchImpl,
+      const codes = mastSpeciesCodes().slice().sort((a, b) => a - b)
+      const gatewayUrl = 'https://data.fs.usda.gov/geodata/rastergateway/bigmap/'
+      const response = await fetchWithTimeout(gatewayUrl, {
+        headers: { accept: 'text/html' },
+      }, fetchImpl)
+      if (!response.ok) throw new Error('BIGMAP Raster Gateway returned ' + response.status)
+      const html = await response.text()
+      const checksums = codes.map((spcd) => {
+        const padded = String(spcd).padStart(4, '0')
+        const pattern = new RegExp(
+          'data\\.spcd=["\\\']' + padded + '["\\\'][^>]*data\\.checksum=["\\\']([0-9A-Fa-f]{64})["\\\']',
+          'i',
+        )
+        const reversePattern = new RegExp(
+          'data\\.checksum=["\\\']([0-9A-Fa-f]{64})["\\\'][^>]*data\\.spcd=["\\\']' + padded + '["\\\']',
+          'i',
+        )
+        const match = pattern.exec(html) || reversePattern.exec(html)
+        if (!match) throw new Error('BIGMAP checksum unavailable for SPCD ' + padded)
+        return { spcd, sha256: match[1].toLowerCase() }
       })
-      const portalItem = (source.evidence as any)?.portal_item
-      if (!portalItem?.id || !portalItem?.modified) {
-        throw new Error('BIGMAP ArcGIS Online item revision is unavailable')
-      }
       const evidence = stableValue({
-        strategy: 'fixed-bigmap-portal-item-revision-v1',
-        portal_item: portalItem,
+        strategy: 'fixed-bigmap-raster-gateway-sha256-v1',
+        gateway_url: gatewayUrl,
         source_product: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceProduct,
         source_data_year: FARM_WATCH_MAST_CAPACITY_PRODUCT.sourceDataYear,
-        expected_species_codes: codes,
+        checksums,
       })
       return {
         key,
         status: 'available',
         authoritative: true,
-        resolution_status: 'provider_portal_item_revision',
+        resolution_status: 'provider_published_sha256_checksums',
         identity_sha256: await sha256Hex(stableJson(evidence)),
         observed_at: observedAt,
         evidence,
