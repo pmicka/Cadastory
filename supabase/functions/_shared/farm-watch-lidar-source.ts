@@ -357,10 +357,26 @@ async function searchCollection(
     page = stacNextPage(payload, baseBody)
   }
 
-  if (matchedCount !== null && features.length < matchedCount) {
+  const featureIds = features.map((feature) =>
+    collectionId + ':' + String(feature?.id || '')
+  )
+  if (new Set(featureIds).size !== featureIds.length) {
+    throw new Error('LiDAR STAC pagination returned duplicate item identities')
+  }
+
+  if (matchedCount !== null && features.length !== matchedCount) {
     throw new Error(
-      'LiDAR STAC pagination incomplete: returned ' +
+      'LiDAR STAC pagination count mismatch: returned ' +
       features.length + ' of ' + matchedCount,
+    )
+  }
+  if (
+    matchedCount === null &&
+    features.length >= FARM_WATCH_LIDAR_SOURCE_PRODUCT.searchLimit &&
+    pageCount === 1
+  ) {
+    throw new Error(
+      'LiDAR STAC pagination completeness is unproven at the search limit',
     )
   }
 
