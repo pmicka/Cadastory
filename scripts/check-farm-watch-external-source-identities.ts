@@ -71,6 +71,36 @@ assert(
   'external dependency resolver must cover exactly eight unique P0.2 slots',
 )
 
+
+
+const materializationEdge = await Deno.readTextFile(
+  'supabase/functions/farm-watch-materialization/index.ts',
+)
+const lidarMaterializer = await Deno.readTextFile(
+  'scripts/farm-watch-lidar-physical-materialize.ts',
+)
+const terrainMaterializer = await Deno.readTextFile(
+  'scripts/farm-watch-terrain-materialize.ts',
+)
+assert(
+  materializationEdge.includes(
+    "pmicka/Cadastory/.github/workflows/farm-watch-lidar-physical.yml@refs/heads/main",
+  ),
+  'LiDAR physical workflow is not authorized to refresh canonical source coverage',
+)
+assert(
+  lidarMaterializer.includes("product: 'lidar-source-coverage'") &&
+  lidarMaterializer.indexOf('ensureCurrentLidarSourceCoverage()') <
+    lidarMaterializer.indexOf("workerRequest({ operation: 'claim' })"),
+  'LiDAR physical materializer must refresh source coverage before physical claim',
+)
+assert(
+  terrainMaterializer.includes('resolveFarmWatchExternalSourceSignatureForProperty') &&
+  terrainMaterializer.includes('p_source_signature: authoritativeSource.sourceSignature') &&
+  terrainMaterializer.includes('external_source_observations: authoritativeSource.observations'),
+  'terrain CLI can bypass authoritative DEM identity binding',
+)
+
 if (Deno.args.includes('--bigmap-diagnostic')) {
   const url = 'https://data.fs.usda.gov/geodata/rastergateway/bigmap/'
   const response = await fetch(url)
