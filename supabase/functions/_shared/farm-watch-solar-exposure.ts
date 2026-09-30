@@ -4,6 +4,7 @@ import {
   FARM_WATCH_SOLAR_EXPOSURE_PRODUCT,
   FARM_WATCH_SOLAR_TERRAIN_PRODUCT,
   requireSolarDate,
+  solarCanopyMosaicRule,
 } from './farm-watch-solar-exposure-contract.ts'
 import { sha256Hex } from './farm-watch-terrain.ts'
 
@@ -438,10 +439,7 @@ async function sampleCanopy(
     target.domain,
     p.canopySourceUrl,
     {
-      mosaicRule: JSON.stringify({
-        mosaicMethod: 'esriMosaicNorthwest',
-        where: 'beginyear = ' + p.canopyYear,
-      }),
+      mosaicRule: JSON.stringify(solarCanopyMosaicRule()),
     },
     fetchImpl,
   )
