@@ -13,7 +13,8 @@ jobs:
     if: >-
       github.actor == 'pmicka' &&
       github.event.issue.user.login == 'pmicka' &&
-      (github.event.issue.title == '[ops] Materialize Farm Watch neutral primitives' ||
+      (github.event.issue.title == '[ops] Materialize Farm Watch terrain analysis' ||
+       github.event.issue.title == '[ops] Materialize Farm Watch neutral primitives' ||
        github.event.issue.title == '[ops] Materialize Farm Watch solar exposure' ||
        github.event.issue.title == '[ops] Materialize Farm Watch thermal exposure')
     runs-on: ubuntu-latest
@@ -30,6 +31,16 @@ jobs:
           deno check scripts/farm-watch-neutral-primitives-materialize.ts
           deno check scripts/farm-watch-solar-exposure-materialize.ts
           deno check scripts/farm-watch-thermal-exposure-materialize.ts
+
+      - name: Materialize terrain analysis
+        if: github.event.issue.title == '[ops] Materialize Farm Watch terrain analysis'
+        run: >-
+          deno run
+          --allow-env
+          --allow-net
+          scripts/farm-watch-neutral-primitives-materialize.ts
+          --property validation-property-01
+          --product terrain
 
       - name: Materialize neutral primitives
         if: github.event.issue.title == '[ops] Materialize Farm Watch neutral primitives'
