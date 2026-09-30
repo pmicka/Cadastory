@@ -855,7 +855,16 @@ export async function resolveFarmWatchExternalSourceIdentities(args: {
   requireAll?: boolean
 }) {
   const fetchImpl = args.fetchImpl || fetch
-  const keys = [...new Set(args.dependencyKeys)]
+  const requestedKeys = [...new Set(args.dependencyKeys.map(String))]
+  const unknownKeys = requestedKeys.filter((value) =>
+    !(FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS as readonly string[]).includes(value)
+  )
+  if (unknownKeys.length) {
+    throw new Error(
+      'unsupported external dependency key(s): ' + unknownKeys.sort().join(', '),
+    )
+  }
+  const keys = requestedKeys
     .filter((value): value is FarmWatchExternalDependencyKey =>
       (FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS as readonly string[]).includes(value)
     )
