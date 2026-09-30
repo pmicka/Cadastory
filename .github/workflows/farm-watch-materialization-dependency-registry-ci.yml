@@ -5,7 +5,9 @@ on:
     paths:
       - 'supabase/migrations/*materialization_dependency_registry*.sql'
       - 'supabase/migrations/*materialization_dependency_manifest*.sql'
+      - 'supabase/migrations/*fail_closed_reader_semantics*.sql'
       - 'scripts/check-farm-watch-materialization-dependency-registry.ts'
+      - 'scripts/check-farm-watch-fail-closed-reader.ts'
       - 'docs/FARM_WATCH_MATERIALIZATION_DEPENDENCY_MANIFEST_V1.md'
       - '.github/workflows/farm-watch-materialization-dependency-registry-ci.yml'
   workflow_dispatch:
@@ -24,3 +26,5 @@ jobs:
           deno-version: v2.x
       - name: Check canonical materialization dependency registry
         run: deno run --allow-read scripts/check-farm-watch-materialization-dependency-registry.ts
+      - name: Check fail-closed reader semantics
+        run: deno run --allow-read scripts/check-farm-watch-fail-closed-reader.ts
