@@ -29,6 +29,9 @@ import {
 import {
   resolveFarmWatchExternalSourceSignatureForProperty,
 } from '../_shared/farm-watch-external-source-identity.ts'
+import {
+  recheckFarmWatchMaterializationIdentity,
+} from '../_shared/farm-watch-materialization-completion.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 let SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -1488,6 +1491,12 @@ async function materialize(slug: string, identity: any) {
       })
     if (uploadError) throw new Error('structure synthesis artifact upload failed: ' + uploadError.message)
 
+    const completionDependencies = await recheckFarmWatchMaterializationIdentity({
+      productKind: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.productKind,
+      expectedSourceSignature: dependencies.sourceSignature,
+      resolveCurrent: () => resolveDependencies(slug),
+    })
+
     const now = new Date()
     const defaultExpiry = new Date(
       now.getTime() + FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.refreshDays * 24 * 60 * 60 * 1000,
@@ -1513,7 +1522,7 @@ async function materialize(slug: string, identity: any) {
           artifact_sha256: leafPayload.artifact_sha256,
         },
       },
-      source_signature: dependencies.sourceSignature,
+      source_signature: completionDependencies.sourceSignature,
       github_workflow: identity,
       completed_at: now.toISOString(),
     }
