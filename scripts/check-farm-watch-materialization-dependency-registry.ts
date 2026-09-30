@@ -1,8 +1,8 @@
 const registryMigration = await Deno.readTextFile(
-  'supabase/migrations/20260929220800_farm_watch_materialization_dependency_registry_v1.sql',
+  'supabase/migrations/20260930002459_farm_watch_materialization_dependency_registry_v1.sql',
 )
 const manifestMigration = await Deno.readTextFile(
-  'supabase/migrations/20260929220900_farm_watch_materialization_dependency_manifest_v1.sql',
+  'supabase/migrations/20260930002503_farm_watch_materialization_dependency_manifest_v1.sql',
 )
 const doc = await Deno.readTextFile(
   'docs/FARM_WATCH_MATERIALIZATION_DEPENDENCY_MANIFEST_V1.md',
