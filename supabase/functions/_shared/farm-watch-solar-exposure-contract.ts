@@ -1,3 +1,9 @@
+import {
+  FARM_WATCH_TCC_SOURCE,
+  farmWatchTccCatalogWhere,
+  farmWatchTccMosaicRule,
+} from './farm-watch-tcc-contract.ts'
+
 export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
   key: 'solar-terrain-context',
   productKind: 'solar-terrain-context',
@@ -12,11 +18,10 @@ export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
   horizonSearchRadiusMeters: 3000,
   horizonRayStepMeters: 90,
   supportCellMeters: 30,
-  canopyYear: 2025,
-  canopyProductVersion: 'v2025-6',
-  canopyCatalogName: 'nlcd_tcc_conus_wgs84_v2025_6_20250101_20251231',
-  canopySourceUrl:
-    'https://imagery.geoplatform.gov/iipp/rest/services/Vegetation/USFS_EDW_NLCD_TCC_CONUS/ImageServer',
+  canopyYear: FARM_WATCH_TCC_SOURCE.year,
+  canopyProductVersion: FARM_WATCH_TCC_SOURCE.productVersion,
+  canopyCatalogName: FARM_WATCH_TCC_SOURCE.catalogName,
+  canopySourceUrl: FARM_WATCH_TCC_SOURCE.sourceUrl,
   demSourceUrl:
     'https://kyraster.ky.gov/arcgis/rest/services/ElevationServices/Ky_DEM_KYAPED_2FT_Phase3_WGS84WM/ImageServer',
   demFallbackSourceUrl:
@@ -26,15 +31,11 @@ export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
 })
 
 export function solarCanopyCatalogWhere() {
-  const name = FARM_WATCH_SOLAR_TERRAIN_PRODUCT.canopyCatalogName
-  return "name = '" + String(name).replaceAll("'", "''") + "'"
+  return farmWatchTccCatalogWhere()
 }
 
 export function solarCanopyMosaicRule() {
-  return {
-    mosaicMethod: 'esriMosaicNorthwest',
-    where: solarCanopyCatalogWhere(),
-  }
+  return farmWatchTccMosaicRule()
 }
 
 export const FARM_WATCH_SOLAR_EXPOSURE_PRODUCT = Object.freeze({
