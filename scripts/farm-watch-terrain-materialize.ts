@@ -14,6 +14,9 @@ import {
 import {
   resolveFarmWatchExternalSourceSignatureForProperty,
 } from '../supabase/functions/_shared/farm-watch-external-source-identity.ts'
+import {
+  recheckFarmWatchMaterializationIdentity,
+} from '../supabase/functions/_shared/farm-watch-materialization-completion.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || ''
 const SERVICE_KEY =
@@ -126,6 +129,17 @@ try {
     })
   if (uploadError) throw new Error(`terrain artifact upload failed: ${uploadError.message}`)
 
+  const completionSource = await recheckFarmWatchMaterializationIdentity({
+    productKind: FARM_WATCH_TERRAIN_PRODUCT.productKind,
+    expectedSourceSignature: authoritativeSource.sourceSignature,
+    resolveCurrent: () => resolveFarmWatchExternalSourceSignatureForProperty({
+      admin,
+      slug: propertySlug,
+      productKind: FARM_WATCH_TERRAIN_PRODUCT.productKind,
+      sourceSignature: FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
+    }),
+  })
+
   const completedAt = new Date()
   const expiresAt = new Date(
     completedAt.getTime() + FARM_WATCH_TERRAIN_PRODUCT.refreshDays * 24 * 60 * 60 * 1000,
@@ -155,7 +169,7 @@ try {
     source_url: FARM_WATCH_TERRAIN_PRODUCT.sourceUrl,
     source_signature: authoritativeSource.sourceSignature,
     source_signature_sha256: claim.source_signature_sha256,
-    external_source_observations: authoritativeSource.observations,
+    external_source_observations: completionSource.observations,
     source_revision_status: FARM_WATCH_TERRAIN_PRODUCT.sourceRevisionStatus,
     sampled_source_sha256: sampledSourceSha256,
     operation: 'ImageServer/getSamples',

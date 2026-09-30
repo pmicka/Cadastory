@@ -1,0 +1,38 @@
+name: Farm Watch materialization completion CI
+
+on:
+  pull_request:
+    paths:
+      - "scripts/farm-watch-terrain-materialize.ts"
+      - "scripts/check-farm-watch-materialization-completion.ts"
+      - "supabase/functions/_shared/farm-watch-materialization-completion.ts"
+      - "supabase/functions/_shared/farm-watch-materialization-completion.test.ts"
+      - "supabase/functions/farm-watch-materialization/index.ts"
+      - "supabase/functions/farm-watch-structure-synthesis-worker/index.ts"
+      - ".github/workflows/farm-watch-materialization-completion-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  completion-drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Check completion identity helper
+        run: deno check supabase/functions/_shared/farm-watch-materialization-completion.ts
+      - name: Test completion identity guard
+        run: deno test supabase/functions/_shared/farm-watch-materialization-completion.test.ts
+      - name: Check legacy terrain materializer
+        run: deno check scripts/farm-watch-terrain-materialize.ts
+      - name: Check central materialization Edge function
+        run: deno check supabase/functions/farm-watch-materialization/index.ts
+      - name: Check structure synthesis worker
+        run: deno check supabase/functions/farm-watch-structure-synthesis-worker/index.ts
+      - name: Check completion-drift call sites
+        run: deno run --allow-read scripts/check-farm-watch-materialization-completion.ts
