@@ -59,6 +59,12 @@ assert(
   'external identity override is missing',
 )
 
+const postgrestExternalDependencyRpc = 'farm_watch_get_materialization_external_deps_v1_internal'
+assert(
+  postgrestExternalDependencyRpc.length <= 63,
+  'PostgREST RPC identifier exceeds PostgreSQL 63-character identifier limit',
+)
+
 assert(
   FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS.length === 8 &&
   new Set(FARM_WATCH_EXTERNAL_DEPENDENCY_KEYS).size === 8,

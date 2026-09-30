@@ -833,7 +833,7 @@ export async function resolveFarmWatchExternalSourceSignatureForProperty(args: {
 }) {
   const dependencyKeys = await rpcValue(
     args.admin,
-    'farm_watch_get_materialization_external_dependencies_v1_internal',
+    'farm_watch_get_materialization_external_deps_v1_internal',
     { p_product_kind: args.productKind },
   )
   const keys = Array.isArray(dependencyKeys)

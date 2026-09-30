@@ -13,6 +13,7 @@ on:
       - 'supabase/functions/farm-watch-mast-capacity-worker/index.ts'
       - 'supabase/functions/farm-watch-structure-synthesis-worker/index.ts'
       - 'supabase/migrations/*authoritative_external_source_identity*.sql'
+      - 'supabase/migrations/*short_external_dependency_rpc*.sql'
       - 'scripts/check-farm-watch-external-source-identities.ts'
       - 'docs/FARM_WATCH_MATERIALIZATION_DEPENDENCY_MANIFEST_V1.md'
       - '.github/workflows/farm-watch-authoritative-source-identity-ci.yml'
