@@ -248,14 +248,14 @@ These are freshness completeness rules. They distinguish provider response/selec
 
 ### Fixed historical leaf-off imagery
 
-The 2019 and 2024 leaf-off products are now tied to the exact provider catalog items represented by the product contract:
+The 2019 and 2024 leaf-off products are now tied to fixed provider acquisition campaigns rather than the ImageServer default mosaic:
 
-- Phase 2 2019: `N071E278_2019`
-- Phase 3 2024 Season 1: `N071E278_2024_Season1_3IN_cog`
+- Phase 2: base imagery records (`Category = 1`) whose names belong to the fixed 2019 acquisition;
+- Phase 3: base imagery records (`Category = 1`) whose names belong to the fixed 2024 Season 1 acquisition.
 
-Both RGB and infrared `exportImage` requests use the same exact-name mosaic rule that the authoritative identity resolver uses. The configured user-facing tile/acquisition metadata remains intact, while `providerCatalogName` records the actual catalog selector.
+The prior `sourceTile` values remain reference metadata because the property can cross an imagery-tile boundary. Restricting the build to one named reference tile would incorrectly drop valid property coverage. Instead, both RGB and infrared `exportImage` requests use the same fixed-acquisition mosaic filter as the authoritative identity resolver, and the identity binds the complete bounded set of intersecting base tiles selected from that campaign.
 
-The resolver requires exactly one matching RGB catalog record and exactly one matching infrared catalog record and complete bounded samples under that same mosaic rule. A newer statewide imagery acquisition does not invalidate these intentionally fixed historical products; a change to the selected fixed catalog item or its sampled content does.
+The resolver requires a non-empty complete RGB and infrared catalog selection plus complete bounded samples over the same property + 10 m analysis extent the builder consumes. A newer statewide imagery acquisition does not invalidate these intentionally fixed historical products; adding, removing, or changing an intersecting tile within the pinned acquisition changes the identity.
 
 ### Exact NLCD TCC release selection
 
