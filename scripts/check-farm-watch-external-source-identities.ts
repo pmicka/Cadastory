@@ -299,7 +299,7 @@ const incompleteArcgis = await resolveFarmWatchExternalSourceIdentities({
 })
 assert(
   incompleteArcgis[0]?.status === 'unavailable' &&
-  String(incompleteArcgis[0]?.error || '').includes('sample probe incomplete'),
+  String(incompleteArcgis[0]?.error || '').includes('sample coverage incomplete'),
   'incomplete ArcGIS sample responses must fail closed',
 )
 
