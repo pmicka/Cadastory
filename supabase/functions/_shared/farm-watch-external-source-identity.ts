@@ -3,7 +3,11 @@ import {
   sha256Hex,
 } from './farm-watch-lidar-source.ts'
 import { FARM_WATCH_TERRAIN_PRODUCT } from './farm-watch-terrain-contract.ts'
-import { FARM_WATCH_LEAF_OFF_PRODUCT } from './farm-watch-leaf-off-contract.ts'
+import {
+  FARM_WATCH_LEAF_OFF_PRODUCT,
+  leafOffSourceCatalogWhere,
+  leafOffSourceMosaicRule,
+} from './farm-watch-leaf-off-contract.ts'
 import { FARM_WATCH_SOLAR_TERRAIN_PRODUCT } from './farm-watch-solar-exposure-contract.ts'
 import {
   FARM_WATCH_MAST_CAPACITY_GROUPS,
@@ -39,6 +43,8 @@ const USER_AGENT = 'Cadastory-Farm-Watch-Source-Identity/1.0 (+https://pmicka.co
 const ARCGIS_ONLINE_ROOT = 'https://www.arcgis.com'
 const TCC_ARCGIS_ITEM_ID = '8f6ea42df79f4c4186239cbd42852f14'
 const SOURCE_TIMEOUT_MS = 20_000
+const SOLAR_DEM_IDENTITY_SUPPORT_METERS =
+  1500 + FARM_WATCH_SOLAR_TERRAIN_PRODUCT.horizonSearchRadiusMeters + 60
 
 function finite(value: unknown): number | null {
   const n = Number(value)
