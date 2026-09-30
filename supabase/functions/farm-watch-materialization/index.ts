@@ -343,6 +343,23 @@ async function authoritativeExternalSourceSignature(
     sourceSignature,
   })
 }
+
+async function assertAuthoritativeExternalSourceSignatureCurrent(
+  slug: string,
+  productKind: string,
+  baseSourceSignature: string,
+  expectedSourceSignature: string,
+) {
+  const current = await authoritativeExternalSourceSignature(
+    slug,
+    productKind,
+    baseSourceSignature,
+  )
+  if (current.sourceSignature !== expectedSourceSignature) {
+    throw new Error('external source identity changed during materialization build')
+  }
+  return current.observations
+}
 function validateTerrainArtifact(value: any) {
   const grid = value?.grid
   const contours = value?.contours
@@ -642,6 +659,7 @@ async function spatialPatternDependencies(slug: string, includeResourceGeometry 
     structureState,
     structureIdentity,
     structureArtifactSha256,
+    baseSourceSignature,
     sourceSignature,
     externalSourceObservations: resolved.observations,
   }
@@ -772,6 +790,7 @@ async function solarTerrainDependencies(slug: string, includeArtifacts = false) 
     spatialArtifactSha256,
     terrainArtifact,
     spatialArtifact,
+    baseSourceSignature,
     sourceSignature,
     externalSourceObservations: resolved.observations,
   }
@@ -978,6 +997,7 @@ async function claimBuild(
   return data ? {
     ...data,
     source_signature: resolved.sourceSignature,
+    base_source_signature: String(spec.sourceSignature || ''),
     external_source_observations: resolved.observations,
   } : data
 }
@@ -1076,6 +1096,13 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
       claim.boundary_geojson,
       claim.stated_acres == null ? null : Number(claim.stated_acres),
     )
+    const completionExternalSourceObservations =
+      await assertAuthoritativeExternalSourceSignatureCurrent(
+        slug,
+        FARM_WATCH_TERRAIN_PRODUCT.productKind,
+        String(claim.base_source_signature || FARM_WATCH_TERRAIN_SOURCE_SIGNATURE),
+        String(claim.source_signature || ''),
+      )
     const bytes = new TextEncoder().encode(JSON.stringify(artifact))
     const artifactSha256 = await sha256Hex(bytes)
     const path = terrainArtifactPath(
@@ -1124,7 +1151,7 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
         source_url: FARM_WATCH_TERRAIN_PRODUCT.sourceUrl,
         source_signature: claim.source_signature || FARM_WATCH_TERRAIN_SOURCE_SIGNATURE,
         source_signature_sha256: claim.source_signature_sha256,
-        external_source_observations: claim.external_source_observations || [],
+        external_source_observations: completionExternalSourceObservations,
         source_revision_status: FARM_WATCH_TERRAIN_PRODUCT.sourceRevisionStatus,
         sampled_source_sha256: sampledSourceSha256,
         operation: 'ImageServer/getSamples',
@@ -1161,6 +1188,13 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
   try {
     const startedAt = performance.now()
     const { artifact, sampledSourceSha256 } = await buildLidarSourceArtifact(claim.boundary_geojson)
+    const completionExternalSourceObservations =
+      await assertAuthoritativeExternalSourceSignatureCurrent(
+        slug,
+        FARM_WATCH_LIDAR_SOURCE_PRODUCT.productKind,
+        String(claim.base_source_signature || FARM_WATCH_LIDAR_SOURCE_SIGNATURE),
+        String(claim.source_signature || ''),
+      )
     const bytes = new TextEncoder().encode(JSON.stringify(artifact))
     const artifactSha256 = await sha256Hex(bytes)
     const path = lidarSourceArtifactPath(
@@ -1209,7 +1243,7 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
         source_signature: claim.source_signature || FARM_WATCH_LIDAR_SOURCE_SIGNATURE,
         source_signature_sha256: claim.source_signature_sha256,
         source_revision_status: 'provider_observed_authoritative_v1',
-        external_source_observations: claim.external_source_observations || [],
+        external_source_observations: completionExternalSourceObservations,
         sampled_source_sha256: sampledSourceSha256,
         operation: 'STAC POST /search',
         requested_at: completedAt.toISOString(),
@@ -1231,6 +1265,8 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
 }
 
 async function uploadNeutralPrimitive(args: {
+  slug?: string
+  baseSourceSignature?: string
   claim: any
   artifact: any
   sampledSourceSha256: string
@@ -1244,6 +1280,16 @@ async function uploadNeutralPrimitive(args: {
   externalSourceObservations?: any[]
 }) {
   const spec = productSpec(args.key)
+  let completionExternalSourceObservations = args.externalSourceObservations || []
+  if (args.slug && args.baseSourceSignature) {
+    completionExternalSourceObservations =
+      await assertAuthoritativeExternalSourceSignatureCurrent(
+        args.slug,
+        spec.productKind,
+        args.baseSourceSignature,
+        args.sourceSignature,
+      )
+  }
   const jsonBytes = new TextEncoder().encode(JSON.stringify(args.artifact))
   const bytes = args.storageEncoding === 'gzip' ? await gzipBytes(jsonBytes) : jsonBytes
   const maxArtifactBytes = args.maxArtifactBytes ?? 10 * 1024 * 1024
@@ -1284,7 +1330,7 @@ async function uploadNeutralPrimitive(args: {
       ...(args.artifact.source_provenance || {}),
       source_signature: args.sourceSignature,
       source_signature_sha256: args.claim.source_signature_sha256,
-      external_source_observations: args.externalSourceObservations || [],
+      external_source_observations: completionExternalSourceObservations,
       storage_encoding: args.storageEncoding || 'identity',
       completed_at: completedAt.toISOString(),
     },
@@ -1337,6 +1383,8 @@ async function buildTerrainFormMaterialization(slug: string, workerId: string) {
       landscapePhysicalIdentitySha256: deps.physicalIdentity!,
     })
     await uploadNeutralPrimitive({
+      slug,
+      baseSourceSignature,
       claim,
       artifact,
       sampledSourceSha256,
@@ -1390,6 +1438,8 @@ async function buildSpatialPatternMaterialization(slug: string, workerId: string
       landscapeStructureArtifact: structurePayload.artifact,
     })
     await uploadNeutralPrimitive({
+      slug,
+      baseSourceSignature: deps.baseSourceSignature,
       claim,
       artifact,
       sampledSourceSha256,
@@ -1432,6 +1482,8 @@ async function buildSolarTerrainMaterialization(slug: string, workerId: string) 
       spatialPatternArtifactSha256: deps.spatialArtifactSha256!,
     })
     await uploadNeutralPrimitive({
+      slug,
+      baseSourceSignature: deps.baseSourceSignature,
       claim,
       artifact: built.artifact,
       sampledSourceSha256: built.sampledSourceSha256,
