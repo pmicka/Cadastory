@@ -481,6 +481,7 @@ async function providerObservedArcgis(args: {
   requireCatalog?: boolean
   expectedCatalogCount?: number | null
   requireSamples?: boolean
+  minimumSampleCoverage?: number
   fetchImpl: typeof fetch
 }) {
   const service = await serviceMetadata(args.serviceUrl, args.fetchImpl).catch(() => null)
@@ -539,16 +540,30 @@ async function providerObservedArcgis(args: {
         args.fetchImpl,
       )
       samples = observedSamples.rows
+      const sampleCoverage = observedSamples.requested_count
+        ? observedSamples.returned_count / observedSamples.requested_count
+        : 0
+      const minimumSampleCoverage = Math.max(
+        0,
+        Math.min(1, args.minimumSampleCoverage ?? 1),
+      )
       sampleObservation = {
         requested_count: observedSamples.requested_count,
         returned_count: observedSamples.returned_count,
         complete: observedSamples.complete,
+        coverage_fraction: sampleCoverage,
+        minimum_coverage_fraction: minimumSampleCoverage,
+        coverage_requirement_met: sampleCoverage >= minimumSampleCoverage,
       }
-      if (args.requireSamples && !observedSamples.complete) {
+      if (
+        args.requireSamples &&
+        sampleCoverage < minimumSampleCoverage
+      ) {
         throw new Error(
-          'bounded source sample probe incomplete: returned ' +
+          'bounded source sample coverage incomplete: returned ' +
           observedSamples.returned_count + ' of ' +
-          observedSamples.requested_count,
+          observedSamples.requested_count +
+          '; minimum_fraction=' + minimumSampleCoverage,
         )
       }
     } catch (error) {
@@ -711,6 +726,7 @@ async function resolveOne(
         sampleGrid: 7,
         requireCatalog: true,
         requireSamples: true,
+        minimumSampleCoverage: 0.9,
         fetchImpl,
       })
       return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
@@ -752,6 +768,7 @@ async function resolveOne(
         sampleGrid: 5,
         requireCatalog: true,
         requireSamples: true,
+        minimumSampleCoverage: 0.9,
         fetchImpl,
       })
       return { key, status: 'available', authoritative: true, observed_at: observedAt, ...source }
@@ -765,7 +782,10 @@ async function resolveOne(
         ? FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-phase3')
         : FARM_WATCH_LEAF_OFF_PRODUCT.sources.find((row) => row.id === 'ky-franklin-2019')
       if (!wanted) throw new Error('fixed imagery contract is unavailable')
-      const bbox = expandBboxMeters(propertyBbox, 650)
+      const bbox = expandBboxMeters(
+        propertyBbox,
+        FARM_WATCH_LEAF_OFF_PRODUCT.analysisPadMeters,
+      )
       const where = leafOffSourceCatalogWhere(wanted)
       const mosaicRule = leafOffSourceMosaicRule(wanted)
       const sampleExtra = {
