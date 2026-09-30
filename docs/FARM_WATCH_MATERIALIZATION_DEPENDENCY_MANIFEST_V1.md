@@ -152,3 +152,32 @@ The P0.2 regression contract requires:
 - old artifacts lacking provider-observation tokens become stale when authoritative identities are supplied;
 - service-role/private authorization boundaries remain unchanged.
 
+## P0.3 fail-closed reader semantics
+
+P0.3 closes the audited legacy-reader fallback in which a missing provider-observation map could be treated as the static external contract identity. That behavior allowed the resolver to reject a newer P0.2-bound artifact and then walk backward to an older pre-P0.2 artifact whose source signature matched the contract-only identity.
+
+The canonical reader now requires every declared external dependency to have an explicit authoritative observation before that dependency can be `available`.
+
+For an external dependency, the supplied observation must:
+
+- have `status=available`;
+- have `authoritative=true`;
+- use a non-empty, non-`contract_only` resolution status;
+- contain a lowercase 64-character SHA-256 identity.
+
+If the observation is missing, partial, unavailable, contract-only, non-authoritative, or malformed, the dependency is `unavailable`, the recursive manifest is `blocked`, and `authoritative_external_resolution_complete=false`.
+
+The standard service-role freshness wrapper deliberately supplies no external-observation map. It therefore fails closed for products with direct or transitive external dependencies instead of manufacturing current availability from registry contract metadata. The exact-time private Farm Watch reader remains the normal application path because it resolves provider observations first and passes the complete map into the recursive resolver.
+
+Retained artifacts are not deleted. A no-observation reader may return the latest retained artifact as stale metadata, but it may not label that artifact `available` when authoritative external resolution is incomplete.
+
+Regression coverage includes:
+
+- no external-observation map;
+- a partial external-observation map;
+- authoritative observations selecting the current P0.2 artifact;
+- prevention of fallback to an older contract-only artifact;
+- propagation of authoritative incompleteness through materialization dependencies.
+
+P0.3 does not address base-property boundary/acreage binding, source-selection completeness, fixed-imagery pinning, solar support extent, BIGMAP archive-to-consumed-raster equivalence, or the remaining completion-time drift gaps. Those remain separate P0 findings.
+
