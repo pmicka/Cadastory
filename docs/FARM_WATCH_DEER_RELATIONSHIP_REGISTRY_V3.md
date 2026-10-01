@@ -174,6 +174,8 @@ The 2026-10-01 ledger update adds two recent peer-reviewed studies without promo
 
 Both relationships are `negative_constraint` outputs. Their study measurements are context-only provenance/measurement targets, not relationship-activation inputs. No source coefficient or odds ratio is transferred.
 
+Because FW-M58 through FW-M64 are `context_only`, they do **not** enter the blocked-measurement resolution queue and do not change the 2026 engineering posture by themselves.
+
 ## Ledger coverage
 
 CI reads `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md` and compares every `FW-Dxx` heading against the registry.
@@ -209,7 +211,7 @@ Every measurement that currently blocks a relationship has exactly one dispositi
 - `calibrated_proxy` — implement a plausible estimator and promote it only after study-aligned validation;
 - `remain_unavailable` — do not create a weak substitute.
 
-The current portfolio contains 30 blocked measurements: 16 reproducible, 8 calibrated proxies, and 6 intentionally unavailable. FW-M02 vegetation height exited this queue after production validation and promotion to `derived_equivalent`. FW-M17 annual mast state also exited after Batch 5A/5B: the exact-year KDFWR statewide/regional survey state is accepted as a `calibrated_proxy` for the annual-state input at regional scope only. Tier 1 production validation on 2026-09-25 additionally promoted FW-M24 building density, FW-M36 road landscape context, FW-M39 exact 1/9 km² study scales, and FW-M45 extreme-event state to `derived_equivalent`. FW-M35 multiscale forest landscape context subsequently moved to `derived_equivalent` through the dedicated 10 m 30/90/270 m forest proportion/edge-density product with the land-cover source substitution explicitly retained. These promotions reproduce input variables/context only; they do not transfer the cited deer responses or coefficients. FW-R01 remains blocked by FW-M01, FW-M03, FW-M04, and FW-M05.
+The current portfolio contains 24 blocked measurements: 11 reproducible, 7 calibrated proxies, and 6 intentionally unavailable. FW-M02 vegetation height exited this queue after production validation and promotion to `derived_equivalent`. FW-M17 annual mast state also exited after Batch 5A/5B: the exact-year KDFWR statewide/regional survey state is accepted as a `calibrated_proxy` for the annual-state input at regional scope only. Tier 1 production validation on 2026-09-25 additionally promoted FW-M24 building density, FW-M36 road landscape context, FW-M39 exact 1/9 km² study scales, and FW-M45 extreme-event state to `derived_equivalent`. FW-M35 multiscale forest landscape context subsequently moved to `derived_equivalent` through the dedicated 10 m 30/90/270 m forest proportion/edge-density product with the land-cover source substitution explicitly retained. These promotions reproduce input variables/context only; they do not transfer the cited deer responses or coefficients. FW-R01 remains blocked by FW-M01, FW-M03, FW-M04, and FW-M05.
 
 This resolution layer is planning/governance only. A `reproduce` or `calibrated_proxy` decision does not change the relationship registry's current alignment status. The relationship remains blocked until the corresponding neutral product is implemented and its exit gate is satisfied.
 
