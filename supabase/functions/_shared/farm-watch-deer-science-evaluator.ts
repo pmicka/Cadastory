@@ -1413,6 +1413,23 @@ export function evaluateDeerScienceContext(args: {
     return out
   }, {} as Record<string, number>)
 
+  const state_gate_counts = [
+    'pass',
+    'not_applicable',
+    'insufficient_state',
+  ].reduce((out, status) => {
+    out[status] = evaluations.filter(
+      (row) => row.state_gate.status === status,
+    ).length
+    return out
+  }, {} as Record<string, number>)
+  const state_insufficient_relationship_ids = evaluations
+    .filter((row) => row.state_gate.status === 'insufficient_state')
+    .map((row) => row.relationship_id)
+  const state_not_applicable_relationship_ids = evaluations
+    .filter((row) => row.state_gate.status === 'not_applicable')
+    .map((row) => row.relationship_id)
+
   return {
     schema: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.outputSchemaVersion,
     method: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.algorithmVersion,
@@ -1455,6 +1472,9 @@ export function evaluateDeerScienceContext(args: {
     measurement_fidelity_matrix_row_count: measurement_fidelity_rows.length,
     measurement_fidelity_counts,
     measurement_binding_counts,
+    state_gate_counts,
+    state_insufficient_relationship_ids,
+    state_not_applicable_relationship_ids,
     evaluator_active_relationship_ids: evaluations
       .filter((row) => row.status === 'active')
       .map((row) => row.relationship_id),
