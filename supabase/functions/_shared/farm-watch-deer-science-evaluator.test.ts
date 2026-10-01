@@ -71,6 +71,117 @@ Deno.test('unknown required biological dimension abstains before property interp
   assert(row.biological_gate.missing_dimensions.includes('movement_state'))
 })
 
+Deno.test('state framework keeps explicit unknown, source unavailable, proxy, and deterministic states separate', () => {
+  const result = evaluateDeerScienceContext({
+    scenario: scenario({
+      sex: 'unknown',
+      age_class: 'unknown',
+      movement_state: 'unknown',
+      individual_reproductive_state: 'unknown',
+      season: 'fall',
+      diel_period: 'day',
+      regional_reproductive_context: 'unavailable',
+    }),
+    evidence: [
+      evidence('seasonal-state', 'known', ['property','regional'], {
+        precipitation_state: 'known',
+        drought_state: 'proxy',
+        stream_state: 'proxy',
+        rootzone_soil_moisture_state: 'known',
+      }),
+      evidence('field-phenology-context', 'known', ['field','property'], {
+        phenology_state: ['mature_senescing'],
+      }),
+      evidence('current-crop-identity', 'unavailable', ['field','property'], {
+        crop_name: [],
+      }),
+      evidence('annual-mast-state', 'unavailable', ['property','regional'], {
+        annual_mast_proxy_status: 'unavailable',
+      }),
+      evidence('snow-winter-severity-context', 'proxy', ['property','regional'], {
+        latest_complete_daily_context: {
+          snow_depth_cm: 0,
+          minimum_daily_temperature_c: 11,
+        },
+        minnesota_wsi_context_status: 'not_applicable',
+      }),
+      evidence('extreme-weather-event-context', 'known', ['property','regional'], {
+        applicability_state: 'not_applicable',
+        event_active: false,
+      }),
+    ],
+    relationships: [
+      relationship('FW-R06-moon-phase-negative-constraint'),
+    ],
+  })
+
+  const states = new Map(
+    result.state_framework.dimensions.map((row) => [row.key, row]),
+  )
+  assert(states.get('sex')?.status === 'unknown')
+  assert(states.get('movement_state')?.status === 'unknown')
+  assert(states.get('season')?.status === 'known')
+  assert(states.get('season')?.provenance === 'deterministic_calendar_context')
+  assert(states.get('diel_period')?.status === 'known')
+  assert(states.get('diel_period')?.provenance === 'deterministic_solar_context')
+  assert(states.get('regional_reproductive_context')?.status === 'unavailable')
+  assert(states.get('recent_precipitation_state')?.status === 'known')
+  assert(states.get('drought_state')?.status === 'proxy')
+  assert(states.get('snow_winter_state')?.status === 'proxy')
+  assert(states.get('field_phenology_state')?.status === 'known')
+  assert(states.get('current_crop_identity')?.status === 'unavailable')
+  assert(states.get('annual_mast_state')?.status === 'unavailable')
+  assert(states.get('extreme_weather_state')?.status === 'known')
+  assert(states.get('leaf_state')?.status === 'unavailable')
+  assert(
+    states.get('leaf_state')?.provenance ===
+      'no_authorized_current_leaf_state_product',
+  )
+  assert(result.state_framework.scoring_performed === false)
+  assert(result.state_framework.behavioral_inference_performed === false)
+})
+
+Deno.test('relationship state gate fails closed on unknown biological and missing environmental/resource states', () => {
+  const row = evaluateDeerRelationship({
+    relationship: relationship('FW-R23-water-rainfall-context'),
+    scenario: scenario({ season: 'summer' }),
+    evidence: [],
+  })
+
+  assert(row.state_gate.status === 'insufficient_state')
+  assert(
+    row.state_gate.missing_or_incompatible_state_inputs.includes('water_state'),
+  )
+  assert(
+    row.state_gate.missing_or_incompatible_state_inputs.includes(
+      'recent_precipitation',
+    ),
+  )
+})
+
+Deno.test('relationship state gate distinguishes known non-applicability from missing state', () => {
+  const row = evaluateDeerRelationship({
+    relationship: relationship('FW-R23-water-rainfall-context'),
+    scenario: scenario({ season: 'summer' }),
+    evidence: [
+      evidence('managed-water-source-context', 'known', ['property'], {
+        current_presence_state: 'confirmed_none',
+      }),
+      evidence('seasonal-state', 'known', ['property','regional'], {
+        precipitation_state: 'known',
+      }),
+    ],
+  })
+
+  assert(row.state_gate.status === 'not_applicable')
+  assert(
+    row.state_gate.failed_state_constraint_ids.includes(
+      'FW-C05-water-present',
+    ),
+  )
+  assert(row.state_gate.unresolved_state_constraint_ids.length === 0)
+})
+
 Deno.test('known biological mismatch is not applicable rather than missing input', () => {
   const row = evaluateDeerRelationship({
     relationship: relationship('FW-R19-juvenile-male-dispersal-ag-riparian'),
@@ -496,6 +607,68 @@ Deno.test('R30 remains measured-but-insufficient when only one explicit agricult
     ),
   )
   assert(row.decision_actionable === false)
+})
+
+Deno.test('Farm Watch evidence adapter preserves component seasonal state and snow context for the state framework', () => {
+  const adapted = buildDeerEvaluatorEvidenceFromFarmWatch({
+    scenario: scenario(),
+    deer_context: {
+      deer_biological_state: { status: 'available' },
+      diel_photoperiod: { status: 'available' },
+      seasonal_state: {
+        status: 'available',
+        context: {
+          component_states: {
+            precipitation: 'known',
+            drought: 'proxy',
+            stream: 'proxy',
+            rootzone_soil_moisture: 'known',
+            state_fieldwork: 'known',
+            regional_crop_progress: 'known',
+            state_crop_stage: 'known',
+            mapped_crop_context: 'known',
+          },
+          components: {
+            precipitation: { total_mm: 12 },
+            drought: { category: 'D0' },
+            stream: { state: 'normal' },
+            rootzone_soil_moisture: { percentile: 44 },
+          },
+        },
+      },
+      field_phenology: { status: 'unavailable', context: { fields: [] } },
+    },
+    deer_evidence_stack: {
+      products: {},
+      snow_winter_severity_context: {
+        status: 'available',
+        evidence_state: 'proxy',
+        context: {
+          evidence_state: 'proxy',
+          latest_complete_daily_context: {
+            snow_depth_cm: 0,
+            minimum_daily_temperature_c: 7,
+          },
+          minnesota_wsi_context: { status: 'not_applicable' },
+        },
+      },
+    },
+  })
+
+  const seasonal = adapted.find((row) => row.product_key === 'seasonal-state')
+  assert(seasonal)
+  assert(seasonal.values?.precipitation_state === 'known')
+  assert(seasonal.values?.drought_state === 'proxy')
+  assert(seasonal.values?.stream_state === 'proxy')
+  assert(seasonal.values?.rootzone_soil_moisture_state === 'known')
+
+  const snow = adapted.find(
+    (row) => row.product_key === 'snow-winter-severity-context',
+  )
+  assert(snow)
+  assert(snow.values?.minnesota_wsi_context_status === 'not_applicable')
+  const daily = snow.values?.latest_complete_daily_context as Record<string, unknown>
+  assert(daily.snow_depth_cm === 0)
 })
 
 Deno.test('Farm Watch evidence adapter derives mapped agriculture fractions from existing landscape context', () => {
