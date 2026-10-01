@@ -567,6 +567,29 @@ Deno.test('juvenile-male dispersal terrain relationship emits conditional mechan
   assert(row.decision_actionable === false)
 })
 
+Deno.test('new edge/aspect and fawn-cover research enters the evaluator only as negative constraints', () => {
+  for (const id of [
+    'FW-R32-seasonal-edge-aspect-negative-constraint',
+    'FW-R33-fawn-visibility-concealment-negative-constraint',
+  ]) {
+    const row = evaluateDeerRelationship({
+      relationship: relationship(id),
+      scenario: scenario(),
+      evidence: [],
+    })
+    assert(row.status === 'active')
+    assert(row.result?.output_kind === 'negative_constraint')
+    assert(row.decision_relevance === 'negative_constraint')
+    assert(row.decision_actionable === false)
+    assert(row.measurement_fidelity_matrix.length > 0)
+    assert(
+      row.measurement_fidelity_matrix.every(
+        (measurement) => measurement.relationship_use === 'context_only',
+      ),
+    )
+  }
+})
+
 Deno.test('negative constraints remain first-class evaluator outputs', () => {
   const row = evaluateDeerRelationship({
     relationship: relationship('FW-R06-moon-phase-negative-constraint'),
