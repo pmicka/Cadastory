@@ -1011,6 +1011,50 @@ function surfaceWaterPresence(value: any) {
     null
 }
 
+function agricultureScaleMetrics(landscapeContext: any) {
+  const zones = Array.isArray(landscapeContext?.agriculture?.field_context_by_zone)
+    ? landscapeContext.agriculture.field_context_by_zone
+    : []
+  const areas = landscapeContext?.domain?.areas_acres || {}
+  const scaleByRadius: Record<string, DeerRelationshipScale> = {
+    '500': 'local_500m',
+    '1500': 'landscape_1500m',
+    '3000': 'broad_3000m',
+  }
+  const fractionByScale: Record<string, number> = {}
+  const fieldAreaByScale: Record<string, number> = {}
+  const domainAreaByScale: Record<string, number> = {}
+  const fieldCountByScale: Record<string, number> = {}
+
+  for (const zone of zones) {
+    const radius = String(Number(zone?.radius_m))
+    const scale = scaleByRadius[radius]
+    const fieldArea = Number(zone?.intersected_field_acres)
+    const domainArea = Number(areas?.[radius])
+    if (!scale || !Number.isFinite(fieldArea) || !Number.isFinite(domainArea) || !(domainArea > 0)) {
+      continue
+    }
+    fractionByScale[scale] = fieldArea / domainArea * 100
+    fieldAreaByScale[scale] = fieldArea
+    domainAreaByScale[scale] = domainArea
+    const count = Number(zone?.field_count)
+    if (Number.isFinite(count)) fieldCountByScale[scale] = count
+  }
+
+  const scales = Object.keys(fractionByScale)
+    .filter((scale): scale is DeerRelationshipScale =>
+      ['local_500m','landscape_1500m','broad_3000m'].includes(scale)
+    )
+
+  return {
+    scales,
+    fractionByScale,
+    fieldAreaByScale,
+    domainAreaByScale,
+    fieldCountByScale,
+  }
+}
+
 export function buildDeerEvaluatorEvidenceFromFarmWatch(args: {
   scenario: FarmWatchDeerScienceScenario
   deer_context: any
@@ -1018,6 +1062,7 @@ export function buildDeerEvaluatorEvidenceFromFarmWatch(args: {
   managed_food_feature_context?: any
   managed_water_source_context?: any
   hydrology?: any
+  landscape_context?: any
   road_focal_context?: any
 }) {
   const out: FarmWatchDeerEvaluatorEvidence[] = []
@@ -1074,11 +1119,29 @@ export function buildDeerEvaluatorEvidenceFromFarmWatch(args: {
   const fields = Array.isArray(phenology?.context?.fields)
     ? phenology.context.fields
     : []
-  addEvidence(out, 'agriculture-landcover-context', phenology, {
-    evidence_state: fields.length ? 'known' : 'unavailable',
-    scales: fieldScopes(phenology),
+  const landscape = args.landscape_context || {}
+  const agricultureMetrics = agricultureScaleMetrics(landscape)
+  const agricultureSource = agricultureMetrics.scales.length ? landscape : phenology
+  addEvidence(out, 'agriculture-landcover-context', agricultureSource, {
+    evidence_state:
+      agricultureMetrics.scales.length || fields.length ? 'known' : 'unavailable',
+    scales: agricultureMetrics.scales.length
+      ? agricultureMetrics.scales
+      : fieldScopes(phenology),
     values: {
       mapped_field_count: fields.length,
+      mapped_agriculture_fraction_percent_by_scale:
+        agricultureMetrics.fractionByScale,
+      mapped_agriculture_area_acres_by_scale:
+        agricultureMetrics.fieldAreaByScale,
+      landscape_domain_area_acres_by_scale:
+        agricultureMetrics.domainAreaByScale,
+      mapped_field_count_by_scale:
+        agricultureMetrics.fieldCountByScale,
+      support_geometry:
+        agricultureMetrics.scales.length
+          ? 'barrier-aware fixed-radius landscape domains'
+          : null,
     },
   })
 
