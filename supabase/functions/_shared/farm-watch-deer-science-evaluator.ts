@@ -356,7 +356,10 @@ function stateStatusFromEvidenceState(
 }
 
 function normalizedScenarioState(value: unknown): FarmWatchDeerStateFrameworkStatus {
-  return knownDimension(String(value || '')) ? 'known' : 'unknown'
+  const normalized = String(value || '').trim()
+  if (normalized === 'unavailable' || normalized === 'not_resolved') return 'unavailable'
+  if (!normalized || normalized === 'unknown') return 'unknown'
+  return 'known'
 }
 
 function requiredRelationshipsByStateDimension() {
@@ -570,9 +573,11 @@ function buildDeerStateFramework(args: {
       ? stateStatusFromEvidenceState(phenology?.evidence_state)
       : phenology?.evidence_state === 'stale'
         ? 'stale'
-        : phenology
-          ? 'unknown'
-          : 'unavailable',
+        : phenology?.evidence_state === 'unavailable'
+          ? 'unavailable'
+          : phenology
+            ? 'unknown'
+            : 'unavailable',
     value: phenologyValues,
     provenance: phenology ? 'field_phenology_context' : 'unavailable',
     source_product: 'field-phenology-context',
@@ -588,9 +593,11 @@ function buildDeerStateFramework(args: {
     family: 'resource',
     status: cropValues.length
       ? stateStatusFromEvidenceState(crop?.evidence_state)
-      : crop
-        ? 'unknown'
-        : 'unavailable',
+      : crop?.evidence_state === 'unavailable'
+        ? 'unavailable'
+        : crop
+          ? 'unknown'
+          : 'unavailable',
     value: cropValues,
     provenance: crop ? 'accepted_field_crop_identity' : 'unavailable',
     source_product: 'current-crop-identity',
