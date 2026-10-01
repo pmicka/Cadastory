@@ -17,6 +17,20 @@ This document resolves every measurement that was blocked after the 2026-09-23 s
 
 A resolution decision is about **input measurement fidelity**, not biological transferability. Reproducing a study covariate does not authorize its published coefficient, effect magnitude, direction in a different population, or a deer-management recommendation.
 
+## Runtime evidence-fidelity matrix
+
+This resolution document is the development roadmap for unresolved study variables. The runtime evaluator now exposes a separate evidence-fidelity matrix for **every** declared source-study variable, including already-resolved variables.
+
+Runtime classes are:
+
+- `exact` ← registry `measurement_equivalent`;
+- `study_aligned_derivative` ← `derived_equivalent`;
+- `calibrated_proxy` ← `calibrated_proxy`;
+- `mechanism_only` ← `mechanism_context_only`;
+- `unavailable` ← `unsupported`.
+
+The matrix also reports current evidence binding independently. Therefore `current_binding_status=satisfied` does not upgrade a `mechanism_only` or `unavailable` source measurement. This is the primary guard against accidental proxy inflation.
+
 ## Portfolio
 
 The current blocked set contains 24 required study measurements:
