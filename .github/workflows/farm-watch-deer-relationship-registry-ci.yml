@@ -19,6 +19,8 @@ on:
       - 'docs/FARM_WATCH_DEER_SCIENCE_CONTEXT_V2.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_CONTEXT_V3.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_CONTEXT_V4.md'
+      - 'docs/FARM_WATCH_DEER_SCIENCE_CONTEXT_V5.md'
+      - 'docs/FARM_WATCH_DEER_STATE_FRAMEWORK_V1.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_IMPLEMENTATION_PLAN.md'
       - '.github/workflows/farm-watch-deer-relationship-registry-ci.yml'
