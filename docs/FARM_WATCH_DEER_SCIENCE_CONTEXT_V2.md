@@ -1,5 +1,7 @@
 # Farm Watch Deer Science Context v2
 
+> **Superseded:** Current evaluator semantics are defined in `FARM_WATCH_DEER_SCIENCE_CONTEXT_V3.md`. v2 established the relationship-applicability versus property-direction boundary; v3 adds explicit, registry-authorized property-covariate conditioning without promoting those hypotheses to deer-use or behavioral-probability conclusions.
+
 Status: implementation candidate — semantic correction  
 Version: 2026-10-01  
 Species: white-tailed deer (`Odocoileus virginianus`)  
