@@ -121,8 +121,8 @@ assert(
 )
 
 for (const required of [
-  'deer-science-context-v2',
-  'farm-watch-deer-science-evaluator-v2',
+  'deer-science-context-v3',
+  'farm-watch-deer-science-evaluator-v3',
   'evaluateDeerRelationship',
   'evaluateDeerScienceContext',
   'buildDeerEvaluatorEvidenceFromFarmWatch',
@@ -130,8 +130,10 @@ for (const required of [
   'value_constraint_not_satisfied',
   'biological_state_unknown',
   'directional_relationship_context',
-  'property_covariate_direction_not_evaluated',
-  'property_directional_evidence_evaluated: false',
+  'property_conditioning_not_configured',
+  'property_covariate_contrast_measured',
+  'property_conditioned_hypothesis_count',
+  'mapped_agriculture_fraction_percent_by_scale',
   'decision_actionable: false',
   'coefficient_synthesis_performed: false',
   'behavioral_probability_inferred: false',
@@ -147,6 +149,7 @@ for (const required of [
   "admin.rpc('farm_watch_resolve_deer_biological_state_v1_internal'",
   "admin.rpc(\n      'farm_watch_resolve_road_focal_context_v1_internal'",
   'evaluateDeerScienceContext',
+  'landscape_context:',
   'deer_science_context: deerScienceContext',
 ]) assert(edge.includes(required), 'private edge is missing deer evaluator binding: ' + required)
 
