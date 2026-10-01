@@ -121,8 +121,8 @@ assert(
 )
 
 for (const required of [
-  'deer-science-context-v3',
-  'farm-watch-deer-science-evaluator-v3',
+  'deer-science-context-v4',
+  'farm-watch-deer-science-evaluator-v4',
   'evaluateDeerRelationship',
   'evaluateDeerScienceContext',
   'buildDeerEvaluatorEvidenceFromFarmWatch',
@@ -134,6 +134,12 @@ for (const required of [
   'property_covariate_contrast_measured',
   'property_conditioned_hypothesis_count',
   'mapped_agriculture_fraction_percent_by_scale',
+  'measurement_fidelity_matrix',
+  'measurement_fidelity_counts',
+  'measurement_binding_counts',
+  'study_aligned_derivative',
+  'mechanism_only',
+  'proxy_inflation_guard',
   'decision_actionable: false',
   'coefficient_synthesis_performed: false',
   'behavioral_probability_inferred: false',
