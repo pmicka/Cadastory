@@ -16,8 +16,8 @@ import type {
 
 export const FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT = Object.freeze({
   key: 'deer-science-context',
-  algorithmVersion: 'farm-watch-deer-science-evaluator-v1',
-  outputSchemaVersion: 'deer-science-context-v1',
+  algorithmVersion: 'farm-watch-deer-science-evaluator-v2',
+  outputSchemaVersion: 'deer-science-context-v2',
   species: 'Odocoileus virginianus',
   statusVocabulary: Object.freeze([
     'active',
@@ -31,7 +31,7 @@ export type FarmWatchDeerScienceRelationshipStatus =
   typeof FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.statusVocabulary[number]
 
 export const FARM_WATCH_DEER_DECISION_RELEVANCE = Object.freeze([
-  'directional_signal',
+  'directional_relationship_context',
   'mechanism_context',
   'negative_constraint',
   'abstained',
@@ -350,8 +350,8 @@ function activeDecisionRelevance(relationship: DeerRelationshipRecord): {
     relationship.output_kind === 'ordinal_directional'
   ) {
     return {
-      decision_relevance: 'directional_signal',
-      decision_actionable: true,
+      decision_relevance: 'directional_relationship_context',
+      decision_actionable: false,
     }
   }
   if (relationship.output_kind === 'mechanism_context') {
@@ -369,6 +369,30 @@ function activeDecisionRelevance(relationship: DeerRelationshipRecord): {
   return {
     decision_relevance: 'abstained',
     decision_actionable: false,
+  }
+}
+
+function propertyDirectionalEvidence(relationship: DeerRelationshipRecord) {
+  const directionalOutput =
+    relationship.output_kind === 'quantitative_relative_selection' ||
+    relationship.output_kind === 'ordinal_directional'
+
+  if (!directionalOutput) {
+    return {
+      status: 'not_applicable' as const,
+      evaluated: false,
+      reason_codes: ['relationship_output_not_directional'] as const,
+      interpretation_boundary:
+        'This relationship output is not a property-specific directional inference.',
+    }
+  }
+
+  return {
+    status: 'not_evaluated' as const,
+    evaluated: false,
+    reason_codes: ['property_covariate_direction_not_evaluated'] as const,
+    interpretation_boundary:
+      'Registry applicability and a literature-supported relationship direction do not establish a property-specific directional effect.',
   }
 }
 
@@ -424,6 +448,7 @@ export function evaluateDeerRelationship(args: {
       numeric_parameters: [...relationship.coefficient_transfer.numeric_parameters],
     },
     fidelity,
+    property_directional_evidence: propertyDirectionalEvidence(relationship),
     biological_gate: {
       ...gate,
       required_explicit_dimensions: [
@@ -610,6 +635,10 @@ export function evaluateDeerScienceContext(args: {
     .filter((row) => row.decision_actionable)
     .map((row) => row.relationship_id)
 
+  const directional_relationship_context_ids = evaluations
+    .filter((row) => row.decision_relevance === 'directional_relationship_context')
+    .map((row) => row.relationship_id)
+
   return {
     schema: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.outputSchemaVersion,
     method: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.algorithmVersion,
@@ -634,6 +663,12 @@ export function evaluateDeerScienceContext(args: {
     decision_actionable_relationship_count:
       decision_actionable_relationship_ids.length,
     decision_actionable_relationship_ids,
+    directional_relationship_context_count:
+      directional_relationship_context_ids.length,
+    directional_relationship_context_ids,
+    property_directional_evidence_evaluated: false,
+    property_directional_evidence_relationship_count: 0,
+    property_directional_evidence_relationship_ids: [],
     evaluator_active_relationship_ids: evaluations
       .filter((row) => row.status === 'active')
       .map((row) => row.relationship_id),
@@ -643,7 +678,7 @@ export function evaluateDeerScienceContext(args: {
     coefficient_synthesis_performed: false,
     behavioral_probability_inferred: false,
     interpretation_boundary:
-      'Registry-driven property/date/scenario evaluation only. Evaluator-active is not synonymous with decision-actionable: only active quantitative/ordinal directional outputs are classified as directional signals; mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
+      'Registry-driven property/date/scenario applicability evaluation only. An active quantitative or ordinal relationship is literature-supported directional context, not property-specific directional evidence. This evaluator does not yet test whether the property covariates exhibit the study-aligned contrast required for a local directional conclusion, so decision_actionable remains false until a separate property-conditioned evaluation supports it. Mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
   }
 }
 
