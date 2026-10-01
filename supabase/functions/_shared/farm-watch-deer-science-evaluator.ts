@@ -16,8 +16,8 @@ import type {
 
 export const FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT = Object.freeze({
   key: 'deer-science-context',
-  algorithmVersion: 'farm-watch-deer-science-evaluator-v2',
-  outputSchemaVersion: 'deer-science-context-v2',
+  algorithmVersion: 'farm-watch-deer-science-evaluator-v3',
+  outputSchemaVersion: 'deer-science-context-v3',
   species: 'Odocoileus virginianus',
   statusVocabulary: Object.freeze([
     'active',
@@ -111,11 +111,46 @@ type ConstraintEvaluation = {
   rationale: string
 }
 
+type PropertyDirectionalObservation = {
+  scale: DeerRelationshipScale
+  value: number
+  unit: string
+}
+
 type PropertyDirectionalEvidenceEvaluation = {
-  status: 'not_evaluated' | 'not_applicable'
-  evaluated: false
+  status:
+    | 'not_applicable'
+    | 'not_configured'
+    | 'insufficient_measurement'
+    | 'measured_no_contrast'
+    | 'hypothesis_available'
+  evaluated: boolean
   reason_codes: string[]
   interpretation_boundary: string
+  conditioning_rule_id?: string | null
+  metric_label?: string | null
+  support_geometry?: string | null
+  observations?: PropertyDirectionalObservation[]
+  contrast?: {
+    lower_scale: DeerRelationshipScale
+    lower_value: number
+    higher_scale: DeerRelationshipScale
+    higher_value: number
+    absolute_difference: number
+    unit: string
+  } | null
+  hypothesis?: {
+    source_response_variable: string
+    source_relationship_direction: string
+    higher_covariate_scale: DeerRelationshipScale
+    higher_covariate_value: number
+    lower_covariate_scale: DeerRelationshipScale
+    lower_covariate_value: number
+    interpretation: string
+    behavioral_response_inferred: false
+    coefficient_transfer_performed: false
+  } | null
+  limitations?: string[]
 }
 
 function knownDimension(value: string | null | undefined) {
@@ -379,7 +414,7 @@ function activeDecisionRelevance(relationship: DeerRelationshipRecord): {
   }
 }
 
-function propertyDirectionalEvidence(
+function initialPropertyDirectionalEvidence(
   relationship: DeerRelationshipRecord,
 ): PropertyDirectionalEvidenceEvaluation {
   const directionalOutput =
@@ -388,7 +423,7 @@ function propertyDirectionalEvidence(
 
   if (!directionalOutput) {
     return {
-      status: 'not_applicable' as const,
+      status: 'not_applicable',
       evaluated: false,
       reason_codes: ['relationship_output_not_directional'],
       interpretation_boundary:
@@ -396,12 +431,142 @@ function propertyDirectionalEvidence(
     }
   }
 
+  if (!relationship.property_conditioning) {
+    return {
+      status: 'not_configured',
+      evaluated: false,
+      reason_codes: ['property_conditioning_not_configured'],
+      interpretation_boundary:
+        'The relationship is directionally supported by literature, but no explicit property-conditioning rule is authorized for this relationship.',
+    }
+  }
+
   return {
-    status: 'not_evaluated' as const,
+    status: 'insufficient_measurement',
     evaluated: false,
-    reason_codes: ['property_covariate_direction_not_evaluated'],
+    reason_codes: ['property_covariate_not_evaluated'],
+    conditioning_rule_id: relationship.property_conditioning.id,
+    metric_label: relationship.property_conditioning.metric_label,
+    support_geometry: relationship.property_conditioning.support_geometry,
+    limitations: [...relationship.property_conditioning.limitations],
     interpretation_boundary:
-      'Registry applicability and a literature-supported relationship direction do not establish a property-specific directional effect.',
+      'A property-conditioning rule exists, but the relationship must first pass registry/scenario gates and expose the configured property covariate.',
+  }
+}
+
+function numericScaleValues(
+  rows: readonly FarmWatchDeerEvaluatorEvidence[],
+  field: string,
+  orderedScales: readonly DeerRelationshipScale[],
+) {
+  const observations: PropertyDirectionalObservation[] = []
+  for (const row of rows) {
+    const value = row.values?.[field]
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue
+    const record = value as Record<string, unknown>
+    for (const scale of orderedScales) {
+      const numeric = Number(record[scale])
+      if (!Number.isFinite(numeric)) continue
+      observations.push({
+        scale,
+        value: numeric,
+        unit: 'percent',
+      })
+    }
+  }
+
+  const byScale = new Map<DeerRelationshipScale, PropertyDirectionalObservation>()
+  for (const observation of observations) {
+    if (!byScale.has(observation.scale)) byScale.set(observation.scale, observation)
+  }
+  return orderedScales
+    .map((scale) => byScale.get(scale))
+    .filter((row): row is PropertyDirectionalObservation => Boolean(row))
+}
+
+function evaluatePropertyDirectionalEvidence(
+  relationship: DeerRelationshipRecord,
+  selected: ReadonlyMap<string, FarmWatchDeerEvaluatorEvidence[]>,
+): PropertyDirectionalEvidenceEvaluation {
+  const base = initialPropertyDirectionalEvidence(relationship)
+  const rule = relationship.property_conditioning
+  if (!rule) return base
+
+  const rows = selected.get(rule.binding_key) || []
+  const observations = numericScaleValues(rows, rule.metric_field, rule.ordered_scales)
+  if (observations.length < 2) {
+    return {
+      ...base,
+      status: 'insufficient_measurement',
+      evaluated: true,
+      reason_codes: ['property_covariate_contrast_unavailable'],
+      observations,
+      contrast: null,
+      hypothesis: null,
+      interpretation_boundary:
+        'The configured property covariate was checked, but fewer than two explicit spatial scales carried numeric values, so no within-property contrast is emitted.',
+    }
+  }
+
+  let lower = observations[0]
+  let higher = observations[0]
+  for (const observation of observations.slice(1)) {
+    if (observation.value < lower.value) lower = observation
+    if (observation.value > higher.value) higher = observation
+  }
+
+  const difference = higher.value - lower.value
+  if (!(difference > 0)) {
+    return {
+      ...base,
+      status: 'measured_no_contrast',
+      evaluated: true,
+      reason_codes: ['property_covariate_no_ordered_contrast'],
+      observations,
+      contrast: {
+        lower_scale: lower.scale,
+        lower_value: lower.value,
+        higher_scale: higher.scale,
+        higher_value: higher.value,
+        absolute_difference: 0,
+        unit: rule.unit,
+      },
+      hypothesis: null,
+      interpretation_boundary:
+        'The configured property covariate was measured across explicit scales, but no non-zero contrast was present. No property-conditioned directional hypothesis is emitted.',
+    }
+  }
+
+  return {
+    status: 'hypothesis_available',
+    evaluated: true,
+    reason_codes: ['property_covariate_contrast_measured'],
+    conditioning_rule_id: rule.id,
+    metric_label: rule.metric_label,
+    support_geometry: rule.support_geometry,
+    observations,
+    contrast: {
+      lower_scale: lower.scale,
+      lower_value: lower.value,
+      higher_scale: higher.scale,
+      higher_value: higher.value,
+      absolute_difference: difference,
+      unit: rule.unit,
+    },
+    hypothesis: {
+      source_response_variable: relationship.response_variable,
+      source_relationship_direction: relationship.direction,
+      higher_covariate_scale: higher.scale,
+      higher_covariate_value: higher.value,
+      lower_covariate_scale: lower.scale,
+      lower_covariate_value: lower.value,
+      interpretation: rule.hypothesis_interpretation,
+      behavioral_response_inferred: false,
+      coefficient_transfer_performed: false,
+    },
+    limitations: [...rule.limitations],
+    interpretation_boundary:
+      'This is a property-conditioned covariate hypothesis anchored to measured Farm Watch values. It does not establish deer use, dispersal, behavioral probability, or a transferable effect magnitude.',
   }
 }
 
@@ -457,7 +622,7 @@ export function evaluateDeerRelationship(args: {
       numeric_parameters: [...relationship.coefficient_transfer.numeric_parameters],
     },
     fidelity,
-    property_directional_evidence: propertyDirectionalEvidence(relationship),
+    property_directional_evidence: initialPropertyDirectionalEvidence(relationship),
     biological_gate: {
       ...gate,
       required_explicit_dimensions: [
@@ -573,6 +738,10 @@ export function evaluateDeerRelationship(args: {
     ...base,
     status: 'active' as const,
     ...activeDecisionRelevance(relationship),
+    property_directional_evidence: evaluatePropertyDirectionalEvidence(
+      relationship,
+      inputEvaluation.selected,
+    ),
     reason_codes: [],
     result: activeResult(relationship, fidelity),
   }
@@ -648,6 +817,16 @@ export function evaluateDeerScienceContext(args: {
     .filter((row) => row.decision_relevance === 'directional_relationship_context')
     .map((row) => row.relationship_id)
 
+  const property_directional_evidence_relationship_ids = evaluations
+    .filter((row) => row.property_directional_evidence.evaluated)
+    .map((row) => row.relationship_id)
+
+  const property_conditioned_hypothesis_relationship_ids = evaluations
+    .filter((row) =>
+      row.property_directional_evidence.status === 'hypothesis_available'
+    )
+    .map((row) => row.relationship_id)
+
   return {
     schema: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.outputSchemaVersion,
     method: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.algorithmVersion,
@@ -675,9 +854,14 @@ export function evaluateDeerScienceContext(args: {
     directional_relationship_context_count:
       directional_relationship_context_ids.length,
     directional_relationship_context_ids,
-    property_directional_evidence_evaluated: false,
-    property_directional_evidence_relationship_count: 0,
-    property_directional_evidence_relationship_ids: [],
+    property_directional_evidence_evaluated:
+      property_directional_evidence_relationship_ids.length > 0,
+    property_directional_evidence_relationship_count:
+      property_directional_evidence_relationship_ids.length,
+    property_directional_evidence_relationship_ids,
+    property_conditioned_hypothesis_count:
+      property_conditioned_hypothesis_relationship_ids.length,
+    property_conditioned_hypothesis_relationship_ids,
     evaluator_active_relationship_ids: evaluations
       .filter((row) => row.status === 'active')
       .map((row) => row.relationship_id),
@@ -687,7 +871,7 @@ export function evaluateDeerScienceContext(args: {
     coefficient_synthesis_performed: false,
     behavioral_probability_inferred: false,
     interpretation_boundary:
-      'Registry-driven property/date/scenario applicability evaluation only. An active quantitative or ordinal relationship is literature-supported directional context, not property-specific directional evidence. This evaluator does not yet test whether the property covariates exhibit the study-aligned contrast required for a local directional conclusion, so decision_actionable remains false until a separate property-conditioned evaluation supports it. Mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
+      'Registry-driven property/date/scenario applicability plus explicitly authorized property-conditioning only. An active quantitative or ordinal relationship is literature-supported directional context. A property-conditioned hypothesis is emitted only when the registry declares a conditioning rule and the configured property covariate has a measured multi-scale contrast. Such a hypothesis remains non-actionable and does not infer deer use, dispersal, behavioral probability, or effect magnitude. Mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
   }
 }
 
