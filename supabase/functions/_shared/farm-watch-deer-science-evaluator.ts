@@ -111,6 +111,13 @@ type ConstraintEvaluation = {
   rationale: string
 }
 
+type PropertyDirectionalEvidenceEvaluation = {
+  status: 'not_evaluated' | 'not_applicable'
+  evaluated: false
+  reason_codes: string[]
+  interpretation_boundary: string
+}
+
 function knownDimension(value: string | null | undefined) {
   const normalized = String(value || '').trim()
   return Boolean(
@@ -372,7 +379,9 @@ function activeDecisionRelevance(relationship: DeerRelationshipRecord): {
   }
 }
 
-function propertyDirectionalEvidence(relationship: DeerRelationshipRecord) {
+function propertyDirectionalEvidence(
+  relationship: DeerRelationshipRecord,
+): PropertyDirectionalEvidenceEvaluation {
   const directionalOutput =
     relationship.output_kind === 'quantitative_relative_selection' ||
     relationship.output_kind === 'ordinal_directional'
@@ -381,7 +390,7 @@ function propertyDirectionalEvidence(relationship: DeerRelationshipRecord) {
     return {
       status: 'not_applicable' as const,
       evaluated: false,
-      reason_codes: ['relationship_output_not_directional'] as const,
+      reason_codes: ['relationship_output_not_directional'],
       interpretation_boundary:
         'This relationship output is not a property-specific directional inference.',
     }
@@ -390,7 +399,7 @@ function propertyDirectionalEvidence(relationship: DeerRelationshipRecord) {
   return {
     status: 'not_evaluated' as const,
     evaluated: false,
-    reason_codes: ['property_covariate_direction_not_evaluated'] as const,
+    reason_codes: ['property_covariate_direction_not_evaluated'],
     interpretation_boundary:
       'Registry applicability and a literature-supported relationship direction do not establish a property-specific directional effect.',
   }
