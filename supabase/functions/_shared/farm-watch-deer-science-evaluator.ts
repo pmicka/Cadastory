@@ -373,12 +373,56 @@ function requiredRelationshipsByStateDimension() {
     for (const dimension of relationship.biological_state_gates.required_explicit_dimensions) {
       add(dimension, relationship.relationship_id)
     }
+
     for (const requirement of relationship.required_inputs) {
-      const stateDimension =
-        FARM_WATCH_DEER_STATE_INPUT_DIMENSIONS[
-          requirement.key as keyof typeof FARM_WATCH_DEER_STATE_INPUT_DIMENSIONS
-        ]
-      if (stateDimension) add(stateDimension, relationship.relationship_id)
+      switch (requirement.key) {
+        case 'diel_state':
+          add('diel_period', relationship.relationship_id)
+          break
+        case 'thermal_exposure':
+          add('thermal_environment', relationship.relationship_id)
+          break
+        case 'winter_severity':
+          add('snow_winter_state', relationship.relationship_id)
+          break
+        case 'annual_mast_state':
+          add('annual_mast_state', relationship.relationship_id)
+          break
+        case 'current_crop_identity':
+          add('current_crop_identity', relationship.relationship_id)
+          break
+        case 'field_phenology':
+        case 'agriculture_state':
+          add('field_phenology_state', relationship.relationship_id)
+          break
+        case 'browse_state':
+          add('browse_state', relationship.relationship_id)
+          break
+        case 'human_activity':
+          add('human_activity_state', relationship.relationship_id)
+          break
+        case 'extreme_event':
+          add('extreme_weather_state', relationship.relationship_id)
+          break
+        case 'recent_precipitation':
+          add('recent_precipitation_state', relationship.relationship_id)
+          break
+        case 'water_state':
+          add('surface_water_state', relationship.relationship_id)
+          add('managed_water_state', relationship.relationship_id)
+          break
+        case 'resource_state':
+          if (requirement.product_keys.includes('managed-food-feature-context')) {
+            add('managed_food_state', relationship.relationship_id)
+          }
+          if (requirement.product_keys.includes('field-phenology-context')) {
+            add('field_phenology_state', relationship.relationship_id)
+          }
+          if (requirement.product_keys.includes('browse-resource-context')) {
+            add('browse_state', relationship.relationship_id)
+          }
+          break
+      }
     }
   }
   return out
@@ -510,8 +554,14 @@ function buildDeerStateFramework(args: {
     key: 'thermal_environment',
     family: 'environmental',
     status: stateStatusFromEvidenceState(thermal?.evidence_state),
-    value: thermal ? 'physical_context_available' : null,
-    provenance: thermal ? 'farm_watch_physical_context' : 'unavailable',
+    value:
+      thermal && thermal.evidence_state !== 'unavailable'
+        ? 'physical_context_available'
+        : null,
+    provenance:
+      thermal && thermal.evidence_state !== 'unavailable'
+        ? 'farm_watch_physical_context'
+        : 'unavailable',
     source_product: 'thermal-exposure-context',
     evidence_state: thermal?.evidence_state || null,
     interpretation_boundary:
@@ -617,6 +667,22 @@ function buildDeerStateFramework(args: {
     evidence_state: mast?.evidence_state || null,
     interpretation_boundary:
       'Regional annual mast survey state is separate from property mast production and from static mast-producing-species capacity.',
+  })
+
+  const browse = stateEvidence(args.evidence, 'browse-resource-context')
+  add({
+    key: 'browse_state',
+    family: 'resource',
+    status: stateStatusFromEvidenceState(browse?.evidence_state),
+    value: browse?.values || null,
+    provenance:
+      browse && browse.evidence_state !== 'unavailable'
+        ? 'browse_resource_context'
+        : 'unavailable',
+    source_product: 'browse-resource-context',
+    evidence_state: browse?.evidence_state || null,
+    interpretation_boundary:
+      'Woody browse state requires source-aligned browse evidence; LiDAR structure, greenness, or generic canopy context must not be substituted.',
   })
 
   const surfaceWater = stateEvidence(args.evidence, 'surface-water-state')
