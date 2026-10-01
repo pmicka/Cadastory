@@ -1,4 +1,5 @@
 import {
+  buildDeerEvaluatorEvidenceFromFarmWatch,
   evaluateDeerRelationship,
   evaluateDeerScienceContext,
   type FarmWatchDeerEvaluatorEvidence,
@@ -229,11 +230,11 @@ Deno.test('juvenile-male dispersal path relationship can be active without becom
   assert(row.coefficient_transfer.numeric_parameters.length === 0)
   assert(row.decision_relevance === 'directional_relationship_context')
   assert(row.decision_actionable === false)
-  assert(row.property_directional_evidence.status === 'not_evaluated')
+  assert(row.property_directional_evidence.status === 'not_configured')
   assert(row.property_directional_evidence.evaluated === false)
   assert(
     row.property_directional_evidence.reason_codes.includes(
-      'property_covariate_direction_not_evaluated',
+      'property_conditioning_not_configured',
     ),
   )
 })
@@ -274,6 +275,145 @@ Deno.test('active ordinal relationships remain relationship context until proper
   assert(row.decision_relevance === 'directional_relationship_context')
   assert(row.decision_actionable === false)
   assert(row.property_directional_evidence.status === 'not_evaluated')
+})
+
+Deno.test('R30 emits a property-conditioned agriculture hypothesis only after measuring an explicit multi-scale contrast', () => {
+  const result = evaluateDeerScienceContext({
+    scenario: scenario({
+      sex: 'male',
+      age_class: 'juvenile',
+      movement_state: 'resident',
+      season: 'spring',
+    }),
+    evidence: [
+      evidence('deer-biological-state', 'available', ['individual_scenario']),
+      evidence(
+        'agriculture-landcover-context',
+        'known',
+        ['local_500m','landscape_1500m','broad_3000m'],
+        {
+          mapped_agriculture_fraction_percent_by_scale: {
+            local_500m: 0.66,
+            landscape_1500m: 2.53,
+            broad_3000m: 3.89,
+          },
+        },
+      ),
+    ],
+    relationships: [
+      relationship('FW-R30-spring-juvenile-male-dispersal-probability'),
+    ],
+  })
+
+  assert(result.status === 'available')
+  assert(result.directional_relationship_context_count === 1)
+  assert(result.property_directional_evidence_evaluated === true)
+  assert(result.property_directional_evidence_relationship_count === 1)
+  assert(result.property_conditioned_hypothesis_count === 1)
+  assert(
+    result.property_conditioned_hypothesis_relationship_ids.includes(
+      'FW-R30-spring-juvenile-male-dispersal-probability',
+    ),
+  )
+  assert(result.decision_actionable_relationship_count === 0)
+  assert(result.behavioral_probability_inferred === false)
+
+  const row = result.relationships[0]
+  assert(row.status === 'active')
+  assert(row.decision_relevance === 'directional_relationship_context')
+  assert(row.decision_actionable === false)
+  assert(row.property_directional_evidence.status === 'hypothesis_available')
+  assert(row.property_directional_evidence.evaluated === true)
+  assert(row.property_directional_evidence.conditioning_rule_id === 'FW-P01-r30-agriculture-scale-contrast')
+  assert(row.property_directional_evidence.observations?.length === 3)
+  assert(row.property_directional_evidence.contrast?.lower_scale === 'local_500m')
+  assert(row.property_directional_evidence.contrast?.higher_scale === 'broad_3000m')
+  assert(
+    Math.abs(
+      Number(row.property_directional_evidence.contrast?.absolute_difference) - 3.23,
+    ) < 0.000001,
+  )
+  assert(row.property_directional_evidence.hypothesis?.behavioral_response_inferred === false)
+  assert(row.property_directional_evidence.hypothesis?.coefficient_transfer_performed === false)
+})
+
+Deno.test('R30 remains measured-but-insufficient when only one explicit agriculture scale exists', () => {
+  const row = evaluateDeerRelationship({
+    relationship: relationship('FW-R30-spring-juvenile-male-dispersal-probability'),
+    scenario: scenario({
+      sex: 'male',
+      age_class: 'juvenile',
+      season: 'spring',
+    }),
+    evidence: [
+      evidence('deer-biological-state', 'available', ['individual_scenario']),
+      evidence(
+        'agriculture-landcover-context',
+        'known',
+        ['landscape_1500m'],
+        {
+          mapped_agriculture_fraction_percent_by_scale: {
+            landscape_1500m: 2.53,
+          },
+        },
+      ),
+    ],
+  })
+
+  assert(row.status === 'active')
+  assert(row.property_directional_evidence.status === 'insufficient_measurement')
+  assert(row.property_directional_evidence.evaluated === true)
+  assert(
+    row.property_directional_evidence.reason_codes.includes(
+      'property_covariate_contrast_unavailable',
+    ),
+  )
+  assert(row.decision_actionable === false)
+})
+
+Deno.test('Farm Watch evidence adapter derives mapped agriculture fractions from existing landscape context', () => {
+  const adapted = buildDeerEvaluatorEvidenceFromFarmWatch({
+    scenario: scenario(),
+    deer_context: {
+      deer_biological_state: { status: 'available' },
+      diel_photoperiod: { status: 'available' },
+      seasonal_state: { status: 'available', context: { component_states: {} } },
+      field_phenology: { status: 'available', context: { fields: [] } },
+    },
+    deer_evidence_stack: { products: {} },
+    landscape_context: {
+      status: 'available',
+      identity_sha256: 'landscape-test',
+      evidence_class: 'deterministic_derived',
+      domain: {
+        areas_acres: {
+          '500': 423.07,
+          '1500': 1456.5,
+          '3000': 5286.42,
+        },
+      },
+      agriculture: {
+        field_context_by_zone: [
+          { radius_m: 500, field_count: 1, intersected_field_acres: 2.79 },
+          { radius_m: 1500, field_count: 12, intersected_field_acres: 36.82 },
+          { radius_m: 3000, field_count: 37, intersected_field_acres: 205.73 },
+        ],
+      },
+    },
+  })
+
+  const agriculture = adapted.find(
+    (row) => row.product_key === 'agriculture-landcover-context',
+  )
+  assert(agriculture)
+  assert(agriculture.evidence_state === 'known')
+  assert(agriculture.scales.includes('local_500m'))
+  assert(agriculture.scales.includes('landscape_1500m'))
+  assert(agriculture.scales.includes('broad_3000m'))
+  const fractions = agriculture.values?.mapped_agriculture_fraction_percent_by_scale as Record<string, number>
+  assert(Math.abs(fractions.local_500m - (2.79 / 423.07 * 100)) < 0.000001)
+  assert(Math.abs(fractions.landscape_1500m - (36.82 / 1456.5 * 100)) < 0.000001)
+  assert(Math.abs(fractions.broad_3000m - (205.73 / 5286.42 * 100)) < 0.000001)
 })
 
 Deno.test('juvenile-male dispersal terrain relationship emits conditional mechanism context, never a ridge/road sign', () => {
