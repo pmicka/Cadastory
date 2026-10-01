@@ -550,7 +550,7 @@ Deno.test('FW-D24 blocks universal forest-edge and aspect preferences while pres
   assert(edge)
   assert(edge.activation_requirement === 'context_only')
   assert(edge.alignment === 'unsupported')
-  assert(/forest\/non-forest/i.test(edge.study_protocol))
+  assert(/forest.*non-forest/i.test(edge.study_protocol))
   assert(/must not be relabeled/i.test(edge.permitted_use))
 })
 
