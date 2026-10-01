@@ -1,5 +1,7 @@
 # Farm Watch Deer Relationship Registry v1
 
+> **Superseded:** Current machine relationship and property-conditioning semantics are documented in `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V2.md`.
+
 Status: Batch 9 implementation contract  
 Species: white-tailed deer (`Odocoileus virginianus`)  
 Normative science source: `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
