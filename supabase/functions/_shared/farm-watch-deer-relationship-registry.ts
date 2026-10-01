@@ -54,6 +54,17 @@ export const FARM_WATCH_DEER_MEASUREMENT_ALIGNMENTS = Object.freeze([
 export type DeerMeasurementAlignment =
   typeof FARM_WATCH_DEER_MEASUREMENT_ALIGNMENTS[number]
 
+export const FARM_WATCH_DEER_EVIDENCE_FIDELITY_CLASSES = Object.freeze([
+  'exact',
+  'study_aligned_derivative',
+  'calibrated_proxy',
+  'mechanism_only',
+  'unavailable',
+] as const)
+
+export type DeerEvidenceFidelityClass =
+  typeof FARM_WATCH_DEER_EVIDENCE_FIDELITY_CLASSES[number]
+
 export type DeerStudyMeasurementRequirement = {
   id: string
   binding_key: string | null
@@ -63,6 +74,23 @@ export type DeerStudyMeasurementRequirement = {
   activation_requirement: 'required' | 'context_only' | 'not_applicable'
   permitted_use: string
   limitations: string[]
+}
+
+export function deerMeasurementEvidenceFidelityClass(
+  alignment: DeerMeasurementAlignment,
+): DeerEvidenceFidelityClass {
+  switch (alignment) {
+    case 'measurement_equivalent':
+      return 'exact'
+    case 'derived_equivalent':
+      return 'study_aligned_derivative'
+    case 'calibrated_proxy':
+      return 'calibrated_proxy'
+    case 'mechanism_context_only':
+      return 'mechanism_only'
+    case 'unsupported':
+      return 'unavailable'
+  }
 }
 
 export type DeerRelationshipValueConstraint = {
