@@ -1,6 +1,6 @@
 # Farm Watch Deer Science Evidence Ledger
 
-Status: current as of 2026-09-25  
+Status: current as of 2026-10-01  
 Target species: white-tailed deer (`Odocoileus virginianus`)  
 Primary transfer geography: central Kentucky / lower Ohio Valley  
 Validation property: `validation-property-01`
@@ -75,7 +75,7 @@ The initial targeted search did not surface a directly transferable central-Kent
 
 ### Machine-readable relationship registry
 
-Batch 9 is implemented as `deer-relationship-registry-v1` in
+Batch 9 is implemented as `deer-relationship-registry-v3` in
 `supabase/functions/_shared/farm-watch-deer-relationship-registry.ts`.
 
 The registry is the machine transfer contract for this ledger. CI requires every current `FW-Dxx`
@@ -586,6 +586,42 @@ The generic Scout weather snapshot table remains out of scope for deer thermal w
 
 ---
 
+## FW-D24 — Southwest Wisconsin habitat selection makes forest-edge and aspect effects explicitly seasonal
+
+**Citation:** Gilbertson, M.L.J., Ketz, A.C., Hunsaker, M.A., Walsh, D.P., Storm, D.J., and Turner, W.C. 2025. *White-tailed deer habitat use and implications for chronic wasting disease transmission.* Wildlife Monographs 217:e70001. DOI: 10.1002/wmon.70001.
+
+**Population/design:** 596 GPS-collared white-tailed deer in southwest Wisconsin, 2017–2022. Seasonal range-resident trajectories were standardized to 4-hour fixes and analyzed with integrated step-selection functions. Dispersal events were excluded from this habitat-selection analysis.
+
+**Relevant source measurements:** Habitat covariates included land cover, log distance to nearest forest edge, NDVI, elevation, eastness, northness, distance to perennial river/stream, and snow depth. Forest edge was derived from a 30 m Wiscland 2 binary forest/non-forest raster. Aspect came from a 30 m DEM and was represented as eastness and northness.
+
+**Supported relationship:** Selection for forest-edge proximity and aspect was not season invariant. Relative selection for distance from forest edges was highest in the non-breeding season, meaning preference for proximity to forest edge was weakest then; a smaller seasonal change was also evident in the post-fawning period. Eastness was frequently important in post-fawning and non-breeding models, with a tendency toward eastward aspects. Northness varied seasonally; in coarse land-use models, more southward aspects were favored most strongly in the non-breeding season and next in the breeding season.
+
+**Transfer disposition:** **context-conditional / negative-constraint against universal edge or aspect scores; coefficient-transfer-not-supported.**
+
+**Farm Watch mapping:** This study is strong evidence that edge and aspect interpretation must be season/state aware. It does **not** make the existing `spatial-edge-patch-context` source-equivalent to the paper’s binary-forest edge-distance variable: Farm Watch currently mixes canopy-class edges, mapped field edges, and 5 m structural transitions, each with different semantics. Likewise, terrain/solar geometry may support future aspect context, but a north/south/east/west deer preference must remain explicitly tied to the source biological season and model support.
+
+**Boundary:** Do not create a generic “closer to edge is better” rule, a generic south-facing-slope bonus, or a generic north-facing-slope penalty. The source seasons are biological phases (fawning, post-fawning, breeding, non-breeding), not automatically interchangeable with generic calendar spring/summer/fall/winter labels.
+
+---
+
+## FW-D25 — Neonatal fawn survival evidence separates horizontal visibility from concealment
+
+**Citation:** Obermoller, T.R., Michel, E.S., and Bump, J.K. 2026. *The art of avoidance: bedsite use, antipredator strategies, and predation risk in white-tailed deer fawns.* Journal of Wildlife Management. DOI: 10.1002/jwmg.70240.
+
+**Population/design:** White-tailed deer fawns in south-central Minnesota, May–August 2021–2023, monitored through 90 days of age in a row-crop/grassland-dominated landscape where coyotes were the primary predator. The study compared coyote-mortality bedsites with paired bedsites of surviving fawns and with earlier capture bedsites from the same individuals.
+
+**Relevant source measurements:** Horizontal visibility was measured with a 2 m cover pole divided into 10 cm bands, viewed from 15 m in four cardinal directions; percent bands visible was averaged across directions. Fawn concealment was measured separately with a fawn decoy and an observer at approximately 1 m eye height, recording the distance at which 25% of the decoy became visible from each cardinal direction. Vegetation height was measured independently along a 10 m transect.
+
+**Supported relationship:** Horizontal visibility was greater at paired-survivor and capture bedsites than at mortality bedsites. The paired comparison estimated lower mortality-bedsite odds with increasing horizontal visibility. In contrast, the study found no evidence of differences in fawn concealment or vegetation height between mortality and comparison bedsites. Antipredator-strategy interactions did not establish a simple concealment rule.
+
+**Transfer disposition:** **mechanism-support / context-conditional, plus negative-constraint against a universal concealment or visibility score; coefficient-transfer-not-supported.**
+
+**Farm Watch mapping:** The study directly supports keeping **horizontal field of view**, **predator-view concealment**, and **vegetation height** as separate physical variables. The current `horizontal-visibility-context` is not source-equivalent: it uses generic 1.5/3/6 m equal observer/target heights, 16 azimuths, up to 100 m, and LiDAR/terrain ray support rather than the paper’s 2 m pole, 15 m cardinal-direction protocol. The study is therefore a high-value target for future measurement alignment, not permission to attach neonatal survival semantics to the current generic visibility raster.
+
+**Boundary:** Do not infer adult bedding quality, general “security cover,” Kentucky fawn survival, or a universal predator-avoidance benefit from the Minnesota effect magnitude. The null concealment result prevents a generic claim that more low-height concealment always improves fawn survival; it does not prove concealment is irrelevant in every population, predator system, or spatial scale.
+
+---
+
 # Cross-study synthesis for model architecture
 
 ## 1. Thermal state should be modeled physically, then behaviorally gated
@@ -703,6 +739,38 @@ Where these states are unknown, the model should expose that uncertainty rather 
 
 ---
 
+## 7. Forest edge and aspect interpretation must remain seasonal
+
+FW-D24 provides a large, recent Midwestern telemetry dataset showing that edge-distance and aspect relationships change across biological seasons.
+
+Therefore:
+
+- forest-edge proximity must not receive a universal positive or negative sign;
+- existing field-edge, canopy-edge and structural-transition metrics must not be treated as interchangeable;
+- aspect effects must remain season-conditioned and source-aligned;
+- generic north-facing or south-facing slope bonuses remain prohibited.
+
+A future positive relationship should first reproduce the paper's forest/non-forest edge-distance definition or declare a validated source substitution.
+
+---
+
+## 8. Horizontal visibility and concealment are different measurements
+
+FW-D25 sharpens the structure stack's interpretation boundary.
+
+The Minnesota fawn study independently measured:
+
+- horizontal field of view;
+- predator-view concealment distance;
+- vegetation height;
+- overstory closure.
+
+Only horizontal visibility consistently differed between mortality and comparison bedsites in the main paired/capture analyses. Farm Watch should therefore resist collapsing these variables into a single "security cover" score.
+
+The existing generic visibility raster remains useful physical geometry. A future fawn-specific interpretation requires a source-aligned 15 m cover-pole protocol or a separately validated computational equivalent.
+
+---
+
 # Explicit blocked assumptions
 
 Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT encode the following as universal rules:
@@ -720,6 +788,9 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 - roads/trails are generically selected;
 - dense vegetation is automatically bedding/security cover;
 - field edge proximity automatically increases deer use;
+- forest-edge proximity automatically increases deer use across seasons;
+- greater low-height concealment automatically improves fawn survival;
+- greater horizontal visibility automatically improves deer survival/security across life stages;
 - corn/soybean CDL identity means current food availability;
 - nearest water or higher stream discharge means deer will use that location;
 - open hunting season means deer are currently pressured.
@@ -734,7 +805,8 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 | Diel state | strong | production | deterministic solar/photoperiod contract is complete; study-specific movement-defined activity periods remain parked |
 | Rut / reproductive timing | strong, region-dependent | statewide Kentucky qualitative gate ready; exact regional dates incomplete | use FW-D21 statewide gate; capture authoritative annual physiographic-region dates before finer regionalization |
 | Terrain/topography | strong evidence of context dependence | neutral inputs ready | no new physical data required before conditional model; movement-state gate required |
-| Fine vegetation structure | moderate-to-strong mechanism evidence; state-specific | strong neutral structure inputs | derive/validate neutral visibility/concealment metric before biological labeling |
+| Forest edge / aspect selection | strong recent Midwestern evidence of seasonal variation | neutral edge/terrain primitives exist, but source-equivalent forest-edge distance is not yet bound | preserve biological-season semantics; do not use a universal edge/aspect sign |
+| Fine vegetation structure | moderate-to-strong mechanism evidence; state-specific; FW-D25 now separates visibility from concealment | strong neutral structure inputs | align any fawn-specific interpretation to the 15 m cover-pole / predator-view field protocols before biological labeling |
 | Mast | strong direct evidence | production substrate complete; 2026 exact-year annual component awaits KDFWR publication | Batch 5A capacity + Batch 5B regional annual proxy are reconciled; property mast abundance remains unknown unless separately observed |
 | Crop resource state | strong | neutral HLS/seasonal substrate available, deer relationship input parked for 2026 | current field crop identity/stage/harvest remains scientifically required but is not an active engineering target this season |
 | Managed food plots / forage | direct mapped-feature requirement in hunting-risk studies | production static-configured; Flat Creek 2026 explicitly confirmed none | no active engineering blocker; reuse configured polygons by year and keep feeders/mineral attractants separate |
@@ -754,13 +826,13 @@ Until new evidence is added to this ledger, Farm Watch deer modeling MUST NOT en
 This v1 ledger is sufficient to prevent unsupported first-model terms, but it is not the end of the literature review. The next evidence additions should preferentially resolve uncertainties that would change implementation:
 
 1. **Central/eastern US thermal ecology** — studies closer to Kentucky that quantify solar exposure, operative temperature, slope/aspect, canopy and bed/use selection.
-2. **LiDAR-derived white-tailed deer visibility/concealment** — prioritize white-tailed-deer studies over extrapolation from other cervids.
+2. **Visibility/concealment measurement alignment** — FW-D25 now supplies a white-tailed-deer field protocol; next work should test whether Farm Watch can reproduce the 15 m cover-pole horizontal-visibility measurement separately from predator-view concealment, rather than search for a generic obstruction score.
 3. **Oak mast spatial prediction** — studies connecting oak species/acorn production to deer space use at usable spatial/temporal scales.
 4. **Corn/soy phenology and harvest** — modern GPS studies to complement FW-D08 and determine whether crop-state interactions generalize beyond one refuge/agricultural system.
 5. **Hydrology/water in humid eastern landscapes** — distinguish water need from riparian movement structure.
 6. **Kentucky physiographic-region breeding phenology** — capture the authoritative annual KDFWR regional conception-date product in structured form; statewide qualitative timing is now covered by FW-D21, with Illinois age effects (FW-D22) and Ohio onset evidence (FW-D23) retained at their actual transfer scope.
 7. **Hunter-pressure measurement** — identify studies using explicit hunter GPS/effort data suitable for translating pressure into a dynamic risk surface.
-8. **Fawning/female state** — quantify concealment/structure selection and movement changes during parturition/lactation in eastern forests.
+8. **Fawning/female state** — FW-D25 adds neonatal fawn bedsite/predation evidence, but adult female parturition/lactation movement and maternal habitat selection in eastern forests still need stronger source-aligned coverage.
 9. **Browse availability/phenology** — identify measurable remote or field proxies that can complement agriculture and mast.
 10. **Coefficient-transfer review** — only after candidate model forms are selected; recover exact standardized coefficients, scales, uncertainty, and availability definitions from the most transferable studies.
 
