@@ -6,7 +6,7 @@ Normative science source: `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
 
 ## Purpose
 
-`deer-relationship-registry-v1` is the machine-readable transfer layer between the durable deer-science evidence ledger and future deer-specific evaluation modules.
+`deer-relationship-registry-v2` is the machine-readable transfer layer between the durable deer-science evidence ledger and future deer-specific evaluation modules.
 
 It does **not** evaluate a property, predict deer use, or produce a score. It records what a future module is allowed to evaluate, which inputs and biological states are required, what spatial/temporal scale is supported, whether a coefficient may be transferred, and when the module must abstain or remain blocked.
 
@@ -227,10 +227,10 @@ It does not implement:
 
 Those remain Batch 10+ work and must consume this registry rather than recreate scientific rules in ad hoc code.
 
-## Registry consumer — Deer Science Context v2
+## Registry consumer — Deer Science Context v3
 
 As of 2026-09-26, the first generic registry consumer is implemented in
-`farm-watch-deer-science-evaluator.ts` (current output schema `deer-science-context-v2`).
+`farm-watch-deer-science-evaluator.ts` (current output schema `deer-science-context-v3`).
 
 The evaluator does not duplicate relationship rules. It reads this registry and enforces, in order:
 
@@ -241,7 +241,9 @@ The evaluator does not duplicate relationship rules. It reads this registry and 
 - coefficient-transfer disposition;
 - relationship output kind and direction.
 
-The consumer distinguishes registry/study applicability from property-specific directional evidence. An active ordinal or quantitative relationship remains `directional_relationship_context` with `decision_actionable=false` until a separate property-conditioned evaluation establishes a local, study-aligned covariate contrast.
+The consumer distinguishes registry/study applicability from property-conditioned evidence. An active ordinal or quantitative relationship remains `directional_relationship_context`. A relationship may expose a property-conditioned hypothesis only when this registry declares an explicit `property_conditioning` rule and the configured measured covariate resolves a real contrast. Current property-conditioned hypotheses remain `decision_actionable=false` and do not infer deer use or behavioral probability.
+
+R30 is the first property-conditioned relationship. Its rule binds mapped agricultural fraction across Farm Watch's barrier-aware 500 m, 1.5 km, and 3 km domains while preserving the source-study mismatch: Gilbertson et al. measured agricultural proportion inside individual 95% aKDE pre-dispersal ranges. The fixed-radius Farm Watch contrast can anchor a hypothesis but cannot reproduce the animal-specific source support geometry or transfer a probability coefficient.
 
 The consumer distinguishes known non-applicability from missing information. For example:
 
