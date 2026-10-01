@@ -274,7 +274,7 @@ Deno.test('active ordinal relationships remain relationship context until proper
   assert(row.status === 'active')
   assert(row.decision_relevance === 'directional_relationship_context')
   assert(row.decision_actionable === false)
-  assert(row.property_directional_evidence.status === 'not_evaluated')
+  assert(row.property_directional_evidence.status === 'not_configured')
 })
 
 Deno.test('R30 emits a property-conditioned agriculture hypothesis only after measuring an explicit multi-scale contrast', () => {
