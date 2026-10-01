@@ -1,5 +1,7 @@
 # Farm Watch Deer Science Context v1
 
+> **Superseded:** Current evaluator semantics are defined in `FARM_WATCH_DEER_SCIENCE_CONTEXT_V2.md`. The v1 rule that treated an active ordinal/quantitative relationship as a decision-actionable directional signal is retired; active relationship direction alone does not establish property-specific directional evidence.
+
 Status: implementation candidate  
 Version: 2026-09-26  
 Species: white-tailed deer (`Odocoileus virginianus`)  
