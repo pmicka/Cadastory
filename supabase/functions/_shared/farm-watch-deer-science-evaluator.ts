@@ -98,6 +98,18 @@ export type FarmWatchDeerStateDimension = {
   provenance: string
   source_product: DeerRelationshipProductKey | null
   evidence_state: DeerRelationshipEvidenceState | null
+  as_of: string | null
+  temporal_scope: string | null
+  spatial_scope: DeerRelationshipScale[]
+  state_class:
+    | 'explicit_scenario_input'
+    | 'deterministic_physical_state'
+    | 'authoritative_observed_or_derived'
+    | 'calibrated_proxy'
+    | 'unknown'
+    | 'stale'
+    | 'unavailable'
+  may_be_used_for_relationship_activation: boolean
   required_by_relationship_ids: string[]
   interpretation_boundary: string
 }
@@ -456,15 +468,54 @@ function meaningfulStateValues(value: unknown) {
 function buildDeerStateFramework(args: {
   scenario: FarmWatchDeerScienceScenario
   evidence: readonly FarmWatchDeerEvaluatorEvidence[]
+  stateGates: readonly {
+    relationship_id: string
+    state_gate: {
+      status: 'pass' | 'not_applicable' | 'insufficient_state'
+      missing_biological_dimensions: string[]
+      missing_or_incompatible_state_inputs: string[]
+    }
+  }[]
 }) {
   const requiredBy = requiredRelationshipsByStateDimension()
   const requiredIds = (key: string) =>
     [...(requiredBy.get(key) || new Set<string>())].sort()
   const dimensions: FarmWatchDeerStateDimension[] = []
-  const add = (row: Omit<FarmWatchDeerStateDimension,'required_by_relationship_ids'>) => {
+  const add = (row: Omit<
+    FarmWatchDeerStateDimension,
+    | 'required_by_relationship_ids'
+    | 'as_of'
+    | 'temporal_scope'
+    | 'spatial_scope'
+    | 'state_class'
+    | 'may_be_used_for_relationship_activation'
+  >) => {
+    const evidence = row.source_product
+      ? stateEvidence(args.evidence, row.source_product)
+      : null
+    const requiredByRelationshipIds = requiredIds(row.key)
+    const stateClass: FarmWatchDeerStateDimension['state_class'] =
+      row.status === 'unknown' || row.status === 'stale' || row.status === 'unavailable'
+        ? row.status
+        : row.provenance === 'explicit_scenario_input'
+          ? 'explicit_scenario_input'
+          : row.provenance.startsWith('deterministic_')
+            ? 'deterministic_physical_state'
+            : row.status === 'proxy'
+              ? 'calibrated_proxy'
+              : 'authoritative_observed_or_derived'
     dimensions.push({
       ...row,
-      required_by_relationship_ids: requiredIds(row.key),
+      required_by_relationship_ids: requiredByRelationshipIds,
+      as_of: evidence?.as_of || (row.family === 'temporal' ? args.scenario.at : null),
+      temporal_scope: row.family === 'temporal'
+        ? 'evaluation_timestamp'
+        : evidence?.as_of ? 'source_as_of' : null,
+      spatial_scope: evidence?.scales ? [...evidence.scales] : [],
+      state_class: stateClass,
+      may_be_used_for_relationship_activation:
+        requiredByRelationshipIds.length > 0 &&
+        (row.status === 'known' || row.status === 'proxy'),
     })
   }
 
@@ -512,6 +563,17 @@ function buildDeerStateFramework(args: {
     evidence_state: knownDimension(args.scenario.diel_period) ? 'available' : null,
     interpretation_boundary:
       'Solar phase is physical context, not a measured deer activity state.',
+  })
+  add({
+    key: 'timestamp_date',
+    family: 'temporal',
+    status: Number.isNaN(Date.parse(args.scenario.at)) ? 'unknown' : 'known',
+    value: args.scenario.at,
+    provenance: 'deterministic_evaluation_timestamp',
+    source_product: null,
+    evidence_state: null,
+    interpretation_boundary:
+      'Evaluation timestamp anchors deterministic temporal context; it does not establish a biological phase unless a registry contract authorizes the mapping.',
   })
   add({
     key: 'regional_reproductive_context',
@@ -686,11 +748,15 @@ function buildDeerStateFramework(args: {
   })
 
   const surfaceWater = stateEvidence(args.evidence, 'surface-water-state')
+  const surfaceWaterValue = surfaceWater?.values?.current_presence_state
+  const surfaceWaterStatus = stateStatusFromEvidenceState(surfaceWater?.evidence_state)
   add({
     key: 'surface_water_state',
     family: 'resource',
-    status: stateStatusFromEvidenceState(surfaceWater?.evidence_state),
-    value: surfaceWater?.values?.current_presence_state ?? null,
+    status: surfaceWaterStatus === 'known' && surfaceWaterValue == null
+      ? 'unknown'
+      : surfaceWaterStatus,
+    value: surfaceWaterValue ?? null,
     provenance: surfaceWater ? 'surface_water_state' : 'unavailable',
     source_product: 'surface-water-state',
     evidence_state: surfaceWater?.evidence_state || null,
@@ -728,10 +794,28 @@ function buildDeerStateFramework(args: {
       'Open season, roads, stands, and access geometry do not establish actual hunting pressure; unknown activity remains unknown.',
   })
 
-  const unresolvedRequired = dimensions.filter((row) =>
-    row.required_by_relationship_ids.length > 0 &&
-    ['unknown','stale','unavailable'].includes(row.status)
-  )
+  // Use the already-evaluated registry input groups and biological gates to
+  // determine unresolved dimensions. This preserves `match: any` semantics:
+  // one satisfied alternative must not leave the other alternative looking
+  // like a missing requirement in the top-level summary.
+  const unresolvedKeys = new Set<string>()
+  const inputDimensionKeys: Record<string, string[]> = {}
+  for (const [inputKey, dimensionKey] of Object.entries(
+    FARM_WATCH_DEER_STATE_INPUT_DIMENSIONS,
+  )) {
+    inputDimensionKeys[inputKey] = [dimensionKey]
+  }
+  inputDimensionKeys.water_state = ['surface_water_state', 'managed_water_state']
+  for (const row of args.stateGates) {
+    if (row.state_gate.status !== 'insufficient_state') continue
+    for (const key of row.state_gate.missing_biological_dimensions) {
+      unresolvedKeys.add(key)
+    }
+    for (const inputKey of row.state_gate.missing_or_incompatible_state_inputs) {
+      for (const key of inputDimensionKeys[inputKey] || []) unresolvedKeys.add(key)
+    }
+  }
+  const unresolvedRequired = dimensions.filter((row) => unresolvedKeys.has(row.key))
 
   const counts = ['known','proxy','unknown','stale','unavailable'].reduce(
     (out, status) => {
@@ -772,6 +856,36 @@ function evaluateRelationshipStateGate(args: {
   const unresolvedStateConstraints = stateConstraints.filter(
     (row) => row.status === 'unresolved',
   )
+  const biologicalRequirements = [
+    ['sex', args.relationship.biological_state_gates.sex, args.scenario.sex],
+    ['age_class', args.relationship.biological_state_gates.age_class, args.scenario.age_class],
+    ['movement_state', args.relationship.biological_state_gates.movement_state, args.scenario.movement_state],
+    ['reproductive_state', args.relationship.biological_state_gates.reproductive_state, args.scenario.individual_reproductive_state],
+    ['season', args.relationship.biological_state_gates.seasons, args.scenario.season],
+    ['diel_period', args.relationship.biological_state_gates.diel_periods, args.scenario.diel_period],
+    ['regional_reproductive_context', args.relationship.biological_state_gates.regional_reproductive_context, args.scenario.regional_reproductive_context],
+  ] as const
+  const requiredDimensions = new Set(
+    args.relationship.biological_state_gates.required_explicit_dimensions,
+  )
+  const biologicalStateRequirements = biologicalRequirements.map(
+    ([dimension, allowed, current_value]) => {
+      const required = allowed !== null || requiredDimensions.has(dimension)
+      const mismatch = args.biologicalGate.mismatches.some(
+        (row) => row.dimension === dimension,
+      )
+      const unknown = args.biologicalGate.missing_dimensions.includes(dimension)
+      return {
+        dimension,
+        required,
+        required_vocabulary: allowed ? [...allowed] : null,
+        current_value,
+        match_status: !required
+          ? 'not_required'
+          : mismatch ? 'mismatch' : unknown ? 'unknown' : 'pass',
+      }
+    },
+  )
 
   let status:
     | 'pass'
@@ -792,6 +906,7 @@ function evaluateRelationshipStateGate(args: {
     required_explicit_dimensions: [
       ...args.relationship.biological_state_gates.required_explicit_dimensions,
     ],
+    biological_state_requirements: biologicalStateRequirements,
     missing_biological_dimensions: [...args.biologicalGate.missing_dimensions],
     biological_mismatches: args.biologicalGate.mismatches.map((row) => ({
       ...row,
@@ -1515,6 +1630,10 @@ export function evaluateDeerScienceContext(args: {
     state_framework: buildDeerStateFramework({
       scenario: args.scenario,
       evidence: args.evidence,
+      stateGates: evaluations.map((row) => ({
+        relationship_id: row.relationship_id,
+        state_gate: row.state_gate,
+      })),
     }),
     scenario: {
       sex: args.scenario.sex,

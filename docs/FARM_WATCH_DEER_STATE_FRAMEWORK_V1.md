@@ -23,10 +23,27 @@ Each state dimension reports:
 - provenance;
 - source product when one exists;
 - source evidence state;
+- source `as_of` timestamp when available;
+- temporal and spatial scope when known;
+- a state class distinguishing explicit scenario input, deterministic physical state, authoritative observed/derived state, calibrated proxy, stale, unavailable, and unknown;
+- whether it is a candidate state input for a registry relationship (the relationship's allowed evidence states, input match, fidelity, and value constraints still decide eligibility);
 - relationship IDs that depend on the dimension;
 - an interpretation boundary.
 
 The framework is emitted inside `deer-science-context-v5`.
+
+## State classes
+
+| Class | Meaning |
+| --- | --- |
+| Explicit biological scenario | Sex, age class, movement, individual reproductive state, and regional reproductive context are separate values. Individual unknowns remain unknown. |
+| Deterministic temporal/solar state | Evaluation date, calendar season, and diel/photoperiod phase are time/solar context, not observed deer behavior. |
+| Environmental/resource state | Existing precipitation, drought, stream, soil moisture, thermal, snow, event, field phenology, crop identity, mast, water, browse, and disturbance products retain their own state and scope. |
+| Proxy state | A proxy remains labeled as such and is usable only where the relationship's existing input contract allows it. |
+| Unknown/unavailable/stale | Unknown describes unestablished focal state; unavailable means no authorized state product; stale remains stale. None is promoted to known. |
+| Source-study vocabulary | Study-defined periods and classes remain explicit where present; they are not coerced into general calendar seasons, age bands, or resource classes. |
+
+These classes control scientific applicability and input eligibility. They do not themselves establish deer presence, movement, feeding, bedding, habitat selection, or other behavior.
 
 ## Critical unknown-versus-unavailable rule
 
@@ -66,8 +83,10 @@ The framework preserves:
 
 - meteorological/calendar season;
 - deterministic solar/diel period.
+- the evaluation timestamp/date.
 
 Calendar season does not automatically reproduce a source study's biological-season definitions. Solar phase does not automatically mean deer activity.
+For example, Gilbertson et al.'s `fawning`, `post-fawning`, `breeding`, and `non-breeding` periods remain distinct from meteorological `spring`, `summer`, `fall`, and `winter`. A mapping is permitted only where an explicit registry contract defines it; the state framework itself performs no translation.
 
 ## Environmental state
 
@@ -120,6 +139,7 @@ Every evaluated relationship now carries `state_gate`.
 The gate reports:
 
 - required explicit biological dimensions;
+- per-dimension required source vocabulary, current scenario value, and `pass | mismatch | unknown | not_required` status (from the registry's existing gates);
 - missing biological dimensions;
 - known biological mismatches;
 - stateful input keys;
@@ -139,6 +159,8 @@ This state gate is diagnostic and remains separate from:
 - structural/spatial covariates;
 - source/product freshness logic;
 - property-conditioned covariate hypotheses.
+
+The framework's unresolved-dimension summary is derived from these evaluated registry gates. For `match: any` inputs, an accepted alternative satisfies the group; an unavailable unused alternative is still visible as a state dimension but is not reported as a missing requirement for that relationship. A product being available without the required state value (for example surface-water context with no current presence observation) remains `unknown` and does not satisfy the state gate.
 
 ## Fail-closed examples
 

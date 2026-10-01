@@ -9,6 +9,7 @@ on:
       - 'supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts'
       - 'supabase/functions/_shared/farm-watch-deer-science-evaluator.ts'
       - 'supabase/functions/_shared/farm-watch-deer-science-evaluator.test.ts'
+      - 'scripts/check-farm-watch-ui-evidence-stack.ts'
       - 'supabase/functions/_shared/farm-watch-diel-biological-state.ts'
       - 'supabase/functions/_shared/farm-watch-diel-biological-state.test.ts'
       - 'docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md'
@@ -52,5 +53,7 @@ jobs:
         run: deno test supabase/functions/_shared/farm-watch-deer-measurement-resolution.test.ts
       - name: Test registry-driven deer evaluator
         run: deno test supabase/functions/_shared/farm-watch-deer-science-evaluator.test.ts
+      - name: Check Farm Watch deer state and evidence-stack invariants
+        run: deno run --allow-read scripts/check-farm-watch-ui-evidence-stack.ts
       - name: Regression test Batch 3 biological state
         run: deno test supabase/functions/_shared/farm-watch-diel-biological-state.test.ts
