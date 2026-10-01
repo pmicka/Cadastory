@@ -6,8 +6,8 @@ import {
 
 export const FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_PRODUCT = Object.freeze({
   key: 'deer-relationship-registry',
-  algorithmVersion: 'farm-watch-deer-relationship-registry-v1',
-  outputSchemaVersion: 'deer-relationship-registry-v1',
+  algorithmVersion: 'farm-watch-deer-relationship-registry-v2',
+  outputSchemaVersion: 'deer-relationship-registry-v2',
   species: 'Odocoileus virginianus',
   ledgerVersion: '2026-09-25',
   outputKinds: Object.freeze([
