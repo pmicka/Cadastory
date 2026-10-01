@@ -1012,6 +1012,16 @@ function surfaceWaterPresence(value: any) {
 }
 
 function agricultureScaleMetrics(landscapeContext: any) {
+  if (landscapeContext?.status !== 'available') {
+    return {
+      scales: [] as DeerRelationshipScale[],
+      fractionByScale: {} as Record<string, number>,
+      fieldAreaByScale: {} as Record<string, number>,
+      domainAreaByScale: {} as Record<string, number>,
+      fieldCountByScale: {} as Record<string, number>,
+    }
+  }
+
   const zones = Array.isArray(landscapeContext?.agriculture?.field_context_by_zone)
     ? landscapeContext.agriculture.field_context_by_zone
     : []
