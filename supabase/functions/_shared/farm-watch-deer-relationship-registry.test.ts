@@ -12,6 +12,10 @@ import {
   validateDeerRelationshipRegistry,
   validateRelationshipModuleDefinition,
 } from './farm-watch-deer-relationship-registry.ts'
+import {
+  FARM_WATCH_DEER_INTERACTIONS,
+  validateDeerInteractionRegistry,
+} from './farm-watch-deer-interaction-registry.ts'
 
 function assert(condition: unknown, message = 'assertion failed'): asserts condition {
   if (!condition) throw new Error(message)
@@ -20,6 +24,47 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 Deno.test('Batch 9 registry validates as a whole', () => {
   assert(validateDeerRelationshipRegistry())
   assert(FARM_WATCH_DEER_RELATIONSHIPS.length >= 33)
+})
+
+Deno.test('research interaction registry validates and covers every relationship explicitly marked as an interaction', () => {
+  assert(validateDeerInteractionRegistry())
+  assert(FARM_WATCH_DEER_INTERACTIONS.length === 10)
+  const registeredRelationshipIds = new Set(FARM_WATCH_DEER_INTERACTIONS.flatMap((row) => row.relationship_ids))
+  for (const row of FARM_WATCH_DEER_RELATIONSHIPS) {
+    if (row.direction === 'interaction') {
+      assert(registeredRelationshipIds.has(row.relationship_id), row.relationship_id + ' has no interaction contract')
+    }
+  }
+  assert(!registeredRelationshipIds.has('FW-R19-juvenile-male-dispersal-ag-riparian'))
+  assert(!registeredRelationshipIds.has('FW-R31-juvenile-male-dispersal-distance'))
+})
+
+Deno.test('interaction contracts contain semantic structure only and never authorize transferred coefficients', () => {
+  const contractKeys = [
+    'interaction_id','ledger_ids','relationship_ids','title','biological_mechanism','response_variable',
+    'participating_variables','interaction_type','structure','state_gate_relationship_ids','required_measurements',
+    'context_only_measurement_ids','temporal_scale','spatial_scale','supported_form','supported_direction',
+    'supported_nonlinearity','coefficient_transfer_disposition','property_conditioning_eligibility',
+    'null_or_blocked_conditions','transfer_limitations','interpretation_boundary',
+  ].sort()
+  for (const row of FARM_WATCH_DEER_INTERACTIONS) {
+    assert(row.coefficient_transfer_disposition === 'not_authorized')
+    assert(row.property_conditioning_eligibility === 'not_configured')
+    assert(JSON.stringify(Object.keys(row).sort()) === JSON.stringify(contractKeys))
+    const serialized = JSON.stringify(row)
+    assert(!serialized.includes('numeric_formula'))
+    assert(!serialized.includes('coefficient_value'))
+  }
+})
+
+Deno.test('FW-D24 and FW-D25 remain guardrails rather than generic edge or visibility interactions', () => {
+  assert(!FARM_WATCH_DEER_INTERACTIONS.some((row) => row.ledger_ids.includes('FW-D24')))
+  assert(!FARM_WATCH_DEER_INTERACTIONS.some((row) => row.ledger_ids.includes('FW-D25')))
+  assert(!FARM_WATCH_DEER_INTERACTIONS.some((row) =>
+    row.participating_variables.includes('generic_edge_density') ||
+    row.participating_variables.includes('security_cover') ||
+    row.participating_variables.includes('horizontal_visibility_x_concealment')
+  ))
 })
 
 Deno.test('every durable deer ledger entry has machine-readable relationship coverage', async () => {

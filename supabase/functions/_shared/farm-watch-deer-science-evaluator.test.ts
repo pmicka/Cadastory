@@ -456,7 +456,7 @@ Deno.test('juvenile-male dispersal path relationship can be active without becom
   })
   assert(row.status === 'active')
   assert(row.result?.output_kind === 'ordinal_directional')
-  assert(row.result?.direction === 'interaction')
+  assert(row.result?.direction === 'mixed')
   assert(row.coefficient_transfer.status === 'not_supported')
   assert(row.coefficient_transfer.numeric_parameters.length === 0)
   assert(row.decision_relevance === 'directional_relationship_context')
