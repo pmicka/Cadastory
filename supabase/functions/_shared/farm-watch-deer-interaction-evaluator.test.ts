@@ -43,8 +43,10 @@ function evidenceForRelationship(
     .flatMap((input) => {
       const productKey = input.product_keys[0]
       const product = FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG[productKey]
-      const state = input.allowed_evidence_states.find((value) => product.evidence_states.includes(value))
-      const scale = input.allowed_scales.find((value) => product.scales.includes(value))
+      const productStates = product.evidence_states as readonly string[]
+      const productScales = product.scales as readonly string[]
+      const state = input.allowed_evidence_states.find((value) => productStates.includes(value))
+      const scale = input.allowed_scales.find((value) => productScales.includes(value))
       if (!state || !scale) throw new Error('No compatible test evidence for ' + input.key)
       return [{
         product_key: productKey,
