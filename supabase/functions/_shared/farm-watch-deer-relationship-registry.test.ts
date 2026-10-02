@@ -4,6 +4,7 @@ import {
   FARM_WATCH_DEER_LEDGER_IDS,
   FARM_WATCH_DEER_RELATIONSHIPS,
   applicableBiologicalStateLedgerIds,
+  deerMeasurementEvidenceFidelityClass,
   deerRelationshipStudyFidelityStatus,
   getDeerRelationship,
   relationshipsForLedgerId,
@@ -45,6 +46,37 @@ Deno.test('active biological relationships carry explicit study-measurement cont
       relationship.relationship_id + ' has no study-measurement contract',
     )
   }
+})
+
+Deno.test('every deer study measurement maps to exactly one explicit evidence-fidelity class', () => {
+  const counts = {
+    exact: 0,
+    study_aligned_derivative: 0,
+    calibrated_proxy: 0,
+    mechanism_only: 0,
+    unavailable: 0,
+  }
+
+  let rows = 0
+  for (const relationship of FARM_WATCH_DEER_RELATIONSHIPS) {
+    for (const measurement of relationship.study_measurements) {
+      rows += 1
+      const fidelity = deerMeasurementEvidenceFidelityClass(measurement.alignment)
+      counts[fidelity] += 1
+    }
+  }
+
+  assert(rows > 0)
+  assert(Object.values(counts).reduce((sum, count) => sum + count, 0) === rows)
+  for (const count of Object.values(counts)) assert(count > 0)
+})
+
+Deno.test('measurement-fidelity vocabulary prevents mechanism-only and unsupported variables from masquerading as aligned evidence', () => {
+  assert(deerMeasurementEvidenceFidelityClass('measurement_equivalent') === 'exact')
+  assert(deerMeasurementEvidenceFidelityClass('derived_equivalent') === 'study_aligned_derivative')
+  assert(deerMeasurementEvidenceFidelityClass('calibrated_proxy') === 'calibrated_proxy')
+  assert(deerMeasurementEvidenceFidelityClass('mechanism_context_only') === 'mechanism_only')
+  assert(deerMeasurementEvidenceFidelityClass('unsupported') === 'unavailable')
 })
 
 Deno.test('FW-R01 vegetation height is bound only to the production-validated study-aligned product', () => {

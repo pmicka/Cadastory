@@ -228,10 +228,10 @@ It does not implement:
 
 Those remain Batch 10+ work and must consume this registry rather than recreate scientific rules in ad hoc code.
 
-## Registry consumer — Deer Science Context v3
+## Registry consumer — Deer Science Context v4
 
 As of 2026-09-26, the first generic registry consumer is implemented in
-`farm-watch-deer-science-evaluator.ts` (current output schema `deer-science-context-v3`).
+`farm-watch-deer-science-evaluator.ts` (current output schema `deer-science-context-v4`).
 
 The evaluator does not duplicate relationship rules. It reads this registry and enforces, in order:
 
@@ -242,9 +242,11 @@ The evaluator does not duplicate relationship rules. It reads this registry and 
 - coefficient-transfer disposition;
 - relationship output kind and direction.
 
+The consumer also emits a per-source-variable evidence-fidelity matrix. Registry alignment is normalized to `exact`, `study_aligned_derivative`, `calibrated_proxy`, `mechanism_only`, or `unavailable`, while current evidence binding is reported separately. This prevents an available product from silently upgrading a weaker study-variable equivalence class.
+
 The consumer distinguishes registry/study applicability from property-conditioned evidence. An active ordinal or quantitative relationship remains `directional_relationship_context`. A relationship may expose a property-conditioned hypothesis only when this registry declares an explicit `property_conditioning` rule and the configured measured covariate resolves a real contrast. Current property-conditioned hypotheses remain `decision_actionable=false` and do not infer deer use or behavioral probability.
 
-R30 is the first property-conditioned relationship. Its rule binds mapped agricultural fraction across Farm Watch's barrier-aware 500 m, 1.5 km, and 3 km domains while preserving the source-study mismatch: Gilbertson et al. measured agricultural proportion inside individual 95% aKDE pre-dispersal ranges. The fixed-radius Farm Watch contrast can anchor a hypothesis but cannot reproduce the animal-specific source support geometry or transfer a probability coefficient.
+R30 retains an explicit property-conditioning rule, but FW-M55 is `mechanism_only` and required for activation. Its configured mapped agricultural fractions across Farm Watch's barrier-aware 500 m, 1.5 km, and 3 km domains do not reproduce Gilbertson et al.'s agricultural proportion inside individual 95% aKDE pre-dispersal ranges. The mismatch blocks relationship activation and any directional property hypothesis until source-aligned support is available; it does not transfer a probability coefficient.
 
 The consumer distinguishes known non-applicability from missing information. For example:
 
@@ -257,4 +259,3 @@ The consumer distinguishes known non-applicability from missing information. For
 `extreme_event.applicability_state = active_extreme_event`. This closes the prior contract gap where an authoritative known no-event state could otherwise satisfy only the generic product/evidence-state requirement.
 
 The evaluator remains non-synthetic: no universal score or probability is produced, and no numeric coefficient appears unless this registry separately authorizes its transfer.
-

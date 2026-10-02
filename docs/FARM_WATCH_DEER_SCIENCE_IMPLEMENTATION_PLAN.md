@@ -152,7 +152,7 @@ The first production deer output should be a vector of evidence-backed module re
 | --- | --- |
 | `deer-biological-state-v1` | explicit sex/age/reproductive/movement/diel scenario |
 | `deer-relationship-registry-v2` | machine-readable implementation of science-ledger relationships |
-| `deer-science-context-v3` | module-by-module evaluated output with provenance, applicability, freshness, and uncertainty |
+| `deer-science-context-v4` | module-by-module evaluated output with provenance, applicability, freshness, and uncertainty |
 | later: `deer-relative-selection-v1` | quantitative synthesis only when parameter transfer is justified |
 
 Gridded artifacts should continue to use the generic Farm Watch materialization framework/private Storage. Date-keyed scalar/state products should use guarded central tables and service-only internal readers.
@@ -901,7 +901,7 @@ Use conservatively. Riparian selection during dispersal and semiarid water visit
 
 ---
 
-# Batch 11 — `deer-science-context-v3`
+# Batch 11 — `deer-science-context-v4`
 
 Status: implementation candidate complete on 2026-09-26; private-endpoint integration is source-controlled but production deployment remains a separate explicit action.
 
@@ -924,6 +924,7 @@ For each module:
 - output kind;
 - literature-supported relationship direction when registry-active;
 - property-conditioned covariate evidence only when an explicit registry rule evaluates real measured property values/contrasts; current hypotheses remain non-behavioral and non-actionable;
+- one explicit evidence-fidelity matrix row per declared source-study variable, keeping scientific equivalence class separate from current product/evidence binding;
 - input freshness;
 - input evidence classes;
 - relationship IDs;
@@ -935,7 +936,7 @@ For each module:
 
 ## No universal score
 
-v3 should not sum unlike outputs. Registry-active directional context is not itself a property-specific effect or decision-actionable conclusion. Registry-authorized property-conditioned hypotheses remain non-actionable unless a future stronger evidence contract explicitly permits otherwise.
+v4 should not sum unlike outputs. Registry-active directional context is not itself a property-specific effect or decision-actionable conclusion. Registry-authorized property-conditioned hypotheses remain non-actionable unless a future stronger evidence contract explicitly permits otherwise.
 
 A location might be:
 
@@ -1118,7 +1119,7 @@ The original scientific priority labels remain below for provenance, but the 202
 6. field phenology;
 7. science relationship registry;
 8. first deer modules that can satisfy their study measurements from the active autonomous/static queue;
-9. `deer-science-context-v3`, with explicit abstention for parked inputs.
+9. `deer-science-context-v4`, with explicit abstention for parked inputs.
 
 ## P1 — materially improve decision quality
 
