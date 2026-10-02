@@ -13,6 +13,7 @@ on:
       - 'supabase/functions/_shared/farm-watch-diel-biological-state.test.ts'
       - 'docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md'
       - 'docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V2.md'
+      - 'docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V3.md'
       - 'docs/FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_V1.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_CONTEXT_V1.md'
       - 'docs/FARM_WATCH_DEER_SCIENCE_CONTEXT_V2.md'
