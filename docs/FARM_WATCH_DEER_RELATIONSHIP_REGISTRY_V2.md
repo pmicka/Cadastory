@@ -1,9 +1,9 @@
 # Farm Watch Deer Relationship Registry v2
 
-Status: Batch 9 contract + property-conditioning extension  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Normative science source: `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
-Previous contract: `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`
+- **Status:** Batch 9 contract + property-conditioning extension
+- **Species:** white-tailed deer (`Odocoileus virginianus`)
+- **Normative science source:** `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+- **Previous contract:** `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`
 
 ## Purpose
 

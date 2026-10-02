@@ -258,7 +258,7 @@ async function exportSpecies(
 
 async function loadLocalSourceManifest(path: string) {
   const payload = JSON.parse(await Deno.readTextFile(path))
-  if (payload?.schema !== 'farm-watch-bigmap-local-crop-manifest-v1') {
+  if (payload?.schema !== 'farm-watch-bigmap-local-crop-manifest-v2') {
     throw new Error('local BIGMAP manifest schema is invalid')
   }
   if (String(payload?.crop?.property_slug || '') !== propertySlug) {
@@ -274,6 +274,36 @@ async function loadLocalSourceManifest(path: string) {
     throw new Error('local BIGMAP manifest does not contain the complete mast species set')
   }
   return payload
+}
+
+function assertLocalManifestMatchesClaimedBigmapIdentity(manifest: any, observations: any[]) {
+  const observation = (observations || []).find((row: any) =>
+    String(row?.key || '') === 'external:fia-bigmap-2018-species-biomass'
+  )
+  if (
+    observation?.status !== 'available' ||
+    observation?.authoritative !== true ||
+    observation?.resolution_status !== 'provider_published_sha256_checksums'
+  ) {
+    throw new Error('claimed authoritative BIGMAP checksum observation is unavailable')
+  }
+  const published = new Map(
+    (observation?.evidence?.checksums || []).map((row: any) => [
+      Number(row?.spcd),
+      String(row?.sha256 || '').toLowerCase(),
+    ]),
+  )
+  const items = Array.isArray(manifest?.items) ? manifest.items : []
+  for (const item of items) {
+    const spcd = Number(item?.spcd)
+    const manifestSha = String(item?.archive_provenance?.published_zip_sha256 || '').toLowerCase()
+    if (!/^[0-9a-f]{64}$/.test(manifestSha) || published.get(spcd) !== manifestSha) {
+      throw new Error('local BIGMAP ZIP provenance does not match claimed provider identity for SPCD ' + spcd)
+    }
+  }
+  if (published.size !== items.length) {
+    throw new Error('claimed BIGMAP checksum set does not match local provenance species set')
+  }
 }
 
 function siblingFile(manifestPath: string, fileName: string) {
@@ -305,6 +335,18 @@ async function readLocalSpecies(
 
   const item = (manifest?.items || []).find((row: any) => Number(row?.spcd) === expected.spcd)
   if (!item) throw new Error('local BIGMAP manifest is missing SPCD ' + expected.spcd)
+  const sourceTiffSha256 = String(item.source_tiff_sha256 || '').toLowerCase()
+  const archive = item?.archive_provenance || {}
+  const publishedZipSha256 = String(archive?.published_zip_sha256 || '').toLowerCase()
+  const archiveMemberTiffSha256 = String(archive?.archive_member_tiff_sha256 || '').toLowerCase()
+  if (
+    !/^[0-9a-f]{64}$/.test(sourceTiffSha256) ||
+    !/^[0-9a-f]{64}$/.test(publishedZipSha256) ||
+    archiveMemberTiffSha256 !== sourceTiffSha256 ||
+    String(archive?.gateway_url || '') !== String(manifest?.source?.bulk_download_page || '')
+  ) {
+    throw new Error('local BIGMAP archive provenance is incomplete for SPCD ' + expected.spcd)
+  }
   const filePath = siblingFile(manifestPath, String(item.crop_file || ''))
   const bytes = await Deno.readFile(filePath)
   const sourceSha256 = await sha256Hex(bytes)
@@ -334,6 +376,10 @@ async function readLocalSpecies(
     sourceSha256,
     sourceBytes: bytes.byteLength,
     sourceFileName: String(item.source_tiff_name || ''),
+    sourceTiffSha256,
+    publishedZipSha256,
+    archiveFileName: String(archive?.archive_file_name || ''),
+    archiveMember: String(archive?.archive_member || ''),
     transport: 'operator_workstation_usfs_raster_gateway_bounded_crop',
   }
 }
@@ -405,6 +451,12 @@ async function main() {
       ? await loadLocalSourceManifest(localSourceManifest)
       : null
     if (localManifest) {
+      assertLocalManifestMatchesClaimedBigmapIdentity(
+        localManifest,
+        Array.isArray(claim?.external_source_observations)
+          ? claim.external_source_observations
+          : [],
+      )
       console.log('Using operator-cropped official USDA Raster Data Gateway BIGMAP sources')
     } else {
       console.log('Querying BIGMAP 2018 species catalog from official public ArcGIS service')
@@ -458,8 +510,20 @@ async function main() {
           genus: String(record.genus || expected.scientific_name.split(' ')[0]),
           species: String(record.species || expected.scientific_name.split(' ').slice(1).join(' ')),
           scientific_name: expected.scientific_name,
-          source_tiff_sha256: exported.sourceSha256,
-          source_tiff_size_bytes: exported.sourceBytes,
+          bounded_crop_sha256: exported.sourceSha256,
+          bounded_crop_size_bytes: exported.sourceBytes,
+          source_tiff_sha256: localManifest && 'sourceTiffSha256' in exported
+            ? exported.sourceTiffSha256
+            : exported.sourceSha256,
+          source_zip_published_sha256: localManifest && 'publishedZipSha256' in exported
+            ? exported.publishedZipSha256
+            : null,
+          source_zip_file_name: localManifest && 'archiveFileName' in exported
+            ? exported.archiveFileName
+            : null,
+          source_zip_member: localManifest && 'archiveMember' in exported
+            ? exported.archiveMember
+            : null,
           source_transport: localManifest
             ? 'operator_workstation_usfs_raster_gateway_bounded_crop'
             : 'github_actions_public_usfs_arcgis',
@@ -581,6 +645,10 @@ async function main() {
         sampled_species_count: sourceItems.length,
         sampled_species_codes: sourceItems.map((row) => row.spcd).sort((a, b) => a - b),
         raw_source_persisted: false,
+        archive_to_crop_provenance_verified: localManifest ? true : null,
+        archive_provenance_contract: localManifest
+          ? 'usfs-published-zip-sha256-to-member-tiff-to-native-grid-crop-v1'
+          : null,
         bounded_source_transport: localManifest
           ? 'operator_workstation_usfs_raster_gateway_bounded_crop'
           : 'github_actions_public_usfs_arcgis',
