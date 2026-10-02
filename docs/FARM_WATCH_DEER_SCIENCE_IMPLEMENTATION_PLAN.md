@@ -342,6 +342,8 @@ A dated physical thermal surface can be produced with no deer label and with all
 
 # Batch 3 — Diel and biological-state contracts
 
+**2026-10-01 extension:** the evaluator now emits `deer-state-framework-v1`, preserving biological, temporal, environmental, resource, and disturbance state separately. Each relationship also exposes a fail-closed `state_gate` (`pass | not_applicable | insufficient_state`). Unknown animal state is distinct from unavailable source state; leaf state remains explicitly unavailable rather than inferred from calendar season or historical leaf-off imagery.
+
 Status: production; deployed and validated 2026-09-21  
 Priority: P0  
 Depends on: deterministic solar time; regional phenology review.
@@ -823,6 +825,8 @@ A resolution decision does not itself unblock a deer relationship. Registry alig
 ---
 
 # Batch 10 — First deer-science evaluation modules
+
+**State-gating hardening complete:** `deer-science-context-v5` now exposes a formal state framework before ecological interpretation. State readiness is diagnostic and remains separate from measurement fidelity, spatial covariates, source freshness, and property-conditioned hypotheses.
 
 Status: registry-driven evaluator implemented as a source-controlled candidate on 2026-09-26; individual relationships still activate, abstain, or remain blocked strictly according to their current registry gates and evidence.
 

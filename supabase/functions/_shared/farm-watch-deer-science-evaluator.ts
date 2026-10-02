@@ -18,8 +18,8 @@ import type {
 
 export const FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT = Object.freeze({
   key: 'deer-science-context',
-  algorithmVersion: 'farm-watch-deer-science-evaluator-v4',
-  outputSchemaVersion: 'deer-science-context-v4',
+  algorithmVersion: 'farm-watch-deer-science-evaluator-v5',
+  outputSchemaVersion: 'deer-science-context-v5',
   species: 'Odocoileus virginianus',
   statusVocabulary: Object.freeze([
     'active',
@@ -75,6 +75,61 @@ type GateEvaluation = {
     allowed: string[]
   }>
 }
+
+export type FarmWatchDeerStateFrameworkStatus =
+  | 'known'
+  | 'proxy'
+  | 'unknown'
+  | 'stale'
+  | 'unavailable'
+
+export type FarmWatchDeerStateFrameworkFamily =
+  | 'biological'
+  | 'temporal'
+  | 'environmental'
+  | 'resource'
+  | 'disturbance'
+
+export type FarmWatchDeerStateDimension = {
+  key: string
+  family: FarmWatchDeerStateFrameworkFamily
+  status: FarmWatchDeerStateFrameworkStatus
+  value: unknown
+  provenance: string
+  source_product: DeerRelationshipProductKey | null
+  evidence_state: DeerRelationshipEvidenceState | null
+  as_of: string | null
+  temporal_scope: string | null
+  spatial_scope: DeerRelationshipScale[]
+  state_class:
+    | 'explicit_scenario_input'
+    | 'deterministic_physical_state'
+    | 'authoritative_observed_or_derived'
+    | 'calibrated_proxy'
+    | 'unknown'
+    | 'stale'
+    | 'unavailable'
+  may_be_used_for_relationship_activation: boolean
+  required_by_relationship_ids: string[]
+  interpretation_boundary: string
+}
+
+const FARM_WATCH_DEER_STATE_INPUT_DIMENSIONS = Object.freeze({
+  biological_state: 'biological_state',
+  diel_state: 'diel_period',
+  thermal_exposure: 'thermal_environment',
+  resource_state: 'resource_state',
+  winter_severity: 'snow_winter_state',
+  annual_mast_state: 'annual_mast_state',
+  current_crop_identity: 'current_crop_identity',
+  field_phenology: 'field_phenology_state',
+  agriculture_state: 'agriculture_resource_state',
+  browse_state: 'browse_state',
+  human_activity: 'human_activity_state',
+  extreme_event: 'extreme_weather_state',
+  water_state: 'surface_water_state',
+  recent_precipitation: 'recent_precipitation_state',
+} as const)
 
 type InputEvaluation = {
   key: string
@@ -298,6 +353,572 @@ function evaluateBiologicalGate(
         : 'pass',
     missing_dimensions: [...new Set(missing)].sort(),
     mismatches,
+  }
+}
+
+function stateStatusFromEvidenceState(
+  evidenceState: DeerRelationshipEvidenceState | null | undefined,
+): FarmWatchDeerStateFrameworkStatus {
+  if (evidenceState === 'available' || evidenceState === 'known' || evidenceState === 'accepted') {
+    return 'known'
+  }
+  if (evidenceState === 'proxy') return 'proxy'
+  if (evidenceState === 'stale') return 'stale'
+  return 'unavailable'
+}
+
+function normalizedScenarioState(value: unknown): FarmWatchDeerStateFrameworkStatus {
+  const normalized = String(value || '').trim()
+  if (normalized === 'unavailable' || normalized === 'not_resolved') return 'unavailable'
+  if (!normalized || normalized === 'unknown') return 'unknown'
+  return 'known'
+}
+
+function requiredRelationshipsByStateDimension() {
+  const out = new Map<string, Set<string>>()
+  const add = (key: string, relationshipId: string) => {
+    if (!out.has(key)) out.set(key, new Set())
+    out.get(key)!.add(relationshipId)
+  }
+
+  for (const relationship of FARM_WATCH_DEER_RELATIONSHIPS) {
+    for (const dimension of relationship.biological_state_gates.required_explicit_dimensions) {
+      add(dimension, relationship.relationship_id)
+    }
+
+    for (const requirement of relationship.required_inputs) {
+      switch (requirement.key) {
+        case 'diel_state':
+          add('diel_period', relationship.relationship_id)
+          break
+        case 'thermal_exposure':
+          add('thermal_environment', relationship.relationship_id)
+          break
+        case 'winter_severity':
+          add('snow_winter_state', relationship.relationship_id)
+          break
+        case 'annual_mast_state':
+          add('annual_mast_state', relationship.relationship_id)
+          break
+        case 'current_crop_identity':
+          add('current_crop_identity', relationship.relationship_id)
+          break
+        case 'field_phenology':
+        case 'agriculture_state':
+          add('field_phenology_state', relationship.relationship_id)
+          break
+        case 'browse_state':
+          add('browse_state', relationship.relationship_id)
+          break
+        case 'human_activity':
+          add('human_activity_state', relationship.relationship_id)
+          break
+        case 'extreme_event':
+          add('extreme_weather_state', relationship.relationship_id)
+          break
+        case 'recent_precipitation':
+          add('recent_precipitation_state', relationship.relationship_id)
+          break
+        case 'water_state':
+          add('surface_water_state', relationship.relationship_id)
+          add('managed_water_state', relationship.relationship_id)
+          break
+        case 'resource_state':
+          if (requirement.product_keys.includes('managed-food-feature-context')) {
+            add('managed_food_state', relationship.relationship_id)
+          }
+          if (requirement.product_keys.includes('field-phenology-context')) {
+            add('field_phenology_state', relationship.relationship_id)
+          }
+          if (requirement.product_keys.includes('browse-resource-context')) {
+            add('browse_state', relationship.relationship_id)
+          }
+          break
+      }
+    }
+  }
+  return out
+}
+
+function stateEvidence(
+  evidence: readonly FarmWatchDeerEvaluatorEvidence[],
+  productKey: DeerRelationshipProductKey,
+) {
+  return evidence.find((row) => row.product_key === productKey) || null
+}
+
+function componentState(
+  evidence: FarmWatchDeerEvaluatorEvidence | null,
+  key: string,
+) {
+  const value = evidence?.values?.[key]
+  if (VALID_EVIDENCE_STATES.has(value as DeerRelationshipEvidenceState)) {
+    return value as DeerRelationshipEvidenceState
+  }
+  return evidence?.evidence_state || null
+}
+
+function meaningfulStateValues(value: unknown) {
+  const values = Array.isArray(value) ? value : [value]
+  return values.filter((item) =>
+    knownDimension(String(item ?? ''))
+  )
+}
+
+function buildDeerStateFramework(args: {
+  scenario: FarmWatchDeerScienceScenario
+  evidence: readonly FarmWatchDeerEvaluatorEvidence[]
+  stateGates: readonly {
+    relationship_id: string
+    state_gate: {
+      status: 'pass' | 'not_applicable' | 'insufficient_state'
+      missing_biological_dimensions: string[]
+      missing_or_incompatible_state_inputs: string[]
+    }
+  }[]
+}) {
+  const requiredBy = requiredRelationshipsByStateDimension()
+  const requiredIds = (key: string) =>
+    [...(requiredBy.get(key) || new Set<string>())].sort()
+  const dimensions: FarmWatchDeerStateDimension[] = []
+  const add = (row: Omit<
+    FarmWatchDeerStateDimension,
+    | 'required_by_relationship_ids'
+    | 'as_of'
+    | 'temporal_scope'
+    | 'spatial_scope'
+    | 'state_class'
+    | 'may_be_used_for_relationship_activation'
+  >) => {
+    const evidence = row.source_product
+      ? stateEvidence(args.evidence, row.source_product)
+      : null
+    const requiredByRelationshipIds = requiredIds(row.key)
+    const stateClass: FarmWatchDeerStateDimension['state_class'] =
+      row.status === 'unknown' || row.status === 'stale' || row.status === 'unavailable'
+        ? row.status
+        : row.provenance === 'explicit_scenario_input'
+          ? 'explicit_scenario_input'
+          : row.provenance.startsWith('deterministic_')
+            ? 'deterministic_physical_state'
+            : row.status === 'proxy'
+              ? 'calibrated_proxy'
+              : 'authoritative_observed_or_derived'
+    dimensions.push({
+      ...row,
+      required_by_relationship_ids: requiredByRelationshipIds,
+      as_of: evidence?.as_of || (row.family === 'temporal' ? args.scenario.at : null),
+      temporal_scope: row.family === 'temporal'
+        ? 'evaluation_timestamp'
+        : evidence?.as_of ? 'source_as_of' : null,
+      spatial_scope: evidence?.scales ? [...evidence.scales] : [],
+      state_class: stateClass,
+      may_be_used_for_relationship_activation:
+        requiredByRelationshipIds.length > 0 &&
+        (row.status === 'known' || row.status === 'proxy'),
+    })
+  }
+
+  for (const [key, value] of [
+    ['sex', args.scenario.sex],
+    ['age_class', args.scenario.age_class],
+    ['movement_state', args.scenario.movement_state],
+    ['reproductive_state', args.scenario.individual_reproductive_state],
+  ] as const) {
+    add({
+      key,
+      family: 'biological',
+      status: normalizedScenarioState(value),
+      value,
+      provenance: knownDimension(value) ? 'explicit_scenario_input' : 'unknown',
+      source_product: 'deer-biological-state',
+      evidence_state: knownDimension(value) ? 'available' : null,
+      interpretation_boundary:
+        'Individual biological state is never inferred from regional timing, remote sensing, or habitat structure.',
+    })
+  }
+
+  add({
+    key: 'season',
+    family: 'temporal',
+    status: normalizedScenarioState(args.scenario.season),
+    value: args.scenario.season,
+    provenance: knownDimension(args.scenario.season)
+      ? 'deterministic_calendar_context'
+      : 'unknown',
+    source_product: 'deer-biological-state',
+    evidence_state: knownDimension(args.scenario.season) ? 'available' : null,
+    interpretation_boundary:
+      'Calendar/meteorological season is deterministic context; source-study biological seasons remain separate when their definitions differ.',
+  })
+  add({
+    key: 'diel_period',
+    family: 'temporal',
+    status: normalizedScenarioState(args.scenario.diel_period),
+    value: args.scenario.diel_period,
+    provenance: knownDimension(args.scenario.diel_period)
+      ? 'deterministic_solar_context'
+      : 'unknown',
+    source_product: 'diel-photoperiod-context',
+    evidence_state: knownDimension(args.scenario.diel_period) ? 'available' : null,
+    interpretation_boundary:
+      'Solar phase is physical context, not a measured deer activity state.',
+  })
+  add({
+    key: 'timestamp_date',
+    family: 'temporal',
+    status: Number.isNaN(Date.parse(args.scenario.at)) ? 'unknown' : 'known',
+    value: args.scenario.at,
+    provenance: 'deterministic_evaluation_timestamp',
+    source_product: null,
+    evidence_state: null,
+    interpretation_boundary:
+      'Evaluation timestamp anchors deterministic temporal context; it does not establish a biological phase unless a registry contract authorizes the mapping.',
+  })
+  add({
+    key: 'regional_reproductive_context',
+    family: 'biological',
+    status: normalizedScenarioState(args.scenario.regional_reproductive_context),
+    value: args.scenario.regional_reproductive_context,
+    provenance: knownDimension(args.scenario.regional_reproductive_context)
+      ? 'regional_population_evidence'
+      : 'unavailable',
+    source_product: 'deer-biological-state',
+    evidence_state: knownDimension(args.scenario.regional_reproductive_context)
+      ? 'available'
+      : 'unavailable',
+    interpretation_boundary:
+      'Regional breeding timing never establishes an individual deer reproductive state or movement response.',
+  })
+
+  const seasonal = stateEvidence(args.evidence, 'seasonal-state')
+  for (const [key, valueKey, boundary] of [
+    ['recent_precipitation_state','precipitation_state','Recent precipitation is environmental context and does not imply deer movement or water use.'],
+    ['drought_state','drought_state','Drought state is environmental context and does not establish local deer use.'],
+    ['stream_state','stream_state','Stream/discharge state may be off-property proxy context and does not establish water use.'],
+    ['rootzone_soil_moisture_state','rootzone_soil_moisture_state','Root-zone soil moisture is environmental context, not a forage or deer-use observation.'],
+  ] as const) {
+    const state = componentState(seasonal, valueKey)
+    add({
+      key,
+      family: 'environmental',
+      status: stateStatusFromEvidenceState(state),
+      value: seasonal?.values?.[valueKey] ?? null,
+      provenance: seasonal ? 'seasonal_state_component' : 'unavailable',
+      source_product: 'seasonal-state',
+      evidence_state: state,
+      interpretation_boundary: boundary,
+    })
+  }
+
+  const thermal = stateEvidence(args.evidence, 'thermal-exposure-context')
+  add({
+    key: 'thermal_environment',
+    family: 'environmental',
+    status: stateStatusFromEvidenceState(thermal?.evidence_state),
+    value:
+      thermal && thermal.evidence_state !== 'unavailable'
+        ? 'physical_context_available'
+        : null,
+    provenance:
+      thermal && thermal.evidence_state !== 'unavailable'
+        ? 'farm_watch_physical_context'
+        : 'unavailable',
+    source_product: 'thermal-exposure-context',
+    evidence_state: thermal?.evidence_state || null,
+    interpretation_boundary:
+      'Thermal context is physical forcing/exposure context and is not automatically operative temperature or a deer thermal response.',
+  })
+
+  const snow = stateEvidence(args.evidence, 'snow-winter-severity-context')
+  add({
+    key: 'snow_winter_state',
+    family: 'environmental',
+    status: stateStatusFromEvidenceState(snow?.evidence_state),
+    value: {
+      latest_complete_daily_context:
+        snow?.values?.latest_complete_daily_context ?? null,
+      minnesota_wsi_context_status:
+        snow?.values?.minnesota_wsi_context_status ?? null,
+    },
+    provenance: snow ? 'noaa_nohrsc_hrrr_context' : 'unavailable',
+    source_product: 'snow-winter-severity-context',
+    evidence_state: snow?.evidence_state || null,
+    interpretation_boundary:
+      'Snow depth and minimum temperature remain physical variables; Minnesota WSI categories and response magnitudes do not transfer to Kentucky.',
+  })
+
+  const extreme = stateEvidence(args.evidence, 'extreme-weather-event-context')
+  add({
+    key: 'extreme_weather_state',
+    family: 'environmental',
+    status: stateStatusFromEvidenceState(extreme?.evidence_state),
+    value: {
+      applicability_state: extreme?.values?.applicability_state ?? null,
+      event_active: extreme?.values?.event_active ?? null,
+    },
+    provenance: extreme ? 'authoritative_event_context' : 'unavailable',
+    source_product: 'extreme-weather-event-context',
+    evidence_state: extreme?.evidence_state || null,
+    interpretation_boundary:
+      'Extreme-event state is separate from routine weather and cannot be generalized into a generic weather movement score.',
+  })
+
+  add({
+    key: 'leaf_state',
+    family: 'environmental',
+    status: 'unavailable',
+    value: null,
+    provenance: 'no_authorized_current_leaf_state_product',
+    source_product: null,
+    evidence_state: null,
+    interpretation_boundary:
+      'Leaf-off imagery products describe woody structure from named acquisition dates; calendar season or historical leaf-off imagery must not be relabeled as current leaf state.',
+  })
+
+  const phenology = stateEvidence(args.evidence, 'field-phenology-context')
+  const phenologyValues = meaningfulStateValues(phenology?.values?.phenology_state)
+  add({
+    key: 'field_phenology_state',
+    family: 'resource',
+    status: phenologyValues.length
+      ? stateStatusFromEvidenceState(phenology?.evidence_state)
+      : phenology?.evidence_state === 'stale'
+        ? 'stale'
+        : phenology?.evidence_state === 'unavailable'
+          ? 'unavailable'
+          : phenology
+            ? 'unknown'
+            : 'unavailable',
+    value: phenologyValues,
+    provenance: phenology ? 'field_phenology_context' : 'unavailable',
+    source_product: 'field-phenology-context',
+    evidence_state: phenology?.evidence_state || null,
+    interpretation_boundary:
+      'Remote field phenology is resource-state context; it does not establish forage quality, deer feeding, or harvest unless the source contract supports that state.',
+  })
+
+  const crop = stateEvidence(args.evidence, 'current-crop-identity')
+  const cropValues = meaningfulStateValues(crop?.values?.crop_name)
+  add({
+    key: 'current_crop_identity',
+    family: 'resource',
+    status: cropValues.length
+      ? stateStatusFromEvidenceState(crop?.evidence_state)
+      : crop?.evidence_state === 'unavailable'
+        ? 'unavailable'
+        : crop
+          ? 'unknown'
+          : 'unavailable',
+    value: cropValues,
+    provenance: crop ? 'accepted_field_crop_identity' : 'unavailable',
+    source_product: 'current-crop-identity',
+    evidence_state: crop?.evidence_state || null,
+    interpretation_boundary:
+      'Crop identity is separate from crop stage, standing food availability, access, and deer use.',
+  })
+
+  const mast = stateEvidence(args.evidence, 'annual-mast-state')
+  add({
+    key: 'annual_mast_state',
+    family: 'resource',
+    status: stateStatusFromEvidenceState(mast?.evidence_state),
+    value: mast?.values?.annual_mast_proxy_status ?? null,
+    provenance: mast ? 'kdfwr_exact_year_regional_proxy' : 'unavailable',
+    source_product: 'annual-mast-state',
+    evidence_state: mast?.evidence_state || null,
+    interpretation_boundary:
+      'Regional annual mast survey state is separate from property mast production and from static mast-producing-species capacity.',
+  })
+
+  const browse = stateEvidence(args.evidence, 'browse-resource-context')
+  add({
+    key: 'browse_state',
+    family: 'resource',
+    status: stateStatusFromEvidenceState(browse?.evidence_state),
+    value: browse?.values || null,
+    provenance:
+      browse && browse.evidence_state !== 'unavailable'
+        ? 'browse_resource_context'
+        : 'unavailable',
+    source_product: 'browse-resource-context',
+    evidence_state: browse?.evidence_state || null,
+    interpretation_boundary:
+      'Woody browse state requires source-aligned browse evidence; LiDAR structure, greenness, or generic canopy context must not be substituted.',
+  })
+
+  const surfaceWater = stateEvidence(args.evidence, 'surface-water-state')
+  const surfaceWaterValue = surfaceWater?.values?.current_presence_state
+  const surfaceWaterStatus = stateStatusFromEvidenceState(surfaceWater?.evidence_state)
+  add({
+    key: 'surface_water_state',
+    family: 'resource',
+    status: surfaceWaterStatus === 'known' && surfaceWaterValue == null
+      ? 'unknown'
+      : surfaceWaterStatus,
+    value: surfaceWaterValue ?? null,
+    provenance: surfaceWater ? 'surface_water_state' : 'unavailable',
+    source_product: 'surface-water-state',
+    evidence_state: surfaceWater?.evidence_state || null,
+    interpretation_boundary:
+      'Known/observed water presence does not establish deer use or preference.',
+  })
+
+  for (const [key, productKey, valueKey, boundary] of [
+    ['managed_food_state','managed-food-feature-context','managed_food_present','Configured managed-food presence/absence is not measured forage quality or deer use.'],
+    ['managed_water_state','managed-water-source-context','current_presence_state','Configured managed-water presence/absence is not deer use.'],
+  ] as const) {
+    const evidence = stateEvidence(args.evidence, productKey)
+    add({
+      key,
+      family: 'resource',
+      status: stateStatusFromEvidenceState(evidence?.evidence_state),
+      value: evidence?.values?.[valueKey] ?? null,
+      provenance: evidence ? 'configured_property_inventory' : 'unavailable',
+      source_product: productKey,
+      evidence_state: evidence?.evidence_state || null,
+      interpretation_boundary: boundary,
+    })
+  }
+
+  const humanActivity = stateEvidence(args.evidence, 'human-activity-context')
+  add({
+    key: 'human_activity_state',
+    family: 'disturbance',
+    status: stateStatusFromEvidenceState(humanActivity?.evidence_state),
+    value: humanActivity?.values || null,
+    provenance: humanActivity ? 'human_activity_context' : 'unavailable',
+    source_product: 'human-activity-context',
+    evidence_state: humanActivity?.evidence_state || null,
+    interpretation_boundary:
+      'Open season, roads, stands, and access geometry do not establish actual hunting pressure; unknown activity remains unknown.',
+  })
+
+  // Use the already-evaluated registry input groups and biological gates to
+  // determine unresolved dimensions. This preserves `match: any` semantics:
+  // one satisfied alternative must not leave the other alternative looking
+  // like a missing requirement in the top-level summary.
+  const unresolvedKeys = new Set<string>()
+  const inputDimensionKeys: Record<string, string[]> = {}
+  for (const [inputKey, dimensionKey] of Object.entries(
+    FARM_WATCH_DEER_STATE_INPUT_DIMENSIONS,
+  )) {
+    inputDimensionKeys[inputKey] = [dimensionKey]
+  }
+  inputDimensionKeys.water_state = ['surface_water_state', 'managed_water_state']
+  for (const row of args.stateGates) {
+    if (row.state_gate.status !== 'insufficient_state') continue
+    for (const key of row.state_gate.missing_biological_dimensions) {
+      unresolvedKeys.add(key)
+    }
+    for (const inputKey of row.state_gate.missing_or_incompatible_state_inputs) {
+      for (const key of inputDimensionKeys[inputKey] || []) unresolvedKeys.add(key)
+    }
+  }
+  const unresolvedRequired = dimensions.filter((row) => unresolvedKeys.has(row.key))
+
+  const counts = ['known','proxy','unknown','stale','unavailable'].reduce(
+    (out, status) => {
+      out[status] = dimensions.filter((row) => row.status === status).length
+      return out
+    },
+    {} as Record<string, number>,
+  )
+
+  return {
+    schema: 'deer-state-framework-v1',
+    method: 'farm-watch-deer-state-framework-v1',
+    dimensions,
+    counts,
+    unresolved_required_dimension_count: unresolvedRequired.length,
+    unresolved_required_dimensions: unresolvedRequired.map((row) => row.key),
+    scoring_performed: false,
+    behavioral_inference_performed: false,
+    interpretation_boundary:
+      'State framework only. Deterministic, explicit, proxy, stale, unknown, and unavailable states remain distinct. Missing state never inherits a favorable biological interpretation and no state vector is combined into a deer score.',
+  }
+}
+
+function evaluateRelationshipStateGate(args: {
+  relationship: DeerRelationshipRecord
+  scenario: FarmWatchDeerScienceScenario
+  biologicalGate: GateEvaluation
+  inputs: readonly InputEvaluation[]
+  constraints: readonly ConstraintEvaluation[]
+}) {
+  const stateInputKeys = new Set(Object.keys(FARM_WATCH_DEER_STATE_INPUT_DIMENSIONS))
+  const stateInputs = args.inputs.filter((row) => stateInputKeys.has(row.key))
+  const stateConstraints = args.constraints.filter((constraint) =>
+    stateInputs.some((input) => input.key === constraint.binding_key)
+  )
+  const missingStateInputs = stateInputs.filter((row) => row.status !== 'satisfied')
+  const failedStateConstraints = stateConstraints.filter((row) => row.status === 'failed')
+  const unresolvedStateConstraints = stateConstraints.filter(
+    (row) => row.status === 'unresolved',
+  )
+  const biologicalRequirements = [
+    ['sex', args.relationship.biological_state_gates.sex, args.scenario.sex],
+    ['age_class', args.relationship.biological_state_gates.age_class, args.scenario.age_class],
+    ['movement_state', args.relationship.biological_state_gates.movement_state, args.scenario.movement_state],
+    ['reproductive_state', args.relationship.biological_state_gates.reproductive_state, args.scenario.individual_reproductive_state],
+    ['season', args.relationship.biological_state_gates.seasons, args.scenario.season],
+    ['diel_period', args.relationship.biological_state_gates.diel_periods, args.scenario.diel_period],
+    ['regional_reproductive_context', args.relationship.biological_state_gates.regional_reproductive_context, args.scenario.regional_reproductive_context],
+  ] as const
+  const requiredDimensions = new Set(
+    args.relationship.biological_state_gates.required_explicit_dimensions,
+  )
+  const biologicalStateRequirements = biologicalRequirements.map(
+    ([dimension, allowed, current_value]) => {
+      const required = allowed !== null || requiredDimensions.has(dimension)
+      const mismatch = args.biologicalGate.mismatches.some(
+        (row) => row.dimension === dimension,
+      )
+      const unknown = args.biologicalGate.missing_dimensions.includes(dimension)
+      return {
+        dimension,
+        required,
+        required_vocabulary: allowed ? [...allowed] : null,
+        current_value,
+        match_status: !required
+          ? 'not_required'
+          : mismatch ? 'mismatch' : unknown ? 'unknown' : 'pass',
+      }
+    },
+  )
+
+  let status:
+    | 'pass'
+    | 'not_applicable'
+    | 'insufficient_state' = 'pass'
+  if (
+    args.biologicalGate.status === 'not_applicable' ||
+    failedStateConstraints.length
+  ) status = 'not_applicable'
+  else if (
+    args.biologicalGate.status === 'insufficient_input' ||
+    missingStateInputs.length ||
+    unresolvedStateConstraints.length
+  ) status = 'insufficient_state'
+
+  return {
+    status,
+    required_explicit_dimensions: [
+      ...args.relationship.biological_state_gates.required_explicit_dimensions,
+    ],
+    biological_state_requirements: biologicalStateRequirements,
+    missing_biological_dimensions: [...args.biologicalGate.missing_dimensions],
+    biological_mismatches: args.biologicalGate.mismatches.map((row) => ({
+      ...row,
+      allowed: [...row.allowed],
+    })),
+    state_input_keys: stateInputs.map((row) => row.key),
+    missing_or_incompatible_state_inputs: missingStateInputs.map((row) => row.key),
+    state_constraint_ids: stateConstraints.map((row) => row.id),
+    failed_state_constraint_ids: failedStateConstraints.map((row) => row.id),
+    unresolved_state_constraint_ids: unresolvedStateConstraints.map((row) => row.id),
+    interpretation_boundary:
+      'This gate reports state readiness only. Structural/measurement fidelity and spatial covariates remain separate evaluation gates.',
   }
 }
 
@@ -743,6 +1364,13 @@ export function evaluateDeerRelationship(args: {
       inputEvaluation.rows,
     ),
     property_directional_evidence: initialPropertyDirectionalEvidence(relationship),
+    state_gate: evaluateRelationshipStateGate({
+      relationship,
+      scenario,
+      biologicalGate: gate,
+      inputs: inputEvaluation.rows,
+      constraints,
+    }),
     biological_gate: {
       ...gate,
       required_explicit_dimensions: [
@@ -974,6 +1602,23 @@ export function evaluateDeerScienceContext(args: {
     return out
   }, {} as Record<string, number>)
 
+  const state_gate_counts = [
+    'pass',
+    'not_applicable',
+    'insufficient_state',
+  ].reduce((out, status) => {
+    out[status] = evaluations.filter(
+      (row) => row.state_gate.status === status,
+    ).length
+    return out
+  }, {} as Record<string, number>)
+  const state_insufficient_relationship_ids = evaluations
+    .filter((row) => row.state_gate.status === 'insufficient_state')
+    .map((row) => row.relationship_id)
+  const state_not_applicable_relationship_ids = evaluations
+    .filter((row) => row.state_gate.status === 'not_applicable')
+    .map((row) => row.relationship_id)
+
   return {
     schema: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.outputSchemaVersion,
     method: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.algorithmVersion,
@@ -983,6 +1628,14 @@ export function evaluateDeerScienceContext(args: {
       state_code: args.scenario.state_code,
     },
     at: args.scenario.at,
+    state_framework: buildDeerStateFramework({
+      scenario: args.scenario,
+      evidence: args.evidence,
+      stateGates: evaluations.map((row) => ({
+        relationship_id: row.relationship_id,
+        state_gate: row.state_gate,
+      })),
+    }),
     scenario: {
       sex: args.scenario.sex,
       age_class: args.scenario.age_class,
@@ -1012,6 +1665,9 @@ export function evaluateDeerScienceContext(args: {
     measurement_fidelity_matrix_row_count: measurement_fidelity_rows.length,
     measurement_fidelity_counts,
     measurement_binding_counts,
+    state_gate_counts,
+    state_insufficient_relationship_ids,
+    state_not_applicable_relationship_ids,
     evaluator_active_relationship_ids: evaluations
       .filter((row) => row.status === 'active')
       .map((row) => row.relationship_id),
@@ -1021,7 +1677,7 @@ export function evaluateDeerScienceContext(args: {
     coefficient_synthesis_performed: false,
     behavioral_probability_inferred: false,
     interpretation_boundary:
-      'Registry-driven property/date/scenario applicability plus explicitly authorized property-conditioning only. Every source-study variable is exposed through a measurement-fidelity matrix that keeps exact measurements, study-aligned derivatives, calibrated proxies, mechanism-only context, and unavailable variables distinct. An active quantitative or ordinal relationship is literature-supported directional context. A property-conditioned hypothesis is emitted only when the registry declares a conditioning rule and the configured property covariate has a measured multi-scale contrast. Such a hypothesis remains non-actionable and does not infer deer use, dispersal, behavioral probability, or effect magnitude. Mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
+      'Registry-driven property/date/scenario applicability plus explicitly authorized property-conditioning only. A formal state framework keeps deterministic, explicit, proxy, stale, unknown, and unavailable biological/environmental/resource/disturbance states distinct and reports relationship-specific state readiness without collapsing those states into a score. Every source-study variable is exposed through a measurement-fidelity matrix that keeps exact measurements, study-aligned derivatives, calibrated proxies, mechanism-only context, and unavailable variables distinct. An active quantitative or ordinal relationship is literature-supported directional context. A property-conditioned hypothesis is emitted only when the registry declares a conditioning rule and the configured property covariate has a measured multi-scale contrast. Such a hypothesis remains non-actionable and does not infer deer use, dispersal, behavioral probability, or effect magnitude. Mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
   }
 }
 
@@ -1263,7 +1919,23 @@ export function buildDeerEvaluatorEvidenceFromFarmWatch(args: {
     evidence_state: seasonalPrecipitationState(seasonal),
     values: {
       precipitation_state: seasonal?.context?.component_states?.precipitation,
+      drought_state: seasonal?.context?.component_states?.drought,
+      stream_state: seasonal?.context?.component_states?.stream,
+      rootzone_soil_moisture_state:
+        seasonal?.context?.component_states?.rootzone_soil_moisture,
+      state_fieldwork_state:
+        seasonal?.context?.component_states?.state_fieldwork,
+      regional_crop_progress_state:
+        seasonal?.context?.component_states?.regional_crop_progress,
+      state_crop_stage_state:
+        seasonal?.context?.component_states?.state_crop_stage,
+      mapped_crop_context_state:
+        seasonal?.context?.component_states?.mapped_crop_context,
       precipitation: seasonal?.context?.components?.precipitation || null,
+      drought: seasonal?.context?.components?.drought || null,
+      stream: seasonal?.context?.components?.stream || null,
+      rootzone_soil_moisture:
+        seasonal?.context?.components?.rootzone_soil_moisture || null,
     },
   })
 
@@ -1341,7 +2013,6 @@ export function buildDeerEvaluatorEvidenceFromFarmWatch(args: {
     ['human-footprint-context', 'human_footprint_context'],
     ['multiscale-cover-context', 'multiscale_cover_context'],
     ['multiscale-forest-context', 'multiscale_forest_context'],
-    ['snow-winter-severity-context', 'snow_winter_severity_context'],
   ] as const) {
     addEvidence(
       out,
@@ -1349,6 +2020,16 @@ export function buildDeerEvaluatorEvidenceFromFarmWatch(args: {
       stack[sourceKey] || { status: 'unavailable' },
     )
   }
+
+  const snow = stack.snow_winter_severity_context
+  addEvidence(out, 'snow-winter-severity-context', snow || { status: 'unavailable' }, {
+    values: {
+      latest_complete_daily_context:
+        snow?.context?.latest_complete_daily_context || null,
+      minnesota_wsi_context_status:
+        snow?.context?.minnesota_wsi_context?.status || null,
+    },
+  })
 
   const extreme = stack.extreme_weather_event_context
   addEvidence(out, 'extreme-weather-event-context', extreme || { status: 'unavailable' }, {

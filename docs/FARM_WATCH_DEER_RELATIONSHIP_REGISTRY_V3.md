@@ -272,5 +272,7 @@ The consumer distinguishes known non-applicability from missing information. For
 `FW-C06-extreme-event-active` requires
 `extreme_event.applicability_state = active_extreme_event`. This closes the prior contract gap where an authoritative known no-event state could otherwise satisfy only the generic product/evidence-state requirement.
 
+The evaluator also emits `deer-state-framework-v1` and a per-relationship `state_gate`. Biological gates, stateful required inputs, and state-specific value constraints are made inspectable as `pass | not_applicable | insufficient_state`. This is diagnostic only: it does not weaken the registry's measurement-fidelity or input-binding requirements.
+
 The evaluator remains non-synthetic: no universal score or probability is produced, and no numeric coefficient appears unless this registry separately authorizes its transfer.
 
