@@ -121,8 +121,8 @@ assert(
 )
 
 for (const required of [
-  'deer-science-context-v5',
-  'farm-watch-deer-science-evaluator-v5',
+  'deer-science-context-v6',
+  'farm-watch-deer-science-evaluator-v6',
   'evaluateDeerRelationship',
   'evaluateDeerScienceContext',
   'buildDeerEvaluatorEvidenceFromFarmWatch',
@@ -152,6 +152,12 @@ for (const required of [
   'leaf_state',
   'no_authorized_current_leaf_state_product',
   'state_gate_counts',
+  'interaction_evaluation',
+  'eligible_interaction_context_count',
+  'blocked_by_state_count',
+  'blocked_by_fidelity_count',
+  'property_conditioned_interaction_hypothesis_available: false',
+  'scoring_performed: false',
   'decision_actionable: false',
   'coefficient_synthesis_performed: false',
   'behavioral_probability_inferred: false',
