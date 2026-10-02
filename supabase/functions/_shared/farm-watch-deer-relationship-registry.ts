@@ -6,8 +6,8 @@ import {
 
 export const FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_PRODUCT = Object.freeze({
   key: 'deer-relationship-registry',
-  algorithmVersion: 'farm-watch-deer-relationship-registry-v1',
-  outputSchemaVersion: 'deer-relationship-registry-v1',
+  algorithmVersion: 'farm-watch-deer-relationship-registry-v2',
+  outputSchemaVersion: 'deer-relationship-registry-v2',
   species: 'Odocoileus virginianus',
   ledgerVersion: '2026-09-25',
   outputKinds: Object.freeze([
@@ -277,6 +277,19 @@ export type DeerRelationshipBiologicalGate = {
   required_explicit_dimensions: string[]
 }
 
+export type DeerPropertyConditioningRule = {
+  id: string
+  binding_key: string
+  metric_field: string
+  metric_label: string
+  unit: 'percent'
+  comparison: 'ordered_scale_contrast'
+  ordered_scales: DeerRelationshipScale[]
+  support_geometry: string
+  hypothesis_interpretation: string
+  limitations: string[]
+}
+
 export type DeerRelationshipRecord = {
   relationship_id: string
   ledger_ids: string[]
@@ -305,6 +318,7 @@ export type DeerRelationshipRecord = {
   limitations: string[]
   study_measurements: DeerStudyMeasurementRequirement[]
   value_constraints: DeerRelationshipValueConstraint[]
+  property_conditioning?: DeerPropertyConditioningRule | null
   biological_state_annotation?: {
     state_codes?: string[]
     sex?: FarmWatchDeerSex[]
@@ -352,13 +366,14 @@ function gate(
 }
 
 function record(
-  value: Omit<DeerRelationshipRecord,'study_measurements'|'value_constraints'> &
-    Partial<Pick<DeerRelationshipRecord,'study_measurements'|'value_constraints'>>,
+  value: Omit<DeerRelationshipRecord,'study_measurements'|'value_constraints'|'property_conditioning'> &
+    Partial<Pick<DeerRelationshipRecord,'study_measurements'|'value_constraints'|'property_conditioning'>>,
 ): DeerRelationshipRecord {
   return Object.freeze({
     ...value,
     study_measurements: value.study_measurements || [],
     value_constraints: value.value_constraints || [],
+    property_conditioning: value.property_conditioning || null,
   })
 }
 
@@ -1334,6 +1349,22 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     study_measurements:[
       measurement('FW-M55-natal-range-agriculture','agriculture_context','proportion of natal range classified as agricultural land use','Study spring dispersal probability used agricultural land-use proportion in the pre-dispersal/natal range.','derived_equivalent','required','Mapped agricultural land-cover proportion may represent the covariate when the natal-range scale is explicit.'),
     ],
+    property_conditioning:{
+      id:'FW-P01-r30-agriculture-scale-contrast',
+      binding_key:'agriculture_context',
+      metric_field:'mapped_agriculture_fraction_percent_by_scale',
+      metric_label:'mapped agricultural field fraction',
+      unit:'percent',
+      comparison:'ordered_scale_contrast',
+      ordered_scales:['local_500m','landscape_1500m','broad_3000m'],
+      support_geometry:'Farm Watch barrier-aware fixed-radius landscape domains; not the source-study 95% aKDE pre-dispersal range.',
+      hypothesis_interpretation:'Use the measured within-property scale gradient only to anchor a property-specific covariate hypothesis. A higher fixed-radius agricultural fraction identifies the higher side of the published positive agriculture covariate, but does not estimate dispersal probability or establish that any deer used that radius as its natal range.',
+      limitations:[
+        'The source study measured planted/cultivated NLCD proportion within individual 95% aKDE pre-dispersal ranges; Farm Watch fixed-radius domains are a support-geometry proxy.',
+        'No source-study coefficient, probability magnitude, cutoff, or Wisconsin population baseline is transferred.',
+        'This rule does not establish that the focal property is a juvenile male deer natal range or that dispersal occurred.',
+      ],
+    },
   }),
   record({
     relationship_id:'FW-R31-juvenile-male-dispersal-distance',
@@ -1438,6 +1469,35 @@ export function validateDeerRelationshipRecord(row: DeerRelationshipRecord) {
     if (measurement.binding_key != null && !inputKeys.has(measurement.binding_key)) return false
     if (measurement.activation_requirement === 'required' && measurement.binding_key == null) return false
     if (!measurement.study_variable.trim() || !measurement.study_protocol.trim() || !measurement.permitted_use.trim()) return false
+  }
+
+  const propertyConditioning = row.property_conditioning
+  if (propertyConditioning) {
+    if (!/^FW-P\d{2}-[a-z0-9-]+$/.test(propertyConditioning.id)) return false
+    if (
+      row.output_kind !== 'ordinal_directional' &&
+      row.output_kind !== 'quantitative_relative_selection'
+    ) return false
+    if (!inputKeys.has(propertyConditioning.binding_key)) return false
+    if (!propertyConditioning.metric_field.trim() || !propertyConditioning.metric_label.trim()) {
+      return false
+    }
+    if (propertyConditioning.unit !== 'percent') return false
+    if (propertyConditioning.comparison !== 'ordered_scale_contrast') return false
+    if (propertyConditioning.ordered_scales.length < 2) return false
+    if (new Set(propertyConditioning.ordered_scales).size !== propertyConditioning.ordered_scales.length) {
+      return false
+    }
+    const binding = row.required_inputs.find(
+      (requirement) => requirement.key === propertyConditioning.binding_key,
+    )
+    if (!binding) return false
+    if (propertyConditioning.ordered_scales.some((scale) =>
+      !binding.allowed_scales.includes(scale)
+    )) return false
+    if (!propertyConditioning.support_geometry.trim()) return false
+    if (!propertyConditioning.hypothesis_interpretation.trim()) return false
+    if (!propertyConditioning.limitations.length) return false
   }
 
   const valueConstraintIds = new Set<string>()

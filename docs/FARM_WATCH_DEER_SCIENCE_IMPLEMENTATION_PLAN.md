@@ -151,8 +151,8 @@ The first production deer output should be a vector of evidence-backed module re
 | Product | Purpose |
 | --- | --- |
 | `deer-biological-state-v1` | explicit sex/age/reproductive/movement/diel scenario |
-| `deer-relationship-registry-v1` | machine-readable implementation of science-ledger relationships |
-| `deer-science-context-v2` | module-by-module evaluated output with provenance, applicability, freshness, and uncertainty |
+| `deer-relationship-registry-v2` | machine-readable implementation of science-ledger relationships |
+| `deer-science-context-v3` | module-by-module evaluated output with provenance, applicability, freshness, and uncertainty |
 | later: `deer-relative-selection-v1` | quantitative synthesis only when parameter transfer is justified |
 
 Gridded artifacts should continue to use the generic Farm Watch materialization framework/private Storage. Date-keyed scalar/state products should use guarded central tables and service-only internal readers.
@@ -705,16 +705,16 @@ A hunting-risk module is unavailable when actual pressure evidence is unavailabl
 
 # Batch 9 — Machine-readable science relationship registry
 
-Priority: P0 for deer-specific evaluation  
-Status: implemented in `deer-relationship-registry-v1`; no production deployment is required for this repository-level contract.  
-Can begin in parallel once the neutral contracts are stable.
+- **Priority:** P0 for deer-specific evaluation
+- **Status:** implemented in `deer-relationship-registry-v2`; no production deployment is required for this repository-level contract.
+- **Scheduling:** Can begin in parallel once the neutral contracts are stable.
 
 Implementation:
 
 - source-controlled registry: `supabase/functions/_shared/farm-watch-deer-relationship-registry.ts`;
 - ledger-coverage and contract tests: `supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts`;
 - CI: `.github/workflows/farm-watch-deer-relationship-registry-ci.yml`;
-- durable contract: `docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`;
+- durable contract: `docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V2.md`;
 - Batch 3 `applicable_relationship_ids` now delegates to registry metadata rather than maintaining a separate hard-coded FW-D selector;
 - every active biological relationship now carries a study-measurement contract with explicit alignment class and permitted use;
 - value/subtype constraints are machine-readable where a generic product binding is insufficient;
@@ -724,7 +724,7 @@ Implementation:
 
 ## Proposed artifact
 
-`deer-relationship-registry-v1`, preferably code-reviewed and versioned in the repository.
+`deer-relationship-registry-v2`, preferably code-reviewed and versioned in the repository.
 
 Each relationship record:
 
@@ -901,7 +901,7 @@ Use conservatively. Riparian selection during dispersal and semiarid water visit
 
 ---
 
-# Batch 11 — `deer-science-context-v2`
+# Batch 11 — `deer-science-context-v3`
 
 Status: implementation candidate complete on 2026-09-26; private-endpoint integration is source-controlled but production deployment remains a separate explicit action.
 
@@ -923,7 +923,7 @@ For each module:
 - spatial artifact or summary;
 - output kind;
 - literature-supported relationship direction when registry-active;
-- property-specific directional evidence only when a separate property-conditioned evaluation has actually evaluated the required study-aligned covariate contrast;
+- property-conditioned covariate evidence only when an explicit registry rule evaluates real measured property values/contrasts; current hypotheses remain non-behavioral and non-actionable;
 - input freshness;
 - input evidence classes;
 - relationship IDs;
@@ -935,7 +935,7 @@ For each module:
 
 ## No universal score
 
-v2 should not sum unlike outputs. Registry-active directional context is not itself a property-specific effect or decision-actionable conclusion.
+v3 should not sum unlike outputs. Registry-active directional context is not itself a property-specific effect or decision-actionable conclusion. Registry-authorized property-conditioned hypotheses remain non-actionable unless a future stronger evidence contract explicitly permits otherwise.
 
 A location might be:
 
@@ -952,9 +952,9 @@ Owner-facing output can support maps where authorized. Viewer restrictions on fi
 
 The output should explain why a module fired and what would change it.
 
-### v2 evaluator implementation
+### v3 evaluator implementation
 
-`farm-watch-deer-science-evaluator-v2` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
+`farm-watch-deer-science-evaluator-v3` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
 
 - `active`;
 - `not_applicable`;
@@ -969,7 +969,7 @@ FW-R22 additionally carries an explicit active-extreme-event value constraint, p
 
 No relationship is promoted merely because the generic evaluator exists. Parked or unresolved source measurements continue to abstain.
 
-See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V2.md`.
+See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V3.md`.
 
 ---
 
@@ -1118,7 +1118,7 @@ The original scientific priority labels remain below for provenance, but the 202
 6. field phenology;
 7. science relationship registry;
 8. first deer modules that can satisfy their study measurements from the active autonomous/static queue;
-9. `deer-science-context-v2`, with explicit abstention for parked inputs.
+9. `deer-science-context-v3`, with explicit abstention for parked inputs.
 
 ## P1 — materially improve decision quality
 

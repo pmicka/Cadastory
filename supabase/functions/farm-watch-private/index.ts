@@ -966,6 +966,10 @@ Deno.serve(async (req: Request) => {
     hydrology: hydrologyError || !hydrology
       ? { status: 'unavailable' }
       : hydrology,
+    landscape_context:
+      landscapeContextError || !landscapeContext
+        ? { status: 'unavailable' }
+        : landscapeContext,
     road_focal_context: roadFocalContext,
   })
   const deerScienceContext = evaluateDeerScienceContext({

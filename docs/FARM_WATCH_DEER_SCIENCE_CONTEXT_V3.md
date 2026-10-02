@@ -1,8 +1,6 @@
-# Farm Watch Deer Science Context v2
+# Farm Watch Deer Science Context v3
 
-> **Superseded:** Current evaluator semantics are defined in `FARM_WATCH_DEER_SCIENCE_CONTEXT_V3.md`. v2 established the relationship-applicability versus property-direction boundary; v3 adds explicit, registry-authorized property-covariate conditioning without promoting those hypotheses to deer-use or behavioral-probability conclusions.
-
-- **Status:** implementation candidate — semantic correction
+- **Status:** implementation candidate — property-conditioned hypotheses
 - **Version:** 2026-10-01
 - **Species:** white-tailed deer (`Odocoileus virginianus`)
 - **Normative science source:** `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
@@ -10,7 +8,7 @@
 
 ## Purpose
 
-`deer-science-context-v2` is the first Farm Watch property/date/scenario evaluator.
+`deer-science-context-v3` is the first Farm Watch property/date/scenario evaluator.
 
 It consumes the machine-readable deer relationship registry plus current Farm Watch evidence and determines, relationship by relationship, whether the relationship is:
 
@@ -54,9 +52,17 @@ Each relationship carries one of four decision-relevance classes:
 - `negative_constraint`: active guardrail that blocks an unsupported generic rule;
 - `abstained`: not applicable, insufficient input, or measurement blocked.
 
-For directional relationships, v2 also emits `property_directional_evidence.status=not_evaluated` with reason `property_covariate_direction_not_evaluated`. This explicitly separates registry/study applicability from property-specific directional evidence.
+Directional relationships may now declare an explicit `property_conditioning` rule in the registry. The evaluator applies such a rule only after the relationship is registry/scenario active and only to the configured measured covariate.
 
-No v2 relationship becomes decision-actionable solely because it is active. `decision_actionable=false` remains the default until a separate property-conditioned evaluator demonstrates the required property-level covariate contrast using study-aligned measurements.
+Property-directional evidence uses a separate state machine:
+
+- `not_configured`: no property-conditioning contract exists for the directional relationship;
+- `insufficient_measurement`: the contract exists but the configured measured contrast cannot be resolved;
+- `measured_no_contrast`: the configured metric is measured but has no non-zero ordered-scale contrast;
+- `hypothesis_available`: a real property covariate contrast exists and a bounded property-conditioned hypothesis may be stated;
+- `not_applicable`: the relationship output is not directional.
+
+A `hypothesis_available` result is still **not** a local deer-use or behavioral-response inference. `decision_actionable=false`, `behavioral_probability_inferred=false`, and coefficient transfer remain unchanged unless a future contract separately authorizes stronger inference.
 
 ## Evaluation order
 
@@ -68,7 +74,8 @@ Each registry relationship is evaluated in this order:
 4. **Output-kind fidelity** — a context-only measurement contract cannot emit an ordinal or quantitative effect.
 5. **Required product bindings** — product key, evidence state, spatial scale, and any/all semantics must match the registry.
 6. **Study-specific value constraints** — known false constraints are `not_applicable`; unresolved constraints are `insufficient_input`.
-7. **Active result** — only then may the evaluator emit the relationship form, output kind, and registry-authorized direction.
+7. **Active relationship result** — only then may the evaluator emit the relationship form, output kind, and registry-authorized direction.
+8. **Property conditioning** — only an active directional relationship with an explicit registry rule may inspect the configured measured property covariate and emit a bounded property-conditioned hypothesis.
 
 This order deliberately distinguishes “the study does not apply here” from “we do not know enough.”
 
@@ -83,6 +90,7 @@ Current bindings include:
 - seasonal precipitation state;
 - field phenology;
 - mapped agricultural land-cover geometry;
+- barrier-aware 500 m / 1.5 km / 3 km mapped-field acreage and denominator areas, converted deterministically to explicit agricultural-fraction measurements for property conditioning;
 - current crop identity only when explicitly accepted;
 - thermal exposure;
 - terrain form;
@@ -155,8 +163,10 @@ It contains:
 - enforced value constraints;
 - output kind and literature-supported relationship direction when active;
 - explicit property-directional-evidence state;
+- measured property-covariate observations and contrasts when a registry conditioning rule exists;
+- property-conditioned hypothesis counts and IDs;
 - directional relationship-context counts and IDs;
-- decision-actionable counts and IDs, which remain empty in v2 absent property-conditioned evaluation;
+- decision-actionable counts and IDs, which remain empty for the current hypothesis-only conditioning contract;
 - transfer limitations;
 - abstention / non-applicability reasons.
 
@@ -204,7 +214,22 @@ FW-R18 and FW-R19 can become active only under an explicitly requested juvenile-
 
 An adult resident scenario does not inherit those findings.
 
-FW-R18 remains conditional mechanism context and does not assign a universal ridge, valley, or road sign. FW-R19 may expose its literature-supported interaction direction as `directional_relationship_context`, but v2 does not claim that a specific Flat Creek route, riparian feature, or agricultural contrast produces that response. Property-specific directional evidence remains `not_evaluated`.
+FW-R18 remains conditional mechanism context and does not assign a universal ridge, valley, or road sign. FW-R19 may expose its literature-supported interaction direction as `directional_relationship_context`, but no path-specific conditioning rule exists, so it remains `not_configured` for property directional evidence.
+
+### R30 property-conditioned agriculture hypothesis
+
+FW-R30 is the first relationship with an explicit property-conditioning contract.
+
+The source study measured the proportion of each juvenile male's pre-dispersal range classified as agricultural land use using 95% aKDE range vertices. Farm Watch does **not** reproduce that animal-specific support geometry. Instead, it already carries mapped agricultural-field acreage and exact barrier-aware denominator areas at 500 m, 1.5 km, and 3 km around the property.
+
+The evaluator may therefore:
+
+1. derive the mapped agricultural fraction at each explicit Farm Watch scale;
+2. verify that at least two scales contain real numeric measurements;
+3. report the lower and higher observed property-context values and their difference;
+4. anchor a qualitative property-conditioned hypothesis to the source study's positive agriculture relationship.
+
+The output must state that the fixed-radius windows are a support-geometry proxy, not an aKDE natal range. It must not transfer the Wisconsin logistic coefficient, estimate dispersal probability, establish that Flat Creek is a natal range, or claim that a juvenile male dispersed. The result remains `decision_actionable=false`.
 
 ### Hunting pressure
 

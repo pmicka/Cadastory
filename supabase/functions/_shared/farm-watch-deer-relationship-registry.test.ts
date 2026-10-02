@@ -518,6 +518,22 @@ Deno.test('FW-D15 keeps spring probability, dispersal distance, and path selecti
   const spring = getDeerRelationship('FW-R30-spring-juvenile-male-dispersal-probability')
   assert(spring)
   assert(JSON.stringify(spring.biological_state_gates.seasons) === JSON.stringify(['spring']))
+  assert(spring.property_conditioning)
+  assert(spring.property_conditioning.id === 'FW-P01-r30-agriculture-scale-contrast')
+  assert(spring.property_conditioning.binding_key === 'agriculture_context')
+  assert(
+    spring.property_conditioning.metric_field ===
+      'mapped_agriculture_fraction_percent_by_scale',
+  )
+  assert(
+    JSON.stringify(spring.property_conditioning.ordered_scales) ===
+      JSON.stringify(['local_500m','landscape_1500m','broad_3000m']),
+  )
+  assert(/95% aKDE/i.test(spring.property_conditioning.support_geometry))
+  assert(/no source-study coefficient/i.test(
+    spring.property_conditioning.limitations.join(' '),
+  ))
+  assert(validateDeerRelationshipRecord(spring))
 })
 
 Deno.test('FW-D13 low-pressure null result requires explicit low pressure', () => {
