@@ -10,11 +10,14 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import urllib.request
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-SCHEMA = "farm-watch-bigmap-local-crop-manifest-v1"
+SCHEMA = "farm-watch-bigmap-local-crop-manifest-v2"
+GATEWAY_URL = "https://data.fs.usda.gov/geodata/rastergateway/bigmap/"
 CROP_SIZE = [206, 222]
 CROP_GT = [957150.0, 30.0, 0.0, 1758720.0, 0.0, -30.0]
 CROP_BBOX = [957150.0, 1752060.0, 963330.0, 1758720.0]
@@ -133,6 +136,61 @@ def sha256(path: Path) -> str:
             h.update(chunk)
     return h.hexdigest()
 
+def gateway_checksums(html: str) -> dict[int, str]:
+    out: dict[int, str] = {}
+    for spcd in SPECIES:
+        padded = f"{spcd:04d}"
+        patterns = [
+            re.compile(r'data\\.spcd=["\\\']' + padded + r'["\\\'][^>]*data\\.checksum=["\\\']([0-9A-Fa-f]{64})["\\\']', re.I),
+            re.compile(r'data\\.checksum=["\\\']([0-9A-Fa-f]{64})["\\\'][^>]*data\\.spcd=["\\\']' + padded + r'["\\\']', re.I),
+        ]
+        matches = {m.group(1).lower() for pattern in patterns for m in pattern.finditer(html)}
+        if len(matches) != 1:
+            raise RuntimeError(f"expected exactly one published BIGMAP ZIP checksum for SPCD {padded}, found {len(matches)}")
+        out[spcd] = next(iter(matches))
+    return out
+
+def load_gateway_checksums(path: str | None) -> dict[int, str]:
+    if path:
+        html = Path(path).expanduser().read_text()
+    else:
+        request = urllib.request.Request(GATEWAY_URL, headers={"User-Agent": "Cadastory-Farm-Watch-Provenance/1.0"})
+        with urllib.request.urlopen(request, timeout=30) as response:
+            html = response.read().decode("utf-8", errors="replace")
+    return gateway_checksums(html)
+
+def find_archives_by_sha256(roots: list[Path]) -> dict[str, Path]:
+    out: dict[str, Path] = {}
+    for root in roots:
+        if not root.exists():
+            continue
+        for path in root.rglob("*.zip"):
+            resolved = path.resolve()
+            digest = sha256(resolved)
+            if digest in out and out[digest] != resolved:
+                raise RuntimeError(f"duplicate ZIP bytes found at {out[digest]} and {resolved}")
+            out[digest] = resolved
+    return out
+
+def hash_archive_species_tiff(archive: Path, spcd: int) -> tuple[str, str, int]:
+    matches: list[zipfile.ZipInfo] = []
+    with zipfile.ZipFile(archive) as zf:
+        for info in zf.infolist():
+            name = Path(info.filename).name
+            match = SOURCE_RE.search(name)
+            if match and int(match.group(1)) == spcd:
+                matches.append(info)
+        if len(matches) != 1:
+            raise RuntimeError(
+                f"{archive.name}: expected exactly one BIGMAP TIFF for SPCD {spcd:04d}, found {len(matches)}"
+            )
+        info = matches[0]
+        h = hashlib.sha256()
+        with zf.open(info) as source:
+            for chunk in iter(lambda: source.read(8 * 1024 * 1024), b""):
+                h.update(chunk)
+        return info.filename, h.hexdigest(), info.file_size
+
 def crop_name(spcd: int, common: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", common.lower()).strip("-")
     return f"farm-watch-bigmap-{spcd:04d}-{slug}-crop.tif"
@@ -165,6 +223,7 @@ def main() -> int:
     parser.add_argument("--require-all", action="store_true")
     parser.add_argument("--bundle", action="store_true")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument("--gateway-html", help="Optional saved Raster Gateway HTML for offline provenance verification")
     args = parser.parse_args()
 
     missing_tools = [x for x in ("gdalinfo", "gdal_translate") if shutil.which(x) is None]
@@ -175,6 +234,8 @@ def main() -> int:
     output = Path(args.output_dir).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     sources = find_sources(roots)
+    published_checksums = load_gateway_checksums(args.gateway_html) if args.bundle else {}
+    archives_by_sha = find_archives_by_sha256(roots) if args.bundle else {}
     manifest_path = output / "farm-watch-bigmap-mast-crops-manifest.json"
     previous_items: dict[int, dict[str, Any]] = {}
     if manifest_path.exists():
@@ -197,10 +258,32 @@ def main() -> int:
         source = sources.get(spcd)
         crop = output / crop_name(spcd, spec["common_name"])
 
+        archive_provenance: dict[str, Any] | None = None
         if source is not None:
             source_info = run_json("gdalinfo", "-json", str(source))
             window, source_dimensions, source_geotransform = source_window(source_info, source.name)
-            if args.overwrite or not crop.exists():
+            source_tiff_sha256 = sha256(source)
+            if args.bundle:
+                published_zip_sha256 = published_checksums[spcd]
+                archive = archives_by_sha.get(published_zip_sha256)
+                if archive is None:
+                    raise RuntimeError(
+                        f"official BIGMAP ZIP matching published checksum is unavailable for SPCD {spcd:04d}"
+                    )
+                member_name, member_sha256, member_size = hash_archive_species_tiff(archive, spcd)
+                if member_sha256 != source_tiff_sha256 or member_size != source.stat().st_size:
+                    raise RuntimeError(
+                        f"extracted BIGMAP TIFF does not match checksum-verified ZIP member for SPCD {spcd:04d}"
+                    )
+                archive_provenance = {
+                    "gateway_url": GATEWAY_URL,
+                    "published_zip_sha256": published_zip_sha256,
+                    "archive_file_name": archive.name,
+                    "archive_size_bytes": archive.stat().st_size,
+                    "archive_member": member_name,
+                    "archive_member_tiff_sha256": member_sha256,
+                }
+            if args.bundle or args.overwrite or not crop.exists():
                 print(
                     f"Cropping {spcd:04d} {spec['common_name']} "
                     f"from source window {window[0]},{window[1]},{window[2]},{window[3]}"
@@ -213,6 +296,7 @@ def main() -> int:
             source_name = source.name
             source_size = source.stat().st_size
         else:
+            source_tiff_sha256 = ""
             prior = previous_items.get(spcd)
             if not crop.exists() or prior is None:
                 missing.append(spcd)
@@ -226,6 +310,10 @@ def main() -> int:
                 missing.append(spcd)
                 continue
             print(f"Reusing validated bounded crop {spcd:04d} {spec['common_name']}")
+            if args.bundle:
+                raise RuntimeError(
+                    f"cannot bundle retained crop for SPCD {spcd:04d} without its checksum-verified source TIFF and ZIP"
+                )
 
         validate_crop(run_json("gdalinfo", "-json", str(crop)), crop.name)
         items.append({
@@ -233,6 +321,8 @@ def main() -> int:
             **spec,
             "source_tiff_name": source_name,
             "source_tiff_size_bytes": source_size,
+            "source_tiff_sha256": source_tiff_sha256 or None,
+            "archive_provenance": archive_provenance,
             "source_dimensions": source_dimensions,
             "source_geotransform": source_geotransform,
             "source_window": window,
@@ -248,7 +338,8 @@ def main() -> int:
             "authority": "USDA Forest Service Forest Inventory and Analysis (FIA)",
             "product": "FIA BIGMAP 2018 Tree Species Aboveground Biomass",
             "data_year": 2018,
-            "bulk_download_page": "https://data.fs.usda.gov/geodata/rastergateway/bigmap/",
+            "bulk_download_page": GATEWAY_URL,
+            "archive_provenance_required_for_bundle": True,
             "native_crs": "ESRI:102039",
             "native_pixel_meters": 30,
         },
