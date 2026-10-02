@@ -1,10 +1,10 @@
 # Farm Watch Deer Science Context v2
 
-Status: implementation candidate — semantic correction  
-Version: 2026-10-01  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Normative science source: `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`  
-Registry source: `farm-watch-deer-relationship-registry.ts`
+- **Status:** implementation candidate — semantic correction
+- **Version:** 2026-10-01
+- **Species:** white-tailed deer (`Odocoileus virginianus`)
+- **Normative science source:** `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+- **Registry source:** `farm-watch-deer-relationship-registry.ts`
 
 ## Purpose
 
