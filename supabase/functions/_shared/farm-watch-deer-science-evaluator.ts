@@ -465,6 +465,7 @@ function numericScaleValues(
     if (!value || typeof value !== 'object' || Array.isArray(value)) continue
     const record = value as Record<string, unknown>
     for (const scale of orderedScales) {
+      if (!row.scales.includes(scale)) continue
       const raw = record[scale]
       if (typeof raw !== 'number' || !Number.isFinite(raw)) continue
       observations.push({

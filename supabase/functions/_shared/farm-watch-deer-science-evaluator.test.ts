@@ -371,6 +371,33 @@ Deno.test('R30 remains measured-but-insufficient when only one explicit agricult
   assert(row.decision_actionable === false)
 })
 
+Deno.test('R30 ignores numeric scale values not declared by the evidence row', () => {
+  const row = evaluateDeerRelationship({
+    relationship: relationship('FW-R30-spring-juvenile-male-dispersal-probability'),
+    scenario: scenario({ sex: 'male', age_class: 'juvenile', season: 'spring' }),
+    evidence: [
+      evidence('deer-biological-state', 'available', ['individual_scenario']),
+      evidence(
+        'agriculture-landcover-context',
+        'known',
+        ['local_500m'],
+        {
+          mapped_agriculture_fraction_percent_by_scale: {
+            local_500m: 1,
+            broad_3000m: 9,
+          },
+        },
+      ),
+    ],
+  })
+
+  assert(row.status === 'active')
+  assert(row.property_directional_evidence.status === 'insufficient_measurement')
+  assert(row.property_directional_evidence.evaluated === true)
+  assert(row.property_directional_evidence.observations?.length === 1)
+  assert(row.property_directional_evidence.observations?.[0].scale === 'local_500m')
+})
+
 Deno.test('Farm Watch evidence adapter derives mapped agriculture fractions from existing landscape context', () => {
   const adapted = buildDeerEvaluatorEvidenceFromFarmWatch({
     scenario: scenario(),
