@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tarfile
+import tempfile
 import urllib.request
 import zipfile
 from datetime import datetime, timezone
@@ -172,7 +173,7 @@ def find_archives_by_sha256(roots: list[Path]) -> dict[str, Path]:
             out[digest] = resolved
     return out
 
-def hash_archive_species_tiff(archive: Path, spcd: int) -> tuple[str, str, int]:
+def archive_species_tiff_info(archive: Path, spcd: int) -> zipfile.ZipInfo:
     matches: list[zipfile.ZipInfo] = []
     with zipfile.ZipFile(archive) as zf:
         for info in zf.infolist():
@@ -180,16 +181,27 @@ def hash_archive_species_tiff(archive: Path, spcd: int) -> tuple[str, str, int]:
             match = SOURCE_RE.search(name)
             if match and int(match.group(1)) == spcd:
                 matches.append(info)
-        if len(matches) != 1:
-            raise RuntimeError(
-                f"{archive.name}: expected exactly one BIGMAP TIFF for SPCD {spcd:04d}, found {len(matches)}"
-            )
-        info = matches[0]
+    if len(matches) != 1:
+        raise RuntimeError(
+            f"{archive.name}: expected exactly one BIGMAP TIFF for SPCD {spcd:04d}, found {len(matches)}"
+        )
+    return matches[0]
+
+def hash_archive_species_tiff(archive: Path, spcd: int) -> tuple[str, str, int]:
+    info = archive_species_tiff_info(archive, spcd)
+    with zipfile.ZipFile(archive) as zf:
         h = hashlib.sha256()
         with zf.open(info) as source:
             for chunk in iter(lambda: source.read(8 * 1024 * 1024), b""):
                 h.update(chunk)
         return info.filename, h.hexdigest(), info.file_size
+
+def extract_archive_species_tiff(archive: Path, spcd: int, destination: Path) -> Path:
+    info = archive_species_tiff_info(archive, spcd)
+    target = destination / Path(info.filename).name
+    with zipfile.ZipFile(archive) as zf, zf.open(info) as source, target.open("wb") as out:
+        shutil.copyfileobj(source, out, length=8 * 1024 * 1024)
+    return target
 
 def crop_name(spcd: int, common: str) -> str:
     slug = re.sub(r"[^a-z0-9]+", "-", common.lower()).strip("-")
@@ -259,17 +271,27 @@ def main() -> int:
         crop = output / crop_name(spcd, spec["common_name"])
 
         archive_provenance: dict[str, Any] | None = None
+        extracted_temp_source: Path | None = None
+        archive: Path | None = None
+        published_zip_sha256 = ""
+        if args.bundle:
+            published_zip_sha256 = published_checksums[spcd]
+            archive = archives_by_sha.get(published_zip_sha256)
+            if archive is None:
+                raise RuntimeError(
+                    f"official BIGMAP ZIP matching published checksum is unavailable for SPCD {spcd:04d}"
+                )
+            if source is None:
+                temp_dir = Path(tempfile.mkdtemp(prefix=f"farm-watch-bigmap-{spcd:04d}-"))
+                extracted_temp_source = extract_archive_species_tiff(archive, spcd, temp_dir)
+                source = extracted_temp_source
+
         if source is not None:
             source_info = run_json("gdalinfo", "-json", str(source))
             window, source_dimensions, source_geotransform = source_window(source_info, source.name)
             source_tiff_sha256 = sha256(source)
             if args.bundle:
-                published_zip_sha256 = published_checksums[spcd]
-                archive = archives_by_sha.get(published_zip_sha256)
-                if archive is None:
-                    raise RuntimeError(
-                        f"official BIGMAP ZIP matching published checksum is unavailable for SPCD {spcd:04d}"
-                    )
+                assert archive is not None
                 member_name, member_sha256, member_size = hash_archive_species_tiff(archive, spcd)
                 if member_sha256 != source_tiff_sha256 or member_size != source.stat().st_size:
                     raise RuntimeError(
@@ -330,6 +352,8 @@ def main() -> int:
             "crop_size_bytes": crop.stat().st_size,
             "crop_sha256": sha256(crop),
         })
+        if extracted_temp_source is not None:
+            shutil.rmtree(extracted_temp_source.parent, ignore_errors=True)
 
     manifest = {
         "schema": SCHEMA,
