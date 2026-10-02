@@ -276,6 +276,36 @@ async function loadLocalSourceManifest(path: string) {
   return payload
 }
 
+function assertLocalManifestMatchesClaimedBigmapIdentity(manifest: any, observations: any[]) {
+  const observation = (observations || []).find((row: any) =>
+    String(row?.key || '') === 'external:fia-bigmap-2018-species-biomass'
+  )
+  if (
+    observation?.status !== 'available' ||
+    observation?.authoritative !== true ||
+    observation?.resolution_status !== 'provider_published_sha256_checksums'
+  ) {
+    throw new Error('claimed authoritative BIGMAP checksum observation is unavailable')
+  }
+  const published = new Map(
+    (observation?.evidence?.checksums || []).map((row: any) => [
+      Number(row?.spcd),
+      String(row?.sha256 || '').toLowerCase(),
+    ]),
+  )
+  const items = Array.isArray(manifest?.items) ? manifest.items : []
+  for (const item of items) {
+    const spcd = Number(item?.spcd)
+    const manifestSha = String(item?.archive_provenance?.published_zip_sha256 || '').toLowerCase()
+    if (!/^[0-9a-f]{64}$/.test(manifestSha) || published.get(spcd) !== manifestSha) {
+      throw new Error('local BIGMAP ZIP provenance does not match claimed provider identity for SPCD ' + spcd)
+    }
+  }
+  if (published.size !== items.length) {
+    throw new Error('claimed BIGMAP checksum set does not match local provenance species set')
+  }
+}
+
 function siblingFile(manifestPath: string, fileName: string) {
   if (!/^[A-Za-z0-9._-]+$/.test(fileName)) {
     throw new Error('local BIGMAP crop filename is invalid')
@@ -421,6 +451,12 @@ async function main() {
       ? await loadLocalSourceManifest(localSourceManifest)
       : null
     if (localManifest) {
+      assertLocalManifestMatchesClaimedBigmapIdentity(
+        localManifest,
+        Array.isArray(claim?.external_source_observations)
+          ? claim.external_source_observations
+          : [],
+      )
       console.log('Using operator-cropped official USDA Raster Data Gateway BIGMAP sources')
     } else {
       console.log('Querying BIGMAP 2018 species catalog from official public ArcGIS service')
