@@ -208,7 +208,7 @@ Deno.test('known absence of managed artificial water makes summer water-visitati
   assert(gate?.status === 'failed')
 })
 
-Deno.test('juvenile-male dispersal path relationship activates only with explicit scenario and aligned inputs', () => {
+Deno.test('juvenile-male dispersal path relationship can be active without becoming a property directional conclusion', () => {
   const row = evaluateDeerRelationship({
     relationship: relationship('FW-R19-juvenile-male-dispersal-ag-riparian'),
     scenario: scenario({
@@ -227,8 +227,53 @@ Deno.test('juvenile-male dispersal path relationship activates only with explici
   assert(row.result?.direction === 'interaction')
   assert(row.coefficient_transfer.status === 'not_supported')
   assert(row.coefficient_transfer.numeric_parameters.length === 0)
-  assert(row.decision_relevance === 'directional_signal')
-  assert(row.decision_actionable === true)
+  assert(row.decision_relevance === 'directional_relationship_context')
+  assert(row.decision_actionable === false)
+  assert(row.property_directional_evidence.status === 'not_evaluated')
+  assert(row.property_directional_evidence.evaluated === false)
+  assert(
+    row.property_directional_evidence.reason_codes.includes(
+      'property_covariate_direction_not_evaluated',
+    ),
+  )
+})
+
+Deno.test('active ordinal relationships remain relationship context until property covariates are evaluated', () => {
+  const result = evaluateDeerScienceContext({
+    scenario: scenario({
+      sex: 'male',
+      age_class: 'juvenile',
+      movement_state: 'dispersal',
+    }),
+    evidence: [
+      evidence('deer-biological-state', 'available', ['individual_scenario']),
+      evidence('agriculture-landcover-context', 'known', ['landscape_1500m']),
+      evidence('mapped-hydrography-context', 'available', ['landscape_1500m']),
+    ],
+    relationships: [
+      relationship('FW-R19-juvenile-male-dispersal-ag-riparian'),
+    ],
+  })
+
+  assert(result.status === 'available')
+  assert(result.counts.active === 1)
+  assert(result.decision_relevance_counts.directional_relationship_context === 1)
+  assert(result.directional_relationship_context_count === 1)
+  assert(
+    result.directional_relationship_context_ids.includes(
+      'FW-R19-juvenile-male-dispersal-ag-riparian',
+    ),
+  )
+  assert(result.decision_actionable_relationship_count === 0)
+  assert(result.decision_actionable_relationship_ids.length === 0)
+  assert(result.property_directional_evidence_evaluated === false)
+  assert(result.property_directional_evidence_relationship_count === 0)
+
+  const row = result.relationships[0]
+  assert(row.status === 'active')
+  assert(row.decision_relevance === 'directional_relationship_context')
+  assert(row.decision_actionable === false)
+  assert(row.property_directional_evidence.status === 'not_evaluated')
 })
 
 Deno.test('juvenile-male dispersal terrain relationship emits conditional mechanism context, never a ridge/road sign', () => {
@@ -281,12 +326,17 @@ Deno.test('science context remains a relationship vector without synthesized sco
   })
   assert(result.status === 'available')
   assert(result.counts.active === 3)
-  assert(result.decision_relevance_counts.directional_signal === 0)
+  assert(result.decision_relevance_counts.directional_relationship_context === 0)
   assert(result.decision_relevance_counts.mechanism_context === 0)
   assert(result.decision_relevance_counts.negative_constraint === 3)
   assert(result.decision_relevance_counts.abstained === 0)
   assert(result.decision_actionable_relationship_count === 0)
   assert(result.decision_actionable_relationship_ids.length === 0)
+  assert(result.directional_relationship_context_count === 0)
+  assert(result.directional_relationship_context_ids.length === 0)
+  assert(result.property_directional_evidence_evaluated === false)
+  assert(result.property_directional_evidence_relationship_count === 0)
+  assert(result.property_directional_evidence_relationship_ids.length === 0)
   assert(result.evaluator_active_relationship_ids.length === 3)
   assert(result.scoring_performed === false)
   assert(result.coefficient_synthesis_performed === false)

@@ -121,14 +121,18 @@ assert(
 )
 
 for (const required of [
-  'deer-science-context-v1',
-  'farm-watch-deer-science-evaluator-v1',
+  'deer-science-context-v2',
+  'farm-watch-deer-science-evaluator-v2',
   'evaluateDeerRelationship',
   'evaluateDeerScienceContext',
   'buildDeerEvaluatorEvidenceFromFarmWatch',
   'blocked_measurement_alignment',
   'value_constraint_not_satisfied',
   'biological_state_unknown',
+  'directional_relationship_context',
+  'property_covariate_direction_not_evaluated',
+  'property_directional_evidence_evaluated: false',
+  'decision_actionable: false',
   'coefficient_synthesis_performed: false',
   'behavioral_probability_inferred: false',
 ]) assert(evaluator.includes(required), 'missing deer evaluator invariant: ' + required)

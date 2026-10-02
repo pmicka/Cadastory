@@ -152,7 +152,7 @@ The first production deer output should be a vector of evidence-backed module re
 | --- | --- |
 | `deer-biological-state-v1` | explicit sex/age/reproductive/movement/diel scenario |
 | `deer-relationship-registry-v1` | machine-readable implementation of science-ledger relationships |
-| `deer-science-context-v1` | module-by-module evaluated output with provenance, applicability, freshness, and uncertainty |
+| `deer-science-context-v2` | module-by-module evaluated output with provenance, applicability, freshness, and uncertainty |
 | later: `deer-relative-selection-v1` | quantitative synthesis only when parameter transfer is justified |
 
 Gridded artifacts should continue to use the generic Farm Watch materialization framework/private Storage. Date-keyed scalar/state products should use guarded central tables and service-only internal readers.
@@ -901,7 +901,7 @@ Use conservatively. Riparian selection during dispersal and semiarid water visit
 
 ---
 
-# Batch 11 — `deer-science-context-v1`
+# Batch 11 — `deer-science-context-v2`
 
 Status: implementation candidate complete on 2026-09-26; private-endpoint integration is source-controlled but production deployment remains a separate explicit action.
 
@@ -922,7 +922,8 @@ For each module:
 - applicability;
 - spatial artifact or summary;
 - output kind;
-- direction or quantitative value if authorized;
+- literature-supported relationship direction when registry-active;
+- property-specific directional evidence only when a separate property-conditioned evaluation has actually evaluated the required study-aligned covariate contrast;
 - input freshness;
 - input evidence classes;
 - relationship IDs;
@@ -934,7 +935,7 @@ For each module:
 
 ## No universal score
 
-v1 should not sum unlike outputs.
+v2 should not sum unlike outputs. Registry-active directional context is not itself a property-specific effect or decision-actionable conclusion.
 
 A location might be:
 
@@ -951,9 +952,9 @@ Owner-facing output can support maps where authorized. Viewer restrictions on fi
 
 The output should explain why a module fired and what would change it.
 
-### v1 evaluator implementation
+### v2 evaluator implementation
 
-`farm-watch-deer-science-evaluator-v1` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
+`farm-watch-deer-science-evaluator-v2` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
 
 - `active`;
 - `not_applicable`;
@@ -968,7 +969,7 @@ FW-R22 additionally carries an explicit active-extreme-event value constraint, p
 
 No relationship is promoted merely because the generic evaluator exists. Parked or unresolved source measurements continue to abstain.
 
-See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V1.md`.
+See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V2.md`.
 
 ---
 
@@ -1117,7 +1118,7 @@ The original scientific priority labels remain below for provenance, but the 202
 6. field phenology;
 7. science relationship registry;
 8. first deer modules that can satisfy their study measurements from the active autonomous/static queue;
-9. `deer-science-context-v1`, with explicit abstention for parked inputs.
+9. `deer-science-context-v2`, with explicit abstention for parked inputs.
 
 ## P1 — materially improve decision quality
 

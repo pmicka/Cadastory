@@ -1,16 +1,14 @@
-# Farm Watch Deer Science Context v1
+# Farm Watch Deer Science Context v2
 
-> **Superseded:** Current evaluator semantics are defined in `FARM_WATCH_DEER_SCIENCE_CONTEXT_V2.md`. The v1 rule that treated an active ordinal/quantitative relationship as a decision-actionable directional signal is retired; active relationship direction alone does not establish property-specific directional evidence.
-
-Status: implementation candidate  
-Version: 2026-09-26  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Normative science source: `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`  
-Registry source: `farm-watch-deer-relationship-registry.ts`
+- **Status:** implementation candidate — semantic correction
+- **Version:** 2026-10-01
+- **Species:** white-tailed deer (`Odocoileus virginianus`)
+- **Normative science source:** `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+- **Registry source:** `farm-watch-deer-relationship-registry.ts`
 
 ## Purpose
 
-`deer-science-context-v1` is the first Farm Watch property/date/scenario evaluator.
+`deer-science-context-v2` is the first Farm Watch property/date/scenario evaluator.
 
 It consumes the machine-readable deer relationship registry plus current Farm Watch evidence and determines, relationship by relationship, whether the relationship is:
 
@@ -43,18 +41,20 @@ Omitted biological dimensions remain `unknown`.
 The evaluator never fills an unknown biological dimension from a generic calendar heuristic. The existing Kentucky regional breeding context remains population-level timing evidence only.
 
 
-## Evaluator-active versus decision relevance
+## Evaluator-active versus property-specific directional evidence
 
-An `active` registry relationship is not automatically a directional decision signal.
+An `active` registry relationship means that the relationship's biological gates, study-fidelity requirements, product bindings, spatial scales, and value constraints are satisfied for the requested scenario. It does **not** establish that the property exhibits a study-aligned covariate contrast or a local deer response.
 
-Each relationship now carries one of four decision-relevance classes:
+Each relationship carries one of four decision-relevance classes:
 
-- `directional_signal`: active quantitative or ordinal directional output;
+- `directional_relationship_context`: an active quantitative or ordinal relationship whose literature-supported direction is relevant to the scenario;
 - `mechanism_context`: active explanatory or conditional context;
 - `negative_constraint`: active guardrail that blocks an unsupported generic rule;
 - `abstained`: not applicable, insufficient input, or measurement blocked.
 
-Only `directional_signal` sets `decision_actionable=true`. The context also exposes separate evaluator-status and decision-relevance counts.
+For directional relationships, v2 also emits `property_directional_evidence.status=not_evaluated` with reason `property_covariate_direction_not_evaluated`. This explicitly separates registry/study applicability from property-specific directional evidence.
+
+No v2 relationship becomes decision-actionable solely because it is active. `decision_actionable=false` remains the default until a separate property-conditioned evaluator demonstrates the required property-level covariate contrast using study-aligned measurements.
 
 ## Evaluation order
 
@@ -151,7 +151,10 @@ It contains:
 - required-input matches;
 - study-fidelity status;
 - enforced value constraints;
-- output kind and direction when active;
+- output kind and literature-supported relationship direction when active;
+- explicit property-directional-evidence state;
+- directional relationship-context counts and IDs;
+- decision-actionable counts and IDs, which remain empty in v2 absent property-conditioned evaluation;
 - transfer limitations;
 - abstention / non-applicability reasons.
 
@@ -167,7 +170,7 @@ It publishes:
 
 A relationship whose registry says `coefficient_transfer.status=not_supported` emits no numeric parameters.
 
-The output is therefore a vector of independently gated scientific relationships, not an arbitrary weighted overlay.
+The output is therefore a vector of independently gated scientific relationships, not an arbitrary weighted overlay. A registry-active directional relationship is relationship context only until property-conditioned evidence is evaluated.
 
 ## Flat Creek consequences
 
@@ -199,7 +202,7 @@ FW-R18 and FW-R19 can become active only under an explicitly requested juvenile-
 
 An adult resident scenario does not inherit those findings.
 
-FW-R18 remains conditional mechanism context and does not assign a universal ridge, valley, or road sign.
+FW-R18 remains conditional mechanism context and does not assign a universal ridge, valley, or road sign. FW-R19 may expose its literature-supported interaction direction as `directional_relationship_context`, but v2 does not claim that a specific Flat Creek route, riparian feature, or agricultural contrast produces that response. Property-specific directional evidence remains `not_evaluated`.
 
 ### Hunting pressure
 

@@ -227,10 +227,10 @@ It does not implement:
 
 Those remain Batch 10+ work and must consume this registry rather than recreate scientific rules in ad hoc code.
 
-## Registry consumer — Deer Science Context v1
+## Registry consumer — Deer Science Context v2
 
 As of 2026-09-26, the first generic registry consumer is implemented in
-`farm-watch-deer-science-evaluator.ts`.
+`farm-watch-deer-science-evaluator.ts` (current output schema `deer-science-context-v2`).
 
 The evaluator does not duplicate relationship rules. It reads this registry and enforces, in order:
 
@@ -240,6 +240,8 @@ The evaluator does not duplicate relationship rules. It reads this registry and 
 - study-specific value constraints;
 - coefficient-transfer disposition;
 - relationship output kind and direction.
+
+The consumer distinguishes registry/study applicability from property-specific directional evidence. An active ordinal or quantitative relationship remains `directional_relationship_context` with `decision_actionable=false` until a separate property-conditioned evaluation establishes a local, study-aligned covariate contrast.
 
 The consumer distinguishes known non-applicability from missing information. For example:
 
