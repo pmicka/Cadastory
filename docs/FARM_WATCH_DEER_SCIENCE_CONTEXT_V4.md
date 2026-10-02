@@ -204,6 +204,15 @@ It contains:
 - transfer limitations;
 - abstention / non-applicability reasons.
 
+## 2026-10-01 research guardrails
+
+The registry now includes two additional active negative constraints from the updated evidence ledger:
+
+- `FW-R32-seasonal-edge-aspect-negative-constraint` — forest-edge and north/south aspect effects are season-dependent in the 2025 southwest Wisconsin telemetry study; no universal edge or aspect sign is authorized.
+- `FW-R33-fawn-visibility-concealment-negative-constraint` — the 2026 Minnesota neonatal-fawn study keeps horizontal visibility, predator-view concealment and vegetation height separate and blocks a universal cover-to-survival rule.
+
+Their source measurement rows are emitted through the v4 evidence-fidelity matrix as context-only research provenance. They do not create new property-conditioned hypotheses, decision-actionable outputs, or coefficients.
+
 ## Coefficient and score boundary
 
 The evaluator does not synthesize relationships.
