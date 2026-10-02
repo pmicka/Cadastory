@@ -1,9 +1,9 @@
 # Farm Watch Deer Relationship Registry v2
 
-Status: Batch 9 contract + property-conditioning extension  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Normative science source: `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
-Previous contract: `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`
+- **Status:** Batch 9 contract + property-conditioning extension
+- **Species:** white-tailed deer (`Odocoileus virginianus`)
+- **Normative science source:** `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+- **Previous contract:** `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`
 
 ## Purpose
 
@@ -257,4 +257,3 @@ The consumer distinguishes known non-applicability from missing information. For
 `extreme_event.applicability_state = active_extreme_event`. This closes the prior contract gap where an authoritative known no-event state could otherwise satisfy only the generic product/evidence-state requirement.
 
 The evaluator remains non-synthetic: no universal score or probability is produced, and no numeric coefficient appears unless this registry separately authorizes its transfer.
-

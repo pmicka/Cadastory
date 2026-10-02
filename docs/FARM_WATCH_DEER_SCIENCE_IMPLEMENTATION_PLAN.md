@@ -705,9 +705,9 @@ A hunting-risk module is unavailable when actual pressure evidence is unavailabl
 
 # Batch 9 — Machine-readable science relationship registry
 
-Priority: P0 for deer-specific evaluation  
-Status: implemented in `deer-relationship-registry-v2`; no production deployment is required for this repository-level contract.  
-Can begin in parallel once the neutral contracts are stable.
+- **Priority:** P0 for deer-specific evaluation
+- **Status:** implemented in `deer-relationship-registry-v2`; no production deployment is required for this repository-level contract.
+- **Scheduling:** Can begin in parallel once the neutral contracts are stable.
 
 Implementation:
 
