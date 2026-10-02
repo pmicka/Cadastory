@@ -259,3 +259,8 @@ The consumer distinguishes known non-applicability from missing information. For
 
 The evaluator remains non-synthetic: no universal score or probability is produced, and no numeric coefficient appears unless this registry separately authorizes its transfer.
 
+## Separate interaction structure — v1
+
+`farm-watch-deer-interaction-registry.ts` adds a distinct, evaluator-facing interaction contract. Ordinary relationship IDs continue to describe source relationships; they do not by themselves prove that two covariates form a supported interaction. FW-R19 agriculture/riparian and FW-R31 seasonal/agriculture evidence are represented as `mixed` independent relationship forms, not interaction terms.
+
+The `deer-science-context-v6` evaluator consumes #5 state-gate outputs and #3 measurement-fidelity rows from each linked relationship. Missing inputs, state mismatch, and inadequate measurement fidelity fail closed. See [`FARM_WATCH_DEER_INTERACTION_REGISTRY_V1.md`](FARM_WATCH_DEER_INTERACTION_REGISTRY_V1.md) for registered structures, activation order, non-registered combinations, output contract, and no-score boundary.
