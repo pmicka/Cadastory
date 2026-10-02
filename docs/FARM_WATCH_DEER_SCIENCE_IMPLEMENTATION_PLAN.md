@@ -714,7 +714,7 @@ Implementation:
 - source-controlled registry: `supabase/functions/_shared/farm-watch-deer-relationship-registry.ts`;
 - ledger-coverage and contract tests: `supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts`;
 - CI: `.github/workflows/farm-watch-deer-relationship-registry-ci.yml`;
-- durable contract: `docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`;
+- durable contract: `docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V2.md`;
 - Batch 3 `applicable_relationship_ids` now delegates to registry metadata rather than maintaining a separate hard-coded FW-D selector;
 - every active biological relationship now carries a study-measurement contract with explicit alignment class and permitted use;
 - value/subtype constraints are machine-readable where a generic product binding is insufficient;
@@ -952,9 +952,9 @@ Owner-facing output can support maps where authorized. Viewer restrictions on fi
 
 The output should explain why a module fired and what would change it.
 
-### v1 evaluator implementation
+### v3 evaluator implementation
 
-`farm-watch-deer-science-evaluator-v1` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
+`farm-watch-deer-science-evaluator-v3` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
 
 - `active`;
 - `not_applicable`;
@@ -969,7 +969,7 @@ FW-R22 additionally carries an explicit active-extreme-event value constraint, p
 
 No relationship is promoted merely because the generic evaluator exists. Parked or unresolved source measurements continue to abstain.
 
-See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V1.md`.
+See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V3.md`.
 
 ---
 
