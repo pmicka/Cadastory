@@ -184,3 +184,8 @@ The framework performs no:
 - cross-state weighted overlay.
 
 Its purpose is to make state eligibility and uncertainty inspectable before any ecological relationship is interpreted.
+
+
+## Interaction consumer — deer-science-context-v6
+
+The interaction evaluator consumes the existing relationship `state_gate` result from this framework. It does not create a parallel state system or infer missing biological dimensions from property measurements. Unknown movement state blocks dispersal interactions; a known incompatible state is not applicable. Field-stage and exact-year annual resource state remain required input dimensions where the linked relationship contract says so.
