@@ -277,7 +277,135 @@ Deno.test('active ordinal relationships remain relationship context until proper
   assert(row.property_directional_evidence.status === 'not_configured')
 })
 
-Deno.test('R30 emits a property-conditioned agriculture hypothesis only after measuring an explicit multi-scale contrast', () => {
+Deno.test('measurement-fidelity matrix exposes source-variable equivalence and current evidence separately', () => {
+  const row = evaluateDeerRelationship({
+    relationship: relationship('FW-R01-summer-thermal-resource-tradeoff'),
+    scenario: scenario({
+      sex: 'male',
+      age_class: 'adult',
+      season: 'summer',
+      diel_period: 'day',
+    }),
+    evidence: [
+      evidence('deer-biological-state', 'available', ['individual_scenario']),
+      evidence('diel-photoperiod-context', 'available', ['property']),
+      evidence('thermal-exposure-context', 'available', ['local_500m']),
+      evidence(
+        'study-aligned-vegetation-height-context',
+        'available',
+        ['local_500m'],
+      ),
+      evidence('spatial-edge-patch-context', 'available', ['local_500m']),
+      evidence('field-phenology-context', 'known', ['property']),
+    ],
+  })
+
+  assert(row.status === 'blocked_measurement_alignment')
+  assert(row.measurement_fidelity_matrix.length === 5)
+
+  const thermal = row.measurement_fidelity_matrix.find(
+    (item) => item.measurement_id === 'FW-M01-operative-temperature',
+  )
+  assert(thermal)
+  assert(thermal.registry_alignment === 'mechanism_context_only')
+  assert(thermal.fidelity_class === 'mechanism_only')
+  assert(thermal.relationship_use === 'blocks_relationship')
+  assert(thermal.current_binding_status === 'satisfied')
+  assert(thermal.accepted_products.includes('thermal-exposure-context'))
+  assert(thermal.matched_evidence.some(
+    (item) => item.product_key === 'thermal-exposure-context',
+  ))
+  assert(/cannot substitute/i.test(thermal.proxy_inflation_guard))
+
+  const height = row.measurement_fidelity_matrix.find(
+    (item) => item.measurement_id === 'FW-M02-vegetation-height',
+  )
+  assert(height)
+  assert(height.registry_alignment === 'derived_equivalent')
+  assert(height.fidelity_class === 'study_aligned_derivative')
+  assert(height.relationship_use === 'supports_activation')
+  assert(height.current_binding_status === 'satisfied')
+
+  const forage = row.measurement_fidelity_matrix.find(
+    (item) => item.measurement_id === 'FW-M03-forage-index',
+  )
+  assert(forage)
+  assert(forage.registry_alignment === 'unsupported')
+  assert(forage.fidelity_class === 'unavailable')
+  assert(forage.relationship_use === 'blocks_relationship')
+  assert(/No authorized Farm Watch substitute/.test(forage.proxy_inflation_guard))
+})
+
+Deno.test('measurement-fidelity matrix preserves contextual-only variables without promoting them to activation evidence', () => {
+  const row = evaluateDeerRelationship({
+    relationship: relationship('FW-R02-thermal-refuge-time-shift'),
+    scenario: scenario({
+      season: 'summer',
+      diel_period: 'day',
+    }),
+    evidence: [
+      evidence('diel-photoperiod-context', 'available', ['property']),
+      evidence('thermal-exposure-context', 'available', ['local_500m']),
+    ],
+  })
+
+  const shade = row.measurement_fidelity_matrix.find(
+    (item) => item.measurement_id === 'FW-M06-shade-thermal-treatment',
+  )
+  assert(shade)
+  assert(shade.activation_requirement === 'context_only')
+  assert(shade.fidelity_class === 'mechanism_only')
+  assert(shade.relationship_use === 'context_only')
+  assert(shade.current_binding_status === 'satisfied')
+})
+
+Deno.test('R30 matrix exposes agriculture evidence while source support geometry blocks the hypothesis', () => {
+  const result = evaluateDeerScienceContext({
+    scenario: scenario({
+      sex: 'male',
+      age_class: 'juvenile',
+      season: 'spring',
+    }),
+    evidence: [
+      evidence('deer-biological-state', 'available', ['individual_scenario']),
+      evidence(
+        'agriculture-landcover-context',
+        'known',
+        ['local_500m','landscape_1500m','broad_3000m'],
+        {
+          mapped_agriculture_fraction_percent_by_scale: {
+            local_500m: 0.66,
+            landscape_1500m: 2.53,
+            broad_3000m: 3.89,
+          },
+        },
+      ),
+    ],
+    relationships: [
+      relationship('FW-R30-spring-juvenile-male-dispersal-probability'),
+    ],
+  })
+
+  assert(result.measurement_fidelity_matrix_row_count === 1)
+  assert(result.measurement_fidelity_counts.mechanism_only === 1)
+  assert(result.measurement_binding_counts.satisfied === 1)
+
+  const measurement = result.relationships[0].measurement_fidelity_matrix[0]
+  assert(measurement.measurement_id === 'FW-M55-natal-range-agriculture')
+  assert(measurement.fidelity_class === 'mechanism_only')
+  assert(measurement.activation_requirement === 'required')
+  assert(measurement.relationship_use === 'blocks_relationship')
+  assert(measurement.current_binding_status === 'satisfied')
+  assert(measurement.matched_evidence.length === 1)
+  assert(
+    measurement.matched_evidence[0].product_key ===
+      'agriculture-landcover-context',
+  )
+  assert(measurement.matched_evidence[0].evidence_state === 'known')
+  assert(measurement.matched_evidence[0].scales.includes('broad_3000m'))
+})
+
+Deno.test('R30 withholds a property-conditioned hypothesis while source support geometry is unresolved', () => {
   const result = evaluateDeerScienceContext({
     scenario: scenario({
       sex: 'male',
@@ -305,36 +433,25 @@ Deno.test('R30 emits a property-conditioned agriculture hypothesis only after me
     ],
   })
 
-  assert(result.status === 'available')
-  assert(result.directional_relationship_context_count === 1)
-  assert(result.property_directional_evidence_evaluated === true)
-  assert(result.property_directional_evidence_relationship_count === 1)
-  assert(result.property_conditioned_hypothesis_count === 1)
-  assert(
-    result.property_conditioned_hypothesis_relationship_ids.includes(
-      'FW-R30-spring-juvenile-male-dispersal-probability',
-    ),
-  )
+  assert(result.status === 'abstained')
+  assert(result.directional_relationship_context_count === 0)
+  assert(result.property_directional_evidence_evaluated === false)
+  assert(result.property_directional_evidence_relationship_count === 0)
+  assert(result.property_conditioned_hypothesis_count === 0)
+  assert(result.property_conditioned_hypothesis_relationship_ids.length === 0)
   assert(result.decision_actionable_relationship_count === 0)
   assert(result.behavioral_probability_inferred === false)
 
   const row = result.relationships[0]
-  assert(row.status === 'active')
-  assert(row.decision_relevance === 'directional_relationship_context')
+  assert(row.status === 'blocked_measurement_alignment')
+  assert(row.reason_codes.includes('required_measurement_alignment_blocked'))
+  assert(row.decision_relevance === 'abstained')
   assert(row.decision_actionable === false)
-  assert(row.property_directional_evidence.status === 'hypothesis_available')
-  assert(row.property_directional_evidence.evaluated === true)
+  assert(row.property_directional_evidence.status === 'insufficient_measurement')
+  assert(row.property_directional_evidence.evaluated === false)
   assert(row.property_directional_evidence.conditioning_rule_id === 'FW-P01-r30-agriculture-scale-contrast')
-  assert(row.property_directional_evidence.observations?.length === 3)
-  assert(row.property_directional_evidence.contrast?.lower_scale === 'local_500m')
-  assert(row.property_directional_evidence.contrast?.higher_scale === 'broad_3000m')
-  assert(
-    Math.abs(
-      Number(row.property_directional_evidence.contrast?.absolute_difference) - 3.23,
-    ) < 0.000001,
-  )
-  assert(row.property_directional_evidence.hypothesis?.behavioral_response_inferred === false)
-  assert(row.property_directional_evidence.hypothesis?.coefficient_transfer_performed === false)
+  assert(row.measurement_fidelity_matrix[0].fidelity_class === 'mechanism_only')
+  assert(row.measurement_fidelity_matrix[0].relationship_use === 'blocks_relationship')
 })
 
 Deno.test('R30 remains measured-but-insufficient when only one explicit agriculture scale exists', () => {
@@ -360,14 +477,9 @@ Deno.test('R30 remains measured-but-insufficient when only one explicit agricult
     ],
   })
 
-  assert(row.status === 'active')
+  assert(row.status === 'blocked_measurement_alignment')
   assert(row.property_directional_evidence.status === 'insufficient_measurement')
-  assert(row.property_directional_evidence.evaluated === true)
-  assert(
-    row.property_directional_evidence.reason_codes.includes(
-      'property_covariate_contrast_unavailable',
-    ),
-  )
+  assert(row.property_directional_evidence.evaluated === false)
   assert(row.decision_actionable === false)
 })
 
@@ -391,11 +503,9 @@ Deno.test('R30 ignores numeric scale values not declared by the evidence row', (
     ],
   })
 
-  assert(row.status === 'active')
+  assert(row.status === 'blocked_measurement_alignment')
   assert(row.property_directional_evidence.status === 'insufficient_measurement')
-  assert(row.property_directional_evidence.evaluated === true)
-  assert(row.property_directional_evidence.observations?.length === 1)
-  assert(row.property_directional_evidence.observations?.[0].scale === 'local_500m')
+  assert(row.property_directional_evidence.evaluated === false)
 })
 
 Deno.test('Farm Watch evidence adapter derives mapped agriculture fractions from existing landscape context', () => {

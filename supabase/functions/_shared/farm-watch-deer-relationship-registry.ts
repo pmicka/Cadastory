@@ -54,6 +54,17 @@ export const FARM_WATCH_DEER_MEASUREMENT_ALIGNMENTS = Object.freeze([
 export type DeerMeasurementAlignment =
   typeof FARM_WATCH_DEER_MEASUREMENT_ALIGNMENTS[number]
 
+export const FARM_WATCH_DEER_EVIDENCE_FIDELITY_CLASSES = Object.freeze([
+  'exact',
+  'study_aligned_derivative',
+  'calibrated_proxy',
+  'mechanism_only',
+  'unavailable',
+] as const)
+
+export type DeerEvidenceFidelityClass =
+  typeof FARM_WATCH_DEER_EVIDENCE_FIDELITY_CLASSES[number]
+
 export type DeerStudyMeasurementRequirement = {
   id: string
   binding_key: string | null
@@ -63,6 +74,23 @@ export type DeerStudyMeasurementRequirement = {
   activation_requirement: 'required' | 'context_only' | 'not_applicable'
   permitted_use: string
   limitations: string[]
+}
+
+export function deerMeasurementEvidenceFidelityClass(
+  alignment: DeerMeasurementAlignment,
+): DeerEvidenceFidelityClass {
+  switch (alignment) {
+    case 'measurement_equivalent':
+      return 'exact'
+    case 'derived_equivalent':
+      return 'study_aligned_derivative'
+    case 'calibrated_proxy':
+      return 'calibrated_proxy'
+    case 'mechanism_context_only':
+      return 'mechanism_only'
+    case 'unsupported':
+      return 'unavailable'
+  }
 }
 
 export type DeerRelationshipValueConstraint = {
@@ -1347,7 +1375,7 @@ export const FARM_WATCH_DEER_RELATIONSHIPS: readonly DeerRelationshipRecord[] = 
     output_kind:'ordinal_directional',
     limitations:['Wisconsin juvenile/yearling males; no dispersal probability coefficient transfers.'],
     study_measurements:[
-      measurement('FW-M55-natal-range-agriculture','agriculture_context','proportion of natal range classified as agricultural land use','Study spring dispersal probability used agricultural land-use proportion in the pre-dispersal/natal range.','derived_equivalent','required','Mapped agricultural land-cover proportion may represent the covariate when the natal-range scale is explicit.'),
+      measurement('FW-M55-natal-range-agriculture','agriculture_context','proportion of natal range classified as agricultural land use','Study spring dispersal probability used agricultural land-use proportion in the pre-dispersal/natal range.','mechanism_context_only','required','Mapped agriculture across fixed-radius property domains does not reproduce agriculture within an individual 95% aKDE natal range. Preserve it as a support-geometry proxy and block relationship activation and its directional property hypothesis until source-aligned support is available.'),
     ],
     property_conditioning:{
       id:'FW-P01-r30-agriculture-scale-contrast',

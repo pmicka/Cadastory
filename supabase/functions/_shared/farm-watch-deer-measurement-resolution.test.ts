@@ -12,7 +12,7 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 Deno.test('every currently blocked deer study measurement has exactly one resolution decision', () => {
   assert(validateDeerMeasurementResolutionDecisions())
   const blocked = blockedDeerStudyMeasurements()
-  assert(blocked.length === 24, 'expected 24 blocked study measurements')
+  assert(blocked.length === 25, 'expected 25 blocked study measurements')
   assert(FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS.length === blocked.length)
   const decisionIds = FARM_WATCH_DEER_MEASUREMENT_RESOLUTION_DECISIONS
     .map((row) => row.measurement_id)
@@ -30,7 +30,7 @@ Deno.test('measurement resolution portfolio preserves the three explicit disposi
   )
   assert(counts.reproduce === 11)
   assert(counts.calibrated_proxy === 7)
-  assert(counts.remain_unavailable === 6)
+  assert(counts.remain_unavailable === 7)
 })
 
 Deno.test('production Tier 1 measurements leave the blocked resolution queue', () => {
@@ -91,7 +91,7 @@ Deno.test('2026 operating posture parks individual-state and manual/non-core mea
   )
   assert(counts.active === 4)
   assert(counts.parked_2026_individual_state === 3)
-  assert(counts.parked_2026_manual_or_noncore === 17)
+  assert(counts.parked_2026_manual_or_noncore === 18)
 
   for (const id of [
     'FW-M15-hunsaker-male-age',
@@ -119,6 +119,7 @@ Deno.test('2026 operating posture parks individual-state and manual/non-core mea
     'FW-M44-wolf-occurrence',
     'FW-M43-intact-deciduous-forest',
     'FW-M53-male-reproductive-phase',
+    'FW-M55-natal-range-agriculture',
     'FW-M56-potential-path-agriculture',
   ]) {
     const row = getDeerMeasurementResolutionDecision(id)

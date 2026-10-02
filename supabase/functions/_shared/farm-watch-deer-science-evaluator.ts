@@ -1,7 +1,9 @@
 import {
   FARM_WATCH_DEER_INPUT_PRODUCT_CATALOG,
   FARM_WATCH_DEER_RELATIONSHIPS,
+  deerMeasurementEvidenceFidelityClass,
   deerRelationshipStudyFidelityStatus,
+  type DeerEvidenceFidelityClass,
   type DeerRelationshipEvidenceState,
   type DeerRelationshipProductKey,
   type DeerRelationshipRecord,
@@ -16,8 +18,8 @@ import type {
 
 export const FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT = Object.freeze({
   key: 'deer-science-context',
-  algorithmVersion: 'farm-watch-deer-science-evaluator-v3',
-  outputSchemaVersion: 'deer-science-context-v3',
+  algorithmVersion: 'farm-watch-deer-science-evaluator-v4',
+  outputSchemaVersion: 'deer-science-context-v4',
   species: 'Odocoileus virginianus',
   statusVocabulary: Object.freeze([
     'active',
@@ -109,6 +111,37 @@ type ConstraintEvaluation = {
   status: 'satisfied' | 'failed' | 'unresolved'
   observed_values: unknown[]
   rationale: string
+}
+
+type DeerMeasurementRelationshipUse =
+  | 'supports_activation'
+  | 'context_only'
+  | 'blocks_relationship'
+  | 'not_applicable'
+
+type DeerMeasurementCurrentBindingStatus =
+  | 'satisfied'
+  | 'missing_or_incompatible'
+  | 'not_bound'
+  | 'not_applicable'
+
+type DeerMeasurementFidelityMatrixRow = {
+  measurement_id: string
+  study_variable: string
+  study_protocol: string
+  binding_key: string | null
+  activation_requirement: 'required' | 'context_only' | 'not_applicable'
+  registry_alignment: string
+  fidelity_class: DeerEvidenceFidelityClass
+  relationship_use: DeerMeasurementRelationshipUse
+  current_binding_status: DeerMeasurementCurrentBindingStatus
+  permitted_use: string
+  limitations: string[]
+  accepted_products: DeerRelationshipProductKey[]
+  accepted_evidence_states: DeerRelationshipEvidenceState[]
+  accepted_scales: DeerRelationshipScale[]
+  matched_evidence: InputEvaluation['matched']
+  proxy_inflation_guard: string
 }
 
 type PropertyDirectionalObservation = {
@@ -383,6 +416,88 @@ function evaluateConstraints(
   })
 }
 
+function measurementRelationshipUse(
+  activationRequirement: 'required' | 'context_only' | 'not_applicable',
+  fidelityClass: DeerEvidenceFidelityClass,
+): DeerMeasurementRelationshipUse {
+  if (activationRequirement === 'not_applicable') return 'not_applicable'
+  if (activationRequirement === 'context_only') return 'context_only'
+  if (fidelityClass === 'mechanism_only' || fidelityClass === 'unavailable') {
+    return 'blocks_relationship'
+  }
+  return 'supports_activation'
+}
+
+function measurementProxyInflationGuard(
+  fidelityClass: DeerEvidenceFidelityClass,
+  activationRequirement: 'required' | 'context_only' | 'not_applicable',
+) {
+  if (activationRequirement === 'not_applicable') {
+    return 'This source-study variable is not part of relationship activation.'
+  }
+  switch (fidelityClass) {
+    case 'exact':
+      return 'The Farm Watch variable is measurement-equivalent for the permitted use, subject to current evidence availability and scale.'
+    case 'study_aligned_derivative':
+      return 'The Farm Watch variable is a study-aligned deterministic derivative, not a field observation or proof of deer response.'
+    case 'calibrated_proxy':
+      return 'The Farm Watch variable is a calibrated proxy; preserve the stated calibration and transfer limits and do not relabel it as exact.'
+    case 'mechanism_only':
+      return 'The available variable can explain physical mechanism/context only and cannot substitute for the source-study measurement in relationship activation.'
+    case 'unavailable':
+      return 'No authorized Farm Watch substitute exists for this source-study variable; the relationship must abstain when the variable is required.'
+  }
+}
+
+function evaluateMeasurementFidelityMatrix(
+  relationship: DeerRelationshipRecord,
+  inputs: readonly InputEvaluation[],
+): DeerMeasurementFidelityMatrixRow[] {
+  const inputByKey = new Map(inputs.map((input) => [input.key, input]))
+  return relationship.study_measurements.map((measurement) => {
+    const fidelityClass = deerMeasurementEvidenceFidelityClass(measurement.alignment)
+    const relationshipUse = measurementRelationshipUse(
+      measurement.activation_requirement,
+      fidelityClass,
+    )
+    const input = measurement.binding_key
+      ? inputByKey.get(measurement.binding_key)
+      : null
+
+    let currentBindingStatus: DeerMeasurementCurrentBindingStatus = 'not_bound'
+    if (measurement.activation_requirement === 'not_applicable') {
+      currentBindingStatus = 'not_applicable'
+    } else if (input) {
+      currentBindingStatus = input.status
+    }
+
+    return {
+      measurement_id: measurement.id,
+      study_variable: measurement.study_variable,
+      study_protocol: measurement.study_protocol,
+      binding_key: measurement.binding_key,
+      activation_requirement: measurement.activation_requirement,
+      registry_alignment: measurement.alignment,
+      fidelity_class: fidelityClass,
+      relationship_use: relationshipUse,
+      current_binding_status: currentBindingStatus,
+      permitted_use: measurement.permitted_use,
+      limitations: [...measurement.limitations],
+      accepted_products: input ? [...input.allowed_product_keys] : [],
+      accepted_evidence_states: input ? [...input.allowed_evidence_states] : [],
+      accepted_scales: input ? [...input.allowed_scales] : [],
+      matched_evidence: input ? input.matched.map((row) => ({
+        ...row,
+        scales: [...row.scales],
+      })) : [],
+      proxy_inflation_guard: measurementProxyInflationGuard(
+        fidelityClass,
+        measurement.activation_requirement,
+      ),
+    }
+  })
+}
+
 function activeDecisionRelevance(relationship: DeerRelationshipRecord): {
   decision_relevance: FarmWatchDeerDecisionRelevance
   decision_actionable: boolean
@@ -623,6 +738,10 @@ export function evaluateDeerRelationship(args: {
       numeric_parameters: [...relationship.coefficient_transfer.numeric_parameters],
     },
     fidelity,
+    measurement_fidelity_matrix: evaluateMeasurementFidelityMatrix(
+      relationship,
+      inputEvaluation.rows,
+    ),
     property_directional_evidence: initialPropertyDirectionalEvidence(relationship),
     biological_gate: {
       ...gate,
@@ -828,6 +947,33 @@ export function evaluateDeerScienceContext(args: {
     )
     .map((row) => row.relationship_id)
 
+  const measurement_fidelity_rows = evaluations.flatMap(
+    (row) => row.measurement_fidelity_matrix,
+  )
+  const measurement_fidelity_counts = [
+    'exact',
+    'study_aligned_derivative',
+    'calibrated_proxy',
+    'mechanism_only',
+    'unavailable',
+  ].reduce((out, fidelityClass) => {
+    out[fidelityClass] = measurement_fidelity_rows.filter(
+      (row) => row.fidelity_class === fidelityClass,
+    ).length
+    return out
+  }, {} as Record<string, number>)
+  const measurement_binding_counts = [
+    'satisfied',
+    'missing_or_incompatible',
+    'not_bound',
+    'not_applicable',
+  ].reduce((out, status) => {
+    out[status] = measurement_fidelity_rows.filter(
+      (row) => row.current_binding_status === status,
+    ).length
+    return out
+  }, {} as Record<string, number>)
+
   return {
     schema: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.outputSchemaVersion,
     method: FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT.algorithmVersion,
@@ -863,6 +1009,9 @@ export function evaluateDeerScienceContext(args: {
     property_conditioned_hypothesis_count:
       property_conditioned_hypothesis_relationship_ids.length,
     property_conditioned_hypothesis_relationship_ids,
+    measurement_fidelity_matrix_row_count: measurement_fidelity_rows.length,
+    measurement_fidelity_counts,
+    measurement_binding_counts,
     evaluator_active_relationship_ids: evaluations
       .filter((row) => row.status === 'active')
       .map((row) => row.relationship_id),
@@ -872,7 +1021,7 @@ export function evaluateDeerScienceContext(args: {
     coefficient_synthesis_performed: false,
     behavioral_probability_inferred: false,
     interpretation_boundary:
-      'Registry-driven property/date/scenario applicability plus explicitly authorized property-conditioning only. An active quantitative or ordinal relationship is literature-supported directional context. A property-conditioned hypothesis is emitted only when the registry declares a conditioning rule and the configured property covariate has a measured multi-scale contrast. Such a hypothesis remains non-actionable and does not infer deer use, dispersal, behavioral probability, or effect magnitude. Mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
+      'Registry-driven property/date/scenario applicability plus explicitly authorized property-conditioning only. Every source-study variable is exposed through a measurement-fidelity matrix that keeps exact measurements, study-aligned derivatives, calibrated proxies, mechanism-only context, and unavailable variables distinct. An active quantitative or ordinal relationship is literature-supported directional context. A property-conditioned hypothesis is emitted only when the registry declares a conditioning rule and the configured property covariate has a measured multi-scale contrast. Such a hypothesis remains non-actionable and does not infer deer use, dispersal, behavioral probability, or effect magnitude. Mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
   }
 }
 
