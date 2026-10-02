@@ -23,6 +23,12 @@ authoritative / observed source data
 
 This plan implements the relationships preserved in `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`.
 
+## Deer audit follow-up #6 — interaction framework (2026-10-02)
+
+The machine-readable interaction contract is implemented in `farm-watch-deer-interaction-registry.ts` and consumed by `farm-watch-deer-science-evaluator.ts` as `deer-science-context-v6`. It encodes only source-supported interaction structures, after existing #5 state gates and #3 measurement-fidelity checks. See `FARM_WATCH_DEER_INTERACTION_REGISTRY_V1.md` for the contract and unregistered-combination boundaries.
+
+The current registry records source-supported thermal/activity, winter snow/conifer, winter agriculture/browse, crop/stage, localized hunting/diel, hunter-risk/food/diel, sex/risk/food, mast/annual-state/season, dispersal terrain/landscape/state, and male age/breeding-date structures. Several remain blocked by missing or mechanism-only measurements. FW-D15 agriculture and riparian geometry remain separate path covariates; FW-D24 and FW-D25 remain guardrails. No interaction formula, score, coefficient transfer, property-conditioned interaction hypothesis, or behavior claim is added.
+
 It does not ask the validation property to rediscover established ecology. Local observations are used to evaluate transfer, calibrate parameters, or resolve property-specific state when needed.
 
 ## Non-goals
