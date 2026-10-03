@@ -22,7 +22,6 @@ for (const required of [
   'related_derived',
   'derived_from_candidate_key is null',
   'derived_from_candidate_key is not null',
-  'scout.get_opportunity_spine_projection_v2',
   'scout_guard_opportunity_request',
   'assert_tool_registry_integrity_v1',
   'assert_architecture_doctrine_v1',
@@ -61,6 +60,11 @@ const ambiguityReturn = migration.indexOf("'candidate_sites', v_site_options")
 assert(
   firstGuard > -1 && ambiguityReturn > -1 && firstGuard < ambiguityReturn,
   'resolver must run the opportunity guard before disclosing ambiguous candidate sites',
+)
+
+assert(
+  !migration.includes('scout.get_opportunity_spine_projection_v2'),
+  'resolver must not invoke full opportunity card projection during address resolution',
 )
 
 assert(
