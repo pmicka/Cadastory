@@ -46,6 +46,24 @@ assert(
 )
 
 assert(
+  migration.includes("e.evidence_class = 'authoritative_record'") &&
+    !migration.includes("nullif(btrim(e.site_address_text,''),"),
+  'resolver must only trust authoritative address aliases and keep SQL fallback syntax valid',
+)
+
+assert(
+  (migration.match(/s\.expires_at is null or s\.expires_at >= now\(\)/g) ?? []).length >= 4,
+  'resolver must exclude expired opportunities from address matching and returned site rows',
+)
+
+const firstGuard = migration.indexOf('v_guard := public.scout_guard_opportunity_request')
+const ambiguityReturn = migration.indexOf("'candidate_sites', v_site_options")
+assert(
+  firstGuard > -1 && ambiguityReturn > -1 && firstGuard < ambiguityReturn,
+  'resolver must run the opportunity guard before disclosing ambiguous candidate sites',
+)
+
+assert(
   !migration.includes('http://') &&
     !migration.includes('https://') &&
     !migration.match(/\b(st_makepoint|st_geocode|geocoder_url|geocoder_api)\b/i),

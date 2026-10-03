@@ -84,7 +84,7 @@ begin
       s.state_code,
       s.county_name,
       nullif(btrim(s.details->>'city'),'') as city,
-      coalesce(nullif(btrim(s.details->>'address'),''), nullif(btrim(e.site_address_text,''), s.display_name) as display_address,
+      coalesce(nullif(btrim(s.details->>'address'),''), nullif(btrim(e.site_address_text),''), s.display_name) as display_address,
       e.site_address_text as matched_address,
       e.evidence_class,
       e.confidence as resolution_confidence,
@@ -95,6 +95,8 @@ begin
     join scout.opportunity_search_spine s using (candidate_key)
     where s.state_code = v_state_code
       and coalesce(s.global_suppressed,false) = false
+      and (s.expires_at is null or s.expires_at >= now())
+      and e.evidence_class = 'authoritative_record'
       and scout.normalize_address_key_v2(e.site_address_text) = v_address_key
       and regexp_replace(lower(coalesce(s.details->>'city','')), '[^a-z0-9]+', '', 'g') = v_city_key
   ),
@@ -119,6 +121,7 @@ begin
     from scout.opportunity_search_spine s
     where s.state_code = v_state_code
       and coalesce(s.global_suppressed,false) = false
+      and (s.expires_at is null or s.expires_at >= now())
       and scout.normalize_address_key_v2(s.details->>'address') = v_address_key
       and regexp_replace(lower(coalesce(s.details->>'city','')), '[^a-z0-9]+', '', 'g') = v_city_key
   ),
@@ -197,24 +200,6 @@ begin
     );
   end if;
 
-  if v_site_count > 1 then
-    return jsonb_build_object(
-      'allowed', true,
-      'resolution_status', 'needs_confirmation',
-      'query', jsonb_build_object(
-        'address', v_address,
-        'city', v_city,
-        'state_code', v_state_code,
-        'normalized_address_key', v_address_key
-      ),
-      'candidate_sites', v_site_options,
-      'guardrails', jsonb_build_array(
-        'More than one Scout site matched the supplied address key within the city/state constraint.',
-        'No candidate_key was selected; ask the operator to confirm the intended site.'
-      )
-    );
-  end if;
-
   if cardinality(v_service_slugs) > 0 then
     v_guard := public.scout_guard_opportunity_request(
       p_connection_id,
@@ -238,12 +223,31 @@ begin
     end if;
   end if;
 
+  if v_site_count > 1 then
+    return jsonb_build_object(
+      'allowed', true,
+      'resolution_status', 'needs_confirmation',
+      'query', jsonb_build_object(
+        'address', v_address,
+        'city', v_city,
+        'state_code', v_state_code,
+        'normalized_address_key', v_address_key
+      ),
+      'candidate_sites', v_site_options,
+      'guardrails', jsonb_build_array(
+        'More than one Scout site matched the supplied address key within the city/state constraint.',
+        'No candidate_key was selected; ask the operator to confirm the intended site.'
+      )
+    );
+  end if;
+
   v_resolved_site := v_site_options->0;
 
   with site_opportunities as (
     select s.*
     from scout.opportunity_search_spine s
     where coalesce(s.global_suppressed,false) = false
+      and (s.expires_at is null or s.expires_at >= now())
       and (
         (left(v_site_key, 10) = 'candidate:' and s.candidate_key = substring(v_site_key from 11))
         or
@@ -315,6 +319,7 @@ begin
     select s.*
     from scout.opportunity_search_spine s
     where coalesce(s.global_suppressed,false) = false
+      and (s.expires_at is null or s.expires_at >= now())
       and (
         (left(v_site_key, 10) = 'candidate:' and s.candidate_key = substring(v_site_key from 11))
         or
