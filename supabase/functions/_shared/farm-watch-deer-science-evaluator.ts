@@ -9,6 +9,10 @@ import {
   type DeerRelationshipRecord,
   type DeerRelationshipScale,
 } from './farm-watch-deer-relationship-registry.ts'
+import {
+  FARM_WATCH_DEER_INTERACTIONS,
+  type DeerInteractionRecord,
+} from './farm-watch-deer-interaction-registry.ts'
 import type {
   FarmWatchDeerAgeClass,
   FarmWatchDeerMovementState,
@@ -18,8 +22,8 @@ import type {
 
 export const FARM_WATCH_DEER_SCIENCE_CONTEXT_PRODUCT = Object.freeze({
   key: 'deer-science-context',
-  algorithmVersion: 'farm-watch-deer-science-evaluator-v5',
-  outputSchemaVersion: 'deer-science-context-v5',
+  algorithmVersion: 'farm-watch-deer-science-evaluator-v6',
+  outputSchemaVersion: 'deer-science-context-v6',
   species: 'Odocoileus virginianus',
   statusVocabulary: Object.freeze([
     'active',
@@ -1508,10 +1512,131 @@ function moduleStatus(
   return 'not_applicable'
 }
 
+type DeerInteractionEvaluationStatus =
+  | 'eligible_context'
+  | 'blocked_by_state'
+  | 'blocked_by_fidelity'
+  | 'insufficient_input'
+  | 'not_applicable'
+
+const DEER_INTERACTION_FIDELITY_RANK: Record<DeerEvidenceFidelityClass, number> = {
+  exact: 4,
+  study_aligned_derivative: 3,
+  calibrated_proxy: 2,
+  mechanism_only: 1,
+  unavailable: 0,
+}
+
+function evaluateDeerInteraction(args: {
+  interaction: DeerInteractionRecord
+  relationships: ReturnType<typeof evaluateDeerRelationship>[]
+}) {
+  const related = new Map(args.relationships.map((row) => [row.relationship_id, row]))
+  const gateRows = args.interaction.state_gate_relationship_ids.map((id) => related.get(id) || null)
+  const missingRelationshipIds = args.interaction.relationship_ids.filter((id) => !related.has(id))
+  const gateMismatches = gateRows.flatMap((row) => row?.state_gate.biological_mismatches || [])
+  const gateMissingBiological = [...new Set(gateRows.flatMap((row) => row?.state_gate.missing_biological_dimensions || []))].sort()
+  const gateMissingInputs = [...new Set(gateRows.flatMap((row) => row?.state_gate.missing_or_incompatible_state_inputs || []))].sort()
+  const unresolvedStateConstraintIds = [...new Set(gateRows.flatMap((row) => row?.state_gate.unresolved_state_constraint_ids || []))].sort()
+  const stateGateResult = {
+    status: gateRows.some((row) => row?.state_gate.status === 'not_applicable') || gateMismatches.length
+      ? 'not_applicable' as const
+      : missingRelationshipIds.length || gateMissingBiological.length || gateRows.some((row) => row?.state_gate.status === 'insufficient_state')
+        ? 'insufficient_state' as const
+        : 'pass' as const,
+    relationship_ids: [...args.interaction.state_gate_relationship_ids],
+    missing_relationship_ids: missingRelationshipIds,
+    missing_biological_dimensions: gateMissingBiological,
+    missing_or_incompatible_state_inputs: gateMissingInputs,
+    unresolved_state_constraint_ids: unresolvedStateConstraintIds,
+    mismatches: gateMismatches,
+  }
+
+  const measurementIds = new Set([
+    ...args.interaction.required_measurements.map((row) => row.measurement_id),
+    ...args.interaction.context_only_measurement_ids,
+  ])
+  const evidenceBindings = args.interaction.relationship_ids.flatMap((id) => {
+    const relationship = related.get(id)
+    return (relationship?.measurement_fidelity_matrix || [])
+      .filter((row) => measurementIds.has(row.measurement_id))
+      .map((row) => ({ ...row, limitations: [...row.limitations], accepted_products: [...row.accepted_products] }))
+  })
+  const missingMeasurementIds = args.interaction.required_measurements
+    .filter((required) => !evidenceBindings.some((row) => row.measurement_id === required.measurement_id))
+    .map((row) => row.measurement_id)
+  const belowFidelityIds = args.interaction.required_measurements.filter((required) => {
+    const rows = evidenceBindings.filter((row) => row.measurement_id === required.measurement_id)
+    return rows.some((row) =>
+      row.relationship_use === 'blocks_relationship' ||
+      DEER_INTERACTION_FIDELITY_RANK[row.fidelity_class] < DEER_INTERACTION_FIDELITY_RANK[required.minimum_fidelity]
+    )
+  }).map((row) => row.measurement_id)
+  const missingBindingIds = args.interaction.required_measurements.filter((required) => {
+    const rows = evidenceBindings.filter((row) => row.measurement_id === required.measurement_id)
+    return rows.length > 0 && rows.every((row) => row.current_binding_status !== 'satisfied')
+  }).map((row) => row.measurement_id)
+
+  let status: DeerInteractionEvaluationStatus
+  if (stateGateResult.status === 'not_applicable') {
+    status = 'not_applicable'
+  } else if (gateMissingBiological.length) {
+    status = 'blocked_by_state'
+  } else if (missingRelationshipIds.length || gateMissingInputs.length || unresolvedStateConstraintIds.length || stateGateResult.status === 'insufficient_state' || missingMeasurementIds.length || missingBindingIds.length) {
+    status = 'insufficient_input'
+  } else if (belowFidelityIds.length) {
+    status = 'blocked_by_fidelity'
+  } else {
+    const relatedRows = args.interaction.relationship_ids.map((id) => related.get(id)!).filter(Boolean)
+    if (relatedRows.some((row) => row.status === 'not_applicable')) status = 'not_applicable'
+    else if (relatedRows.some((row) => row.status === 'blocked_measurement_alignment')) status = 'blocked_by_fidelity'
+    else if (relatedRows.some((row) => row.status !== 'active')) status = 'insufficient_input'
+    else status = 'eligible_context'
+  }
+
+  return {
+    interaction_id: args.interaction.interaction_id,
+    title: args.interaction.title,
+    source_ledger_ids: [...args.interaction.ledger_ids],
+    relationship_ids: [...args.interaction.relationship_ids],
+    participating_variables: [...args.interaction.participating_variables],
+    participating_measurement_ids: [...measurementIds].sort(),
+    interaction_type: args.interaction.interaction_type,
+    structure: args.interaction.structure,
+    response_variable: args.interaction.response_variable,
+    temporal_scale: args.interaction.temporal_scale,
+    spatial_scale: args.interaction.spatial_scale,
+    state_gate_result: stateGateResult,
+    fidelity_result: {
+      status: belowFidelityIds.length ? 'blocked' as const : missingMeasurementIds.length || missingBindingIds.length ? 'incomplete' as const : 'pass' as const,
+      required_measurement_ids: args.interaction.required_measurements.map((row) => row.measurement_id),
+      below_requirement_measurement_ids: belowFidelityIds,
+      missing_measurement_ids: missingMeasurementIds,
+      missing_binding_measurement_ids: missingBindingIds,
+      context_only_measurement_ids: [...args.interaction.context_only_measurement_ids],
+    },
+    evidence_bindings: evidenceBindings,
+    property_conditioning_state: args.interaction.property_conditioning_eligibility,
+    property_conditioned_interaction_hypothesis_available: false as const,
+    status,
+    supported_interpretation: args.interaction.supported_form,
+    supported_direction: args.interaction.supported_direction,
+    supported_nonlinearity: args.interaction.supported_nonlinearity,
+    limitations: [...args.interaction.transfer_limitations],
+    null_or_blocked_conditions: [...args.interaction.null_or_blocked_conditions],
+    coefficient_transfer_disposition: args.interaction.coefficient_transfer_disposition,
+    decision_actionable: false as const,
+    behavioral_probability_inferred: false as const,
+    scoring_performed: false as const,
+    interpretation_boundary: args.interaction.interpretation_boundary,
+  }
+}
+
 export function evaluateDeerScienceContext(args: {
   scenario: FarmWatchDeerScienceScenario
   evidence: readonly FarmWatchDeerEvaluatorEvidence[]
   relationships?: readonly DeerRelationshipRecord[]
+  interactions?: readonly DeerInteractionRecord[]
 }) {
   const relationships = args.relationships || FARM_WATCH_DEER_RELATIONSHIPS
   const evaluations = relationships.map((relationship) =>
@@ -1521,6 +1646,20 @@ export function evaluateDeerScienceContext(args: {
       evidence: args.evidence,
     })
   )
+  const interactions = (args.interactions || FARM_WATCH_DEER_INTERACTIONS).map((interaction) =>
+    evaluateDeerInteraction({ interaction, relationships: evaluations })
+  )
+  const interaction_statuses: DeerInteractionEvaluationStatus[] = [
+    'eligible_context', 'blocked_by_state', 'blocked_by_fidelity', 'insufficient_input', 'not_applicable',
+  ]
+  const interaction_status_counts = interaction_statuses.reduce((out, status) => {
+    out[status] = interactions.filter((row) => row.status === status).length
+    return out
+  }, {} as Record<DeerInteractionEvaluationStatus, number>)
+  const interaction_ids_by_status = interaction_statuses.reduce((out, status) => {
+    out[status] = interactions.filter((row) => row.status === status).map((row) => row.interaction_id)
+    return out
+  }, {} as Record<DeerInteractionEvaluationStatus, string[]>)
 
   const families = [...new Set(evaluations.map((row) => row.module_family))].sort()
   const modules = families.map((family) => {
@@ -1668,6 +1807,22 @@ export function evaluateDeerScienceContext(args: {
     state_gate_counts,
     state_insufficient_relationship_ids,
     state_not_applicable_relationship_ids,
+    interaction_evaluation: {
+      registered_interaction_count: (args.interactions || FARM_WATCH_DEER_INTERACTIONS).length,
+      evaluated_interaction_count: interactions.length,
+      eligible_interaction_context_count: interaction_status_counts.eligible_context,
+      blocked_by_state_count: interaction_status_counts.blocked_by_state,
+      blocked_by_fidelity_count: interaction_status_counts.blocked_by_fidelity,
+      insufficient_input_count: interaction_status_counts.insufficient_input,
+      not_applicable_count: interaction_status_counts.not_applicable,
+      counts_by_status: interaction_status_counts,
+      interaction_ids_by_status,
+      interactions,
+      decision_actionable: false,
+      behavioral_probability_inferred: false,
+      scoring_performed: false,
+      interpretation_boundary: 'Interactions are semantic, literature-supported joint structures. They are evaluated only after existing relationship state gates and measurement-fidelity contracts; co-occurring covariates do not create an interaction. Eligible context is neither property use nor a behavioral probability.',
+    },
     evaluator_active_relationship_ids: evaluations
       .filter((row) => row.status === 'active')
       .map((row) => row.relationship_id),
@@ -1677,7 +1832,7 @@ export function evaluateDeerScienceContext(args: {
     coefficient_synthesis_performed: false,
     behavioral_probability_inferred: false,
     interpretation_boundary:
-      'Registry-driven property/date/scenario applicability plus explicitly authorized property-conditioning only. A formal state framework keeps deterministic, explicit, proxy, stale, unknown, and unavailable biological/environmental/resource/disturbance states distinct and reports relationship-specific state readiness without collapsing those states into a score. Every source-study variable is exposed through a measurement-fidelity matrix that keeps exact measurements, study-aligned derivatives, calibrated proxies, mechanism-only context, and unavailable variables distinct. An active quantitative or ordinal relationship is literature-supported directional context. A property-conditioned hypothesis is emitted only when the registry declares a conditioning rule and the configured property covariate has a measured multi-scale contrast. Such a hypothesis remains non-actionable and does not infer deer use, dispersal, behavioral probability, or effect magnitude. Mechanism context and negative constraints remain separate. Outputs are not combined into a universal deer score or probability, and numeric coefficients are emitted only if separately authorized by the relationship registry.',
+      'Registry-driven property/date/scenario applicability plus explicitly authorized property-conditioning only. The formal state framework keeps deterministic, explicit, proxy, stale, unknown, and unavailable states distinct. Interaction structure is separately registered and evaluated only after the existing relationship state gates and required measurement-fidelity checks pass. Interactions are semantic literature context, never a formula, deer score, property-use claim, or behavioral probability. Every source-study variable remains visible in its measurement-fidelity matrix. Property-conditioned interaction hypotheses are not enabled by this contract. No coefficient transfers unless a separate explicit registry authorization exists.',
   }
 }
 
