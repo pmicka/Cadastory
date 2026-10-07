@@ -1,8 +1,8 @@
 # Farm Watch Deer Science Evidence Ledger
 
-Status: current as of 2026-10-01  
-Target species: white-tailed deer (`Odocoileus virginianus`)  
-Primary transfer geography: central Kentucky / lower Ohio Valley  
+Status: current as of 2026-10-01
+Target species: white-tailed deer (`Odocoileus virginianus`)
+Primary transfer geography: central Kentucky / lower Ohio Valley
 Validation property: `validation-property-01`
 
 ## Purpose

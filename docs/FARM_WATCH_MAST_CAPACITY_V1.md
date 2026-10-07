@@ -1,6 +1,6 @@
 # Farm Watch Mast Capacity v1
 
-Status: Batch 5A production materialization complete 2026-09-25 for `validation-property-01`; 28-species bounded BIGMAP transport validated
+Status: Batch 5A raster semantics/transport validated; P0 archive-to-crop provenance closure implemented 2026-10-02; authoritative rematerialization pending v2 provenance bundle
 
 ## Purpose
 
@@ -76,3 +76,21 @@ A source-controlled Debian helper now validates the national grid, performs the 
 The manual transport path required two bounded operational fixes during final validation: draft GitHub releases are resolved by release-asset ID rather than release-by-tag, and the shared GitHub OIDC verifier permits `workflow_dispatch` only for the source-controlled mast-capacity workflow while retaining the existing repository/owner/actor/main-ref/workflow-ref checks. Other Farm Watch workflows remain `issues`-only.
 
 **Current state:** Batch 5A is complete for the validation property. Batch 5B may now proceed as a separate annual-mast-state unit; it must remain semantically separate from this modeled species-capacity product.
+
+
+## P0 archive-to-crop provenance closure — 2026-10-02
+
+The September 25 artifact proved the bounded crop bytes used by Farm Watch, but its v1 manifest did not cryptographically prove that those crops descended from the Forest Service ZIP archives identified by the Raster Data Gateway's published SHA-256 checksums. After authoritative external-source freshness began using those published ZIP checksums, the retained v1 artifact correctly became stale and must not be rebound merely because its crop hashes still match.
+
+The supported workstation path now emits `farm-watch-bigmap-local-crop-manifest-v2` and fails closed for production bundling unless every required SPCD proves this chain:
+
+1. the current Raster Data Gateway publishes exactly one SHA-256 for the required SPCD;
+2. a local ZIP hashes exactly to that published SHA-256;
+3. that ZIP contains exactly one matching BIGMAP 2018 AGB TIFF member;
+4. the extracted source TIFF hashes exactly to the ZIP member and retains the expected native raster contract;
+5. the bounded crop is regenerated from that proven source TIFF on the native 30 m grid with no reprojection/resampling;
+6. the materializer verifies the manifest's published ZIP hashes exactly match the authoritative BIGMAP observation bound into the materialization claim.
+
+Completion still re-resolves the external source identity. A provider checksum change between claim and completion rejects the build through the existing completion-time source-signature guard.
+
+Old v1 bundles and retained crops remain historical evidence only. They cannot produce a supported current mast-capacity build without the checksum-verified ZIP/source-TIFF chain. This is a provenance/record-keeping correction; it does not change the BIGMAP values, mast species groups, landscape domain, or biological interpretation.

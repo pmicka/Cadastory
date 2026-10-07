@@ -1,8 +1,8 @@
 # Farm Watch Deer Interaction Registry v1
 
-Status: evaluator-integrated implementation candidate  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Contract: `farm-watch-deer-interaction-registry.ts`  
+Status: evaluator-integrated implementation candidate
+Species: white-tailed deer (`Odocoileus virginianus`)
+Contract: `farm-watch-deer-interaction-registry.ts`
 Evaluator: `deer-science-context-v6`
 
 ## Purpose and boundary

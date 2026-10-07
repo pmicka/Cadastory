@@ -2,11 +2,11 @@
 
 > **Superseded:** Current evaluator semantics are defined in `FARM_WATCH_DEER_SCIENCE_CONTEXT_V4.md`. v4 retains v3 property-conditioning semantics and adds a per-source-variable evidence-fidelity matrix so product availability cannot be mistaken for measurement equivalence.
 
-Status: implementation candidate — property-conditioned hypotheses  
-Version: 2026-10-01  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Normative science source: `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`  
-Registry source: `farm-watch-deer-relationship-registry.ts`
+- **Status:** implementation candidate — property-conditioned hypotheses
+- **Version:** 2026-10-01
+- **Species:** white-tailed deer (`Odocoileus virginianus`)
+- **Normative science source:** `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+- **Registry source:** `farm-watch-deer-relationship-registry.ts`
 
 ## Purpose
 

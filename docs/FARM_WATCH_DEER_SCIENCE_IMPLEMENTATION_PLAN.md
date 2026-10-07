@@ -715,9 +715,9 @@ A hunting-risk module is unavailable when actual pressure evidence is unavailabl
 
 # Batch 9 — Machine-readable science relationship registry
 
-Priority: P0 for deer-specific evaluation  
-Status: implemented in `deer-relationship-registry-v3`; no production deployment is required for this repository-level contract.  
-Can begin in parallel once the neutral contracts are stable.
+- **Priority:** P0 for deer-specific evaluation
+- **Status:** implemented in `deer-relationship-registry-v3`; no production deployment is required for this repository-level contract.
+- **Scheduling:** Can begin in parallel once the neutral contracts are stable.
 
 Implementation:
 
@@ -967,9 +967,9 @@ Owner-facing output can support maps where authorized. Viewer restrictions on fi
 
 The output should explain why a module fired and what would change it.
 
-### v1 evaluator implementation
+### v4 evaluator implementation
 
-`farm-watch-deer-science-evaluator-v1` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
+`farm-watch-deer-science-evaluator-v4` now evaluates every registry relationship for a property/date/scenario and returns one of four operational states:
 
 - `active`;
 - `not_applicable`;
@@ -984,7 +984,7 @@ FW-R22 additionally carries an explicit active-extreme-event value constraint, p
 
 No relationship is promoted merely because the generic evaluator exists. Parked or unresolved source measurements continue to abstain.
 
-See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V1.md`.
+See `FARM_WATCH_DEER_SCIENCE_CONTEXT_V4.md`.
 
 ---
 

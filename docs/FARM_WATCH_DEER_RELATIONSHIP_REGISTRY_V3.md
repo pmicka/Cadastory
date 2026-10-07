@@ -1,7 +1,7 @@
 # Farm Watch Deer Relationship Registry v3
 
-Status: Batch 9 contract + property-conditioning + 2026 research guardrails  
-Species: white-tailed deer (`Odocoileus virginianus`)  
+Status: Batch 9 contract + property-conditioning + 2026 research guardrails
+Species: white-tailed deer (`Odocoileus virginianus`)
 Normative science source: `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
 Previous contract: `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V2.md`
 
@@ -275,4 +275,3 @@ The consumer distinguishes known non-applicability from missing information. For
 The evaluator also emits `deer-state-framework-v1` and a per-relationship `state_gate`. Biological gates, stateful required inputs, and state-specific value constraints are made inspectable as `pass | not_applicable | insufficient_state`. This is diagnostic only: it does not weaken the registry's measurement-fidelity or input-binding requirements.
 
 The evaluator remains non-synthetic: no universal score or probability is produced, and no numeric coefficient appears unless this registry separately authorizes its transfer.
-

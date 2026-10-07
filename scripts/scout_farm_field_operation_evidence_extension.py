@@ -27,10 +27,15 @@ OPERATE_RE = re.compile(r"\b(?:operates?|operating|operation\s+at|operated\s+by)
 LEASE_RE = re.compile(r"\b(?:leases?|leased|leasing|rents?|rented|renting)\b", re.I)
 MANAGE_RE = re.compile(r"\b(?:manages?|managed|managing)\b", re.I)
 GRAZE_RE = re.compile(r"\b(?:grazes?|grazed|grazing)\b", re.I)
+_PASTURE_USE_TERM = (
+    r"(?:pastures?|grazing\s+land)\b"
+    r"(?!\s+(?:road|rd|street|st|lane|ln|drive|dr|highway|hwy|avenue|ave|"
+    r"boulevard|blvd|court|ct|circle|cir|parkway|pkwy|route|rte)\b)"
+)
 PASTURE_USE_RE = re.compile(
-    r"\b(?:uses?|using|maintains?|keeps?|runs?|raises?)\b.{0,100}\b(?:pasture|pastures|grazing\s+land)\b|"
-    r"\b(?:pastures?|grazing\s+land)\b.{0,100}\b(?:cattle|cows?|calves?|heifers?|horses?|livestock|herd)\b|"
-    r"\b(?:cattle|cows?|calves?|heifers?|horses?|livestock|herd)\b.{0,100}\b(?:pasture|pastures|grazing\s+land)\b",
+    rf"\b(?:uses?|using|maintains?|keeps?|runs?|raises?)\b.{{0,100}}\b{_PASTURE_USE_TERM}|"
+    rf"\b{_PASTURE_USE_TERM}.{{0,100}}\b(?:cattle|cows?|calves?|heifers?|horses?|livestock|herd)\b|"
+    rf"\b(?:cattle|cows?|calves?|heifers?|horses?|livestock|herd)\b.{{0,100}}\b{_PASTURE_USE_TERM}",
     re.I | re.S,
 )
 OWN_RE = re.compile(r"\b(?:owns?|owned|ownership|property\s+of|land\s+owned\s+by)\b", re.I)
@@ -375,6 +380,7 @@ def self_test() -> None:
     )
     assert ownership is not None
     assert "property.explicit_owned_by_farm" in ownership["evidence_codes"]
+    assert "field.explicit_pasture_use" not in ownership["evidence_codes"]
     assert ownership["auto_apply"] is False
 
     unrelated = analyze_page_extended(

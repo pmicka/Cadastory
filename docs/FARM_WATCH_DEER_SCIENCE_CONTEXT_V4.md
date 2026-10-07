@@ -2,11 +2,11 @@
 
 > **Superseded:** Current evaluator semantics are defined in `FARM_WATCH_DEER_SCIENCE_CONTEXT_V5.md`. v5 retains the v4 fidelity matrix and adds the explicit fail-closed deer state framework and relationship-specific state gates.
 
-Status: implementation candidate — explicit evidence-fidelity matrix  
-Version: 2026-10-01  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Normative science source: `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`  
-Registry source: `farm-watch-deer-relationship-registry.ts`
+- **Status:** implementation candidate — explicit evidence-fidelity matrix
+- **Version:** 2026-10-01
+- **Species:** white-tailed deer (`Odocoileus virginianus`)
+- **Normative science source:** `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+- **Registry source:** `farm-watch-deer-relationship-registry.ts`
 
 ## Purpose
 

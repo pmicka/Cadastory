@@ -2,10 +2,10 @@
 
 > **Superseded:** Current machine relationship semantics are documented in `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V3.md`. v3 retains property-conditioning and fidelity behavior while adding the 2026-10-01 FW-D24/FW-D25 research guardrails.
 
-Status: Batch 9 contract + property-conditioning extension  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Normative science source: `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
-Previous contract: `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`
+- **Status:** Batch 9 contract + property-conditioning extension
+- **Species:** white-tailed deer (`Odocoileus virginianus`)
+- **Normative science source:** `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+- **Previous contract:** `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`
 
 ## Purpose
 

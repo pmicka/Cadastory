@@ -1,9 +1,9 @@
 # Farm Watch Deer Science Context v5
 
-Status: implementation candidate — explicit state framework + evidence fidelity  
-Version: 2026-10-01  
-Species: white-tailed deer (`Odocoileus virginianus`)  
-Normative science source: `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`  
+Status: implementation candidate — explicit state framework + evidence fidelity
+Version: 2026-10-01
+Species: white-tailed deer (`Odocoileus virginianus`)
+Normative science source: `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
 Registry source: `farm-watch-deer-relationship-registry.ts`
 
 ## Purpose
