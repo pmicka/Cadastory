@@ -12,6 +12,10 @@ import {
   validateDeerRelationshipRegistry,
   validateRelationshipModuleDefinition,
 } from './farm-watch-deer-relationship-registry.ts'
+import {
+  FARM_WATCH_DEER_INTERACTIONS,
+  validateDeerInteractionRegistry,
+} from './farm-watch-deer-interaction-registry.ts'
 
 function assert(condition: unknown, message = 'assertion failed'): asserts condition {
   if (!condition) throw new Error(message)
@@ -19,7 +23,48 @@ function assert(condition: unknown, message = 'assertion failed'): asserts condi
 
 Deno.test('Batch 9 registry validates as a whole', () => {
   assert(validateDeerRelationshipRegistry())
-  assert(FARM_WATCH_DEER_RELATIONSHIPS.length >= 31)
+  assert(FARM_WATCH_DEER_RELATIONSHIPS.length >= 33)
+})
+
+Deno.test('research interaction registry validates and covers every relationship explicitly marked as an interaction', () => {
+  assert(validateDeerInteractionRegistry())
+  assert(FARM_WATCH_DEER_INTERACTIONS.length === 10)
+  const registeredRelationshipIds = new Set(FARM_WATCH_DEER_INTERACTIONS.flatMap((row) => row.relationship_ids))
+  for (const row of FARM_WATCH_DEER_RELATIONSHIPS) {
+    if (row.direction === 'interaction') {
+      assert(registeredRelationshipIds.has(row.relationship_id), row.relationship_id + ' has no interaction contract')
+    }
+  }
+  assert(!registeredRelationshipIds.has('FW-R19-juvenile-male-dispersal-ag-riparian'))
+  assert(!registeredRelationshipIds.has('FW-R31-juvenile-male-dispersal-distance'))
+})
+
+Deno.test('interaction contracts contain semantic structure only and never authorize transferred coefficients', () => {
+  const contractKeys = [
+    'interaction_id','ledger_ids','relationship_ids','title','biological_mechanism','response_variable',
+    'participating_variables','interaction_type','structure','state_gate_relationship_ids','required_measurements',
+    'context_only_measurement_ids','temporal_scale','spatial_scale','supported_form','supported_direction',
+    'supported_nonlinearity','coefficient_transfer_disposition','property_conditioning_eligibility',
+    'null_or_blocked_conditions','transfer_limitations','interpretation_boundary',
+  ].sort()
+  for (const row of FARM_WATCH_DEER_INTERACTIONS) {
+    assert(row.coefficient_transfer_disposition === 'not_authorized')
+    assert(row.property_conditioning_eligibility === 'not_configured')
+    assert(JSON.stringify(Object.keys(row).sort()) === JSON.stringify(contractKeys))
+    const serialized = JSON.stringify(row)
+    assert(!serialized.includes('numeric_formula'))
+    assert(!serialized.includes('coefficient_value'))
+  }
+})
+
+Deno.test('FW-D24 and FW-D25 remain guardrails rather than generic edge or visibility interactions', () => {
+  assert(!FARM_WATCH_DEER_INTERACTIONS.some((row) => row.ledger_ids.includes('FW-D24')))
+  assert(!FARM_WATCH_DEER_INTERACTIONS.some((row) => row.ledger_ids.includes('FW-D25')))
+  assert(!FARM_WATCH_DEER_INTERACTIONS.some((row) =>
+    row.participating_variables.includes('generic_edge_density') ||
+    row.participating_variables.includes('security_cover') ||
+    row.participating_variables.includes('horizontal_visibility_x_concealment')
+  ))
 })
 
 Deno.test('every durable deer ledger entry has machine-readable relationship coverage', async () => {
@@ -27,7 +72,7 @@ Deno.test('every durable deer ledger entry has machine-readable relationship cov
   const documentIds = [...ledger.matchAll(/^## (FW-D\d+)\s+—/gm)]
     .map((match) => match[1])
     .sort()
-  assert(documentIds.length >= 23)
+  assert(documentIds.length >= 25)
   assert(JSON.stringify(documentIds) === JSON.stringify(FARM_WATCH_DEER_LEDGER_IDS))
   for (const ledgerId of documentIds) {
     assert(relationshipsForLedgerId(ledgerId).length > 0, ledgerId + ' is not represented')
@@ -531,6 +576,61 @@ Deno.test('FW-D14 terrain relationship preserves juvenile-male dispersal gate', 
   assert(JSON.stringify(relationship.biological_state_gates.sex) === JSON.stringify(['male']))
   assert(JSON.stringify(relationship.biological_state_gates.age_class) === JSON.stringify(['juvenile']))
   assert(JSON.stringify(relationship.biological_state_gates.movement_state) === JSON.stringify(['dispersal']))
+})
+
+Deno.test('FW-D24 blocks universal forest-edge and aspect preferences while preserving source measurement boundaries', () => {
+  const relationships = relationshipsForLedgerId('FW-D24')
+  assert(relationships.length === 1)
+  const relationship = relationships[0]
+  assert(relationship.relationship_id === 'FW-R32-seasonal-edge-aspect-negative-constraint')
+  assert(relationship.output_kind === 'negative_constraint')
+  assert(relationship.blocked_universal_assumptions.includes('forest_edge_proximity_generic_deer_use'))
+  assert(relationship.blocked_universal_assumptions.includes('south_facing_slope_generic_preference'))
+  assert(relationship.blocked_universal_assumptions.includes('north_facing_slope_generic_preference'))
+  assert(deerRelationshipStudyFidelityStatus(relationship).status === 'context_only')
+
+  const edge = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M58-gilbertson-forest-edge-distance',
+  )
+  assert(edge)
+  assert(edge.activation_requirement === 'context_only')
+  assert(edge.alignment === 'unsupported')
+  assert(/forest.*non-forest/i.test(edge.study_protocol))
+  assert(/must not be relabeled/i.test(edge.permitted_use))
+})
+
+Deno.test('FW-D25 keeps fawn horizontal visibility distinct from concealment and generic survival claims', () => {
+  const relationships = relationshipsForLedgerId('FW-D25')
+  assert(relationships.length === 1)
+  const relationship = relationships[0]
+  assert(relationship.relationship_id === 'FW-R33-fawn-visibility-concealment-negative-constraint')
+  assert(relationship.output_kind === 'negative_constraint')
+  assert(
+    relationship.blocked_universal_assumptions.includes(
+      'low_height_concealment_generic_fawn_survival_advantage',
+    ),
+  )
+  assert(
+    relationship.blocked_universal_assumptions.includes(
+      'horizontal_visibility_generic_deer_survival_advantage',
+    ),
+  )
+  assert(deerRelationshipStudyFidelityStatus(relationship).status === 'context_only')
+
+  const visibility = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M61-obermoller-horizontal-visibility',
+  )
+  assert(visibility)
+  assert(visibility.activation_requirement === 'context_only')
+  assert(visibility.alignment === 'unsupported')
+  assert(/2 m cover pole/i.test(visibility.study_protocol))
+  assert(/15 m/i.test(visibility.study_protocol))
+
+  const concealment = relationship.study_measurements.find(
+    (row) => row.id === 'FW-M62-obermoller-fawn-concealment',
+  )
+  assert(concealment)
+  assert(/25%/.test(concealment.study_protocol))
 })
 
 Deno.test('FW-D15 keeps spring probability, dispersal distance, and path selection separate', () => {

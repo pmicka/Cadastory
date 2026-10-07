@@ -1,16 +1,14 @@
-# Farm Watch Deer Science Context v4
+# Farm Watch Deer Science Context v5
 
-> **Superseded:** Current evaluator semantics are defined in `FARM_WATCH_DEER_SCIENCE_CONTEXT_V5.md`. v5 retains the v4 fidelity matrix and adds the explicit fail-closed deer state framework and relationship-specific state gates.
-
-- **Status:** implementation candidate — explicit evidence-fidelity matrix
-- **Version:** 2026-10-01
-- **Species:** white-tailed deer (`Odocoileus virginianus`)
-- **Normative science source:** `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
-- **Registry source:** `farm-watch-deer-relationship-registry.ts`
+Status: implementation candidate — explicit state framework + evidence fidelity
+Version: 2026-10-01
+Species: white-tailed deer (`Odocoileus virginianus`)
+Normative science source: `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+Registry source: `farm-watch-deer-relationship-registry.ts`
 
 ## Purpose
 
-`deer-science-context-v4` is the first Farm Watch property/date/scenario evaluator.
+`deer-science-context-v5` is the first Farm Watch property/date/scenario evaluator.
 
 It consumes the machine-readable deer relationship registry plus current Farm Watch evidence and determines, relationship by relationship, whether the relationship is:
 
@@ -72,6 +70,7 @@ Each registry relationship is evaluated in this order:
 
 1. **Registry applicability** — an explicitly `not_applicable` registry record remains not applicable.
 2. **Biological gate** — known state mismatches are `not_applicable`; required but unknown state is `insufficient_input`.
+   A parallel `state_gate` now exposes state readiness explicitly as `pass | not_applicable | insufficient_state` without replacing the main evaluator status.
 3. **Study measurement fidelity** — unresolved required source-study measurements return `blocked_measurement_alignment`.
 4. **Output-kind fidelity** — a context-only measurement contract cannot emit an ordinal or quantitative effect.
 5. **Required product bindings** — product key, evidence state, spatial scale, and any/all semantics must match the registry.
@@ -118,6 +117,32 @@ Current bindings include:
 
 A catalog product that is not actually available is represented as `unavailable`, not omitted and not inferred.
 
+## State framework
+
+`deer-science-context-v5` embeds `deer-state-framework-v1`.
+
+The state framework separates:
+
+- **biological:** sex, age class, movement state, individual reproductive state, regional reproductive context;
+- **temporal:** calendar/meteorological season and deterministic solar/diel period;
+- **environmental:** recent precipitation, drought, stream context, root-zone soil moisture, physical thermal context, snow/winter context, extreme-event state, and current leaf state;
+- **resource:** field phenology, accepted crop identity, annual mast state, surface-water state, managed food, and managed water;
+- **disturbance:** actual human/hunting-activity state where available.
+
+Each state is normalized to `known | proxy | unknown | stale | unavailable` while retaining the original evidence state and provenance.
+
+`unknown` and `unavailable` are intentionally different. An individual movement state may be unknown because no animal-specific state was supplied. Current leaf state is unavailable because Farm Watch has no authorized source-aligned current leaf-state product. Historical leaf-off imagery and calendar season are not silently substituted.
+
+The framework also preserves a relationship-specific `state_gate`:
+
+- `pass` — required state gates are satisfied;
+- `not_applicable` — a known biological/state mismatch or known false state constraint excludes the relationship;
+- `insufficient_state` — a required state is unknown, unavailable, stale/incompatible, or unresolved.
+
+State readiness remains separate from study-measurement fidelity and spatial/product bindings. A relationship can have complete state information and still remain blocked because the study variable is not measurement-aligned.
+
+See `FARM_WATCH_DEER_STATE_FRAMEWORK_V1.md` for the durable contract.
+
 ## Evidence-fidelity matrix
 
 Every `study_measurements` entry now produces one runtime matrix row. The matrix does not replace the relationship gate; it makes the gate inspectable.
@@ -146,8 +171,6 @@ Each row separately exposes:
 This separation is intentional. **Product availability is not measurement equivalence.** A current Farm Watch product may bind successfully while the source-study variable remains `mechanism_only` or `unavailable`; in that case the product's presence cannot promote the relationship.
 
 For example, FW-R01 can have current `thermal-exposure-context` available while FW-M01 operative temperature remains `mechanism_only`, because the source study used black-globe operative temperature rather than Farm Watch's current physical thermal context. FW-M03 forage index remains `unavailable` because greenness/phenology does not reproduce standing crop plus forage chemistry. By contrast, FW-M02 vegetation height is `study_aligned_derivative` because the production product preserves the source variable family and support while documenting its interpolation differences.
-
-FW-M55/R30 is `mechanism_only` and required for activation. Mapped agriculture is measurable across Farm Watch fixed-radius domains, but those domains do not reproduce the source study's individual 95% aKDE natal-range support. The current covariate remains visible in the fidelity matrix, while it blocks both relationship activation and the directional property hypothesis until source-aligned support is available.
 
 ## On-demand road context
 
@@ -183,6 +206,9 @@ The private response adds:
 
 It contains:
 
+- `state_framework` with normalized state dimensions, provenance, required-by relationships, unresolved-state summary, and no scoring;
+- per-relationship `state_gate` plus top-level state-gate counts and insufficient/not-applicable relationship IDs;
+
 - schema / algorithm version;
 - property and evaluation timestamp;
 - explicit scenario;
@@ -213,7 +239,7 @@ The registry now includes two additional active negative constraints from the up
 - `FW-R32-seasonal-edge-aspect-negative-constraint` — forest-edge and north/south aspect effects are season-dependent in the 2025 southwest Wisconsin telemetry study; no universal edge or aspect sign is authorized.
 - `FW-R33-fawn-visibility-concealment-negative-constraint` — the 2026 Minnesota neonatal-fawn study keeps horizontal visibility, predator-view concealment and vegetation height separate and blocks a universal cover-to-survival rule.
 
-Their source measurement rows are emitted through the v4 evidence-fidelity matrix as context-only research provenance. They do not create new property-conditioned hypotheses, decision-actionable outputs, or coefficients.
+Their source measurement rows are emitted through the v5 evidence-fidelity matrix as context-only research provenance. They do not create new property-conditioned hypotheses, decision-actionable outputs, or coefficients.
 
 ## Coefficient and score boundary
 
@@ -261,19 +287,20 @@ An adult resident scenario does not inherit those findings.
 
 FW-R18 remains conditional mechanism context and does not assign a universal ridge, valley, or road sign. FW-R19 may expose its literature-supported interaction direction as `directional_relationship_context`, but no path-specific conditioning rule exists, so it remains `not_configured` for property directional evidence.
 
-### R30 property-conditioning contract
+### R30 property-conditioned agriculture hypothesis
 
 FW-R30 is the first relationship with an explicit property-conditioning contract.
 
 The source study measured the proportion of each juvenile male's pre-dispersal range classified as agricultural land use using 95% aKDE range vertices. Farm Watch does **not** reproduce that animal-specific support geometry. Instead, it already carries mapped agricultural-field acreage and exact barrier-aware denominator areas at 500 m, 1.5 km, and 3 km around the property.
 
-The registry retains an explicit property-conditioning rule for possible future use, but its presence does not establish measurement alignment. The evaluator currently:
+The evaluator may therefore:
 
-1. expose the mapped agricultural values and declared scales in the evidence-fidelity matrix;
-2. mark FW-M55 `mechanism_only` and required;
-3. block relationship activation and property conditioning because fixed-radius windows do not reproduce the source study's individual 95% aKDE support.
+1. derive the mapped agricultural fraction at each explicit Farm Watch scale;
+2. verify that at least two scales contain real numeric measurements;
+3. report the lower and higher observed property-context values and their difference;
+4. anchor a qualitative property-conditioned hypothesis to the source study's positive agriculture relationship.
 
-No directional property hypothesis is emitted until source-aligned support is available. The fixed-radius windows remain a support-geometry proxy, not an aKDE natal range. The evaluator must not transfer the Wisconsin logistic coefficient, estimate dispersal probability, establish that Flat Creek is a natal range, or claim that a juvenile male dispersed. Any future eligible result remains `decision_actionable=false`.
+The output must state that the fixed-radius windows are a support-geometry proxy, not an aKDE natal range. It must not transfer the Wisconsin logistic coefficient, estimate dispersal probability, establish that Flat Creek is a natal range, or claim that a juvenile male dispersed. The result remains `decision_actionable=false`.
 
 ### Hunting pressure
 

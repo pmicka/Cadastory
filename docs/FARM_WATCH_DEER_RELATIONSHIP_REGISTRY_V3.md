@@ -1,15 +1,13 @@
-# Farm Watch Deer Relationship Registry v2
+# Farm Watch Deer Relationship Registry v3
 
-> **Superseded:** Current machine relationship semantics are documented in `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V3.md`. v3 retains property-conditioning and fidelity behavior while adding the 2026-10-01 FW-D24/FW-D25 research guardrails.
-
-- **Status:** Batch 9 contract + property-conditioning extension
-- **Species:** white-tailed deer (`Odocoileus virginianus`)
-- **Normative science source:** `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
-- **Previous contract:** `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V1.md`
+Status: Batch 9 contract + property-conditioning + 2026 research guardrails
+Species: white-tailed deer (`Odocoileus virginianus`)
+Normative science source: `docs/FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`
+Previous contract: `FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V2.md`
 
 ## Purpose
 
-`deer-relationship-registry-v2` is the machine-readable transfer layer between the durable deer-science evidence ledger and future deer-specific evaluation modules.
+`deer-relationship-registry-v3` is the machine-readable transfer layer between the durable deer-science evidence ledger and future deer-specific evaluation modules.
 
 It does **not** evaluate a property, predict deer use, or produce a score. It records what a future module is allowed to evaluate, which inputs and biological states are required, what spatial/temporal scale is supported, whether a coefficient may be transferred, and when the module must abstain or remain blocked.
 
@@ -59,7 +57,7 @@ It also preserves **study-fidelity contracts**:
 
 Product-name compatibility is not sufficient to activate a deer relationship.
 
-The v1 measurement-alignment vocabulary is:
+The current measurement-alignment vocabulary is:
 
 - `measurement_equivalent` — Farm Watch represents substantially the same measured variable;
 - `derived_equivalent` — Farm Watch deterministically derives the same semantic quantity from authoritative geometry/state;
@@ -95,7 +93,7 @@ A future module definition must declare the study-measurement contracts and valu
 
 ## Output kinds
 
-The v1 vocabulary is:
+The current output-kind vocabulary is:
 
 - `quantitative_relative_selection`
 - `ordinal_directional`
@@ -110,7 +108,7 @@ No v1 relationship currently authorizes a transferred numeric deer-selection coe
 
 Required inputs may accept only explicitly permitted states.
 
-For a required input, v1 rejects:
+For a required input, the registry rejects:
 
 - `stale`
 - `unavailable`
@@ -150,6 +148,9 @@ The registry machine-enforces the evidence ledger's current blocked assumptions,
 - road avoidance/selection;
 - dense vegetation = bedding/security cover;
 - field edge = deer use;
+- forest-edge proximity = generic deer use across seasons;
+- greater low-height concealment = generic fawn survival advantage;
+- greater horizontal visibility = generic deer survival/security advantage across life stages;
 - CDL crop identity = current food;
 - nearest water/discharge = deer use;
 - open hunting season = current hunting pressure.
@@ -163,6 +164,17 @@ FW-D04 does **not** consume `horizontal-visibility-context-v1` as if it were the
 The registry instead requires the planned `low-height-concealment-context` input for FW-D04 relationships. Gallina et al. used a 2 m cover pole, four 50 cm vertical sections, readings from 15 m, and directional concealment. This preserves the completed Batch 6 general physical visibility product while preventing its generic 1.5 / 3 / 6 m equal-height rays from being silently substituted for the field protocol.
 
 The generalized viewshed remains useful for neutral physical visibility and may later help derive a **stand vulnerability-zone** product for FW-D10, whose source study mapped what a hunter could actually see from each stand rather than using a uniform distance buffer. That is a separate measurement-alignment problem and requires validation/calibration before deer-risk interpretation.
+
+## 2026 research-ledger extension
+
+The 2026-10-01 ledger update adds two recent peer-reviewed studies without promoting their population-specific effects into Flat Creek predictions:
+
+- **FW-D24 / FW-R32 — Gilbertson et al. 2025:** a 596-deer southwest Wisconsin telemetry study showing that forest-edge and aspect selection vary by biological season. The registry uses this as a negative constraint against universal forest-edge or north/south aspect scoring. Its source forest-edge distance, aspect-component, and biological-season measurements are retained as context-only fidelity rows; no current Farm Watch edge primitive is declared source-equivalent.
+- **FW-D25 / FW-R33 — Obermoller et al. 2026:** neonatal-fawn bedsite/predation work from south-central Minnesota showing a horizontal-visibility association while concealment and vegetation height did not differ between mortality and comparison bedsites. The registry uses this to keep horizontal visibility, predator-view concealment, and vegetation height separate and to block universal fawn-survival/security-cover scoring.
+
+Both relationships are `negative_constraint` outputs. Their study measurements are context-only provenance/measurement targets, not relationship-activation inputs. No source coefficient or odds ratio is transferred.
+
+Because FW-M58 through FW-M64 are `context_only`, they do **not** enter the blocked-measurement resolution queue and do not change the 2026 engineering posture by themselves.
 
 ## Ledger coverage
 
@@ -199,7 +211,7 @@ Every measurement that currently blocks a relationship has exactly one dispositi
 - `calibrated_proxy` — implement a plausible estimator and promote it only after study-aligned validation;
 - `remain_unavailable` — do not create a weak substitute.
 
-The current portfolio contains 30 blocked measurements: 16 reproducible, 8 calibrated proxies, and 6 intentionally unavailable. FW-M02 vegetation height exited this queue after production validation and promotion to `derived_equivalent`. FW-M17 annual mast state also exited after Batch 5A/5B: the exact-year KDFWR statewide/regional survey state is accepted as a `calibrated_proxy` for the annual-state input at regional scope only. Tier 1 production validation on 2026-09-25 additionally promoted FW-M24 building density, FW-M36 road landscape context, FW-M39 exact 1/9 km² study scales, and FW-M45 extreme-event state to `derived_equivalent`. FW-M35 multiscale forest landscape context subsequently moved to `derived_equivalent` through the dedicated 10 m 30/90/270 m forest proportion/edge-density product with the land-cover source substitution explicitly retained. These promotions reproduce input variables/context only; they do not transfer the cited deer responses or coefficients. FW-R01 remains blocked by FW-M01, FW-M03, FW-M04, and FW-M05.
+The current portfolio contains 24 blocked measurements: 11 reproducible, 7 calibrated proxies, and 6 intentionally unavailable. FW-M02 vegetation height exited this queue after production validation and promotion to `derived_equivalent`. FW-M17 annual mast state also exited after Batch 5A/5B: the exact-year KDFWR statewide/regional survey state is accepted as a `calibrated_proxy` for the annual-state input at regional scope only. Tier 1 production validation on 2026-09-25 additionally promoted FW-M24 building density, FW-M36 road landscape context, FW-M39 exact 1/9 km² study scales, and FW-M45 extreme-event state to `derived_equivalent`. FW-M35 multiscale forest landscape context subsequently moved to `derived_equivalent` through the dedicated 10 m 30/90/270 m forest proportion/edge-density product with the land-cover source substitution explicitly retained. These promotions reproduce input variables/context only; they do not transfer the cited deer responses or coefficients. FW-R01 remains blocked by FW-M01, FW-M03, FW-M04, and FW-M05.
 
 This resolution layer is planning/governance only. A `reproduce` or `calibrated_proxy` decision does not change the relationship registry's current alignment status. The relationship remains blocked until the corresponding neutral product is implemented and its exit gate is satisfied.
 
@@ -248,7 +260,7 @@ The consumer also emits a per-source-variable evidence-fidelity matrix. Registry
 
 The consumer distinguishes registry/study applicability from property-conditioned evidence. An active ordinal or quantitative relationship remains `directional_relationship_context`. A relationship may expose a property-conditioned hypothesis only when this registry declares an explicit `property_conditioning` rule and the configured measured covariate resolves a real contrast. Current property-conditioned hypotheses remain `decision_actionable=false` and do not infer deer use or behavioral probability.
 
-R30 retains an explicit property-conditioning rule, but FW-M55 is `mechanism_only` and required for activation. Its configured mapped agricultural fractions across Farm Watch's barrier-aware 500 m, 1.5 km, and 3 km domains do not reproduce Gilbertson et al.'s agricultural proportion inside individual 95% aKDE pre-dispersal ranges. The mismatch blocks relationship activation and any directional property hypothesis until source-aligned support is available; it does not transfer a probability coefficient.
+R30 is the first property-conditioned relationship. Its rule binds mapped agricultural fraction across Farm Watch's barrier-aware 500 m, 1.5 km, and 3 km domains while preserving the source-study mismatch: Gilbertson et al. measured agricultural proportion inside individual 95% aKDE pre-dispersal ranges. The fixed-radius Farm Watch contrast can anchor a hypothesis but cannot reproduce the animal-specific source support geometry or transfer a probability coefficient.
 
 The consumer distinguishes known non-applicability from missing information. For example:
 
@@ -259,5 +271,7 @@ The consumer distinguishes known non-applicability from missing information. For
 
 `FW-C06-extreme-event-active` requires
 `extreme_event.applicability_state = active_extreme_event`. This closes the prior contract gap where an authoritative known no-event state could otherwise satisfy only the generic product/evidence-state requirement.
+
+The evaluator also emits `deer-state-framework-v1` and a per-relationship `state_gate`. Biological gates, stateful required inputs, and state-specific value constraints are made inspectable as `pass | not_applicable | insufficient_state`. This is diagnostic only: it does not weaken the registry's measurement-fidelity or input-binding requirements.
 
 The evaluator remains non-synthetic: no universal score or probability is produced, and no numeric coefficient appears unless this registry separately authorizes its transfer.

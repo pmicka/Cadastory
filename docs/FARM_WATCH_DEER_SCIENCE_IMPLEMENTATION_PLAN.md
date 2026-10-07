@@ -23,6 +23,12 @@ authoritative / observed source data
 
 This plan implements the relationships preserved in `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`.
 
+## Deer audit follow-up #6 — interaction framework (2026-10-02)
+
+The machine-readable interaction contract is implemented in `farm-watch-deer-interaction-registry.ts` and consumed by `farm-watch-deer-science-evaluator.ts` as `deer-science-context-v6`. It encodes only source-supported interaction structures, after existing #5 state gates and #3 measurement-fidelity checks. See `FARM_WATCH_DEER_INTERACTION_REGISTRY_V1.md` for the contract and unregistered-combination boundaries.
+
+The current registry records source-supported thermal/activity, winter snow/conifer, winter agriculture/browse, crop/stage, localized hunting/diel, hunter-risk/food/diel, sex/risk/food, mast/annual-state/season, dispersal terrain/landscape/state, and male age/breeding-date structures. Several remain blocked by missing or mechanism-only measurements. FW-D15 agriculture and riparian geometry remain separate path covariates; FW-D24 and FW-D25 remain guardrails. No interaction formula, score, coefficient transfer, property-conditioned interaction hypothesis, or behavior claim is added.
+
 It does not ask the validation property to rediscover established ecology. Local observations are used to evaluate transfer, calibrate parameters, or resolve property-specific state when needed.
 
 ## Non-goals
@@ -151,7 +157,7 @@ The first production deer output should be a vector of evidence-backed module re
 | Product | Purpose |
 | --- | --- |
 | `deer-biological-state-v1` | explicit sex/age/reproductive/movement/diel scenario |
-| `deer-relationship-registry-v2` | machine-readable implementation of science-ledger relationships |
+| `deer-relationship-registry-v3` | machine-readable implementation of science-ledger relationships |
 | `deer-science-context-v4` | module-by-module evaluated output with provenance, applicability, freshness, and uncertainty |
 | later: `deer-relative-selection-v1` | quantitative synthesis only when parameter transfer is justified |
 
@@ -342,6 +348,8 @@ A dated physical thermal surface can be produced with no deer label and with all
 
 # Batch 3 — Diel and biological-state contracts
 
+**2026-10-01 extension:** the evaluator now emits `deer-state-framework-v1`, preserving biological, temporal, environmental, resource, and disturbance state separately. Each relationship also exposes a fail-closed `state_gate` (`pass | not_applicable | insufficient_state`). Unknown animal state is distinct from unavailable source state; leaf state remains explicitly unavailable rather than inferred from calendar season or historical leaf-off imagery.
+
 Status: production; deployed and validated 2026-09-21  
 Priority: P0  
 Depends on: deterministic solar time; regional phenology review.
@@ -368,6 +376,8 @@ Evidence disposition:
 - FW-D21: Kentucky statewide qualitative breeding context — October through January with peak activity usually in mid-November; suitable for a regional timing gate only;
 - FW-D22: Illinois female conception timing varies materially by maternal age; age-effect form is reusable, but Illinois dates are not Kentucky coefficients;
 - FW-D23: Ohio mature-doe physiological onset in early November is regional corroboration only and does not fire a Kentucky relationship;
+- FW-D24: southwest Wisconsin forest-edge/aspect selection is season-dependent and blocks universal edge/aspect scoring;
+- FW-D25: south-central Minnesota neonatal-fawn work separates horizontal visibility from concealment and blocks a generic cover-to-survival rule;
 - FW-D06: Wisconsin male age × breeding-season movement form remains available only after a locally appropriate Kentucky breeding gate is active; Wisconsin dates are not imported.
 
 Exact annual Kentucky physiographic-region conception-date values remain deferred until the authoritative KDFWR product is captured in structured, source-controlled form.
@@ -706,7 +716,7 @@ A hunting-risk module is unavailable when actual pressure evidence is unavailabl
 # Batch 9 — Machine-readable science relationship registry
 
 - **Priority:** P0 for deer-specific evaluation
-- **Status:** implemented in `deer-relationship-registry-v2`; no production deployment is required for this repository-level contract.
+- **Status:** implemented in `deer-relationship-registry-v3`; no production deployment is required for this repository-level contract.
 - **Scheduling:** Can begin in parallel once the neutral contracts are stable.
 
 Implementation:
@@ -714,17 +724,19 @@ Implementation:
 - source-controlled registry: `supabase/functions/_shared/farm-watch-deer-relationship-registry.ts`;
 - ledger-coverage and contract tests: `supabase/functions/_shared/farm-watch-deer-relationship-registry.test.ts`;
 - CI: `.github/workflows/farm-watch-deer-relationship-registry-ci.yml`;
-- durable contract: `docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V2.md`;
+- durable contract: `docs/FARM_WATCH_DEER_RELATIONSHIP_REGISTRY_V3.md`;
 - Batch 3 `applicable_relationship_ids` now delegates to registry metadata rather than maintaining a separate hard-coded FW-D selector;
 - every active biological relationship now carries a study-measurement contract with explicit alignment class and permitted use;
 - value/subtype constraints are machine-readable where a generic product binding is insufficient;
 - a future module is rejected when a required study variable is only mechanism context or unsupported;
 - FW-D04 is explicitly bound to a future research-aligned `low-height-concealment-context` input rather than treating the general Batch 6 horizontal-visibility product as measurement-equivalent;
 - FW-D15 is split into spring dispersal probability, dispersal distance, and path-selection relationships so season/path/riparian findings cannot collapse into one generic agriculture rule.
+- FW-D24 adds a large recent Wisconsin seasonal habitat-selection guardrail: forest-edge and aspect terms cannot become season-invariant bonuses/penalties.
+- FW-D25 adds a neonatal-fawn visibility/concealment guardrail: horizontal field of view, predator-view concealment and vegetation height remain separate measurements, and no Minnesota survival odds ratio transfers.
 
 ## Proposed artifact
 
-`deer-relationship-registry-v2`, preferably code-reviewed and versioned in the repository.
+`deer-relationship-registry-v3`, preferably code-reviewed and versioned in the repository.
 
 Each relationship record:
 
@@ -819,6 +831,8 @@ A resolution decision does not itself unblock a deer relationship. Registry alig
 ---
 
 # Batch 10 — First deer-science evaluation modules
+
+**State-gating hardening complete:** `deer-science-context-v5` now exposes a formal state framework before ecological interpretation. State readiness is diagnostic and remains separate from measurement fidelity, spatial covariates, source freshness, and property-conditioned hypotheses.
 
 Status: registry-driven evaluator implemented as a source-controlled candidate on 2026-09-26; individual relationships still activate, abstain, or remain blocked strictly according to their current registry gates and evidence.
 
