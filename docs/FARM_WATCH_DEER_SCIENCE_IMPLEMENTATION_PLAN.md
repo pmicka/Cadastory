@@ -23,6 +23,12 @@ authoritative / observed source data
 
 This plan implements the relationships preserved in `FARM_WATCH_DEER_SCIENCE_EVIDENCE_LEDGER.md`.
 
+## Deer audit follow-up #6 — interaction framework (2026-10-02)
+
+The machine-readable interaction contract is implemented in `farm-watch-deer-interaction-registry.ts` and consumed by `farm-watch-deer-science-evaluator.ts` as `deer-science-context-v6`. It encodes only source-supported interaction structures, after existing #5 state gates and #3 measurement-fidelity checks. See `FARM_WATCH_DEER_INTERACTION_REGISTRY_V1.md` for the contract and unregistered-combination boundaries.
+
+The current registry records source-supported thermal/activity, winter snow/conifer, winter agriculture/browse, crop/stage, localized hunting/diel, hunter-risk/food/diel, sex/risk/food, mast/annual-state/season, dispersal terrain/landscape/state, and male age/breeding-date structures. Several remain blocked by missing or mechanism-only measurements. FW-D15 agriculture and riparian geometry remain separate path covariates; FW-D24 and FW-D25 remain guardrails. No interaction formula, score, coefficient transfer, property-conditioned interaction hypothesis, or behavior claim is added.
+
 It does not ask the validation property to rediscover established ecology. Local observations are used to evaluate transfer, calibrate parameters, or resolve property-specific state when needed.
 
 ## Non-goals
@@ -341,6 +347,8 @@ A dated physical thermal surface can be produced with no deer label and with all
 ---
 
 # Batch 3 — Diel and biological-state contracts
+
+**2026-10-01 extension:** the evaluator now emits `deer-state-framework-v1`, preserving biological, temporal, environmental, resource, and disturbance state separately. Each relationship also exposes a fail-closed `state_gate` (`pass | not_applicable | insufficient_state`). Unknown animal state is distinct from unavailable source state; leaf state remains explicitly unavailable rather than inferred from calendar season or historical leaf-off imagery.
 
 Status: production; deployed and validated 2026-09-21  
 Priority: P0  
@@ -823,6 +831,8 @@ A resolution decision does not itself unblock a deer relationship. Registry alig
 ---
 
 # Batch 10 — First deer-science evaluation modules
+
+**State-gating hardening complete:** `deer-science-context-v5` now exposes a formal state framework before ecological interpretation. State readiness is diagnostic and remains separate from measurement fidelity, spatial covariates, source freshness, and property-conditioned hypotheses.
 
 Status: registry-driven evaluator implemented as a source-controlled candidate on 2026-09-26; individual relationships still activate, abstain, or remain blocked strictly according to their current registry gates and evidence.
 
