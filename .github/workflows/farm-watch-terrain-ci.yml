@@ -11,6 +11,8 @@ on:
       - '.github/workflows/farm-watch-terrain-ci.yml'
       - '.github/workflows/farm-watch-neutral-primitives.yml'
       - 'supabase/migrations/20261111050000_renew_farm_watch_terrain_before_expiry_v1.sql'
+      - 'supabase/functions/_shared/github-actions-oidc.ts'
+      - 'supabase/functions/_shared/github-actions-oidc.test.ts'
   workflow_dispatch:
 
 permissions:
@@ -24,6 +26,10 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Check and test OIDC scheduled trigger restriction
+        run: |
+          deno check supabase/functions/_shared/github-actions-oidc.ts
+          deno test supabase/functions/_shared/github-actions-oidc.test.ts
       - name: Check terrain module
         run: deno check supabase/functions/_shared/farm-watch-terrain.ts
       - name: Run terrain tests
