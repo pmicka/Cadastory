@@ -23,6 +23,18 @@ const TRUST = Object.freeze({
   ],
 })
 
+// Schedule execution is restricted to the already-authorized terrain workflow on main.
+// The remaining workflow/event combinations retain their existing trust boundary.
+export function trustedFarmWatchMaterializationEvent(workflowRef: string, eventName: string): boolean {
+  const terrainWorkflowRef =
+    'pmicka/Cadastory/.github/workflows/farm-watch-neutral-primitives.yml@refs/heads/main'
+  const mastCapacityWorkflowRef =
+    'pmicka/Cadastory/.github/workflows/farm-watch-mast-capacity.yml@refs/heads/main'
+  return eventName === 'issues' ||
+    (workflowRef === mastCapacityWorkflowRef && eventName === 'workflow_dispatch') ||
+    (workflowRef === terrainWorkflowRef && eventName === 'schedule')
+}
+
 let jwksPromise: Promise<any> | null = null
 
 function base64UrlBytes(value: string) {
@@ -149,12 +161,7 @@ export async function verifyFarmWatchGitHubActionsOidc(token: string) {
   }
 
   const eventName = claimString(claims, 'event_name')
-  const mastCapacityWorkflowRef =
-    'pmicka/Cadastory/.github/workflows/farm-watch-mast-capacity.yml@refs/heads/main'
-  const trustedEvent =
-    eventName === 'issues' ||
-    (workflowRef === mastCapacityWorkflowRef && eventName === 'workflow_dispatch')
-  if (!trustedEvent) {
+  if (!trustedFarmWatchMaterializationEvent(workflowRef, eventName)) {
     throw new Error('untrusted GitHub OIDC claim: event_name')
   }
 
