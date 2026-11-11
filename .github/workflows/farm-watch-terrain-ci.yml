@@ -9,6 +9,8 @@ on:
       - 'supabase/functions/farm-watch-materialization/index.ts'
       - 'scripts/farm-watch-terrain-materialize.ts'
       - '.github/workflows/farm-watch-terrain-ci.yml'
+      - '.github/workflows/farm-watch-neutral-primitives.yml'
+      - 'supabase/migrations/20261111050000_renew_farm_watch_terrain_before_expiry_v1.sql'
   workflow_dispatch:
 
 permissions:
