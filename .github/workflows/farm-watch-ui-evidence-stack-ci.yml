@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'supabase/functions/farm-watch-private/**'
+      - 'supabase/functions/_shared/farm-watch-weather*'
       - 'supabase/migrations/*deer_evidence_stack*.sql'
       - 'supabase/migrations/*materialization_dependency_registry*.sql'
       - 'supabase/migrations/*materialization_dependency_manifest*.sql'
@@ -31,4 +32,4 @@ jobs:
       - name: Check UI evidence-stack invariants
         run: deno run --allow-read scripts/check-farm-watch-ui-evidence-stack.ts
       - name: Test authorized bootstrap and progressive context
-        run: deno test supabase/functions/farm-watch-private/handler.test.ts
+        run: deno test supabase/functions/farm-watch-private/handler.test.ts supabase/functions/_shared/farm-watch-weather.test.ts
