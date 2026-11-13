@@ -62,7 +62,10 @@ function fixture(options: { allowed?: boolean; role?: string; property?: any; fa
       calls.push({ name, args })
       return { data: Object.hasOwn(values, name) ? values[name] : { status: 'unavailable' }, error: name === options.fail ? { message: 'Unavailable' } : null }
     },
-  }, { resolveExternal: async () => {
+  }, { readWeather: async (center: any) => {
+    calls.push({ name: 'weather_reader', args: center })
+    return { status: 'available', kind: 'forecast', current: { temperature: 54 } }
+  }, resolveExternal: async () => {
     ++observations
     return { overrides: { 'external:test': { status: 'unavailable', authoritative: false } },
       observations: [{ key: 'external:test', status: 'unavailable', authoritative: false }] } as any
@@ -245,4 +248,24 @@ Deno.test('unavailable normalized hunting rules do not become a known empty seas
   const body = await (await f.request('rules')).json()
   assert(body.hunting_rules.static.status === 'unavailable')
   assert(!body.hunting_rules.static.context.hunting)
+})
+
+Deno.test('weather is independently authorized and never invokes analytical dependencies', async () => {
+  for (const role of ['owner', 'admin', 'viewer']) {
+    const f = fixture({ role })
+    const response = await f.request('weather')
+    const data = await response.json()
+    assert(response.status === 200 && data.weather.kind === 'forecast')
+    assert(f.calls.length === 4 && f.calls.at(-1)?.name === 'weather_reader')
+    assert(f.observed() === 0)
+  }
+  for (const options of [{ allowed: false }, { role: 'unknown' }, { property: null }]) {
+    const f = fixture(options)
+    assert((await f.request('weather')).status === 404)
+    assert(!f.calls.some(call => call.name === 'weather_reader'))
+  }
+  const f = fixture()
+  assert((await f.request('weather', null)).status === 404)
+  assert((await f.request('weather', 'invalid-token')).status === 404)
+  assert(f.calls.length === 0)
 })

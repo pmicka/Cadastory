@@ -1,3 +1,4 @@
+import { createFarmWatchWeatherReader } from '../_shared/farm-watch-weather.ts'
 import {
   farmWatchPresentationCapabilities,
   normalizeFarmWatchAccountRole,
@@ -20,7 +21,7 @@ import {
 
 function modeForLog(url: string) {
   const mode = new URL(url).searchParams.get('context') || 'full'
-  return ['bootstrap', 'map', 'physical', 'hunting', 'rules', 'deer', 'refresh', 'full'].includes(mode) ? mode : 'invalid'
+  return ['bootstrap', 'map', 'physical', 'hunting', 'rules', 'weather', 'deer', 'refresh', 'full'].includes(mode) ? mode : 'invalid'
 }
 
 const ALLOWED_ORIGINS = new Set([
@@ -916,7 +917,7 @@ async function readScience(admin: any, slug: string, property: any, deerNow: Dat
     deer_evidence_stack: deerEvidenceStack, deer_science_context: deerScienceContext }
 }
 
-export function createPrivateHandler(client: any, { resolveExternal = resolveFarmWatchAllExternalSourceOverridesForProperty } = {}) {
+export function createPrivateHandler(client: any, { resolveExternal = resolveFarmWatchAllExternalSourceOverridesForProperty, readWeather = createFarmWatchWeatherReader() } = {}) {
 return async (req: Request): Promise<Response> => {
   const started = performance.now()
   const timings: { name: string; ms: number }[] = []
@@ -973,7 +974,7 @@ return async (req: Request): Promise<Response> => {
 
   const requestUrl = new URL(req.url)
   const mode = requestUrl.searchParams.get('context') || 'full'
-  if (!['bootstrap', 'map', 'physical', 'hunting', 'rules', 'deer', 'refresh', 'full'].includes(mode)) {
+  if (!['bootstrap', 'map', 'physical', 'hunting', 'rules', 'weather', 'deer', 'refresh', 'full'].includes(mode)) {
     return respond({ error: 'invalid context selector' }, 400, origin)
   }
   if (mode === 'refresh' && normalizedAccountRole === 'viewer') return respond({ error: 'not found' }, 404, origin)
@@ -1000,6 +1001,10 @@ return async (req: Request): Promise<Response> => {
   if (mode === 'bootstrap') {
     // Stored geometry/center only: no geocoding, evidence, refresh or arbitrary metadata.
     return respond({ property: displayProperty(property), access, context: mode }, 200, origin)
+  }
+  if (mode === 'weather') {
+    const weather = await measure('weather_forecast', () => readWeather(storedCenter(property)))
+    return respond({ context: mode, weather }, 200, origin)
   }
   if (mode === 'rules') {
     // Same normalized local hunting authority as the regulatory endpoint; no FAA/GIS refresh.
