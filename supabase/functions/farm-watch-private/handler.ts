@@ -20,7 +20,7 @@ import {
 
 function modeForLog(url: string) {
   const mode = new URL(url).searchParams.get('context') || 'full'
-  return ['bootstrap', 'map', 'physical', 'deer', 'refresh', 'full'].includes(mode) ? mode : 'invalid'
+  return ['bootstrap', 'map', 'physical', 'hunting', 'rules', 'deer', 'refresh', 'full'].includes(mode) ? mode : 'invalid'
 }
 
 const ALLOWED_ORIGINS = new Set([
@@ -795,6 +795,48 @@ async function readPhysicalContext(admin: any, slug: string, includeSoils: boole
   } }
 }
 
+// Guided hunting reference consumes the canonical context/timing readers, but no evidence inventory.
+async function readHuntingReference(admin: any, slug: string, now: Date, scenario: DeerScenarioRequest) {
+  const date = louisvilleCalendarDate(now)
+  const [context, tomorrow] = await Promise.all([
+    readDeerContext(slug, now, scenario, admin),
+    readDielPhotoperiod(slug, calendarDatePlusDays(date, 1), admin),
+  ])
+  const biological = context.deer_biological_state
+  const deer = biological?.status === 'available' ? biological.context : null
+  const planning = huntingDaylightPlanning(date, context.diel_photoperiod, tomorrow)
+  const statuses = [context.diel_photoperiod?.status, tomorrow?.status, biological?.status]
+  const status = statuses.includes('stale') ? 'stale'
+    : statuses.every(value => value === 'available') ? 'available'
+    : statuses.some(value => value === 'available') ? 'partial' : 'unavailable'
+  return {
+    status,
+    deer_context: {
+      status: context.status, as_of_date: context.as_of_date || date, at: context.at || now.toISOString(),
+      deer_biological_state: {
+        status: biological?.status || 'unavailable', at: biological?.at || now.toISOString(),
+        context: deer ? { season: deer.season, diel: { solar_phase: deer.diel?.solar_phase },
+          regional_reproductive_context: {
+            phase: deer.regional_reproductive_context?.phase,
+            peak_timing_label: deer.regional_reproductive_context?.peak_timing_label,
+          } } : null,
+        reason: biological?.reason || null,
+      },
+      interpretation_boundary: context.interpretation_boundary,
+    },
+    hunting_daylight_planning: { ...planning, days: planning.days.map(day => {
+      const diel = day.diel_photoperiod
+      const events = diel?.context?.events
+      return { ...day, diel_photoperiod: {
+        status: diel?.status || 'unavailable', solar_date: diel?.solar_date || day.date,
+        context: diel?.status === 'available' && events ? { events: { civil_dawn: events.civil_dawn, sunrise: events.sunrise,
+          solar_noon: events.solar_noon, sunset: events.sunset, civil_dusk: events.civil_dusk } } : null,
+        reason: diel?.reason || null, interpretation_boundary: diel?.interpretation_boundary,
+      } }
+    }) },
+  }
+}
+
 async function readScience(admin: any, slug: string, property: any, deerNow: Date,
   deerScenarioRequest: DeerScenarioRequest, hydrology: any, hydrologyError: any,
   landscapeContext: any, landscapeContextError: any) {
@@ -897,7 +939,7 @@ return async (req: Request): Promise<Response> => {
       `,total;dur=${(performance.now() - started).toFixed(1)}`)
     response.headers.set('access-control-expose-headers', 'Server-Timing')
     // Names and durations only: no tokens, selectors, response bodies, or account identifiers.
-    const slowest = timings.filter(t => !['scientific_hydration', 'external_source_verification', 'json_encode'].includes(t.name))
+    const slowest = timings.filter(t => !['scientific_hydration', 'external_source_verification', 'hunting_reference', 'json_encode'].includes(t.name))
       .reduce((a, b) => a.ms > b.ms ? a : b, { name: 'none', ms: 0 })
     console.info(JSON.stringify({ event: 'farm_watch_private_timing', mode: modeForLog(req.url),
       status, duration_ms: Math.round(performance.now() - started), slowest_dependency: slowest.name,
@@ -931,7 +973,7 @@ return async (req: Request): Promise<Response> => {
 
   const requestUrl = new URL(req.url)
   const mode = requestUrl.searchParams.get('context') || 'full'
-  if (!['bootstrap', 'map', 'physical', 'deer', 'refresh', 'full'].includes(mode)) {
+  if (!['bootstrap', 'map', 'physical', 'hunting', 'rules', 'deer', 'refresh', 'full'].includes(mode)) {
     return respond({ error: 'invalid context selector' }, 400, origin)
   }
   if (mode === 'refresh' && normalizedAccountRole === 'viewer') return respond({ error: 'not found' }, 404, origin)
@@ -958,6 +1000,20 @@ return async (req: Request): Promise<Response> => {
   if (mode === 'bootstrap') {
     // Stored geometry/center only: no geocoding, evidence, refresh or arbitrary metadata.
     return respond({ property: displayProperty(property), access, context: mode }, 200, origin)
+  }
+  if (mode === 'rules') {
+    // Same normalized local hunting authority as the regulatory endpoint; no FAA/GIS refresh.
+    const read = await admin.rpc('farm_watch_get_regulatory_local_v1_internal', { p_slug: slug })
+    const hunting = !read.error && Array.isArray(read.data?.hunting?.active_seasons) &&
+        Array.isArray(read.data?.hunting?.upcoming_seasons) ? read.data.hunting : null
+    return respond({ context: mode, hunting_rules: {
+      static: { status: hunting ? 'available' : 'unavailable',
+        context: hunting ? { hunting } : {}, as_of_date: read.data?.as_of_date || null },
+    } }, 200, origin)
+  }
+  if (mode === 'hunting') {
+    const reference = await measure('hunting_reference', () => readHuntingReference(admin, slug, deerNow, deerScenarioRequest))
+    return respond({ context: mode, hunting_reference: reference }, 200, origin)
   }
   if (mode === 'map') {
     const [features, observations] = await Promise.all([
