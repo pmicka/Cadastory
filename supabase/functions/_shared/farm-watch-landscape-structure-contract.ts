@@ -22,7 +22,7 @@ export const FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT = Object.freeze({
   leafMaxImageryDimension: FARM_WATCH_LEAF_OFF_PRODUCT.maxImageryDimension,
   leafMaxTerrainDimension: FARM_WATCH_LEAF_OFF_PRODUCT.maxTerrainDimension,
   leafAnalysisPadMeters: FARM_WATCH_LEAF_OFF_PRODUCT.analysisPadMeters,
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
 })
 
 export const FARM_WATCH_LANDSCAPE_STRUCTURE_LIMITATIONS = Object.freeze([

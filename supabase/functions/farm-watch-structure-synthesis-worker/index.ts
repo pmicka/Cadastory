@@ -1,3 +1,4 @@
+import { farmWatchMaterializationExpiresAt } from '../_shared/farm-watch-materialization-expiry.ts'
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import proj4 from 'npm:proj4@2.15.0'
@@ -1498,18 +1499,10 @@ async function materialize(slug: string, identity: any) {
     })
 
     const now = new Date()
-    const defaultExpiry = new Date(
-      now.getTime() + FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.refreshDays * 24 * 60 * 60 * 1000,
+    // Recursive dependency checks enforce upstream validity at every read.
+    const expiresAt = farmWatchMaterializationExpiresAt(
+      now, FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.refreshDays,
     )
-    const dependencyExpiries = [
-      dependencies.physicalState?.materialization?.expires_at,
-      dependencies.leafState?.materialization?.expires_at,
-    ]
-      .map((value) => Date.parse(String(value || '')))
-      .filter(Number.isFinite)
-    const expiresAt = dependencyExpiries.length
-      ? new Date(Math.min(defaultExpiry.getTime(), ...dependencyExpiries))
-      : defaultExpiry
 
     const provenance = {
       dependency_materializations: {
@@ -1553,7 +1546,7 @@ async function materialize(slug: string, identity: any) {
         p_artifact_mime_type: FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT.artifactMimeType,
         p_artifact_size_bytes: bytes.byteLength,
         p_artifact_sha256: artifactSha256,
-        p_expires_at: expiresAt.toISOString(),
+        p_expires_at: expiresAt,
       },
     )
     if (completeError) throw new Error('structure synthesis completion failed: ' + completeError.message)
@@ -1565,7 +1558,7 @@ async function materialize(slug: string, identity: any) {
       artifact_sha256: artifactSha256,
       artifact_size_bytes: bytes.byteLength,
       shared_cell_count: artifact.summary.shared_cell_count,
-      expires_at: expiresAt.toISOString(),
+      expires_at: expiresAt,
     }
   } catch (error) {
     try {

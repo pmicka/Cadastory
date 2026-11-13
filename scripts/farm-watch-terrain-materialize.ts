@@ -1,4 +1,5 @@
 #!/usr/bin/env -S deno run --allow-env --allow-net
+import { farmWatchMaterializationExpiresAt } from '../supabase/functions/_shared/farm-watch-materialization-expiry.ts'
 
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import {
@@ -141,9 +142,7 @@ try {
   })
 
   const completedAt = new Date()
-  const expiresAt = new Date(
-    completedAt.getTime() + FARM_WATCH_TERRAIN_PRODUCT.refreshDays * 24 * 60 * 60 * 1000,
-  )
+  const expiresAt = farmWatchMaterializationExpiresAt(completedAt, FARM_WATCH_TERRAIN_PRODUCT.refreshDays)
 
   const summary = {
     grid_size: artifact.grid.size,
@@ -195,7 +194,7 @@ try {
       p_artifact_mime_type: FARM_WATCH_TERRAIN_PRODUCT.artifactMimeType,
       p_artifact_size_bytes: artifactBytes.byteLength,
       p_artifact_sha256: artifactSha256,
-      p_expires_at: expiresAt.toISOString(),
+      p_expires_at: expiresAt,
     },
   )
   if (completeError) throw new Error(`terrain build completion failed: ${completeError.message}`)

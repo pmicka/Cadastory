@@ -1,0 +1,41 @@
+name: Farm Watch static product validity CI
+
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/_shared/farm-watch-*-contract.ts'
+      - 'supabase/functions/_shared/farm-watch-lidar-source.ts'
+      - 'supabase/functions/_shared/farm-watch-materialization-expiry*'
+      - 'supabase/functions/farm-watch-*/index.ts'
+      - 'supabase/migrations/*farm_watch*materialization*.sql'
+      - 'supabase/migrations/*farm_watch*static_product*.sql'
+      - 'scripts/test-farm-watch-static-validity.py'
+      - 'tests/farm-watch-static-validity*.sql'
+      - '.github/workflows/farm-watch-static-validity-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validity:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Test worker expiry policy and database parity
+        run: deno test --allow-read supabase/functions/_shared/farm-watch-materialization-expiry.test.ts
+      - name: Test migration and unchanged canonical reader in scratch Postgres
+        run: python scripts/test-farm-watch-static-validity.py psql -h localhost -U postgres

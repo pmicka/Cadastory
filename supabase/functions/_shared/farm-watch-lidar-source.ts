@@ -14,7 +14,7 @@ export const FARM_WATCH_LIDAR_SOURCE_PRODUCT = Object.freeze({
   ],
   coverageSampleGridSize: 41,
   searchLimit: 100,
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
 })
 
 export const FARM_WATCH_LIDAR_SOURCE_SIGNATURE = [

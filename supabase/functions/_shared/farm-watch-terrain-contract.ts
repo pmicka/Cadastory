@@ -15,7 +15,7 @@ export const FARM_WATCH_TERRAIN_PRODUCT = Object.freeze({
   boundsPaddingFraction: 0.08,
   flowMinContributingAreaAcres: 0.5,
   flowMaxTraces: 12,
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
 })
 
 export const FARM_WATCH_TERRAIN_SOURCE_SIGNATURE = [
