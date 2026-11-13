@@ -12,7 +12,7 @@ on:
       - 'supabase/functions/_shared/farm-watch-solar-exposure-contract.ts'
       - 'supabase/functions/_shared/farm-watch-solar-exposure.ts'
       - 'supabase/functions/farm-watch-materialization/index.ts'
-      - 'supabase/functions/farm-watch-private/index.ts'
+      - 'supabase/functions/farm-watch-private/**'
       - 'supabase/functions/farm-watch-leaf-off-worker/index.ts'
       - 'supabase/functions/farm-watch-lidar-worker/index.ts'
       - 'supabase/functions/farm-watch-landscape-structure-worker/index.ts'

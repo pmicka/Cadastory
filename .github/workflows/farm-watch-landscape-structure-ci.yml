@@ -13,7 +13,7 @@ on:
       - 'supabase/functions/_shared/farm-watch-landscape-structure-contract.test.ts'
       - 'supabase/functions/farm-watch-landscape-structure-worker/**'
       - 'supabase/functions/farm-watch-materialization/index.ts'
-      - 'supabase/functions/farm-watch-private/index.ts'
+      - 'supabase/functions/farm-watch-private/**'
       - 'scripts/farm-watch-lidar-physical-materialize.ts'
       - 'scripts/farm-watch-leaf-off-materialize.ts'
       - 'scripts/farm-watch-landscape-structure-materialize.ts'
