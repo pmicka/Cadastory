@@ -1,4 +1,4 @@
-import { createPrivateHandler } from './handler.ts'
+import { createPrivateHandler, hydroSourceQuery, HYDRO_SOURCES } from './handler.ts'
 import { resolveFarmWatchExternalSourceIdentities } from '../_shared/farm-watch-external-source-identity.ts'
 function assert(value: unknown, message = 'assertion failed'): asserts value {
   if (!value) throw new Error(message)
@@ -268,4 +268,16 @@ Deno.test('weather is independently authorized and never invokes analytical depe
   assert((await f.request('weather', null)).status === 404)
   assert((await f.request('weather', 'invalid-token')).status === 404)
   assert(f.calls.length === 0)
+})
+
+Deno.test('USGS flowline query uses the published Flowline schema and preserves spatial selection', () => {
+  // Recorded provider field names from the live 3DHP Flowline /50 metadata.
+  const fields = new Set(['OBJECTID', 'id3dhp', 'gnisidlabel', 'featuretypelabel', 'lengthkm', 'flowdirectionlabel', 'streamorder'])
+  const source = HYDRO_SOURCES.find(source => source.key === 'flowline')!
+  const url = hydroSourceQuery(source, { west: -84.91, south: 38.19, east: -84.89, north: 38.21 })
+  for (const field of url.searchParams.get('outFields')!.split(',')) assert(fields.has(field), 'unsupported USGS field: ' + field)
+  assert(url.searchParams.get('f') === 'geojson')
+  assert(url.searchParams.get('spatialRel') === 'esriSpatialRelIntersects')
+  assert(url.searchParams.get('inSR') === '4326' && url.searchParams.get('outSR') === '4326')
+  assert(url.searchParams.get('geometry') === '-84.91,38.19,-84.89,38.21')
 })

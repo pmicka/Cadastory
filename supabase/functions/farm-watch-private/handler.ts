@@ -40,13 +40,13 @@ const HYDRO_PARTIAL_TTL_MS = 60 * 60 * 1000
 const SOIL_MAP_TTL_MS = 30 * 24 * 60 * 60 * 1000
 const SOIL_DEEP_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
-const HYDRO_SOURCES = [
+export const HYDRO_SOURCES = [
   {
     key: 'flowline',
     sourceSlug: 'usgs-3dhp',
     featureKind: 'flowline',
     url: 'https://3dhp.nationalmap.gov/arcgis/rest/services/usgs_3dhp_all/MapServer/50',
-    outFields: 'OBJECTID,id3dhp,gnisidlabel,featuretypelabel,lengthkm,flowdirectionlabel,streamorder,onsurfacelabel',
+    outFields: 'OBJECTID,id3dhp,gnisidlabel,featuretypelabel,lengthkm,flowdirectionlabel,streamorder',
     bufferM: 1000,
     timeoutMs: 15000,
   },
@@ -281,21 +281,26 @@ function sourceFeatureId(source: HydroSource, feature: any, index: number) {
   return String(candidate ?? feature?.id ?? `${source.featureKind}-${index}`)
 }
 
+export function hydroSourceQuery(source: HydroSource, envelope: Envelope) {
+  const url = new URL(`${source.url}/query`)
+  url.searchParams.set('where', '1=1')
+  url.searchParams.set('geometry', `${envelope.west},${envelope.south},${envelope.east},${envelope.north}`)
+  url.searchParams.set('geometryType', 'esriGeometryEnvelope')
+  url.searchParams.set('inSR', '4326')
+  url.searchParams.set('outSR', '4326')
+  url.searchParams.set('spatialRel', 'esriSpatialRelIntersects')
+  url.searchParams.set('outFields', source.outFields)
+  url.searchParams.set('returnGeometry', 'true')
+  url.searchParams.set('geometryPrecision', '6')
+  url.searchParams.set('f', 'geojson')
+  return url
+}
+
 async function fetchHydroSourceAttempt(source: HydroSource, envelope: Envelope) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), source.timeoutMs)
   try {
-    const url = new URL(`${source.url}/query`)
-    url.searchParams.set('where', '1=1')
-    url.searchParams.set('geometry', `${envelope.west},${envelope.south},${envelope.east},${envelope.north}`)
-    url.searchParams.set('geometryType', 'esriGeometryEnvelope')
-    url.searchParams.set('inSR', '4326')
-    url.searchParams.set('outSR', '4326')
-    url.searchParams.set('spatialRel', 'esriSpatialRelIntersects')
-    url.searchParams.set('outFields', source.outFields)
-    url.searchParams.set('returnGeometry', 'true')
-    url.searchParams.set('geometryPrecision', '6')
-    url.searchParams.set('f', 'geojson')
+    const url = hydroSourceQuery(source, envelope)
 
     const response = await fetch(url, {
       signal: controller.signal,
@@ -700,7 +705,7 @@ function huntingDaylightPlanning(
   }
 }
 
-async function refreshHydrology(slug: string, boundary: any, admin: any) {
+export async function refreshHydrology(slug: string, boundary: any, admin: any) {
   const sourceRequests = HYDRO_SOURCES.map((source) => {
     const envelope = expandedEnvelope(boundary, source.bufferM)
     if (!envelope) throw new Error('Property boundary is unavailable for hydrology refresh')
