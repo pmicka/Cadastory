@@ -898,6 +898,7 @@ export async function resolveFarmWatchExternalSourceIdentities(args: {
   dependencyKeys: string[]
   fetchImpl?: typeof fetch
   requireAll?: boolean
+  onTiming?: (key: string, durationMs: number) => void
 }) {
   const fetchImpl = args.fetchImpl || fetch
   const requestedKeys = [...new Set(args.dependencyKeys.map(String))]
@@ -916,7 +917,11 @@ export async function resolveFarmWatchExternalSourceIdentities(args: {
     .sort()
   const cache = new Map<string, any>()
   const observations = await Promise.all(
-    keys.map((key) => resolveOne(key, args.boundary, fetchImpl, cache)),
+    keys.map(async (key) => {
+      const started = performance.now()
+      try { return await resolveOne(key, args.boundary, fetchImpl, cache) }
+      finally { args.onTiming?.(key, performance.now() - started) }
+    }),
   )
   const unavailable = observations.filter((row) => row.status !== 'available')
   if (args.requireAll !== false && unavailable.length) {
@@ -1023,6 +1028,7 @@ export async function resolveFarmWatchAllExternalSourceOverridesForProperty(args
   admin: any
   slug: string
   fetchImpl?: typeof fetch
+  onTiming?: (key: string, durationMs: number) => void
 }) {
   const [dependencyKeys, context] = await Promise.all([
     rpcValue(
@@ -1047,6 +1053,7 @@ export async function resolveFarmWatchAllExternalSourceOverridesForProperty(args
     dependencyKeys: keys,
     fetchImpl: args.fetchImpl,
     requireAll: false,
+    onTiming: args.onTiming,
   })
   return {
     observations,
