@@ -4,7 +4,7 @@ function assert(value: unknown, message = 'assertion failed'): asserts value {
   if (!value) throw new Error(message)
 }
 const boundary = { type: 'Polygon', coordinates: [[[0,0], [.001,0], [.001,.001], [0,.001], [0,0]]] }
-function fixture(options: { allowed?: boolean; role?: string; property?: any; fail?: string; old?: boolean; oldDeep?: boolean; partialDeep?: boolean } = {}) {
+function fixture(options: { allowed?: boolean; role?: string; property?: any; fail?: string; old?: boolean; oldDeep?: boolean; partialDeep?: boolean; hunting?: boolean; staleHunting?: boolean } = {}) {
   const calls: { name: string; args: any }[] = []
   const now = new Date().toISOString()
   const at = options.old ? '2000-01-01T00:00:00Z' : now
@@ -29,6 +29,25 @@ function fixture(options: { allowed?: boolean; role?: string; property?: any; fa
     farm_watch_resolve_deer_context_v1_internal: { status: 'available', diel_photoperiod: { status: 'available' } },
     farm_watch_resolve_deer_biological_state_v1_internal: { status: 'unavailable', context: null },
     farm_watch_get_diel_photoperiod_v1_internal: { status: 'available' },
+  }
+  if (options.hunting) {
+    const today = { status: 'available', context: { events: { sunrise: '2026-11-13T12:23:00Z', sunset: '2026-11-13T22:24:00Z' } } }
+    values.farm_watch_resolve_deer_context_v1_internal = { status: 'partial', as_of_date: '2026-11-13',
+      diel_photoperiod: today, seasonal_state: { status: 'stale', context: 'x'.repeat(100000) },
+      field_phenology: { status: 'stale', context: 'x'.repeat(100000) } }
+    values.farm_watch_resolve_deer_biological_state_v1_internal = { status: 'available', context: {
+      season: 'fall', diel: { solar_phase: 'day' }, regional_reproductive_context: { phase: 'regional', peak_timing_label: 'mid-November' },
+      individual_reproductive_state: 'unknown', unused_diagnostics: 'x'.repeat(100000) } }
+    values.farm_watch_get_diel_photoperiod_v1_internal = today
+    values.farm_watch_get_regulatory_local_v1_internal = { as_of_date: '2026-11-13', hunting: {
+      jurisdiction: 'KY', deer_management: { deer_zone: '1' },
+      active_seasons: [{ season_name: 'Archery', legal_hours: '30 minutes before sunrise to 30 minutes after sunset' }],
+      upcoming_seasons: [], drone_wildlife_rules: [],
+    }, protected_lands: 'x'.repeat(100000) }
+  }
+  if (options.staleHunting) {
+    values.farm_watch_resolve_deer_context_v1_internal.diel_photoperiod.status = 'stale'
+    values.farm_watch_resolve_deer_biological_state_v1_internal.status = 'stale'
   }
   if (options.partialDeep) {
     const soils = values.farm_watch_get_soils_v1_internal
@@ -175,4 +194,55 @@ Deno.test('expired partial coverage withholds expired measurements without rewri
   assert(body.analysis.soils_summary.deep_status === 'stale')
   assert(expired.deep_attribute_status === 'stale' && !expired.horizon_profile)
   assert(missing.deep_attribute_status === 'unavailable')
+})
+
+Deno.test('guided hunting reference is compact and independent of external/evidence/physical dependencies', async () => {
+  for (const role of ['viewer', 'owner', 'admin']) {
+    const f = fixture({ hunting: true, role })
+    const response = await f.request('hunting&at=2026-11-13T12:00:00Z')
+    const text = await response.text(), body = JSON.parse(text)
+    assert(response.status === 200 && text.length < 5000)
+    assert(body.hunting_reference.status === 'available')
+    // The raw full-context status remains partial; stale hidden datasets do not redefine visible timing freshness.
+    assert(body.hunting_reference.deer_context.status === 'partial')
+    assert(body.hunting_reference.deer_context.deer_biological_state.context.season === 'fall')
+    assert(body.hunting_reference.hunting_daylight_planning.days[0].diel_photoperiod.context.events.sunrise === '2026-11-13T12:23:00Z')
+    assert(!text.includes('unused_diagnostics') && !text.includes('field_phenology') && !text.includes('deer_evidence_stack'))
+    assert(f.observed() === 0)
+    assert(!f.calls.some(c => /evidence|hydrology|landscape|soils/.test(c.name)))
+  }
+})
+Deno.test('hunting route enforces authorization and keeps unavailable biological context partial', async () => {
+  assert((await fixture({ allowed: false }).request('hunting')).status === 404)
+  const body = await (await fixture().request('hunting')).json()
+  assert(body.hunting_reference.status === 'partial')
+  assert(body.hunting_reference.deer_context.deer_biological_state.status === 'unavailable')
+})
+
+Deno.test('stale retained hunting clocks and biological context are withheld from guided reference', async () => {
+  const body = await (await fixture({ hunting: true, staleHunting: true }).request('hunting')).json()
+  const reference = body.hunting_reference
+  assert(reference.status === 'stale')
+  assert(reference.deer_context.deer_biological_state.status === 'stale')
+  assert(reference.deer_context.deer_biological_state.context === null)
+  assert(reference.hunting_daylight_planning.days[0].diel_photoperiod.status === 'stale')
+  assert(reference.hunting_daylight_planning.days[0].diel_photoperiod.context === null)
+})
+
+Deno.test('hunting rules use canonical normalized local authority without FAA or scientific-source calls', async () => {
+  const f = fixture({ hunting: true })
+  const response = await f.request('rules')
+  const text = await response.text(), body = JSON.parse(text)
+  assert(response.status === 200 && text.length < 3000)
+  assert(body.hunting_rules.static.status === 'available')
+  assert(body.hunting_rules.static.context.hunting.active_seasons[0].season_name === 'Archery')
+  assert(!text.includes('protected_lands') && f.observed() === 0)
+  assert(f.calls.length === 4 && f.calls[3].name === 'farm_watch_get_regulatory_local_v1_internal')
+  assert((await fixture({ allowed: false }).request('rules')).status === 404)
+})
+Deno.test('unavailable normalized hunting rules do not become a known empty season schedule', async () => {
+  const f = fixture({ hunting: true, fail: 'farm_watch_get_regulatory_local_v1_internal' })
+  const body = await (await f.request('rules')).json()
+  assert(body.hunting_rules.static.status === 'unavailable')
+  assert(!body.hunting_rules.static.context.hunting)
 })
