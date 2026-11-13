@@ -16,7 +16,7 @@ export const FARM_WATCH_LIDAR_PHYSICAL_PRODUCT = Object.freeze({
   structureCellMeters: 5,
   minimumCellReturns: 10,
   thresholdsFt: [4, 16, 32, 64],
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
 })
 
 export const FARM_WATCH_LIDAR_PHYSICAL_LIMITATIONS = Object.freeze([

@@ -1,3 +1,4 @@
+import { farmWatchMaterializationExpiresAt } from '../_shared/farm-watch-materialization-expiry.ts'
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import {
@@ -257,10 +258,7 @@ async function completeLandscapeStructure(slug: string, body: any) {
   }
 
   const completedAt = new Date()
-  const expiresAt = new Date(
-    completedAt.getTime() +
-      FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.refreshDays * 24 * 60 * 60 * 1000,
-  )
+  const expiresAt = farmWatchMaterializationExpiresAt(completedAt, FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.refreshDays)
   const summary = {
     domain_cell_count: artifact.summary.domain_cell_count,
     property_cell_count: artifact.summary.property_cell_count,
@@ -296,7 +294,7 @@ async function completeLandscapeStructure(slug: string, body: any) {
       p_artifact_mime_type: FARM_WATCH_LANDSCAPE_STRUCTURE_PRODUCT.artifactMimeType,
       p_artifact_size_bytes: bytes.byteLength,
       p_artifact_sha256: artifactSha256,
-      p_expires_at: expiresAt.toISOString(),
+      p_expires_at: expiresAt,
     },
   )
   if (completeError) {
@@ -309,7 +307,7 @@ async function completeLandscapeStructure(slug: string, body: any) {
     identity_sha256: completed?.identity_sha256 || null,
     artifact_sha256: artifactSha256,
     artifact_size_bytes: bytes.byteLength,
-    expires_at: expiresAt.toISOString(),
+    expires_at: expiresAt,
   }
 }
 

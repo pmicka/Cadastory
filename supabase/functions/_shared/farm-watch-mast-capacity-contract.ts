@@ -57,7 +57,7 @@ export const FARM_WATCH_MAST_CAPACITY_PRODUCT = Object.freeze({
   sourceNativeWkid: 102039,
   sourceValueUnit: 'tons_per_acre_live_tree_aboveground_biomass',
   domainScope: 'broad_3000m',
-  refreshDays: 365,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
   groupOrder: Object.freeze(['white_oak','red_oak','hickory','beech'] as const),
 })
 

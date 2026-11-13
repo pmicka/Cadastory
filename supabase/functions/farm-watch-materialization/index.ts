@@ -1,3 +1,4 @@
+import { farmWatchMaterializationExpiresAt } from '../_shared/farm-watch-materialization-expiry.ts'
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import {
@@ -1053,7 +1054,7 @@ async function completeBuild(args: {
   mimeType: string
   bytes: Uint8Array
   artifactSha256: string
-  expiresAt: string
+  expiresAt: string | null
 }) {
   const { error } = await admin.rpc('farm_watch_complete_materialization_build_v1_internal', {
     p_build_id: args.buildId,
@@ -1132,9 +1133,7 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
     const completionExternalSourceObservations = completionIdentity.externalSourceObservations || []
 
     const completedAt = new Date()
-    const expiresAt = new Date(
-      completedAt.getTime() + FARM_WATCH_TERRAIN_PRODUCT.refreshDays * 24 * 60 * 60 * 1000,
-    )
+    const expiresAt = farmWatchMaterializationExpiresAt(completedAt, FARM_WATCH_TERRAIN_PRODUCT.refreshDays)
     await completeBuild({
       buildId,
       leaseToken,
@@ -1179,7 +1178,7 @@ async function buildTerrainMaterialization(slug: string, workerId: string) {
       mimeType: FARM_WATCH_TERRAIN_PRODUCT.artifactMimeType,
       bytes,
       artifactSha256,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: expiresAt,
     })
     return await readState(slug, FARM_WATCH_TERRAIN_PRODUCT.key)
   } catch (error) {
@@ -1232,9 +1231,7 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
     const completionExternalSourceObservations = completionIdentity.externalSourceObservations || []
 
     const completedAt = new Date()
-    const expiresAt = new Date(
-      completedAt.getTime() + FARM_WATCH_LIDAR_SOURCE_PRODUCT.refreshDays * 24 * 60 * 60 * 1000,
-    )
+    const expiresAt = farmWatchMaterializationExpiresAt(completedAt, FARM_WATCH_LIDAR_SOURCE_PRODUCT.refreshDays)
     const collectionSummary = Object.fromEntries(artifact.collections.map((collection: any) => [
       collection.id,
       {
@@ -1275,7 +1272,7 @@ async function buildLidarSourceMaterialization(slug: string, workerId: string) {
       mimeType: FARM_WATCH_LIDAR_SOURCE_PRODUCT.artifactMimeType,
       bytes,
       artifactSha256,
-      expiresAt: expiresAt.toISOString(),
+      expiresAt: expiresAt,
     })
     return await readState(slug, FARM_WATCH_LIDAR_SOURCE_PRODUCT.key)
   } catch (error) {
@@ -1293,7 +1290,7 @@ async function uploadNeutralPrimitive(args: {
   key: ProductKey
   sourceSignature: string
   limitations: readonly string[]
-  refreshDays: number
+  refreshDays: number | null
   artifactPath: (propertyId: string, inputSignature: string, artifactSha256: string) => string
   maxArtifactBytes?: number
   storageEncoding?: 'identity' | 'gzip'
@@ -1351,9 +1348,7 @@ async function uploadNeutralPrimitive(args: {
   }
 
   const completedAt = new Date()
-  const expiresAt = new Date(
-    completedAt.getTime() + args.refreshDays * 24 * 60 * 60 * 1000,
-  )
+  const expiresAt = farmWatchMaterializationExpiresAt(completedAt, args.refreshDays)
   await completeBuild({
     buildId: String(args.claim.build_id),
     leaseToken: String(args.claim.lease_token),
@@ -1382,7 +1377,7 @@ async function uploadNeutralPrimitive(args: {
       : 'application/json',
     bytes,
     artifactSha256,
-    expiresAt: expiresAt.toISOString(),
+    expiresAt: expiresAt,
   })
 }
 

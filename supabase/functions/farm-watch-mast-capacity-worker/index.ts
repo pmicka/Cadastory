@@ -1,3 +1,4 @@
+import { farmWatchMaterializationExpiresAt } from '../_shared/farm-watch-materialization-expiry.ts'
 import 'jsr:@supabase/functions-js@2.4.5/edge-runtime.d.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2.115.0'
 import {
@@ -352,9 +353,7 @@ async function complete(slug: string, body: any, identity: any) {
   if (uploadError) throw new Error('mast capacity artifact upload failed: ' + uploadError.message)
 
   const completedAt = new Date()
-  const expiresAt = new Date(
-    completedAt.getTime() + FARM_WATCH_MAST_CAPACITY_PRODUCT.refreshDays * 86400000,
-  )
+  const expiresAt = farmWatchMaterializationExpiresAt(completedAt, FARM_WATCH_MAST_CAPACITY_PRODUCT.refreshDays)
   const sourceProvenance = {
     ...(artifact.source_provenance || {}),
     landscape_domain_identity: domain.identity,
@@ -379,7 +378,7 @@ async function complete(slug: string, body: any, identity: any) {
       p_artifact_mime_type: FARM_WATCH_MAST_CAPACITY_PRODUCT.artifactMimeType,
       p_artifact_size_bytes: bytes.byteLength,
       p_artifact_sha256: artifactSha256,
-      p_expires_at: expiresAt.toISOString(),
+      p_expires_at: expiresAt,
     },
   )
   if (completeError) throw new Error('mast capacity completion failed: ' + completeError.message)
@@ -390,7 +389,7 @@ async function complete(slug: string, body: any, identity: any) {
     identity_sha256: completed?.identity_sha256 || null,
     artifact_sha256: artifactSha256,
     artifact_size_bytes: bytes.byteLength,
-    expires_at: expiresAt.toISOString(),
+    expires_at: expiresAt,
   }
 }
 

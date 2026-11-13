@@ -13,7 +13,7 @@ export const FARM_WATCH_LEAF_OFF_PRODUCT = Object.freeze({
   maxImageryDimension: 1800,
   maxTerrainDimension: 1000,
   analysisPadMeters: 10,
-  refreshDays: 90,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
   demUrl:
     'https://kyraster.ky.gov/arcgis/rest/services/ElevationServices/Ky_DEM_KYAPED_2FT_Phase3_WGS84WM/ImageServer',
   sources: [

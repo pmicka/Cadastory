@@ -19,7 +19,7 @@ export const FARM_WATCH_HORIZONTAL_VISIBILITY_PRODUCT = Object.freeze({
   maximumDistanceMeters: 100,
   terrainIntersectionEpsilonMeters: 0.02,
   structureSupportThreshold: 0.05,
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
 })
 
 export const FARM_WATCH_HORIZONTAL_VISIBILITY_LIMITATIONS = Object.freeze([

@@ -27,7 +27,7 @@ export const FARM_WATCH_SOLAR_TERRAIN_PRODUCT = Object.freeze({
   demFallbackSourceUrl:
     'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer',
   demFallbackMetersToFeet: 3.280839895013123,
-  refreshDays: 30,
+  refreshDays: null, // Stable terrain support; daily solar products retain their date checks.
 })
 
 export function solarCanopyCatalogWhere() {

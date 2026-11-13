@@ -17,7 +17,7 @@ export const FARM_WATCH_TERRAIN_FORM_PRODUCT = Object.freeze({
   landscapeCellMeters: 30,
   localTpiRadiusMeters: 30,
   broadTpiRadiusMeters: 90,
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
   permeabilityScenario: Object.freeze({
     id: 'reference-slope-only-v1',
     base_cost: 1,
@@ -105,7 +105,7 @@ export const FARM_WATCH_SPATIAL_PATTERN_PRODUCT = Object.freeze({
   canopyClassBreaks: Object.freeze([20, 60]),
   structureCellMeters: 5,
   patchNeighborRule: 8,
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
 })
 
 export const FARM_WATCH_SPATIAL_PATTERN_LIMITATIONS = Object.freeze([

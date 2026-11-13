@@ -7,7 +7,7 @@ export const FARM_WATCH_STRUCTURE_SYNTHESIS_PRODUCT = Object.freeze({
   artifactBucket: 'farm-watch-derived',
   artifactFormat: 'farm-watch-structure-complementarity-json-v1',
   artifactMimeType: 'application/json',
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
   leafSourceId: 'ky-phase3',
   minimumUpperShare: 0.10,
 })

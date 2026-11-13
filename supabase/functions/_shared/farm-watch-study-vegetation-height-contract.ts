@@ -16,7 +16,7 @@ export const FARM_WATCH_STUDY_VEGETATION_HEIGHT_PRODUCT = Object.freeze({
   groundSupportRadiusMeters: 10,
   firstReturnSupportRadiusMeters: 2.4,
   heightEncoding: 'u16-centimeters+u8-support-flags-v1',
-  refreshDays: 30,
+  refreshDays: null, // Valid until a source, property, or model dependency changes.
 })
 
 export const FARM_WATCH_STUDY_VEGETATION_HEIGHT_LIMITATIONS = Object.freeze([

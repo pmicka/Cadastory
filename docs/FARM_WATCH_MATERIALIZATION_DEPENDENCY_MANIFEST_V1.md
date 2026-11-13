@@ -7,6 +7,14 @@ Scope: all product kinds persisted in `farm_watch.property_materializations_v1`
 
 Farm Watch materialization retention and scientific freshness are separate concerns.
 
+As of the November 13, 2026 stable-product validity policy, versioned terrain,
+LiDAR, historical imagery/vegetation, structural geometry, and mast-capacity
+snapshots have no calendar expiry. They remain reusable only while the canonical
+source, property, model, schema, and recursive dependency checks pass. This applies
+to existing artifacts as well as future builds; it does not advance their source
+dates or turn historical snapshots into measurements of present conditions.
+See [the policy and deployment notes](FARM_WATCH_STATIC_PRODUCT_VALIDITY_V1.md).
+
 An artifact can remain stored and unexpired while no longer representing the current dependency state. The canonical dependency manifest makes that state explicit and gives every materialized product one shared dependency contract.
 
 This contract is intentionally neutral infrastructure. It does not add deer interpretation, scores, habitat claims, or new scientific datasets.
