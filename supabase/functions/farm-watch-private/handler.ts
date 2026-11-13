@@ -361,13 +361,15 @@ function soilMapUnitsNeedRefresh(soils: any) {
   return Date.now() - retrievedAt > SOIL_MAP_TTL_MS
 }
 
+function soilDeepProfilesExpired(soils: any) {
+  const retrievedAt = Date.parse(soils?.summary?.deep_retrieved_at || '')
+  return !Number.isFinite(retrievedAt) || Date.now() - retrievedAt > SOIL_DEEP_TTL_MS
+}
+
 function soilDeepProfilesNeedRefresh(soils: any) {
   const mapUnitCount = Number(soils?.summary?.map_unit_count) || 0
   const deepProfileCount = Number(soils?.summary?.deep_profile_count) || 0
-  const retrievedAt = Date.parse(soils?.summary?.deep_retrieved_at || '')
-  if (!mapUnitCount || deepProfileCount < mapUnitCount) return true
-  if (!Number.isFinite(retrievedAt)) return true
-  return Date.now() - retrievedAt > SOIL_DEEP_TTL_MS
+  return !mapUnitCount || deepProfileCount < mapUnitCount || soilDeepProfilesExpired(soils)
 }
 
 function hydrologyNeedsRefresh(hydrology: any) {
@@ -756,15 +758,21 @@ async function readPhysicalContext(admin: any, slug: string, includeSoils: boole
   const hydrology = hydroRead.error || !hydroRead.data ? { status: 'unavailable' } : hydroRead.data
   // Retention/identity and ordinary TTL both matter. Never turn a refresh-needed read into current evidence.
   if (soils.status === 'available' && soilMapUnitsNeedRefresh(soils)) soils.status = 'stale'
-  if (soils.status === 'available' && soilDeepProfilesNeedRefresh(soils)) {
+  if (soils.status === 'available' && soilDeepProfilesExpired(soils) && Number(soils.summary?.deep_profile_count) > 0) {
     soils.summary = { ...soils.summary, deep_profile_count: 0, deep_status: 'stale' }
     soils.feature_collection = { ...soils.feature_collection,
       features: (soils.feature_collection?.features || []).map((feature: any) => ({ ...feature,
-        properties: { ...Object.fromEntries(Object.entries(feature.properties || {}).filter(([key]) =>
+        properties: feature.properties?.deep_attribute_status !== 'available' ? feature.properties
+        : { ...Object.fromEntries(Object.entries(feature.properties || {}).filter(([key]) =>
           !['runoff_class', 'tax_order', 'tax_subgroup', 'geomorphic_description', 'restrictive_depth_cm',
             'restriction_kind', 'restriction_hardness', 'parent_material_group', 'parent_material_kind',
             'parent_material_origins', 'flooding_classes', 'ponding_classes', 'horizon_profile'].includes(key))),
           deep_attribute_status: 'stale' } })) }
+  }
+  if (soils.status === 'available' && !soils.summary?.deep_status &&
+      Number(soils.summary?.deep_profile_count || 0) < Number(soils.summary?.map_unit_count || 0)) {
+    soils.summary = { ...soils.summary,
+      deep_status: Number(soils.summary?.deep_profile_count) > 0 ? 'partial' : 'unavailable' }
   }
   if (['available', 'partial'].includes(hydrology.status) && hydrologyNeedsRefresh(hydrology)) hydrology.status = 'stale'
   const domain = domainRead.error ? null : domainRead.data

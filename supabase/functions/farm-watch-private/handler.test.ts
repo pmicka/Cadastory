@@ -4,7 +4,7 @@ function assert(value: unknown, message = 'assertion failed'): asserts value {
   if (!value) throw new Error(message)
 }
 const boundary = { type: 'Polygon', coordinates: [[[0,0], [.001,0], [.001,.001], [0,.001], [0,0]]] }
-function fixture(options: { allowed?: boolean; role?: string; property?: any; fail?: string; old?: boolean; oldDeep?: boolean } = {}) {
+function fixture(options: { allowed?: boolean; role?: string; property?: any; fail?: string; old?: boolean; oldDeep?: boolean; partialDeep?: boolean } = {}) {
   const calls: { name: string; args: any }[] = []
   const now = new Date().toISOString()
   const at = options.old ? '2000-01-01T00:00:00Z' : now
@@ -29,6 +29,12 @@ function fixture(options: { allowed?: boolean; role?: string; property?: any; fa
     farm_watch_resolve_deer_context_v1_internal: { status: 'available', diel_photoperiod: { status: 'available' } },
     farm_watch_resolve_deer_biological_state_v1_internal: { status: 'unavailable', context: null },
     farm_watch_get_diel_photoperiod_v1_internal: { status: 'available' },
+  }
+  if (options.partialDeep) {
+    const soils = values.farm_watch_get_soils_v1_internal
+    soils.summary.map_unit_count = 2
+    soils.feature_collection.features.push({ type: 'Feature', geometry: boundary,
+      properties: { musym: 'missing-profile', deep_attribute_status: 'unavailable' } })
   }
   const handler = createPrivateHandler({
     auth: { getUser: async (token: string) => token === 'valid-token'
@@ -152,4 +158,21 @@ Deno.test('expired deep soil profiles do not relabel current map units or expose
   const properties = body.analysis.soils_geojson.features[0].properties
   assert(properties.musym === 'synthetic' && properties.deep_attribute_status === 'stale')
   assert(!properties.horizon_profile && !properties.runoff_class)
+})
+
+Deno.test('fresh partial deep-profile coverage preserves current profiles and individual unavailable states', async () => {
+  const body = await (await fixture({ partialDeep: true }).request('physical')).json()
+  const analysis = body.analysis
+  assert(analysis.soils_status === 'available')
+  assert(analysis.soils_summary.deep_profile_count === 1 && analysis.soils_summary.deep_status === 'partial')
+  const [current, missing] = analysis.soils_geojson.features.map((f: any) => f.properties)
+  assert(current.deep_attribute_status === 'available' && current.horizon_profile.length === 1)
+  assert(current.runoff_class === 'synthetic' && missing.deep_attribute_status === 'unavailable')
+})
+Deno.test('expired partial coverage withholds expired measurements without rewriting unavailable profiles', async () => {
+  const body = await (await fixture({ partialDeep: true, oldDeep: true }).request('physical')).json()
+  const [expired, missing] = body.analysis.soils_geojson.features.map((f: any) => f.properties)
+  assert(body.analysis.soils_summary.deep_status === 'stale')
+  assert(expired.deep_attribute_status === 'stale' && !expired.horizon_profile)
+  assert(missing.deep_attribute_status === 'unavailable')
 })
