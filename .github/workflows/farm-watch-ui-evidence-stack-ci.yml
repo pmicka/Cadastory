@@ -3,7 +3,7 @@ name: Farm Watch UI evidence stack CI
 on:
   pull_request:
     paths:
-      - 'supabase/functions/farm-watch-private/index.ts'
+      - 'supabase/functions/farm-watch-private/**'
       - 'supabase/migrations/*deer_evidence_stack*.sql'
       - 'supabase/migrations/*materialization_dependency_registry*.sql'
       - 'supabase/migrations/*materialization_dependency_manifest*.sql'
@@ -30,3 +30,5 @@ jobs:
         run: deno check supabase/functions/farm-watch-private/index.ts
       - name: Check UI evidence-stack invariants
         run: deno run --allow-read scripts/check-farm-watch-ui-evidence-stack.ts
+      - name: Test authorized bootstrap and progressive context
+        run: deno test supabase/functions/farm-watch-private/handler.test.ts
