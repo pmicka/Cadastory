@@ -1,0 +1,57 @@
+name: Farm Watch map pin authorization
+on:
+  pull_request:
+    paths:
+      - 'supabase/functions/farm-watch-map-pins/**'
+      - 'supabase/migrations/*farm_watch_property_map_pins_v1.sql'
+      - 'supabase/migrations/*farm_watch*authorized*'
+      - 'supabase/migrations/*farm_watch*role*'
+      - 'scripts/test-farm-watch-map-pins*.py'
+      - 'tests/farm-watch-map-pins.sql'
+      - '.github/workflows/farm-watch-map-pins-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  authorization:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_PASSWORD: local-test-only
+        ports: ['55439:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 55439
+      PGUSER: postgres
+      PGPASSWORD: local-test-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - run: deno check supabase/functions/farm-watch-map-pins/index.ts
+      - run: deno test supabase/functions/farm-watch-map-pins/handler.test.ts supabase/functions/farm-watch-private/handler.test.ts supabase/functions/_shared/farm-watch-presentation-policy.test.ts
+      - name: Real PostGIS authorization and concurrent sessions
+        run: |
+          createdb -T template0 pins_test
+          python3 scripts/test-farm-watch-map-pins.py psql -d pins_test
+      - name: Start local HTTP authorization boundary
+        run: |
+          docker run --name pin-api --network host -d \
+            -e PGRST_DB_URI=postgres://postgres:local-test-only@127.0.0.1:55439/pins_test \
+            -e PGRST_DB_SCHEMAS=public -e PGRST_DB_ANON_ROLE=anon \
+            -e PGRST_JWT_SECRET=farm-watch-local-authorization-test-secret-only \
+            -e PGRST_SERVER_PORT=55440 postgrest/postgrest:v13.0.7
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:55440/ >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          docker logs pin-api
+          exit 1
+      - run: python3 scripts/test-farm-watch-map-pins-http.py

@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+"""Test the real pin migration + existing allowlist/role SQL in an EMPTY PostGIS DB.
+
+Usage: python scripts/test-farm-watch-map-pins.py docker exec -i <container> psql -U postgres
+Refuses an existing farm_watch schema. JWT claims are supplied as PostgREST does;
+only the auth schema bootstrap is synthetic. Never run against a deployment.
+"""
+from pathlib import Path
+import subprocess
+import sys
+from concurrent.futures import ThreadPoolExecutor
+
+root = Path(__file__).resolve().parents[1]
+migrations = root / 'supabase/migrations'
+setup = r'''
+\set ON_ERROR_STOP on
+set client_min_messages=warning;
+create schema farm_watch; -- fail first on a nonempty deployment
+create schema extensions;
+create extension if not exists postgis with schema extensions;
+create schema auth;
+do $$ begin
+ if not exists(select 1 from pg_roles where rolname='anon') then create role anon; end if;
+ if not exists(select 1 from pg_roles where rolname='authenticated') then create role authenticated; end if;
+ if not exists(select 1 from pg_roles where rolname='service_role') then create role service_role bypassrls; end if;
+end $$;
+create function extensions.gen_random_uuid() returns uuid language sql as $$select gen_random_uuid()$$;
+create table auth.users(id uuid primary key, email text, email_confirmed_at timestamptz);
+create table auth.identities(user_id uuid references auth.users, provider text);
+create function auth.uid() returns uuid language sql stable as
+$$select nullif(current_setting('request.jwt.claims',true)::jsonb->>'sub','')::uuid$$;
+create function auth.jwt() returns jsonb language sql stable as
+$$select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;
+grant usage on schema auth to authenticated;
+'''
+for filename in ['20260917053544_add_private_farm_watch_v0.sql',
+                 '20260920163700_add_farm_watch_authorized_email_viewers_v1.sql',
+                 '20260924003000_add_farm_watch_admin_presentation_role_v1.sql']:
+    setup += '\n' + (migrations / filename).read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_property_map_pins_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pins.sql').read_text()
+if not sys.argv[1:]:
+    raise SystemExit(__doc__)
+subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
+# Two independent sessions race the same revision against the actual row lock.
+command = sys.argv[1:]
+def query(sql):
+    return subprocess.run(command + ['-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1', '-c', sql],
+                          text=True, capture_output=True)
+restored = query("update farm_watch.authorized_users set status='active'; select id from farm_watch.property_map_pins_v1 where title='Hole edge'")
+if restored.returncode:
+    raise RuntimeError(restored.stderr)
+pin_id = restored.stdout.strip().splitlines()[-1]
+def race(index):
+    return query("""begin; set role authenticated;
+      set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
+      select public.farm_watch_map_pins_v1('one','update','%s',1,'Concurrent %s',null,1.5,1.5);
+      select pg_sleep(.3); commit;""" % (pin_id, index))
+with ThreadPoolExecutor(max_workers=2) as pool:
+    results = list(pool.map(race, [1,2]))
+assert sorted(result.returncode for result in results) == [0,1], [(r.returncode,r.stderr) for r in results]
+assert any('pin changed; reload' in r.stderr for r in results)
+print('PASS: concurrent independent sessions, exactly one winning revision')
+filled = query("""insert into farm_watch.property_map_pins_v1(property_id,created_by,title,geometry)
+  select '10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','Cap fixture',
+    extensions.st_setsrid(extensions.st_makepoint(11,11),4326)
+  from generate_series(1,499-(select count(*)::int from farm_watch.property_map_pins_v1
+    where property_id='10000000-0000-0000-0000-000000000002'));""")
+assert filled.returncode == 0, filled.stderr
+def race_create(index):
+    return query("""begin; set role authenticated;
+      set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
+      select public.farm_watch_map_pins_v1('two','create',p_title=>'Final cap %s',p_longitude=>11,p_latitude=>11);
+      select pg_sleep(.3); commit;""" % index)
+with ThreadPoolExecutor(max_workers=2) as pool:
+    results = list(pool.map(race_create,[1,2]))
+assert sorted(r.returncode for r in results)==[0,1], [(r.returncode,r.stderr) for r in results]
+assert any('property pin limit reached' in r.stderr for r in results)
+assert query("select count(*) from farm_watch.property_map_pins_v1 where property_id='10000000-0000-0000-0000-000000000002'").stdout.strip()=='500'
+print('PASS: property cap remains 500 under concurrent creates')
