@@ -62,3 +62,13 @@ Deno.test('unauthenticated denial, CORS preflight, malformed JSON and method res
   assert((await handler(new Request(url,{method:'POST',headers:{authorization:'Bearer verified'},body:'bad'}))).status === 400)
   assert(calls.length === 0)
 })
+Deno.test('hex colors normalize; omitted color stays compatible; malformed colors never reach SQL', async () => {
+  const { request, calls } = fixture()
+  assert((await request('POST', { ...pin, color: '#A1B2C3' })).status === 201)
+  assert(calls[0].args.p_color === '#a1b2c3')
+  assert((await request('PATCH', { ...pin, id, revision: 1 })).status === 200)
+  assert(!Object.hasOwn(calls[1].args, 'p_color'), 'old clients must preserve stored color')
+  for (const color of [null, 1, {}, '#fff', '#11223344', '#2463eb\n', 'red', 'var(--color)', '#000000;fill:red'])
+    assert((await request('POST', { ...pin, color })).status === 400)
+  assert(calls.length === 2)
+})
