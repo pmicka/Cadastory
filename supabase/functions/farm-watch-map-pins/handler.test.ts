@@ -75,7 +75,7 @@ Deno.test('hex colors normalize; omitted color stays compatible; malformed color
 
 Deno.test('only named icon values are forwarded; old clients omit icon without losing it', async () => {
   const { request, calls } = fixture()
-  for (const icon of ['pin','deerstand','water_pump','container','trail_camera','gate','bonfire','crop']) {
+  for (const icon of ['pin','deerstand','water_pump','container','trail_camera','gate','bonfire','crop','corn_feeder','salt_mineral_block','tree','pop_up_blind','ladder_stand']) {
     assert((await request('POST', { ...pin, icon })).status === 201)
     assert(calls.at(-1).args.p_icon === icon)
   }
@@ -83,7 +83,7 @@ Deno.test('only named icon values are forwarded; old clients omit icon without l
     assert((await request('POST', { ...pin, icon })).status === 400)
   assert((await request('PATCH', { ...pin, id, revision: 1 })).status === 200)
   assert(!Object.hasOwn(calls.at(-1).args, 'p_icon'))
-  assert(calls.length === 9)
+  assert(calls.length === 14)
 })
 Deno.test('account grant denials come from the authoritative database boundary', async () => {
   const { request, calls } = fixture('42501')
