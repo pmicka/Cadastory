@@ -125,3 +125,26 @@ assert request('/property_map_pin_fixture_links_v1',actor=other,method='GET')[0]
 assert rpc(other,p_property_slug=legacy_property,p_action='update',p_pin_id=saved['id'],p_expected_revision=2,p_title='HTTP migrated feeder',p_longitude=1.3,p_latitude=1.4)[0]==200
 assert rpc(other,p_property_slug=legacy_property,p_action='delete',p_pin_id=saved['id'],p_expected_revision=2)[0]==409
 print('PASS: migrated fixtures use creator-only signed HTTP CRUD; viewer/other-owner/admin/unauthenticated/outsider denial and private migration ledger')
+
+for category in ['auto','general','hunting','farming-orchard']:
+ status,data=rpc(creator,**{**pin,'p_category':category});assert status==200,(category,data)
+ saved=data['pin'];assert saved['category']==category
+ shared=next(p for p in rpc(other,p_action='list')[1]['pins'] if p['id']==saved['id'])
+ assert shared['category']==category and not shared['can_edit']
+ update={**pin,'p_action':'update','p_pin_id':saved['id'],'p_expected_revision':1,'p_category':'general','p_longitude':1.5,'p_latitude':1.5}
+ for actor in [other,'00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006']:
+  assert rpc(actor,**update)[0]==403
+  assert rpc(actor,p_action='delete',p_pin_id=saved['id'],p_expected_revision=1)[0]==403
+ assert rpc(creator,**{**update,'p_property_slug':'two'})[0]==403
+ status,data=rpc(creator,**update);assert status==200 and data['pin']['category']=='general'
+ assert rpc(creator,**update)[0]==409
+ legacy={k:v for k,v in update.items() if k!='p_category'};legacy['p_expected_revision']=2
+ status,data=rpc(creator,**legacy);assert status==200 and data['pin']['category']=='general'
+ status,data=rpc(creator,**{**legacy,'p_expected_revision':3,'p_category':'auto'});assert status==200 and data['pin']['category']=='auto'
+ assert rpc(creator,p_action='delete',p_pin_id=saved['id'],p_expected_revision=4)[0]==200
+for category in ['','Hunting','water','__proto__','<svg/>',{'category':'hunting'}]:
+ assert rpc(creator,**{**pin,'p_category':category})[0]==400
+assert rpc(outsider,**{**pin,'p_category':'hunting'})[0]==403
+assert rpc(None,**{**pin,'p_category':'general'})[0] in (401,403)
+assert rpc(creator,**{**pin,'p_category':'hunting','p_created_by':other})[0]==404
+print('PASS: categories over signed HTTP: persistent sharing, creator-only changes/moves/deletes, owner/admin/outsider/anonymous denial, isolation, stale revisions, legacy omission and explicit automatic reset.')

@@ -55,6 +55,9 @@ setup += '\n' + next(migrations.glob('*_farm_watch_fixture_map_pins_v1.sql')).re
 setup += '\n' + (root / 'tests/farm-watch-map-pin-fixtures.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_fixture_map_pins_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-map-pin-fixtures-replay.sql').read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-categories-fixture.sql').read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_categories_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-categories.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
@@ -84,13 +87,14 @@ pin_id = restored.stdout.strip().splitlines()[-1]
 def race(index):
     return query("""begin; set role authenticated;
       set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
-      select public.farm_watch_map_pins_v1('one','update','%s',1,'Concurrent %s',null,1.5,1.5);
-      select pg_sleep(.3); commit;""" % (pin_id, index))
+      select public.farm_watch_map_pins_v1('one','update','%s',1,'Concurrent %s',null,1.5,1.5,p_category=>'%s');
+      select pg_sleep(.3); commit;""" % (pin_id, index, "general" if index==1 else "hunting"))
 with ThreadPoolExecutor(max_workers=2) as pool:
     results = list(pool.map(race, [1,2]))
 assert sorted(result.returncode for result in results) == [0,1], [(r.returncode,r.stderr) for r in results]
 assert any('pin changed; reload' in r.stderr for r in results)
-print('PASS: concurrent independent sessions, exactly one winning revision')
+assert query("select category = case title when 'Concurrent 1' then 'general' when 'Concurrent 2' then 'hunting' end from farm_watch.property_map_pins_v1 where id='"+pin_id+"'").stdout.strip()=='t'
+print('PASS: concurrent independent sessions, exactly one winning revision/category')
 filled = query("""insert into farm_watch.property_map_pins_v1(property_id,created_by,title,geometry)
   select '10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','Cap fixture',
     extensions.st_setsrid(extensions.st_makepoint(11,11),4326)
