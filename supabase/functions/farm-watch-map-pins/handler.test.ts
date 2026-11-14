@@ -92,3 +92,18 @@ Deno.test('account grant denials come from the authoritative database boundary',
   assert((await request('POST', { ...pin, icon:'gate', can_use_pin_icons:true })).status === 400)
   assert(calls.length === 1)
 })
+
+Deno.test('bounded categories persist independently of restricted icons and older clients omit category', async () => {
+  const { request, calls } = fixture()
+  for (const category of ['auto', 'general', 'hunting', 'farming-orchard']) {
+    assert((await request('POST', { ...pin, category })).status === 201)
+    assert(calls.at(-1).args.p_category === category)
+    assert((await request('PATCH', { ...pin, id, revision: 1, category })).status === 200)
+  }
+  for (const category of [null, 1, {}, [], '', 'Hunting', 'water', '__proto__', '<svg/>'])
+    assert((await request('POST', { ...pin, category })).status === 400)
+  assert((await request('PATCH', { ...pin, id, revision: 1 })).status === 200)
+  assert(!Object.hasOwn(calls.at(-1).args, 'p_category'))
+  assert((await request('DELETE', { id, revision: 1, category:'hunting' })).status === 400)
+  assert(calls.length === 9)
+})
