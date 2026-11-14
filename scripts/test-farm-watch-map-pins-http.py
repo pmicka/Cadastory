@@ -108,3 +108,20 @@ for icon in ['corn_feeder','salt_mineral_block','tree','pop_up_blind','ladder_st
     assert status==200 and data['pin']['icon']==icon
     assert rpc(other,p_action='delete',p_pin_id=saved['id'],p_expected_revision=2)[0]==200
 print('PASS: all five new symbols persist over signed HTTP; sharing, creator-only updates/deletes and owner/admin/viewer denials are server-enforced.')
+
+# Migrated historical fixture copies use the exact same server authorization.
+legacy_property='validation-property-01'
+status,migrated=rpc(other,p_property_slug=legacy_property,p_action='list');assert status==200
+saved=migrated['pins'][0];assert saved['title']=='Migrated feeder edited' and saved['revision']==2
+for actor in [creator,'00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006']:
+ status,shared=rpc(actor,p_property_slug=legacy_property,p_action='list');assert status==200
+ assert shared['pins'][0]['can_edit'] is False
+ args={'p_property_slug':legacy_property,'p_pin_id':saved['id'],'p_expected_revision':2}
+ assert rpc(actor,**args,p_action='delete')[0]==403
+ assert rpc(actor,**args,p_action='update',p_title='Stolen legacy fixture',p_longitude=1,p_latitude=1)[0]==403
+assert rpc(None,p_property_slug=legacy_property,p_action='list')[0] in (401,403)
+assert rpc(outsider,p_property_slug=legacy_property,p_action='list')[0]==403
+assert request('/property_map_pin_fixture_links_v1',actor=other,method='GET')[0] in (401,403,404)
+assert rpc(other,p_property_slug=legacy_property,p_action='update',p_pin_id=saved['id'],p_expected_revision=2,p_title='HTTP migrated feeder',p_longitude=1.3,p_latitude=1.4)[0]==200
+assert rpc(other,p_property_slug=legacy_property,p_action='delete',p_pin_id=saved['id'],p_expected_revision=2)[0]==409
+print('PASS: migrated fixtures use creator-only signed HTTP CRUD; viewer/other-owner/admin/unauthenticated/outsider denial and private migration ledger')
