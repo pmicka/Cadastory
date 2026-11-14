@@ -33,16 +33,18 @@ creator='00000000-0000-0000-0000-000000000001'
 other='00000000-0000-0000-0000-000000000002'
 outsider='00000000-0000-0000-0000-000000000003'
 def rpc(actor,**args):return request('/rpc/farm_watch_map_pins_v1',{'p_property_slug':'one',**args},actor)
-pin={'p_action':'create','p_title':'HTTP persisted pin','p_notes':'<script>plain text</script>','p_longitude':0,'p_latitude':1}
+pin={'p_action':'create','p_title':'HTTP persisted pin','p_notes':'<script>plain text</script>','p_longitude':0,'p_latitude':1,'p_color':'#2463EB'}
 assert rpc(None,p_action='list')[0] in (401,403)
 assert rpc(outsider,**pin)[0]==403
 assert rpc(outsider,p_action='list')[0]==403
 assert rpc(creator,p_action='list',p_property_slug='missing')[0]==403
 status,created=rpc(creator,**pin);assert status==200,(status,created)
 id=created['pin']['id'];revision=created['pin']['revision']
+assert created['pin']['color']=='#2463eb'
 status,shared=rpc(other,p_action='list');assert status==200
 visible=next(p for p in shared['pins'] if p['id']==id)
 assert visible['can_edit'] is False and visible['creator_label']=='Property member'
+assert visible['color']=='#2463eb'
 assert 'created_by' not in visible
 assert all(p['id']!=id for p in rpc(creator,p_action='list',p_property_slug='two')[1]['pins'])
 update={**pin,'p_action':'update','p_pin_id':id,'p_expected_revision':revision,'p_title':'HTTP moved','p_longitude':1.5,'p_latitude':1.5}
@@ -56,10 +58,16 @@ assert rpc(creator,**{**pin,'p_longitude':'NaN'})[0]==400
 assert rpc(creator,**{**pin,'p_title':'x'*101})[0]==400
 assert rpc(creator,**{**pin,'p_notes':'x'*2001})[0]==400
 assert rpc(creator,**{**pin,'p_longitude':3})[0]==400
+assert rpc(creator,**{**pin,'p_color':'red;fill:url(x)'})[0]==400
 status,updated=rpc(creator,**update);assert status==200,(status,updated)
 assert updated['pin']['revision']==revision+1
+# The former request shape still updates successfully without erasing color.
+legacy={k:v for k,v in update.items() if k!='p_color'}
+legacy['p_expected_revision']=revision+1
+status,preserved=rpc(creator,**legacy);assert status==200,(status,preserved)
+assert preserved['pin']['color']=='#2463eb'
 assert rpc(creator,**update)[0]==409
 assert rpc(creator,p_action='delete',p_pin_id=id,p_expected_revision=revision)[0]==409
-assert rpc(creator,p_action='delete',p_pin_id=id,p_expected_revision=revision+1)[0]==200
+assert rpc(creator,p_action='delete',p_pin_id=id,p_expected_revision=revision+2)[0]==200
 assert all(p['id']!=id for p in rpc(creator,p_action='list')[1]['pins'])
 print('PASS: signed HTTP JWTs against actual PostgREST/PostGIS; shared reads, persistent CRUD, property scope, noncreator denial, transfer/reassignment denial, invalid input, stale writes and deletes.')

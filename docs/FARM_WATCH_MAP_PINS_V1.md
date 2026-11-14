@@ -28,8 +28,8 @@ Edge URL: `/functions/v1/farm-watch-map-pins?property=<selected-property-slug>`.
 | Method | JSON request | Response |
 | --- | --- | --- |
 | GET | none | `{pins: [...]}` |
-| POST | `title, notes?, longitude, latitude` | `{pin: {...}}`, HTTP 201 |
-| PATCH | `id, revision, title, notes?, longitude, latitude` | `{pin: {...}}` |
+| POST | `title, notes?, longitude, latitude, color?` | `{pin: {...}}`, HTTP 201 |
+| PATCH | `id, revision, title, notes?, longitude, latitude, color?` | `{pin: {...}}` |
 | DELETE | `id, revision` | `{deleted: true}` |
 
 Unexpected mutation fields, including ownership/property fields or arbitrary GeoJSON, are rejected. Errors are bounded and omit database details. No public/anonymous listing or cross-property list endpoint exists.
@@ -62,3 +62,13 @@ Local verification: Postgres 17.7/PostGIS 3.5, PostgREST 13.0.7; real database/H
 4. Publish the paired frontend, then smoke-test desktop and an actual Android device with the keyboard open, profile switching, reload and sign-out. Browser touch emulation does not substitute for physical-device acceptance.
 
 Do not merge/deploy until the security-sensitive checks pass. Roll back the frontend utility first; the existing map continues to function if pin loading fails. Disable the Edge function and revoke RPC execution if needed. Retain the annotation table/data during rollback; do not drop user pins as a routine rollback step. No analytical product needs rebuilding.
+
+## Persistent colors
+
+`20261114015747_farm_watch_map_pin_colors_v1.sql` adds presentation-only `color`, constrained to a lowercase six-digit hex value. Existing rows gain the original gold (`#ffd27e`) without changing identity, title/notes, geometry, timestamps or revision. Responses include `color` for all authorized viewers. Recoloring uses the same creator check, boundary validation, row lock and revision as any other edit; it grants no additional authority.
+
+The RPC adds a final optional `p_color` argument. Its previous signature is dropped and replaced atomically to avoid ambiguous PostgREST overloads; execute privileges remain authenticated-only. Omitted/null color means gold on create and preserve-current-color on update, so older clients cannot erase someone's selected color. The Edge handler rejects non-string, non-hex, non-seven-character colors (including CSS/markup payloads and trailing newlines) and forwards normalized lowercase hex. Direct RPC calls receive equivalent SQL validation.
+
+Deploy this migration and the updated `farm-watch-map-pins` Edge function **before** publishing the color-picker frontend. The existing frontend continues to work during that rollout. Rollback the frontend first; leave the metadata column and compatible RPC in place so saved colors are retained.
+
+The existing real PostGIS/PostgREST suites now cover colored create/read/update, another user's rejected recolor, stale color conflicts, malformed colors, omitted-color compatibility, and an existing-row upgrade fixture proving that other data/revisions remain unchanged. The original ownership, property isolation, geometry, concurrent edits and cap tests continue to run. The UI removes repetitive annotation disclaimers; this remains an unverified annotation table outside all scientific/evidence products.

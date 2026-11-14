@@ -49,8 +49,8 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client) 
         let body: any
         try { body = JSON.parse(new TextDecoder().decode(bytes)) } catch { return respond({ error: 'invalid input' }, 400) }
         const fields = req.method === 'DELETE' ? ['id', 'revision']
-          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude']
-          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude']
+          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude', 'color']
+          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude', 'color']
         if (!body || Array.isArray(body) || typeof body !== 'object' ||
           Object.keys(body).some(key => !fields.includes(key))) return respond({ error: 'invalid input' }, 400)
         if (req.method !== 'POST') {
@@ -65,6 +65,10 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client) 
             !Number.isFinite(body.latitude) || Math.abs(body.latitude) > 90) return respond({ error: 'invalid input' }, 400)
           Object.assign(args, { p_title: body.title.trim(), p_notes: body.notes || null,
             p_longitude: body.longitude, p_latitude: body.latitude })
+          if (Object.hasOwn(body, 'color')) {
+            if (typeof body.color !== 'string' || body.color.length !== 7 || !/^#[0-9a-f]{6}$/i.test(body.color)) return respond({ error: 'invalid pin color' }, 400)
+            args.p_color = body.color.toLowerCase()
+          }
         }
       }
       const { data, error } = await client.rpc('farm_watch_map_pins_v1', args)

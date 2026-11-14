@@ -38,7 +38,10 @@ for filename in ['20260917053544_add_private_farm_watch_v0.sql',
                  '20260924003000_add_farm_watch_admin_presentation_role_v1.sql']:
     setup += '\n' + (migrations / filename).read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_property_map_pins_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-colors-fixture.sql').read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_colors_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-map-pins.sql').read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-colors.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
