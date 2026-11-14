@@ -94,3 +94,17 @@ assert rpc(other,**{**symbol,'p_icon':'<img src=x onerror=alert(1)>'})[0]==400
 assert rpc(creator,**{**symbol,'p_can_use_pin_icons':True})[0]==404
 assert request('/map_pin_icon_users_v1',{'user_id':creator},creator)[0] in (401,403,404)
 print('PASS: signed HTTP JWTs against actual PostgREST/PostGIS; account-only icons, shared icon views, other-owner/admin denial, legacy icon preservation, persistent CRUD, property scope, creator-only mutations, invalid input and concurrency.')
+
+for icon in ['corn_feeder','salt_mineral_block','tree','pop_up_blind','ladder_stand']:
+    for actor in [creator,'00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006']:
+        assert rpc(actor,**{**pin,'p_icon':icon})[0]==403, (actor,icon)
+    status,data=rpc(other,**{**pin,'p_icon':icon}); assert status==200,(icon,data)
+    saved=data['pin']; assert saved['icon']==icon
+    visible=next(p for p in rpc(creator,p_action='list')[1]['pins'] if p['id']==saved['id'])
+    assert visible['icon']==icon and not visible['can_edit']
+    assert rpc(creator,p_action='update',p_pin_id=saved['id'],p_expected_revision=1,p_title='Stolen',p_longitude=0,p_latitude=1)[0]==403
+    assert rpc(creator,p_action='delete',p_pin_id=saved['id'],p_expected_revision=1)[0]==403
+    status,data=rpc(other,p_action='update',p_pin_id=saved['id'],p_expected_revision=1,p_title='Legacy edit',p_longitude=0,p_latitude=1)
+    assert status==200 and data['pin']['icon']==icon
+    assert rpc(other,p_action='delete',p_pin_id=saved['id'],p_expected_revision=2)[0]==200
+print('PASS: all five new symbols persist over signed HTTP; sharing, creator-only updates/deletes and owner/admin/viewer denials are server-enforced.')

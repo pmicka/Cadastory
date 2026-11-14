@@ -6,12 +6,14 @@ on:
       - 'supabase/migrations/*farm_watch_property_map_pins_v1.sql'
       - 'supabase/migrations/*farm_watch_map_pin_colors_v1.sql'
       - 'supabase/migrations/*farm_watch_map_pin_icons_v1.sql'
+      - 'supabase/migrations/*farm_watch_map_pin_symbol_pack_v1.sql'
       - 'supabase/migrations/*farm_watch*authorized*'
       - 'supabase/migrations/*farm_watch*role*'
       - 'scripts/test-farm-watch-map-pins*.py'
       - 'tests/farm-watch-map-pins.sql'
       - 'tests/farm-watch-map-pin-colors*.sql'
       - 'tests/farm-watch-map-pin-icons*.sql'
+      - 'tests/farm-watch-map-pin-symbol-pack*.sql'
       - '.github/workflows/farm-watch-map-pins-ci.yml'
   workflow_dispatch:
 permissions:
