@@ -72,3 +72,23 @@ Deno.test('hex colors normalize; omitted color stays compatible; malformed color
     assert((await request('POST', { ...pin, color })).status === 400)
   assert(calls.length === 2)
 })
+
+Deno.test('only named icon values are forwarded; old clients omit icon without losing it', async () => {
+  const { request, calls } = fixture()
+  for (const icon of ['pin','deerstand','water_pump','container','trail_camera','gate','bonfire','crop']) {
+    assert((await request('POST', { ...pin, icon })).status === 201)
+    assert(calls.at(-1).args.p_icon === icon)
+  }
+  for (const icon of [null, 1, {}, 'Deerstand', 'feeder', '__proto__', '<svg onload=alert(1)>'])
+    assert((await request('POST', { ...pin, icon })).status === 400)
+  assert((await request('PATCH', { ...pin, id, revision: 1 })).status === 200)
+  assert(!Object.hasOwn(calls.at(-1).args, 'p_icon'))
+  assert(calls.length === 9)
+})
+Deno.test('account grant denials come from the authoritative database boundary', async () => {
+  const { request, calls } = fixture('42501')
+  assert((await request('POST', { ...pin, icon:'gate' })).status === 404)
+  assert(calls[0].args.p_icon === 'gate')
+  assert((await request('POST', { ...pin, icon:'gate', can_use_pin_icons:true })).status === 400)
+  assert(calls.length === 1)
+})

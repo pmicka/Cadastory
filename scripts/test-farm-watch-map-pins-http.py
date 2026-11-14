@@ -70,4 +70,27 @@ assert rpc(creator,**update)[0]==409
 assert rpc(creator,p_action='delete',p_pin_id=id,p_expected_revision=revision)[0]==409
 assert rpc(creator,p_action='delete',p_pin_id=id,p_expected_revision=revision+2)[0]==200
 assert all(p['id']!=id for p in rpc(creator,p_action='list')[1]['pins'])
-print('PASS: signed HTTP JWTs against actual PostgREST/PostGIS; shared reads, persistent CRUD, property scope, noncreator denial, transfer/reassignment denial, invalid input, stale writes and deletes.')
+symbol={**pin,'p_icon':'deerstand'}
+assert rpc(other,p_action='list')[1]['capabilities']['can_use_pin_icons'] is True
+assert rpc(creator,p_action='list')[1]['capabilities']['can_use_pin_icons'] is False
+assert rpc(creator,**symbol)[0]==403
+for actor in ['00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006']:
+    assert rpc(actor,p_action='list')[1]['capabilities']['can_use_pin_icons'] is False
+    assert rpc(actor,**symbol)[0]==403, 'another authorized owner/admin must not inherit icons'
+    status,plain=rpc(actor,**pin);assert status==200,(status,plain)
+    assert plain['pin']['icon']=='pin'
+    assert rpc(actor,p_action='delete',p_pin_id=plain['pin']['id'],p_expected_revision=1)[0]==200
+status,created=rpc(other,**symbol);assert status==200,(status,created)
+saved=created['pin'];assert saved['icon']=='deerstand'
+assert any(p['id']==saved['id'] and p['icon']=='deerstand' and not p['can_edit'] for p in rpc(creator,p_action='list')[1]['pins'])
+icon_update={**symbol,'p_action':'update','p_pin_id':saved['id'],'p_expected_revision':1,'p_icon':'trail_camera'}
+assert rpc(creator,**icon_update)[0]==403
+assert rpc(other,**icon_update)[1]['pin']['icon']=='trail_camera'
+assert rpc(other,**icon_update)[0]==409
+legacy_icon={k:v for k,v in icon_update.items() if k!='p_icon'};legacy_icon['p_expected_revision']=2
+assert rpc(other,**legacy_icon)[1]['pin']['icon']=='trail_camera'
+assert rpc(other,p_action='delete',p_pin_id=saved['id'],p_expected_revision=3)[0]==200
+assert rpc(other,**{**symbol,'p_icon':'<img src=x onerror=alert(1)>'})[0]==400
+assert rpc(creator,**{**symbol,'p_can_use_pin_icons':True})[0]==404
+assert request('/map_pin_icon_users_v1',{'user_id':creator},creator)[0] in (401,403,404)
+print('PASS: signed HTTP JWTs against actual PostgREST/PostGIS; account-only icons, shared icon views, other-owner/admin denial, legacy icon preservation, persistent CRUD, property scope, creator-only mutations, invalid input and concurrency.')
