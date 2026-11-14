@@ -3,6 +3,7 @@ const ORIGINS = new Set(['https://pmicka.com', 'https://www.pmicka.com',
   'http://127.0.0.1:8000', 'http://localhost:8000'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const PIN_ICONS = new Set(['pin', 'deerstand', 'water_pump', 'container', 'trail_camera', 'gate', 'bonfire', 'crop', 'corn_feeder', 'salt_mineral_block', 'tree', 'pop_up_blind', 'ladder_stand'])
+const PIN_CATEGORIES = new Set(['auto', 'general', 'hunting', 'farming-orchard'])
 type Client = { auth: { getUser(token: string): Promise<any> }; rpc(name: string, args: any): PromiseLike<any> }
 
 export function createMapPinsHandler(clientForToken: (token: string) => Client) {
@@ -50,8 +51,8 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client) 
         let body: any
         try { body = JSON.parse(new TextDecoder().decode(bytes)) } catch { return respond({ error: 'invalid input' }, 400) }
         const fields = req.method === 'DELETE' ? ['id', 'revision']
-          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude', 'color', 'icon']
-          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude', 'color', 'icon']
+          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category']
+          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category']
         if (!body || Array.isArray(body) || typeof body !== 'object' ||
           Object.keys(body).some(key => !fields.includes(key))) return respond({ error: 'invalid input' }, 400)
         if (req.method !== 'POST') {
@@ -69,6 +70,10 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client) 
           if (Object.hasOwn(body, 'color')) {
             if (typeof body.color !== 'string' || body.color.length !== 7 || !/^#[0-9a-f]{6}$/i.test(body.color)) return respond({ error: 'invalid pin color' }, 400)
             args.p_color = body.color.toLowerCase()
+          }
+          if (Object.hasOwn(body, 'category')) {
+            if (typeof body.category !== 'string' || !PIN_CATEGORIES.has(body.category)) return respond({ error: 'invalid pin category' }, 400)
+            args.p_category = body.category
           }
           if (Object.hasOwn(body, 'icon')) {
             if (typeof body.icon !== 'string' || !PIN_ICONS.has(body.icon)) return respond({ error: 'invalid pin icon' }, 400)
