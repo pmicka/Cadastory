@@ -275,3 +275,11 @@ RLS, geometry/privacy guards and photo authorization; exercises every new icon
 with CRUD/list/legacy omission, custom color/manual category, shared read-only
 views, property isolation, stale revisions, grantless roles and anonymous denial;
 and expands signed HTTP and Edge validation tests, including invalid names.
+
+Verification results: 45 Deno tests and both Edge entrypoint type checks pass
+locally and in [PR #345 CI](https://github.com/pmicka/Cadastory/actions/runs/43751177721).
+That CI also passes the real PostGIS upgrade/authorization/concurrency tests and
+signed PostgREST HTTP suite, including all six botanical identifiers. Read-only
+deployed `assert_tool_registry_integrity_v1()` and
+`assert_architecture_doctrine_v1()` pass. No authorization or stored-data
+regressions were found by these checks.
