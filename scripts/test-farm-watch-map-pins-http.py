@@ -256,3 +256,45 @@ assert rpc(creator,**{**pin,'p_is_private':'not boolean'})[0]==400
 assert rpc(creator,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revision=revision)[0]==200
 assert photos(creator,'read',p_photo_id=photo_id)[0]==403
 print('PASS: signed HTTP creator-only private pin/photo reads across viewer, owner and admin roles; legacy preservation, sharing/unsharing, stale and property-scope guards.')
+
+# Independent WGS84 ground-distance probes at the selected property's west edge.
+# A latitude-dependent metres/degree conversion is sufficient at this 30 m scale;
+# probes straddle 100 ft by 0.01 ft, well above conversion rounding error.
+import math
+lat_rad=math.radians(1)
+lon_m_per_degree=math.pi/180*6378137/math.sqrt(1-0.00669437999014*math.sin(lat_rad)**2)*math.cos(lat_rad)
+def nearby(feet):return {'p_longitude':-feet*.3048/lon_m_per_degree,'p_latitude':1}
+for feet in [1,50,99.99]:
+ coordinates=nearby(feet)
+ status,data=rpc(creator,**{**pin,**coordinates});assert status==200,(feet,status,data)
+ saved=data['pin'];assert saved['longitude']==coordinates['p_longitude'],'coordinates must not snap'
+ assert any(p['id']==saved['id'] for p in rpc(other,p_action='list')[1]['pins'])
+ update={**pin,**coordinates,'p_action':'update','p_pin_id':saved['id'],'p_expected_revision':1,'p_is_private':True}
+ assert rpc(other,**update)[0]==403
+ assert rpc(creator,**{**update,'p_property_slug':'two'})[0]==403
+ status,data=rpc(creator,**update);assert status==200 and data['pin']['is_private'] is True
+ assert all(p['id']!=saved['id'] for p in rpc(other,p_action='list')[1]['pins'])
+ # Failed far moves leave both the location and revision usable for next edit.
+ assert rpc(creator,**{**update,**nearby(100.01),'p_expected_revision':2})[0]==400
+ status,data=rpc(creator,**{**update,**nearby(99.99),'p_expected_revision':2,'p_is_private':False});assert status==200 and data['pin']['revision']==3
+ assert rpc(creator,**update)[0]==409
+ assert rpc(creator,p_action='delete',p_pin_id=saved['id'],p_expected_revision=3)[0]==200
+for feet in [100.01,101,500]:
+ status,data=rpc(creator,**{**pin,**nearby(feet)});assert status==400,(feet,status,data)
+assert rpc(None,**{**pin,**nearby(50)})[0] in (401,403)
+assert rpc(outsider,**{**pin,**nearby(50)})[0]==403
+# Restricted icons obey the same distance limit and original account grant.
+assert rpc(creator,**{**pin,**nearby(50),'p_icon':'corn_feeder'})[0]==403
+status,data=rpc(other,**{**pin,**nearby(50),'p_icon':'trail_camera','p_camera_bearing_deg':90});assert status==200,(status,data)
+saved=data['pin'];assert saved['camera_bearing_deg']==90
+assert rpc(other,p_action='delete',p_pin_id=saved['id'],p_expected_revision=1)[0]==200
+# Photo attachment/revision authorization also works on a nearby off-property pin.
+status,data=rpc(creator,**{**pin,**nearby(50),'p_is_private':True});assert status==200
+photo_pin=data['pin'];photo_id=str(uuid.uuid4())
+assert service_request('/rpc/pin_test_seed_photo_v1',{'p_pin_id':photo_pin['id'],'p_photo_id':photo_id})[0]==200
+assert photos(creator,'prepare',p_photo_id=photo_id,p_expected_revision=1)[0]==200
+status,data=photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=1);assert status==200 and data['revision']==2
+assert photos(creator,'read',p_photo_id=photo_id)[0]==200
+assert photos(other,'read',p_photo_id=photo_id)[0]==403
+assert rpc(creator,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revision=2)[0]==200
+print('PASS: signed HTTP off-property 100 ft limit, exact coordinate persistence, move/edit/privacy/photos, restricted icons, creator/property/anonymous/outsider denial and unchanged conflict behavior.')

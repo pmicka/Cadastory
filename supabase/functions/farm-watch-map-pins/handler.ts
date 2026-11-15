@@ -99,7 +99,7 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client, 
         const status = error.code === '42501' ? 404 : error.code === 'PT409' ? 409
           : ['22023', '23514', '22P02'].includes(error.code) ? 400 : error.code === '54000' ? 409 : 503
         const message = status === 404 ? 'not found' : status === 409 ? 'Pin changed or property pin limit reached. Reload pins.'
-          : status === 400 ? 'Use a title up to 100 characters, notes up to 2,000 characters, and a location inside or on the property boundary.'
+          : status === 400 ? 'Use a title up to 100 characters, notes up to 2,000 characters, and a location on the property or within 100 ft of its boundary.'
           : 'Pins unavailable. Try again.'
         return respond({ error: message }, status)
       }
