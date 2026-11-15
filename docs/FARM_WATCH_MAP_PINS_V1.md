@@ -186,7 +186,8 @@ pins/a fresh load to replace their earlier snapshot. No new realtime service is
 introduced. Closing the popup/signing out retains existing photo URL cleanup.
 
 Verification: migration snapshots preserve every prior pin field, guard and icon
-grant. Real PostGIS and signed PostgREST tests cover private DTO/photo omission,
+grant. An injected failure before photo RPC replacement proves the column and both
+RPC changes roll back together; the regression rejects an intermediate commit. Real PostGIS and signed PostgREST tests cover private DTO/photo omission,
 creator read/write/share/unshare, other viewer/owner/admin denial, scoped property,
 legacy omission, anonymous/outsider denial, stale revisions and a privacy/edit
 race. Edge tests reject nonboolean input; browser tests exercise desktop/touch

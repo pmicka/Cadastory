@@ -65,7 +65,25 @@ setup += '\n' + (root / 'tests/farm-watch-pin-photos-fixture.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_pin_photos_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-pin-photos.sql').read_text()
 setup += '\n' + (root / 'tests/farm-watch-private-pins-fixture.sql').read_text()
-setup += '\n' + next(migrations.glob('*_farm_watch_private_map_pins_v1.sql')).read_text()
+# Exercise rollback after the map RPC/column changes but before photo privacy.
+# With an accidental intermediate COMMIT, these assertions fail on the leaked DDL.
+privacy_migration = next(migrations.glob('*_farm_watch_private_map_pins_v1.sql')).read_text()
+fault = privacy_migration.replace('create or replace function public.farm_watch_pin_photos_v1',
+    "do $$ begin raise exception 'injected photo RPC deployment failure'; end $$;\n"
+    'create or replace function public.farm_watch_pin_photos_v1', 1)
+assert fault != privacy_migration
+setup += '\n\\set ON_ERROR_STOP off\n' + fault + r'''
+\set ON_ERROR_STOP on
+do $$ begin
+ assert not exists(select 1 from information_schema.columns where table_schema='farm_watch' and table_name='property_map_pins_v1' and column_name='is_private'),'failed migration must roll back privacy column';
+ assert to_regprocedure('public.farm_watch_map_pins_v1(text,text,uuid,integer,text,text,double precision,double precision,text,text,text,integer,double precision,integer)') is not null,'old map RPC survives failed migration';
+ assert to_regprocedure('public.farm_watch_map_pins_v1(text,text,uuid,integer,text,text,double precision,double precision,text,text,text,integer,double precision,integer,boolean)') is null,'new map RPC must roll back';
+ assert pg_get_functiondef('public.farm_watch_pin_photos_v1(text,uuid,text,uuid,integer)'::regprocedure)=(select definition from privacy_photo_rpc_before),'photo RPC survives failed migration';
+ assert not exists(select 1 from privacy_pins_before b full join farm_watch.property_map_pins_v1 p using(id) where b.original is distinct from to_jsonb(p)),'failed migration leaves all pins unchanged';
+end $$;
+\echo PASS: injected photo RPC failure rolls back the entire privacy migration
+'''
+setup += '\n' + privacy_migration
 setup += '\n' + (root / 'tests/farm-watch-private-pins.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)

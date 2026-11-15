@@ -140,9 +140,6 @@ from public, anon, authenticated, service_role;
 grant execute on function public.farm_watch_map_pins_v1(text,text,uuid,integer,text,text,double precision,double precision,text,text,text,integer,double precision,integer,boolean)
 to authenticated;
 
-notify pgrst, 'reload schema';
-commit;
-
 create or replace function public.farm_watch_pin_photos_v1(p_property_slug text,p_pin_id uuid,p_action text,
  p_photo_id uuid default null,p_expected_revision integer default null)
 returns jsonb language plpgsql security definer set search_path='' as $$
@@ -212,5 +209,5 @@ end $$;
 revoke all on function public.farm_watch_pin_photos_v1(text,uuid,text,uuid,integer) from public,anon,authenticated,service_role;
 grant execute on function public.farm_watch_pin_photos_v1(text,uuid,text,uuid,integer) to authenticated;
 
-
+notify pgrst, 'reload schema';
 commit;
