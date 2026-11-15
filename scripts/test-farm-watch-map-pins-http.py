@@ -178,3 +178,51 @@ assert all(data['pin'][key] is None for key in ['camera_bearing_deg','camera_ran
 assert rpc(other,p_action='delete',p_pin_id=camera_id,p_expected_revision=4)[0]==200
 assert all(p['id']!=camera_id for p in rpc(creator,p_action='list')[1]['pins'])
 print('PASS: signed HTTP camera sharing/persistence, creator-only direction/range/FOV/move/delete, role/anonymous/outsider denial, isolation, transfer bypass denial, invalid settings and stale revisions.')
+
+# Photo RPC requests bypass the UI/Edge. Only the synthetic service can model a
+# processed Storage object; ordinary users cannot seed/alter the private bucket.
+import uuid
+def service_request(path,args=None):
+ encode=lambda obj:base64.urlsafe_b64encode(json.dumps(obj,separators=(',',':')).encode()).decode().rstrip('=')
+ content=encode({'alg':'HS256','typ':'JWT'})+'.'+encode({'role':'service_role','exp':int(time.time())+300})
+ jwt=content+'.'+base64.urlsafe_b64encode(hmac.new(SECRET.encode(),content.encode(),hashlib.sha256).digest()).decode().rstrip('=')
+ req=Request(base+path,data=json.dumps(args or {}).encode(),headers={'content-type':'application/json','authorization':'Bearer '+jwt})
+ try:
+  with urlopen(req,timeout=10) as response:return response.status,json.load(response)
+ except HTTPError as error:return error.code,json.load(error)
+status,data=rpc(creator,**pin);assert status==200
+photo_pin=data['pin'];assert photo_pin['photo_count']==0
+revision=photo_pin['revision'];ids=[]
+def photos(actor,action,**kwargs):
+ return request('/rpc/farm_watch_pin_photos_v1',{'p_property_slug':'one','p_pin_id':photo_pin['id'],'p_action':action,**kwargs},actor)
+assert photos(None,'list')[0] in (401,403)
+assert photos(outsider,'list')[0]==403
+for index in range(4):
+ photo_id=str(uuid.uuid4());ids.append(photo_id)
+ assert photos(creator,'prepare',p_photo_id=photo_id,p_expected_revision=revision)[0]==200
+ assert photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=revision)[0]==400,'unprocessed object cannot be attached'
+ seed={'p_pin_id':photo_pin['id'],'p_photo_id':photo_id}
+ assert request('/rpc/pin_test_seed_photo_v1',seed,creator)[0]==403
+ assert service_request('/rpc/pin_test_seed_photo_v1',seed)[0]==200
+ for actor in [other,'00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006']:
+  assert photos(actor,'attach',p_photo_id=photo_id,p_expected_revision=revision)[0]==403
+ status,data=photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=revision);assert status==200,(status,data)
+ revision=data['revision']
+ assert photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=revision-1)[0]==409
+ assert all(p['id'] in ids for p in photos(other,'list')[1]['photos'])
+ assert photos(other,'read',p_photo_id=photo_id)[0]==200
+ assert photos(other,'delete',p_photo_id=photo_id,p_expected_revision=revision)[0]==403
+ assert photos(creator,'read',p_photo_id=photo_id,p_property_slug='two')[0]==403
+ assert photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=revision,p_created_by=other)[0]==404
+ assert photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=revision,p_object_path='other/property/photo.webp')[0]==404
+assert len(photos(creator,'list')[1]['photos'])==4
+assert photos(creator,'prepare',p_photo_id=str(uuid.uuid4()),p_expected_revision=revision)[0]==409
+assert request('/rpc/farm_watch_pin_photo_cleanup_v1',{},creator)[0]==403
+status,data=photos(creator,'delete',p_photo_id=ids[0],p_expected_revision=revision);assert status==200
+revision=data['revision']
+assert photos(creator,'read',p_photo_id=ids[0])[0]==403
+assert photos(creator,'delete',p_photo_id=ids[0],p_expected_revision=revision-1)[0]==409
+assert rpc(creator,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revision=revision)[0]==200
+assert photos(other,'list')[0]==403
+status,data=service_request('/rpc/farm_watch_pin_photo_cleanup_v1');assert status==200 and len(data['paths'])>=4
+print('PASS: signed HTTP photo sharing, creator-only attach/remove, no arbitrary object/ownership fields, missing processed-object denial, four-photo cap, stale revisions, private service helpers and pin-delete cleanup queue.')

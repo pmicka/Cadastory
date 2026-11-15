@@ -6,7 +6,7 @@ const PIN_ICONS = new Set(['pin', 'deerstand', 'water_pump', 'container', 'trail
 const PIN_CATEGORIES = new Set(['auto', 'general', 'hunting', 'farming-orchard'])
 type Client = { auth: { getUser(token: string): Promise<any> }; rpc(name: string, args: any): PromiseLike<any> }
 
-export function createMapPinsHandler(clientForToken: (token: string) => Client) {
+export function createMapPinsHandler(clientForToken: (token: string) => Client, cleanup: () => Promise<void> = async () => {}) {
   return async (req: Request): Promise<Response> => {
     const origin = req.headers.get('origin') || ''
     const headers: Record<string, string> = { 'content-type': 'application/json; charset=utf-8',
@@ -99,6 +99,7 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client) 
           : 'Pins unavailable. Try again.'
         return respond({ error: message }, status)
       }
+      if (req.method === 'DELETE') { try { await cleanup() } catch { /* Private outbox retains retries. */ } }
       return respond(data, req.method === 'POST' ? 201 : 200)
     } catch { return respond({ error: 'Pins unavailable. Try again.' }, 503) }
   }
