@@ -9,6 +9,8 @@ on:
       - 'tests/farm-watch-pin-photos*.sql'
       - 'supabase/migrations/*farm_watch_private_map_pins_v1.sql'
       - 'tests/farm-watch-private-pins*.sql'
+      - 'supabase/migrations/*farm_watch_map_pin_boundary_buffer_v1.sql'
+      - 'tests/farm-watch-map-pin-boundary-buffer*.sql'
       - 'supabase/migrations/*farm_watch_property_map_pins_v1.sql'
       - 'supabase/migrations/*farm_watch_map_pin_colors_v1.sql'
       - 'supabase/migrations/*farm_watch_map_pin_icons_v1.sql'

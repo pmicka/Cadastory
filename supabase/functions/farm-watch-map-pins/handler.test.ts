@@ -144,3 +144,12 @@ Deno.test('privacy is an optional strict boolean; same verified caller and RPC r
   }
   assert((await request('DELETE',{id,revision:3,is_private:true})).status===400)
 })
+
+Deno.test('geometry validation reports the bounded placement allowance without exposing database detail', async () => {
+  const {request}=fixture('22023')
+  const response=await request('POST',pin)
+  assert(response.status===400)
+  const body=await response.json()
+  assert(body.error.includes('within 100 ft of its boundary'))
+  assert(!body.error.includes('private database detail'))
+})

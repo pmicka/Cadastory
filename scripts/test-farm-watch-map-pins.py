@@ -85,6 +85,9 @@ end $$;
 '''
 setup += '\n' + privacy_migration
 setup += '\n' + (root / 'tests/farm-watch-private-pins.sql').read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-boundary-buffer-fixture.sql').read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_boundary_buffer_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-boundary-buffer.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)

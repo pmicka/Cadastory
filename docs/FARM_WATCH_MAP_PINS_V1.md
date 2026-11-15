@@ -17,7 +17,7 @@ The RPC scopes every query to the selected active property. Updates/deletes addi
 - WGS84 `geometry(Point,4326)` is authoritative; coordinates in responses are derived from it. No duplicated latitude/longitude columns.
 - Required trimmed title: 1–100 Unicode characters; optional notes: at most 2,000 characters. Text remains plain text, including literal markup. Frontend rendering uses DOM text/value properties.
 - Coordinates must be finite, longitude −180…180, latitude −90…90. Point type/SRID, nonempty and valid geometry are enforced.
-- `ST_Covers` against the stored valid property boundary is mandatory. Exterior edges and hole edges are allowed; hole interiors and outside points are rejected. Missing/invalid boundaries fail closed. There is no off-property exception in v1.
+- Placement requires the selected property’s valid mapped geometry: `ST_Covers` for on-property points or spheroidal `ST_DWithin` for points no farther than 100 ft (30.48 m) outside it. The same allowance applies beside interior rings; deep holes and distant points are rejected. Missing, invalid, empty or inactive boundaries fail closed. Exact user coordinates are retained.
 - At most 500 pins per property. Creates serialize on the property row before counting, so concurrent creates cannot exceed the cap. A list is therefore bounded to 500 records (maximum approximately 1 MB of notes). HTTP mutation bodies are bounded to 16 KiB before parsing.
 - Foreign keys link the canonical property and Auth user; deletion of either cascades. Pins have UUID IDs and property/creator indexes.
 
@@ -192,3 +192,39 @@ creator read/write/share/unshare, other viewer/owner/admin denial, scoped proper
 legacy omission, anonymous/outsider denial, stale revisions and a privacy/edit
 race. Edge tests reject nonboolean input; browser tests exercise desktop/touch
 controls, private drafts/cones, Save/Cancel, conflict and signout races.
+
+
+## Nearby pin placement
+
+`20261115134418_farm_watch_map_pin_boundary_buffer_v1.sql` permits annotation
+creation and movement up to **100 ft (30.48 m)** beyond the selected property’s
+mapped footprint. The original `ST_Covers` rule still accepts on-property
+locations, while `ST_DWithin` on schema-qualified PostGIS geography enforces a
+real distance in metres for nearby locations. It applies to every disjoint
+property piece and near interior hole edges; it is not an expanded bounding box.
+Missing/invalid/empty geometry fails closed, and an archived property cannot be
+used. The original property geometry is not changed or used as a snapping target.
+
+The migration replaces only the existing private trigger function, preserving
+its icon-grant and immutable identity/property/creator checks, timestamp/revision
+behavior and ACL. RPC definitions, role grants, privacy/photos, data rows and
+scientific/operator observations are unchanged. All ordinary metadata/privacy
+and photo writes to a nearby pin must continue to pass the same placement guard.
+A nearby annotation still belongs to its explicitly selected property and creator;
+proximity to another property does not confer reassignment or editing access.
+
+Apply the migration and redeploy the map-pins Edge handler’s updated validation
+message before publishing the paired frontend instructions. There is no new
+request field or RPC signature. The old handler remains wire-compatible; the
+new message explains the 100 ft limit when a location is rejected. Existing
+inside-property pins keep every field and revision.
+
+Verification uses real PostGIS probes at Kentucky latitude on both sides of the
+100 ft cutoff, holes/multipart shapes, missing/invalid/empty/inactive properties,
+metadata/private updates, rejected distant moves, selected-property isolation,
+creator/grant checks and unchanged snapshots/ACLs. Independent signed PostgREST
+probes cover nearby create/edit/move/privacy/photos and restricted icons, plus
+anonymous/outsider/noncreator/incorrect-property denial. The complete existing
+SQL/HTTP/concurrency and Edge suites remain enabled. The paired turkey reference
+does not impose fall feeder exclusion circles across mapped property boundaries
+merely because an off-property feeder pin is now allowed.
