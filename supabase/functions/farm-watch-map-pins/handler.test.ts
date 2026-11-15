@@ -127,3 +127,20 @@ Deno.test('successful pin deletion invokes photo cleanup; cleanup failure keeps 
  const response=await handler(new Request('https://test.invalid?property=one',{method:'DELETE',headers:{authorization:'Bearer verified','content-type':'application/json'},body:JSON.stringify({id,revision:1})}))
  assert(response.status===200&&cleanups===1)
 })
+
+Deno.test('privacy is an optional strict boolean; same verified caller and RPC revision boundary', async () => {
+  const { calls, request }=fixture()
+  for (const method of ['POST','PATCH']) {
+    const body={...pin,...(method==='PATCH'?{id,revision:3}:{})}
+    for (const value of [true,false]) {
+      assert((await request(method,{...body,is_private:value})).status===(method==='POST'?201:200))
+      assert(calls.at(-1).args.p_is_private===value)
+    }
+    const before=calls.length
+    for (const value of [null,'true',0,1,[],{}]) assert((await request(method,{...body,is_private:value})).status===400)
+    assert(calls.length===before)
+    assert((await request(method,body)).status===(method==='POST'?201:200))
+    assert(!Object.hasOwn(calls.at(-1).args,'p_is_private'))
+  }
+  assert((await request('DELETE',{id,revision:3,is_private:true})).status===400)
+})
