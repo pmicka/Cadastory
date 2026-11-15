@@ -2,7 +2,7 @@
 const ORIGINS = new Set(['https://pmicka.com', 'https://www.pmicka.com',
   'http://127.0.0.1:8000', 'http://localhost:8000'])
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const PIN_ICONS = new Set(['pin', 'deerstand', 'water_pump', 'container', 'trail_camera', 'gate', 'bonfire', 'crop', 'corn_feeder', 'salt_mineral_block', 'tree', 'pop_up_blind', 'ladder_stand'])
+const PIN_ICONS = new Set(['pin', 'dot', 'deerstand', 'water_pump', 'container', 'trail_camera', 'gate', 'bonfire', 'crop', 'corn_feeder', 'salt_mineral_block', 'tree', 'pop_up_blind', 'ladder_stand'])
 const PIN_CATEGORIES = new Set(['auto', 'general', 'hunting', 'farming-orchard'])
 type Client = { auth: { getUser(token: string): Promise<any> }; rpc(name: string, args: any): PromiseLike<any> }
 
