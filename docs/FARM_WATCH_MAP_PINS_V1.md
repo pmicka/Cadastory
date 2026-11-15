@@ -247,3 +247,31 @@ gates. Roll back the frontend first and keep the compatible whitelist/storage so
 saved annotations survive. Dot tests cover CRUD, legacy omission, camera-to-dot
 conversion, categories, privacy, stale/noncreator rejection, grant checks and
 unchanged table/guard/photo authorization; HTTP tests bypass the UI/Edge.
+
+
+## Additional supplied botanical symbols
+
+`20261115191045_farm_watch_map_pin_botanical_symbols_v1.sql` additively extends
+both current table/RPC allowlists with `sprout`, `sapling`, `ear_of_corn`, `wheat`,
+`blackberry` and `acorn`. The Edge handler uses the same identifiers. The existing
+explicit account grant applies to every new icon. The latest RPC signature,
+creator/property/privacy/revision guards, camera/photo behavior and ACLs remain
+unchanged; no rows, colors, categories, revisions or grant memberships are updated.
+User-authored annotations remain annotations, not verified fixtures or evidence.
+
+Read-only inspection of deployed project `ufpkjaadmmpmeogzhrcq` on 2026-11-15
+confirmed the current dot-inclusive constraint and privacy-aware 15-argument RPC.
+The deployed Edge Function was version 10. No deployment was performed.
+
+After explicit deployment approval, apply the additive migration, deploy
+`farm-watch-map-pins`, then publish the paired notebook frontend. Both backend
+steps must precede exposing the six new choices. Old clients remain compatible.
+On rollback, remove the frontend choices first and retain the additive allowlists
+so saved symbols survive. The frontend's existing symbol-pack document records
+source filenames, original-artwork checks and Farming & Orchard/green defaults.
+
+Verification extends the upgrade snapshot tests for rows, grants, RPC ACLs,
+RLS, geometry/privacy guards and photo authorization; exercises every new icon
+with CRUD/list/legacy omission, custom color/manual category, shared read-only
+views, property isolation, stale revisions, grantless roles and anonymous denial;
+and expands signed HTTP and Edge validation tests, including invalid names.

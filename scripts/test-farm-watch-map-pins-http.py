@@ -95,7 +95,7 @@ assert rpc(creator,**{**symbol,'p_can_use_pin_icons':True})[0]==404
 assert request('/map_pin_icon_users_v1',{'user_id':creator},creator)[0] in (401,403,404)
 print('PASS: signed HTTP JWTs against actual PostgREST/PostGIS; account-only icons, shared icon views, other-owner/admin denial, legacy icon preservation, persistent CRUD, property scope, creator-only mutations, invalid input and concurrency.')
 
-for icon in ['dot','corn_feeder','salt_mineral_block','tree','pop_up_blind','ladder_stand']:
+for icon in ['dot','corn_feeder','salt_mineral_block','tree','pop_up_blind','ladder_stand','sprout','sapling','ear_of_corn','wheat','blackberry','acorn']:
     for actor in [creator,'00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006']:
         assert rpc(actor,**{**pin,'p_icon':icon})[0]==403, (actor,icon)
     status,data=rpc(other,**{**pin,'p_icon':icon}); assert status==200,(icon,data)
@@ -107,7 +107,7 @@ for icon in ['dot','corn_feeder','salt_mineral_block','tree','pop_up_blind','lad
     status,data=rpc(other,p_action='update',p_pin_id=saved['id'],p_expected_revision=1,p_title='Legacy edit',p_longitude=0,p_latitude=1)
     assert status==200 and data['pin']['icon']==icon
     assert rpc(other,p_action='delete',p_pin_id=saved['id'],p_expected_revision=2)[0]==200
-print('PASS: small dot and five added symbols persist over signed HTTP; sharing, creator-only updates/deletes and owner/admin/viewer denials are server-enforced.')
+print('PASS: small dot and eleven added symbols persist over signed HTTP; sharing, creator-only updates/deletes and owner/admin/viewer denials are server-enforced.')
 
 # Migrated historical fixture copies use the exact same server authorization.
 legacy_property='validation-property-01'
