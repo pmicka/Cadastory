@@ -13,6 +13,8 @@ on:
       - 'tests/farm-watch-map-pin-boundary-buffer*.sql'
       - 'supabase/migrations/*farm_watch_map_pin_dot_v1.sql'
       - 'tests/farm-watch-map-pin-dot*.sql'
+      - 'tests/farm-watch-map-pin-botanical*.sql'
+      - 'supabase/migrations/*farm_watch_map_pin_botanical_symbols_v1.sql'
       - 'supabase/migrations/*farm_watch_property_map_pins_v1.sql'
       - 'supabase/migrations/*farm_watch_map_pin_colors_v1.sql'
       - 'supabase/migrations/*farm_watch_map_pin_icons_v1.sql'

@@ -91,6 +91,9 @@ setup += '\n' + (root / 'tests/farm-watch-map-pin-boundary-buffer.sql').read_tex
 setup += '\n' + (root / 'tests/farm-watch-map-pin-dot-fixture.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_dot_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-map-pin-dot.sql').read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-botanical-fixture.sql').read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_botanical_symbols_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-botanical.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
