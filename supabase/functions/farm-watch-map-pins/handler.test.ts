@@ -107,3 +107,16 @@ Deno.test('bounded categories persist independently of restricted icons and olde
   assert((await request('DELETE', { id, revision: 1, category:'hunting' })).status === 400)
   assert(calls.length === 9)
 })
+
+Deno.test('camera settings are bounded numbers, forwarded under the caller JWT; omissions preserve old clients', async () => {
+  const { request, calls } = fixture()
+  const camera = { camera_bearing_deg: 359, camera_range_m: 24.384, camera_fov_deg: 40 }
+  assert((await request('POST', { ...pin, icon: 'trail_camera', ...camera })).status === 201)
+  for (const [key, value] of Object.entries(camera)) assert(calls[0].args['p_'+key] === value)
+  for (const [key, values] of Object.entries({ camera_bearing_deg: [-1,360,1.5],camera_range_m:[0,1.523,91.441],camera_fov_deg:[9,121,40.5] }))
+    for (const value of [...values,null,'40',{},[]]) assert((await request('PATCH',{...pin,id,revision:1,...camera,[key]:value})).status === 400)
+  assert((await request('DELETE', { id, revision:1, ...camera })).status === 400)
+  assert((await request('PATCH', { ...pin, id, revision:1 })).status === 200)
+  assert(!Object.hasOwn(calls.at(-1).args,'p_camera_bearing_deg'))
+  assert(calls.length === 2)
+})

@@ -51,8 +51,8 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client) 
         let body: any
         try { body = JSON.parse(new TextDecoder().decode(bytes)) } catch { return respond({ error: 'invalid input' }, 400) }
         const fields = req.method === 'DELETE' ? ['id', 'revision']
-          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category']
-          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category']
+          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg']
+          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg']
         if (!body || Array.isArray(body) || typeof body !== 'object' ||
           Object.keys(body).some(key => !fields.includes(key))) return respond({ error: 'invalid input' }, 400)
         if (req.method !== 'POST') {
@@ -70,6 +70,15 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client) 
           if (Object.hasOwn(body, 'color')) {
             if (typeof body.color !== 'string' || body.color.length !== 7 || !/^#[0-9a-f]{6}$/i.test(body.color)) return respond({ error: 'invalid pin color' }, 400)
             args.p_color = body.color.toLowerCase()
+          }
+          for (const [field,minimum,maximum,integer] of [
+            ['camera_bearing_deg',0,359,true],['camera_range_m',1.524,91.44,false],['camera_fov_deg',10,120,true],
+          ] as const) {
+            if (!Object.hasOwn(body,field)) continue
+            const value = body[field]
+            if (!Number.isFinite(value) || value < minimum || value > maximum || (integer && !Number.isInteger(value)))
+              return respond({ error: 'invalid camera view' },400)
+            args['p_'+field] = value
           }
           if (Object.hasOwn(body, 'category')) {
             if (typeof body.category !== 'string' || !PIN_CATEGORIES.has(body.category)) return respond({ error: 'invalid pin category' }, 400)
