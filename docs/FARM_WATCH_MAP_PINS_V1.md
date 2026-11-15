@@ -228,3 +228,22 @@ anonymous/outsider/noncreator/incorrect-property denial. The complete existing
 SQL/HTTP/concurrency and Edge suites remain enabled. The paired turkey reference
 does not impose fall feeder exclusion circles across mapped property boundaries
 merely because an off-property feeder pin is now allowed.
+
+
+## Small dot annotations
+
+Migration `20261115162439_farm_watch_map_pin_dot_v1.sql` adds `dot` to the
+table/RPC icon whitelist; the Edge handler accepts the same value. It uses the
+existing explicit pin-icon grant, creator-only mutations, private visibility,
+category/color/photo metadata, property buffer and optimistic revision contract.
+Existing rows/grants/ACL/RLS and photo authorization are unchanged. No scientific
+input or materialization is affected. The paired frontend renders it as a plain
+colored circle at 30% of the normal symbol diameter, with its existing touch target.
+
+Run the real PostGIS, signed PostgREST HTTP and Edge suites, apply this migration
+and deploy `farm-watch-map-pins` before publishing the notebook dot client.
+Verify the single authenticated-only RPC and the registry-integrity/architecture
+gates. Roll back the frontend first and keep the compatible whitelist/storage so
+saved annotations survive. Dot tests cover CRUD, legacy omission, camera-to-dot
+conversion, categories, privacy, stale/noncreator rejection, grant checks and
+unchanged table/guard/photo authorization; HTTP tests bypass the UI/Edge.
