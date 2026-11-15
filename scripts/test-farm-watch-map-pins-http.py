@@ -148,3 +148,33 @@ assert rpc(outsider,**{**pin,'p_category':'hunting'})[0]==403
 assert rpc(None,**{**pin,'p_category':'general'})[0] in (401,403)
 assert rpc(creator,**{**pin,'p_category':'hunting','p_created_by':other})[0]==404
 print('PASS: categories over signed HTTP: persistent sharing, creator-only changes/moves/deletes, owner/admin/outsider/anonymous denial, isolation, stale revisions, legacy omission and explicit automatic reset.')
+
+# New fields are tested directly at the signed PostgREST boundary, bypassing Edge/UI.
+camera={**pin,'p_icon':'trail_camera','p_camera_bearing_deg':90,'p_camera_range_m':24.384,'p_camera_fov_deg':40}
+assert rpc(creator,**camera)[0]==403
+assert rpc(outsider,**camera)[0]==403
+assert rpc(None,**camera)[0] in (401,403)
+status,data=rpc(other,**camera);assert status==200,(status,data)
+saved=data['pin'];camera_id=saved['id']
+shared=next(p for p in rpc(creator,p_action='list')[1]['pins'] if p['id']==camera_id)
+assert shared['camera_bearing_deg']==90 and shared['camera_range_m']==24.384 and shared['camera_fov_deg']==40 and not shared['can_edit']
+assert all(p['id']!=camera_id for p in rpc(creator,p_property_slug='two',p_action='list')[1]['pins'])
+update={**camera,'p_action':'update','p_pin_id':camera_id,'p_expected_revision':1,'p_longitude':1.5,'p_latitude':1.5,'p_camera_bearing_deg':270,'p_camera_range_m':30.48,'p_camera_fov_deg':60}
+for actor in [creator,'00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006',outsider]:
+ assert rpc(actor,**update)[0]==403
+ assert rpc(actor,p_action='delete',p_pin_id=camera_id,p_expected_revision=1)[0]==403
+assert rpc(other,**{**update,'p_property_slug':'two'})[0]==403
+for key in ['p_created_by','p_property_id','p_geometry']:
+ assert rpc(other,**{**update,key:creator})[0]==404
+for key,values in {'p_camera_bearing_deg':[-1,360,1.5],'p_camera_range_m':[0,1.523,91.441,'NaN','Infinity'],'p_camera_fov_deg':[9,121,40.5]}.items():
+ for value in values:assert rpc(other,**{**update,key:value})[0]==400,(key,value)
+status,data=rpc(other,**update);assert status==200 and data['pin']['camera_bearing_deg']==270 and data['pin']['latitude']==1.5
+assert rpc(other,**update)[0]==409
+assert rpc(other,p_action='delete',p_pin_id=camera_id,p_expected_revision=1)[0]==409
+legacy={k:v for k,v in update.items() if not k.startswith('p_camera_')};legacy['p_expected_revision']=2
+status,data=rpc(other,**legacy);assert status==200 and data['pin']['camera_range_m']==30.48 and data['pin']['camera_fov_deg']==60
+status,data=rpc(other,**{**legacy,'p_expected_revision':3,'p_icon':'container'});assert status==200
+assert all(data['pin'][key] is None for key in ['camera_bearing_deg','camera_range_m','camera_fov_deg'])
+assert rpc(other,p_action='delete',p_pin_id=camera_id,p_expected_revision=4)[0]==200
+assert all(p['id']!=camera_id for p in rpc(creator,p_action='list')[1]['pins'])
+print('PASS: signed HTTP camera sharing/persistence, creator-only direction/range/FOV/move/delete, role/anonymous/outsider denial, isolation, transfer bypass denial, invalid settings and stale revisions.')

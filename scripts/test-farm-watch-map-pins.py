@@ -58,6 +58,9 @@ setup += '\n' + (root / 'tests/farm-watch-map-pin-fixtures-replay.sql').read_tex
 setup += '\n' + (root / 'tests/farm-watch-map-pin-categories-fixture.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_categories_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-map-pin-categories.sql').read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-camera-fixture.sql').read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_camera_view_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-map-pin-camera.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
@@ -95,6 +98,21 @@ assert sorted(result.returncode for result in results) == [0,1], [(r.returncode,
 assert any('pin changed; reload' in r.stderr for r in results)
 assert query("select category = case title when 'Concurrent 1' then 'general' when 'Concurrent 2' then 'hunting' end from farm_watch.property_map_pins_v1 where id='"+pin_id+"'").stdout.strip()=='t'
 print('PASS: concurrent independent sessions, exactly one winning revision/category')
+# Camera geometry settings must win atomically with the same optimistic revision.
+created_camera = query("""set role authenticated; set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000002"}';
+ select public.farm_watch_map_pins_v1('one','create',p_title=>'Camera race',p_longitude=>0,p_latitude=>1,p_icon=>'trail_camera',p_camera_bearing_deg=>0)->'pin'->>'id';""")
+assert created_camera.returncode == 0, created_camera.stderr
+camera_id = created_camera.stdout.strip().splitlines()[-1]
+def race_camera(index):
+    return query("""begin; set role authenticated; set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000002"}';
+      select public.farm_watch_map_pins_v1('one','update','%s',1,'Camera race %s',null,0,1,p_camera_bearing_deg=>%s,p_camera_range_m=>%s,p_camera_fov_deg=>%s);
+      select pg_sleep(.3); commit;""" % (camera_id,index,index*90,index*10,index*20))
+with ThreadPoolExecutor(max_workers=2) as pool:
+    results = list(pool.map(race_camera,[1,2]))
+assert sorted(r.returncode for r in results)==[0,1], [(r.returncode,r.stderr) for r in results]
+assert any('pin changed; reload' in r.stderr for r in results)
+assert query("select revision=2 and ((camera_bearing_deg,camera_range_m,camera_fov_deg)=(90,10,20) or (camera_bearing_deg,camera_range_m,camera_fov_deg)=(180,20,40)) from farm_watch.property_map_pins_v1 where id='"+camera_id+"'").stdout.strip()=='t'
+print('PASS: concurrent camera bearing/range/FOV writes have exactly one atomic winning revision')
 filled = query("""insert into farm_watch.property_map_pins_v1(property_id,created_by,title,geometry)
   select '10000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000001','Cap fixture',
     extensions.st_setsrid(extensions.st_makepoint(11,11),4326)
