@@ -3,6 +3,10 @@ on:
   pull_request:
     paths:
       - 'supabase/functions/farm-watch-map-pins/**'
+      - 'supabase/functions/farm-watch-pin-photos/**'
+      - 'supabase/functions/_shared/farm-watch-pin-photo-storage.ts'
+      - 'supabase/migrations/*farm_watch_pin_photos_v1.sql'
+      - 'tests/farm-watch-pin-photos*.sql'
       - 'supabase/migrations/*farm_watch_property_map_pins_v1.sql'
       - 'supabase/migrations/*farm_watch_map_pin_colors_v1.sql'
       - 'supabase/migrations/*farm_watch_map_pin_icons_v1.sql'
@@ -47,8 +51,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check supabase/functions/farm-watch-map-pins/index.ts
-      - run: deno test supabase/functions/farm-watch-map-pins/handler.test.ts supabase/functions/farm-watch-private/handler.test.ts supabase/functions/_shared/farm-watch-presentation-policy.test.ts
+      - run: deno check --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-map-pins/index.ts supabase/functions/farm-watch-pin-photos/index.ts
+      - run: deno test --allow-read --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-pin-photos/handler.test.ts supabase/functions/farm-watch-pin-photos/image.test.ts supabase/functions/farm-watch-pin-photos/cleanup.test.ts supabase/functions/farm-watch-map-pins/handler.test.ts supabase/functions/farm-watch-private/handler.test.ts supabase/functions/_shared/farm-watch-presentation-policy.test.ts
       - name: Real PostGIS authorization and concurrent sessions
         run: |
           createdb -T template0 pins_test

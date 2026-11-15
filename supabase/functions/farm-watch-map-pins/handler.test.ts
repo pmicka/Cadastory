@@ -120,3 +120,10 @@ Deno.test('camera settings are bounded numbers, forwarded under the caller JWT; 
   assert(!Object.hasOwn(calls.at(-1).args,'p_camera_bearing_deg'))
   assert(calls.length === 2)
 })
+
+Deno.test('successful pin deletion invokes photo cleanup; cleanup failure keeps the deletion successful',async()=>{
+ let cleanups=0
+ const handler=createMapPinsHandler(()=>({auth:{getUser:async()=>({data:{user:{id:'verified'}}})},rpc:async()=>({data:{deleted:true}})}),async()=>{cleanups++;throw Error('retry private cleanup')})
+ const response=await handler(new Request('https://test.invalid?property=one',{method:'DELETE',headers:{authorization:'Bearer verified','content-type':'application/json'},body:JSON.stringify({id,revision:1})}))
+ assert(response.status===200&&cleanups===1)
+})

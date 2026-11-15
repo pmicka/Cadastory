@@ -3,7 +3,7 @@
 
 Usage: python scripts/test-farm-watch-map-pins.py docker exec -i <container> psql -U postgres
 Refuses an existing farm_watch schema. JWT claims are supplied as PostgREST does;
-only the auth schema bootstrap is synthetic. Never run against a deployment.
+only the Auth/Storage catalog bootstraps are synthetic. Never run against a deployment.
 """
 from pathlib import Path
 import subprocess
@@ -61,6 +61,9 @@ setup += '\n' + (root / 'tests/farm-watch-map-pin-categories.sql').read_text()
 setup += '\n' + (root / 'tests/farm-watch-map-pin-camera-fixture.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_camera_view_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-map-pin-camera.sql').read_text()
+setup += '\n' + (root / 'tests/farm-watch-pin-photos-fixture.sql').read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_pin_photos_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-pin-photos.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
@@ -130,3 +133,26 @@ assert sorted(r.returncode for r in results)==[0,1], [(r.returncode,r.stderr) fo
 assert any('property pin limit reached' in r.stderr for r in results)
 assert query("select count(*) from farm_watch.property_map_pins_v1 where property_id='10000000-0000-0000-0000-000000000002'").stdout.strip()=='500'
 print('PASS: property cap remains 500 under concurrent creates')
+
+# Independently raced uploads must not exceed four or lose an edit revision.
+created_photo_pin=query("""set role authenticated; set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
+ select public.farm_watch_map_pins_v1('one','create',p_title=>'Photo race',p_longitude=>0,p_latitude=>1)->'pin'->>'id';""")
+assert created_photo_pin.returncode==0,created_photo_pin.stderr
+photo_pin_id=created_photo_pin.stdout.strip().splitlines()[-1]
+import uuid
+photo_ids=[str(uuid.uuid4()) for _ in range(5)]
+for index,photo in enumerate(photo_ids):
+ seeded=query("select public.pin_test_seed_photo_v1('"+photo_pin_id+"','"+photo+"')")
+ assert seeded.returncode==0,seeded.stderr
+ if index<3:
+  attached=query("""set role authenticated; set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
+   select public.farm_watch_pin_photos_v1('one','%s','attach','%s',%s);"""%(photo_pin_id,photo,index+1))
+  assert attached.returncode==0,attached.stderr
+def race_photo(photo):
+ return query("""begin;set role authenticated;set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
+ select public.farm_watch_pin_photos_v1('one','%s','attach','%s',4); select pg_sleep(.3);commit;"""%(photo_pin_id,photo))
+with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(race_photo,photo_ids[3:]))
+assert sorted(r.returncode for r in results)==[0,1],[(r.returncode,r.stderr) for r in results]
+assert query("select count(*) from farm_watch.map_pin_photos_v1 where pin_id='"+photo_pin_id+"'").stdout.strip()=='4'
+assert query("select revision from farm_watch.property_map_pins_v1 where id='"+photo_pin_id+"'").stdout.strip()=='5'
+print('PASS: concurrent photo attaches serialize at four photos with one winning revision')
