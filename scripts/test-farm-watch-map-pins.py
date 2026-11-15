@@ -64,6 +64,9 @@ setup += '\n' + (root / 'tests/farm-watch-map-pin-camera.sql').read_text()
 setup += '\n' + (root / 'tests/farm-watch-pin-photos-fixture.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_pin_photos_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-pin-photos.sql').read_text()
+setup += '\n' + (root / 'tests/farm-watch-private-pins-fixture.sql').read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_private_map_pins_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-private-pins.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
@@ -156,3 +159,17 @@ assert sorted(r.returncode for r in results)==[0,1],[(r.returncode,r.stderr) for
 assert query("select count(*) from farm_watch.map_pin_photos_v1 where pin_id='"+photo_pin_id+"'").stdout.strip()=='4'
 assert query("select revision from farm_watch.property_map_pins_v1 where id='"+photo_pin_id+"'").stdout.strip()=='5'
 print('PASS: concurrent photo attaches serialize at four photos with one winning revision')
+
+# Privacy and a legacy edit contend for the same revision: no silent overwrite.
+private_created=query("""set role authenticated;set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
+ select public.farm_watch_map_pins_v1('one','create',p_title=>'Privacy race',p_longitude=>0,p_latitude=>1)->'pin'->>'id';""")
+assert private_created.returncode==0,private_created.stderr
+private_id=private_created.stdout.strip().splitlines()[-1]
+def race_privacy(index):
+ return query("""begin;set role authenticated;set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
+ select public.farm_watch_map_pins_v1('one','update','%s',1,'Privacy race %s',null,0,1%s);select pg_sleep(.3);commit;"""%(private_id,index,',p_is_private=>true' if index==1 else ''))
+with ThreadPoolExecutor(max_workers=2) as pool:results=list(pool.map(race_privacy,[1,2]))
+assert sorted(r.returncode for r in results)==[0,1],[(r.returncode,r.stderr) for r in results]
+assert any('pin changed; reload' in r.stderr for r in results)
+assert query("select revision=2 and ((title='Privacy race 1' and is_private) or (title='Privacy race 2' and not is_private)) from farm_watch.property_map_pins_v1 where id='"+private_id+"'").stdout.strip()=='t'
+print('PASS: concurrent privacy and legacy edits share one atomic revision winner')

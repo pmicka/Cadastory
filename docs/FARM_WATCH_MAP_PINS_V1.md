@@ -155,3 +155,39 @@ Rollout after approval:
 3. Publish the paired notebook client. It stages files/removals until Save. Metadata and successive Storage uploads are not one distributed transaction: partial failures report that the pin saved and retain remaining files with the latest revision for retry; ambiguous timeouts require cancel/reload. Roll back frontend first and retain stored attachments and the compatible APIs.
 
 Verification includes real PostGIS/PostgREST authorization, creator/viewer/other-owner/admin/outsider/anonymous reads/mutations, missing/forged Storage references, count cap, stale revisions, independent concurrent attaches, private table/Storage RLS even under a broad policy, deletion cascades/outbox and preserved legacy data/grants/guard. The scratch fixture models only the Storage catalog; SQL/RLS/RPC execution is real, while object bytes are verified by actual WASM decode/resize/EXIF-orientation/metadata-strip/WebP tests. Edge tests cover JWT-first checks, streamed size/type limits, no privileged Storage before authorization, cleanup retry and conflict recovery. Browser tests cover real file decoding/preparation, four-file creation/editing, save/cancel/retry, lazy authenticated reads, timed/manual/swipe navigation and in-flight upload/download sign-out. Production preflight is read-only; no migration/deployment occurs during PR preparation.
+
+
+## Creator-only private pins
+
+`is_private` defaults to false for existing and new pins. The creator can switch
+between shared and private with the eye control in the popup. In create/edit mode
+the change is staged with other fields until Save; Cancel discards it. In view
+mode it saves immediately using the same creator check and optimistic revision.
+A private marker (and camera coverage, if present) renders at 70% opacity for its
+creator; icon menu previews and touch target sizes stay unchanged.
+
+The map RPC excludes private pin DTOs for every other account, including owners
+and admins. Photo list/read RPCs apply the same predicate before Edge Storage
+reads. Photo writes still require the original creator and revision. Table and
+Storage access remain private; role/profile and icon grants are unchanged. An
+omitted/null `p_is_private` preserves visibility on update, so older clients never
+silently reshare private pins. Stored ownership/property IDs remain immutable.
+
+Deploy `20261115084333_farm_watch_private_map_pins_v1.sql` and the updated
+`farm-watch-map-pins` Edge function before publishing the matching frontend. The
+migration atomically replaces map/photo RPC definitions and the previous map RPC
+overload. Retain the Edge function's existing verified-user JWT flow and deployment
+configuration. Photo Edge source does not change: it calls the protected photo
+RPC before each Storage read. No bucket or object migration is needed.
+
+Requests after a visibility change use the new access rule. A response already
+received by another browser cannot be recalled; existing open maps need Reload
+pins/a fresh load to replace their earlier snapshot. No new realtime service is
+introduced. Closing the popup/signing out retains existing photo URL cleanup.
+
+Verification: migration snapshots preserve every prior pin field, guard and icon
+grant. Real PostGIS and signed PostgREST tests cover private DTO/photo omission,
+creator read/write/share/unshare, other viewer/owner/admin denial, scoped property,
+legacy omission, anonymous/outsider denial, stale revisions and a privacy/edit
+race. Edge tests reject nonboolean input; browser tests exercise desktop/touch
+controls, private drafts/cones, Save/Cancel, conflict and signout races.

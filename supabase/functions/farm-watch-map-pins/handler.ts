@@ -51,8 +51,8 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client, 
         let body: any
         try { body = JSON.parse(new TextDecoder().decode(bytes)) } catch { return respond({ error: 'invalid input' }, 400) }
         const fields = req.method === 'DELETE' ? ['id', 'revision']
-          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg']
-          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg']
+          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'is_private', 'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg']
+          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'is_private', 'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg']
         if (!body || Array.isArray(body) || typeof body !== 'object' ||
           Object.keys(body).some(key => !fields.includes(key))) return respond({ error: 'invalid input' }, 400)
         if (req.method !== 'POST') {
@@ -67,6 +67,10 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client, 
             !Number.isFinite(body.latitude) || Math.abs(body.latitude) > 90) return respond({ error: 'invalid input' }, 400)
           Object.assign(args, { p_title: body.title.trim(), p_notes: body.notes || null,
             p_longitude: body.longitude, p_latitude: body.latitude })
+          if (Object.hasOwn(body, 'is_private')) {
+            if (typeof body.is_private !== 'boolean') return respond({ error: 'invalid pin visibility' }, 400)
+            args.p_is_private = body.is_private
+          }
           if (Object.hasOwn(body, 'color')) {
             if (typeof body.color !== 'string' || body.color.length !== 7 || !/^#[0-9a-f]{6}$/i.test(body.color)) return respond({ error: 'invalid pin color' }, 400)
             args.p_color = body.color.toLowerCase()

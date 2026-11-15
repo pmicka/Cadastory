@@ -226,3 +226,33 @@ assert rpc(creator,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revisio
 assert photos(other,'list')[0]==403
 status,data=service_request('/rpc/farm_watch_pin_photo_cleanup_v1');assert status==200 and len(data['paths'])>=4
 print('PASS: signed HTTP photo sharing, creator-only attach/remove, no arbitrary object/ownership fields, missing processed-object denial, four-photo cap, stale revisions, private service helpers and pin-delete cleanup queue.')
+
+# Privacy enforced by the real signed PostgREST boundary, including known photo IDs.
+status,data=rpc(creator,**pin,p_is_private=True);assert status==200,(status,data)
+photo_pin=data['pin'];assert photo_pin['is_private'] is True
+photo_id=str(uuid.uuid4())
+assert service_request('/rpc/pin_test_seed_photo_v1',{'p_pin_id':photo_pin['id'],'p_photo_id':photo_id})[0]==200
+status,data=photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=1);assert status==200
+revision=data['revision']
+for actor in [other,'00000000-0000-0000-0000-000000000004','00000000-0000-0000-0000-000000000005','00000000-0000-0000-0000-000000000006']:
+ assert all(p['id']!=photo_pin['id'] for p in rpc(actor,p_action='list')[1]['pins'])
+ for action,extra in [('list',{}),('read',{'p_photo_id':photo_id}),('prepare',{'p_photo_id':str(uuid.uuid4()),'p_expected_revision':revision})]:
+  assert photos(actor,action,**extra)[0]==403,(actor,action)
+ assert rpc(actor,p_action='update',p_pin_id=photo_pin['id'],p_expected_revision=revision,p_title='Hijack',p_longitude=0,p_latitude=1,p_is_private=False)[0]==403
+ assert rpc(actor,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revision=revision)[0]==403
+assert photos(creator,'read',p_photo_id=photo_id)[0]==200
+update={**pin,'p_action':'update','p_pin_id':photo_pin['id'],'p_expected_revision':revision}
+status,data=rpc(creator,**update);assert status==200 and data['pin']['is_private'] is True,'legacy edits retain privacy'
+revision=data['pin']['revision']
+assert rpc(creator,**{**update,'p_is_private':False})[0]==409
+assert rpc(creator,**{**update,'p_property_slug':'two','p_expected_revision':revision,'p_is_private':False})[0]==403
+for private in [False,True]:
+ status,data=rpc(creator,**{**update,'p_expected_revision':revision,'p_is_private':private});assert status==200
+ revision=data['pin']['revision'];assert data['pin']['is_private'] is private
+ assert photos(other,'read',p_photo_id=photo_id)[0]==(403 if private else 200)
+assert rpc(None,p_action='list')[0] in (401,403)
+assert rpc(outsider,p_action='list')[0]==403
+assert rpc(creator,**{**pin,'p_is_private':'not boolean'})[0]==400
+assert rpc(creator,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revision=revision)[0]==200
+assert photos(creator,'read',p_photo_id=photo_id)[0]==403
+print('PASS: signed HTTP creator-only private pin/photo reads across viewer, owner and admin roles; legacy preservation, sharing/unsharing, stale and property-scope guards.')
