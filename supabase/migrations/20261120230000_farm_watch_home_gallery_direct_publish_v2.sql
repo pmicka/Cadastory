@@ -16,11 +16,16 @@ alter table farm_watch.home_gallery_uploads_v1
   add column focal_y smallint not null default 50 check (focal_y between 0 and 100),
   add column is_visible boolean not null default true;
 
+-- Existing staging rows predate editable metadata. Their old immutable-row
+-- trigger would reject this one-time backfill, so pause it only inside this
+-- atomic migration transaction, then immediately restore protection.
+alter table farm_watch.home_gallery_uploads_v1 disable trigger home_gallery_upload_guard_v1;
 with numbered as (
   select id,10+row_number() over(partition by property_id order by created_at,id) as position
   from farm_watch.home_gallery_uploads_v1
 ) update farm_watch.home_gallery_uploads_v1 u
   set sort_index=n.position from numbered n where u.id=n.id;
+alter table farm_watch.home_gallery_uploads_v1 enable trigger home_gallery_upload_guard_v1;
 
 alter table farm_watch.home_gallery_uploads_v1
   alter column sort_index set not null,
