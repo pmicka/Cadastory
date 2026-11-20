@@ -12,7 +12,7 @@ It is not a replacement for the current ten `wmw_XX.jpg` assets.
 - Edge service: `farm-watch-gallery-uploads`. Direct client access to the new bucket is blocked even if a broader Storage RLS policy is introduced later.
 - Existing gallery RPC and existing public carousel still operate on the original 10-photo static catalog **without changes**.
 
-**Do not add the frontend upload button or deploy the Edge service before migration, isolated CI, owner/admin and viewer smoke tests, and authorization verification.** This code is additive. The Edge function must be deployed separately after migration and staging verification.
+**Deployment:** The private staging bucket and Edge service are already deployed. This corrective release updates only the gallery Edge handler and admin browser preprocessor. The original ten static photos and viewer slideshow are unchanged.
 
 ## Authenticated request contract
 
@@ -23,7 +23,7 @@ All requests use:
 
 - `GET` lists staged photo metadata and the gallery revision.
 - `GET ...&photo=<uuid>` returns authenticated WebP bytes for an existing staged photo (owner/admin only).
-- `POST ...&revision=<integer>` accepts **raw JPEG, PNG or WebP bytes**, maximum 4 MiB. The server generates the photo UUID, checks authorization/revision first, uses the existing bounded ImageMagick WASM processor, strips embedded metadata, normalizes orientation, optimizes to WebP, stores via the server-side client, and attaches through the authorized RPC. On conflict, the unlinked object is queued for cleanup.
+- `POST ...&revision=<integer>` accepts **browser-prepared WebP bytes** (content type `image/webp`; maximum 4 MiB request and 512 KiB canonical stored object). The updated administrator UI accepts JPEG, PNG and WebP source files up to 4 MiB and uses browser image decoding/canvas to orient, resize to at most 1600 px, flatten any transparency and encode an opaque WebP. This avoids the hosted Edge Function's 2-second CPU budget. The Edge service checks the live owner/admin authorization and revision before reading the file, parses its bounded RIFF container, rejects alpha/animation/lossless/unknown chunks, extracts one VP8 key frame and rebuilds the container without ICCP/EXIF/XMP metadata. This is **container-level normalization, not a complete VP8 bitstream decoder**; downloaded private images remain untrusted media. It then attaches via the authorized RPC and queues cleanup on failure. Raw JPEG/PNG sent directly to the Edge endpoint return HTTP 415; clients must update to the current admin page.
 - `DELETE ...&photo=<uuid>&revision=<integer>` deletes the staged database attachment with revision check and queues its object for eventual Storage removal.
 
 A successful attach/delete increments `farm_watch.home_gallery_v1.revision`, so concurrent admin metadata updates cannot silently overwrite one another. A prepared upload does **not** increment the revision; it is validated again at attachment time. The existing ten static assets cannot be deleted through this service.
@@ -45,7 +45,7 @@ Do not reuse the separate map-pin photo bucket: map pins have different ownershi
 
 - `tests/farm-watch-home-gallery-uploads.sql` runs in the existing isolated PostGIS harness. It tests viewer denial, authenticated role grants, storage policy fail-closed behavior, owner/admin staging, revision conflicts, property isolation, revocation, direct bucket denial, and queued cleanup. Fixtures roll back.
 - `handler.test.ts` and `cleanup.test.ts` run in Deno using controlled RPC/storage mocks, covering auth and forbidden requests, body size, bad media types, immutable IDs/paths, conflict cleanup and metadata constraints.
-- Existing `farm-watch-pin-photos/image.test.ts` exercises the shared image transcoder (EXIF handling, metadata stripping and header bombs).
+- `optimized-webp.test.ts` verifies VP8-only containers, bounded image dimensions, metadata removal, malformed RIFF and animation/alpha rejection. The separate map-pin photo endpoint retains its ImageMagick tests and behavior.
 - A real authenticated production session write/read/delete smoke test and policy advisory audit are required before exposing the service to end users.
 
 No existing media bytes are changed by merging this PR.
