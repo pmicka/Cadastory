@@ -147,8 +147,7 @@ do $$ declare result jsonb; begin
       p_queue_path=>'../../evil.webp')
   $q$,'22023');
   result:=public.farm_watch_home_gallery_upload_cleanup_v1(
-    p_ack_paths=>array(select object_path
-      from farm_watch.home_gallery_upload_deletions_v1));
+    p_ack_paths=>array[result->'paths'->>0]);
   assert jsonb_array_length(result->'paths')=0;
 end $$;
 reset role;
