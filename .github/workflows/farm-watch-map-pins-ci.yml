@@ -66,7 +66,7 @@ jobs:
         with:
           deno-version: v2.x
       - run: deno check --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-map-pins/index.ts supabase/functions/farm-watch-pin-photos/index.ts supabase/functions/farm-watch-gallery-uploads/index.ts
-      - run: deno test --allow-read --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-pin-photos/handler.test.ts supabase/functions/farm-watch-pin-photos/image.test.ts supabase/functions/farm-watch-gallery-uploads/handler.test.ts supabase/functions/farm-watch-gallery-uploads/cleanup.test.ts supabase/functions/farm-watch-pin-photos/cleanup.test.ts supabase/functions/farm-watch-map-pins/handler.test.ts supabase/functions/farm-watch-private/handler.test.ts supabase/functions/_shared/farm-watch-presentation-policy.test.ts
+      - run: deno test --allow-read --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-pin-photos/handler.test.ts supabase/functions/farm-watch-pin-photos/image.test.ts supabase/functions/farm-watch-gallery-uploads/handler.test.ts supabase/functions/farm-watch-gallery-uploads/optimized-webp.test.ts supabase/functions/farm-watch-gallery-uploads/cleanup.test.ts supabase/functions/farm-watch-pin-photos/cleanup.test.ts supabase/functions/farm-watch-map-pins/handler.test.ts supabase/functions/farm-watch-private/handler.test.ts supabase/functions/_shared/farm-watch-presentation-policy.test.ts
       - name: Real PostGIS authorization and concurrent sessions
         run: |
           createdb -T template0 pins_test
