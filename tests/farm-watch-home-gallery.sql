@@ -10,6 +10,11 @@ do $$ begin
 end $$;
 
 begin;
+-- Normalize the existing map-pin fixture accounts inside this rollback-only unit.
+update farm_watch.authorized_users
+set status='active',revoked_at=null,
+    account_role=case when user_id='00000000-0000-0000-0000-000000000001' then 'viewer' else 'owner' end
+where user_id in ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000002');
 insert into farm_watch.home_gallery_v1(property_id)
 select id from farm_watch.properties where slug in ('one','two');
 insert into farm_watch.home_gallery_photos_v1(property_id,photo_number,sort_index)
