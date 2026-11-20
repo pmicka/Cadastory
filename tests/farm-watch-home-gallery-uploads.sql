@@ -56,8 +56,9 @@ do $$ declare result jsonb; begin
   result:=public.farm_watch_home_gallery_uploads_v1('one','prepare',
     '33333333-3333-3333-3333-333333333333',1);
   -- Authenticated clients cannot SELECT the private properties table.
-  assert result->>'object_path' ~
-    '^[0-9a-f-]{36}/33333333-3333-3333-3333-333333333333\\.webp
+  assert split_part(result->>'object_path','/',2) =
+    '33333333-3333-3333-3333-333333333333.webp'
+    and char_length(split_part(result->>'object_path','/',1))=36;
   perform public.pin_test_expect_error($q$
     select public.farm_watch_home_gallery_uploads_v1('one','attach',
       '33333333-3333-3333-3333-333333333333',1)
