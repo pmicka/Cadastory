@@ -90,7 +90,10 @@ select public.pin_test_expect_error($q$
   select public.farm_watch_manage_access_v1()
 $q$,'42501'); -- existing admin may not see directory or promote self
 set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000002"}';
-do $$ declare result jsonb;begin
+-- These white-box assertions inspect private tables as the test harness
+-- superuser. The RPC itself still verifies JWT and current owner role.
+reset role;
+do $ declare result jsonb;begin
   result:=public.farm_watch_manage_access_v1('set','invited@example.invalid','viewer',2);
   assert result->>'revision'='3';
   assert (select account_role from farm_watch.authorized_users
@@ -133,6 +136,7 @@ do $$ declare result jsonb;begin
 end $$;
 
 -- The target can log back in after revocation; fresh role checks must deny it.
+set role authenticated;
 set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000004"}';
 select public.pin_test_expect_error($q$
  select public.farm_watch_manage_access_v1('set','newperson@example.invalid','owner',7)
