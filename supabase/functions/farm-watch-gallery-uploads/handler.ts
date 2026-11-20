@@ -13,7 +13,7 @@ export type ProcessedGalleryPhoto = {bytes:Uint8Array;width:number;height:number
 export function createHomeGalleryUploadsHandler(
   clientForToken:(token:string)=>any,
   adminForStorage:()=>any,
-  normalizeImage:(bytes:Uint8Array)=>ProcessedGalleryPhoto = canonicalGalleryWebp,
+  normalizeImage:(bytes:Uint8Array)=>ProcessedGalleryPhoto|Promise<ProcessedGalleryPhoto> = canonicalGalleryWebp,
 ) {
   return async (req:Request):Promise<Response> => {
     const origin = req.headers.get('origin')||''
@@ -132,7 +132,7 @@ export function createHomeGalleryUploadsHandler(
       let offset=0
       for(const chunk of chunks){source.set(chunk,offset);offset+=chunk.length}
       let processed:ProcessedGalleryPhoto
-      try{processed=normalizeImage(source)}
+      try{processed=await normalizeImage(source)}
       catch{return respond({error:'Could not validate optimized WebP photo.'},400)}
       if(!processed.bytes.length||processed.bytes.length>524288||
           ![processed.width,processed.height].every(n=>
