@@ -46,3 +46,4 @@ Rollback is a code/migration process, not a change to the current grants. Existi
 - Direct nonowner grants without a retrievable email are visible but read-only; email-identifiable direct nonowner grants can be updated through the same email workflow.
 - The directory exposes account and audit information only to the authenticated owner. It does not expose tokens, identity-provider secrets or raw account tables.
 - Existing-photo management and viewers' dashboard access continue to use their own authorization APIs.
+- Viewer is the existing **guided access** role; some existing modules permit self-scoped operations (such as personally created map pins). This unit does not silently change those permissions into a global read-only policy.
