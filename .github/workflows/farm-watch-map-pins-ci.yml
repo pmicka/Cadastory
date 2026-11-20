@@ -8,6 +8,8 @@ on:
       - 'supabase/migrations/*farm_watch_pin_photos_v1.sql'
       - 'supabase/migrations/*farm_watch_home_gallery_catalog_v1.sql'
       - 'supabase/migrations/*farm_watch_home_gallery_uploads_v1.sql'
+      - 'supabase/migrations/*farm_watch_home_gallery_direct_publish_v2.sql'
+      - 'tests/farm-watch-home-gallery-direct-publish.sql'
       - 'supabase/functions/farm-watch-gallery-uploads/**'
       - 'supabase/functions/_shared/farm-watch-gallery-upload-storage.ts'
       - 'tests/farm-watch-home-gallery-uploads.sql'
