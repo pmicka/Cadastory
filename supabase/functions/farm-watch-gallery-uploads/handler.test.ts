@@ -40,7 +40,7 @@ function fixture(options:any={}) {
     storage.push({processed:bytes.length})
     return {bytes:new Uint8Array([82,73,70,70]),width:100,height:120}
   })
-  const request=(method='GET',body?:BodyInit,query='',token='valid',type='image/jpeg')=>
+  const request=(method='GET',body?:BodyInit,query='',token='valid',type='image/webp')=>
     handler(new Request('https://test.invalid/?property=one'+query,{
       method,
       headers:{authorization:'Bearer '+token,origin:'https://pmicka.com',
@@ -94,6 +94,8 @@ Deno.test('upload checks owner role/revision before decoding, optimizes and atta
     assert((await f.request('POST',new Uint8Array([1]),query)).status===400)
   }
   assert((await f.request('POST',new Uint8Array([1]),'&revision=1','valid','image/svg+xml')).status===415)
+  assert((await f.request('POST',new Uint8Array([1]),'&revision=1','valid','image/jpeg')).status===415)
+  assert((await f.request('POST',new Uint8Array([1]),'&revision=1','valid','image/png')).status===415)
   const tooLarge=fixture()
   assert((await tooLarge.request('POST',new Uint8Array(4194305),'&revision=1')).status===413)
   assert(!tooLarge.storage.length)
