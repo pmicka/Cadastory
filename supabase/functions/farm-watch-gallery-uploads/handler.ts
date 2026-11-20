@@ -63,8 +63,14 @@ export function createHomeGalleryUploadsHandler(
       const args:any={p_property_slug:property}
       if(req.method==='GET') {
         if(url.searchParams.has('revision'))return respond({error:'invalid input'},400)
-        const {data,error}=await client.rpc('farm_watch_home_gallery_uploads_v1',{
-          ...args,p_action:photo?'read':'list',...(photo?{p_photo_id:photo}:{})})
+        // Visible uploaded homepage photos may be viewed by authorized viewers.
+        // The list operation remains owner/admin-only; every image read is
+        // independently checked against the current role and visibility in SQL.
+        const {data,error}=photo
+          ? await client.rpc('farm_watch_home_gallery_image_v1',{
+              p_property_slug:property,p_photo_id:photo})
+          : await client.rpc('farm_watch_home_gallery_uploads_v1',{
+              ...args,p_action:'list'})
         if(error)return failure(error)
         if(!photo)return respond(data)
         if (!PATH.test(data?.object_path||'') ||
