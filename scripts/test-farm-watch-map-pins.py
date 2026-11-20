@@ -107,7 +107,7 @@ setup += '\n' + (root / 'tests/farm-watch-home-gallery-direct-publish.sql').read
 setup += r'''
 alter table auth.users add column created_at timestamptz not null default now();
 alter table auth.users add column last_sign_in_at timestamptz;
-insert into farm_watch.properties(slug,display_name) values ('validation-property-01','WMW Farm');
+insert into farm_watch.properties(slug,display_name) values ('validation-property-01','WMW Farm') on conflict (slug) do nothing;
 '''
 setup += '\n' + next(migrations.glob('*_farm_watch_people_access_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-people-access.sql').read_text()
