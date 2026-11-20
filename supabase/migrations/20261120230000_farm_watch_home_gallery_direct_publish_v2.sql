@@ -2,6 +2,12 @@ begin;
 
 -- One homepage gallery for the ten legacy assets AND uploaded private WebP media.
 -- Previously uploaded/staged files become visible (last in order) without copying bytes.
+-- The ten originals may now move anywhere among at most 40 gallery items.
+alter table farm_watch.home_gallery_photos_v1
+  drop constraint home_gallery_photos_v1_sort_index_check,
+  add constraint home_gallery_photos_v1_sort_index_check
+    check(sort_index between 1 and 40);
+
 alter table farm_watch.home_gallery_uploads_v1
   add column sort_index integer,
   add column caption text check (caption is null or char_length(caption)<=240),
@@ -242,11 +248,11 @@ begin
        or exists(
           select key from unnest(p_order) key
           except
-          select 'legacy:'||p.photo_number::text from farm_watch.home_gallery_photos_v1 p
+          (select 'legacy:'||p.photo_number::text from farm_watch.home_gallery_photos_v1 p
              where p.property_id=target_property_id
-          union all
-          select 'upload:'||u.id::text from farm_watch.home_gallery_uploads_v1 u
-             where u.property_id=target_property_id
+           union all
+           select 'upload:'||u.id::text from farm_watch.home_gallery_uploads_v1 u
+             where u.property_id=target_property_id)
        ) then raise exception 'invalid gallery order' using errcode='22023'; end if;
     update farm_watch.home_gallery_photos_v1 p
       set sort_index=array_position(p_order,'legacy:'||p.photo_number::text)
