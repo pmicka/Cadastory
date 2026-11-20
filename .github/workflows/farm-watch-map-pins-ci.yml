@@ -7,6 +7,10 @@ on:
       - 'supabase/functions/_shared/farm-watch-pin-photo-storage.ts'
       - 'supabase/migrations/*farm_watch_pin_photos_v1.sql'
       - 'supabase/migrations/*farm_watch_home_gallery_catalog_v1.sql'
+      - 'supabase/migrations/*farm_watch_home_gallery_uploads_v1.sql'
+      - 'supabase/functions/farm-watch-gallery-uploads/**'
+      - 'supabase/functions/_shared/farm-watch-gallery-upload-storage.ts'
+      - 'tests/farm-watch-home-gallery-uploads.sql'
       - 'tests/farm-watch-home-gallery.sql'
       - 'tests/farm-watch-pin-photos*.sql'
       - 'supabase/migrations/*farm_watch_private_map_pins_v1.sql'
@@ -61,8 +65,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-map-pins/index.ts supabase/functions/farm-watch-pin-photos/index.ts
-      - run: deno test --allow-read --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-pin-photos/handler.test.ts supabase/functions/farm-watch-pin-photos/image.test.ts supabase/functions/farm-watch-pin-photos/cleanup.test.ts supabase/functions/farm-watch-map-pins/handler.test.ts supabase/functions/farm-watch-private/handler.test.ts supabase/functions/_shared/farm-watch-presentation-policy.test.ts
+      - run: deno check --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-map-pins/index.ts supabase/functions/farm-watch-pin-photos/index.ts supabase/functions/farm-watch-gallery-uploads/index.ts
+      - run: deno test --allow-read --lock=supabase/functions/farm-watch-pin-photos/deno.lock supabase/functions/farm-watch-pin-photos/handler.test.ts supabase/functions/farm-watch-pin-photos/image.test.ts supabase/functions/farm-watch-gallery-uploads/handler.test.ts supabase/functions/farm-watch-gallery-uploads/cleanup.test.ts supabase/functions/farm-watch-pin-photos/cleanup.test.ts supabase/functions/farm-watch-map-pins/handler.test.ts supabase/functions/farm-watch-private/handler.test.ts supabase/functions/_shared/farm-watch-presentation-policy.test.ts
       - name: Real PostGIS authorization and concurrent sessions
         run: |
           createdb -T template0 pins_test
