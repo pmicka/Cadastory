@@ -30,7 +30,7 @@ function fixture(options:any={}) {
       if(args.p_action==='attach'&&options.conflict)
         return {data:null,error:{code:'PT409'}}
       if(args.p_action==='list')return {data:{revision:1,photos:[],staged_only:true}}
-      if(args.p_action==='read')return {data:{object_path:path(args.p_photo_id),bytes:4}}
+      if(name==='farm_watch_home_gallery_image_v1')return {data:{object_path:path(args.p_photo_id),bytes:4}}
       if(args.p_action==='prepare')return {data:{
         object_path:options.badPath?'../../unsafe':path(args.p_photo_id)}}
       return {data:{revision:2,staged_only:true,photo:{id:args.p_photo_id}}}
@@ -58,7 +58,8 @@ Deno.test('only a verified caller can list or read staged media; no Storage unti
   assert(image.status===200)
   assert(image.headers.get('content-type')==='image/webp')
   assert(image.headers.get('cache-control')?.includes('no-store'))
-  assert(f.calls[1].args.p_action==='read')
+  assert(f.calls[1].name==='farm_watch_home_gallery_image_v1')
+  assert(f.calls[1].args.p_photo_id===PHOTO)
   assert(f.storage.some(s=>s.download===path(PHOTO)))
   const denied=fixture({denied:'42501'})
   assert((await denied.request('GET',undefined,'&photo='+PHOTO)).status===404)
