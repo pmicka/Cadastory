@@ -98,6 +98,9 @@ setup += '\n' + (root / 'tests/farm-watch-map-pin-botanical.sql').read_text()
 # real authorization/RLS test fixture. No website assets or hosted DB are used.
 setup += '\n' + next(migrations.glob('*_farm_watch_home_gallery_catalog_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-home-gallery.sql').read_text()
+# Unpublished managed gallery uploads use the existing real auth and Storage fixtures.
+setup += '\n' + next(migrations.glob('*_farm_watch_home_gallery_uploads_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-home-gallery-uploads.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
