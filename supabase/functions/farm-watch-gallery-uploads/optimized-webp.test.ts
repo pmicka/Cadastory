@@ -1,5 +1,9 @@
 import { canonicalGalleryWebp } from './optimized-webp.ts'
-import { assert, assertEquals, assertThrows } from 'jsr:@std/assert@1.0.14'
+const assert=(value:unknown)=>{if(!value)throw Error('assertion failed')}
+const assertEquals=(a:unknown,b:unknown)=>{
+  if(JSON.stringify(a)!==JSON.stringify(b))throw Error('expected values to match')
+}
+const assertThrows=(f:()=>unknown)=>{let thrown=false;try{f()}catch{thrown=true}assert(thrown)}
 
 const VP8_FRAME=new Uint8Array([
   0x10,0x00,0x00,0x9d,0x01,0x2a,0x80,0x02,0xe0,0x01,
@@ -63,11 +67,11 @@ Deno.test('reject animated, alpha, lossless, truncated, conflicting dimensions a
     riff([chunk('EXIF',new Uint8Array([1])),good]), // undeclared metadata
     riff([chunk('VP8X',extended()),chunk('VP8 ',new Uint8Array([0]))]),
     riff([chunk('VP8X',new Uint8Array(9)),good]),
-    riff([chunk('VP8X',Uint8Array.from({...extended(),4:0})),good]), // wrong dims
+    riff([chunk('VP8X',(()=>{const v=extended();v[4]=0;return v})()),good]), // wrong dims
     riff([chunk('FOO ',new Uint8Array([1])),good]),
-    riff([chunk('VP8 ',Uint8Array.from({...VP8_FRAME,0:0x11}))]), // interframe
-    riff([chunk('VP8 ',Uint8Array.from({...VP8_FRAME,3:0}))]), // bad sync
-    riff([chunk('VP8 ',Uint8Array.from({...VP8_FRAME,6:0,7:0}))]), // zero width
+    riff([chunk('VP8 ',(()=>{const v=VP8_FRAME.slice();v[0]=0x11;return v})())]), // interframe
+    riff([chunk('VP8 ',(()=>{const v=VP8_FRAME.slice();v[3]=0;return v})())]), // bad sync
+    riff([chunk('VP8 ',(()=>{const v=VP8_FRAME.slice();v[6]=0;v[7]=0;return v})())]), // zero width
   ]
   for(const v of bad)assertThrows(()=>canonicalGalleryWebp(v))
   const valid=riff([good])
