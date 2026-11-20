@@ -95,14 +95,14 @@ begin
           and u.revoked_at is null limit 1
       ) d on true
     ), direct_only as (
-      select au.email as email,u.account_role,u.status,
+      select lower(au.email) as email,u.account_role,u.status,
         u.created_at,u.updated_at,u.user_id as linked_user_id,
         au.last_sign_in_at,
         (au.email_confirmed_at is not null and exists(
           select 1 from auth.identities ai where ai.user_id=u.user_id and ai.provider='google'
         )) as google_confirmed,
         u.account_role as direct_role,
-        true as protected,
+        (u.account_role='owner' or u.user_id=actor or au.email is null) as protected,
         'direct:'||u.user_id::text as record_key,'direct'::text as source
       from farm_watch.authorized_users u
       left join auth.users au on au.id=u.user_id
@@ -120,7 +120,7 @@ begin
         else null end,
       'google_linked',c.google_confirmed,
       'has_signed_in',c.google_confirmed and c.last_sign_in_at is not null,
-      'managed',c.source='email' and not coalesce(c.protected,false),
+      'managed',not coalesce(c.protected,false),
       'created_at',c.created_at,'updated_at',c.updated_at
     ) order by case when c.account_role='owner' then 0 else 1 end,
       c.email nulls last,c.record_key),'[]'::jsonb)
