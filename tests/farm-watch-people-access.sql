@@ -5,7 +5,7 @@ do $$ begin
     'public.farm_watch_manage_access_v1(text,text,text,integer)','execute');
   assert not has_function_privilege('anon',
     'public.farm_watch_manage_access_v1(text,text,text,integer)','execute');
-  assert not has_function_privilege('anon','farm_watch.access_audit_v1','select');
+  assert not has_table_privilege('anon','farm_watch.access_audit_v1','select');
   assert not has_table_privilege('authenticated',
     'farm_watch.authorized_users','select,insert,update,delete');
   assert not has_table_privilege('authenticated',
