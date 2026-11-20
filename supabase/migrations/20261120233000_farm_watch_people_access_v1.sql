@@ -139,8 +139,9 @@ begin
       'activity',events,'can_manage',true,'source','farm-access-v1');
   end if;
 
-  if p_action not in ('set','revoke') or p_email is null or p_expected_revision is null
-    or (p_action='set' and p_role not in ('admin','viewer'))
+  if p_action is null or p_action not in ('set','revoke')
+    or p_email is null or p_expected_revision is null
+    or (p_action='set' and (p_role is null or p_role not in ('admin','viewer')))
     or (p_action='revoke' and p_role is not null)
   then raise exception 'invalid access change' using errcode='22023'; end if;
 
