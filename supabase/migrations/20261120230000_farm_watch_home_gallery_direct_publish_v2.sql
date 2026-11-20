@@ -29,8 +29,10 @@ alter table farm_watch.home_gallery_uploads_v1 enable trigger home_gallery_uploa
 
 alter table farm_watch.home_gallery_uploads_v1
   alter column sort_index set not null,
-  add constraint fw_home_gallery_uploaded_order_bounded
-    check(sort_index between 1 and 40);
+  add constraint fw_home_gallery_uploaded_order_positive
+    check(sort_index between 1 and 1000000000);
+-- Persisted sort keys can have gaps after deletion. The v2 read projection
+-- returns bounded dense 1..40 positions, and reorder rewrites all sort keys.
 
 -- The gallery row already serializes operations. Assign a position at insertion,
 -- keep identity/Storage metadata immutable on edit, and queue objects on delete.
