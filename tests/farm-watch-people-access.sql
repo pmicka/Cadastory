@@ -38,6 +38,9 @@ do $$ declare result jsonb;begin
   assert exists(select 1 from jsonb_array_elements(result->'members') m
     where m->>'email'='invited@example.invalid' and m->>'role'='viewer'
       and m->>'google_linked'='true');
+  assert exists(select 1 from jsonb_array_elements(result->'members') m
+    where m->>'email'='creator@example.invalid' and m->>'source'='direct'
+      and m->>'managed'='true'); -- identifiable direct nonowner can be managed
   assert not exists(select 1 from jsonb_array_elements(result->'members') m
     where m ? 'password' or m ? 'access_token');
   perform public.pin_test_expect_error($q$
