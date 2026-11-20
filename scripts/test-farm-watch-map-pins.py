@@ -94,6 +94,10 @@ setup += '\n' + (root / 'tests/farm-watch-map-pin-dot.sql').read_text()
 setup += '\n' + (root / 'tests/farm-watch-map-pin-botanical-fixture.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_map_pin_botanical_symbols_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-map-pin-botanical.sql').read_text()
+# WMW homepage gallery catalog is isolated from map pins and uses the same
+# real authorization/RLS test fixture. No website assets or hosted DB are used.
+setup += '\\n' + next(migrations.glob('*_farm_watch_home_gallery_catalog_v1.sql')).read_text()
+setup += '\\n' + (root / 'tests/farm-watch-home-gallery.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
