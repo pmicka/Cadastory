@@ -1,4 +1,5 @@
 import { HOME_GALLERY_UPLOAD_BUCKET, cleanHomeGalleryUploads } from '../_shared/farm-watch-gallery-upload-storage.ts'
+import { canonicalGalleryWebp } from './optimized-webp.ts'
 
 const ORIGINS = new Set(['https://pmicka.com','https://www.pmicka.com',
   'http://127.0.0.1:8000','http://localhost:8000'])
@@ -12,7 +13,7 @@ export type ProcessedGalleryPhoto = {bytes:Uint8Array;width:number;height:number
 export function createHomeGalleryUploadsHandler(
   clientForToken:(token:string)=>any,
   adminForStorage:()=>any,
-  processImage:(bytes:Uint8Array)=>Promise<ProcessedGalleryPhoto>,
+  normalizeImage:(bytes:Uint8Array)=>ProcessedGalleryPhoto = canonicalGalleryWebp,
 ) {
   return async (req:Request):Promise<Response> => {
     const origin = req.headers.get('origin')||''
@@ -99,8 +100,10 @@ export function createHomeGalleryUploadsHandler(
         return respond(data)
       }
 
-      if(!['image/jpeg','image/png','image/webp'].includes(req.headers.get('content-type')||''))
-        return respond({error:'Choose a JPEG, PNG or WebP photo.'},415)
+      // Mobile JPEG/PNG images are resized and encoded in the browser. The
+      // Edge Function refuses raw photos rather than hitting its 2s CPU limit.
+      if(req.headers.get('content-type')!=='image/webp')
+        return respond({error:'Use the updated gallery admin page to prepare this photo.'},415)
       const id=crypto.randomUUID()
       const permitted=await client.rpc('farm_watch_home_gallery_uploads_v1',{
         ...args,p_action:'prepare',p_photo_id:id,p_expected_revision:revision})
@@ -129,8 +132,8 @@ export function createHomeGalleryUploadsHandler(
       let offset=0
       for(const chunk of chunks){source.set(chunk,offset);offset+=chunk.length}
       let processed:ProcessedGalleryPhoto
-      try{processed=await processImage(source)}
-      catch{return respond({error:'Could not process the photo. Choose a JPEG, PNG or WebP.'},400)}
+      try{processed=normalizeImage(source)}
+      catch{return respond({error:'Could not validate optimized WebP photo.'},400)}
       if(!processed.bytes.length||processed.bytes.length>524288||
           ![processed.width,processed.height].every(n=>
             Number.isInteger(n)&&n>0&&n<=1600))
