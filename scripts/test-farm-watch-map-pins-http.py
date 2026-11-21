@@ -216,6 +216,26 @@ for index in range(4):
  assert photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=revision,p_created_by=other)[0]==404
  assert photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=revision,p_object_path='other/property/photo.webp')[0]==404
 assert len(photos(creator,'list')[1]['photos'])==4
+assert all((p['focal_x'],p['focal_y'])==(50,50) for p in photos(other,'list')[1]['photos'])
+assert all('object_path' not in p for p in photos(other,'list')[1]['photos'])
+for index,photo_id in enumerate(ids):
+ coords={'p_focal_x':index*20,'p_focal_y':100-index*20}
+ update_frame={'p_photo_id':photo_id,'p_expected_revision':revision,**coords}
+ assert photos(None,'frame',**update_frame)[0] in (401,403)
+ assert photos(other,'frame',**update_frame)[0]==403
+ assert photos(outsider,'frame',**update_frame)[0]==403
+ assert photos(creator,'frame',**update_frame,p_property_slug='two')[0]==403
+ assert photos(creator,'frame',**{**update_frame,'p_photo_id':str(uuid.uuid4())})[0]==403
+ assert photos(creator,'frame',**{**update_frame,'p_focal_y':101})[0]==400
+ assert photos(creator,'frame',**{**update_frame,'p_focal_y':0.5})[0]==400
+ assert photos(creator,'frame',**{**update_frame,'p_expected_revision':revision-1})[0]==409
+ status,data=photos(creator,'frame',**update_frame)
+ assert status==200 and data['revision']==revision+1 and data['photo']['id']==photo_id,(status,data)
+ assert 'object_path' not in data['photo']
+ revision=data['revision']
+frames={p['id']:(p['focal_x'],p['focal_y']) for p in photos(other,'list')[1]['photos']}
+assert frames=={photo_id:(index*20,100-index*20) for index,photo_id in enumerate(ids)}
+
 assert photos(creator,'prepare',p_photo_id=str(uuid.uuid4()),p_expected_revision=revision)[0]==409
 assert request('/rpc/farm_watch_pin_photo_cleanup_v1',{},creator)[0]==403
 status,data=photos(creator,'delete',p_photo_id=ids[0],p_expected_revision=revision);assert status==200
@@ -225,7 +245,7 @@ assert photos(creator,'delete',p_photo_id=ids[0],p_expected_revision=revision-1)
 assert rpc(creator,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revision=revision)[0]==200
 assert photos(other,'list')[0]==403
 status,data=service_request('/rpc/farm_watch_pin_photo_cleanup_v1');assert status==200 and len(data['paths'])>=4
-print('PASS: signed HTTP photo sharing, creator-only attach/remove, no arbitrary object/ownership fields, missing processed-object denial, four-photo cap, stale revisions, private service helpers and pin-delete cleanup queue.')
+print('PASS: signed HTTP photo sharing, independent framing and creator-only attach/frame/remove, no arbitrary object/ownership fields, missing processed-object denial, four-photo cap, stale revisions, private service helpers and pin-delete cleanup queue.')
 
 # Privacy enforced by the real signed PostgREST boundary, including known photo IDs.
 status,data=rpc(creator,**pin,p_is_private=True);assert status==200,(status,data)
@@ -293,7 +313,8 @@ status,data=rpc(creator,**{**pin,**nearby(50),'p_is_private':True});assert statu
 photo_pin=data['pin'];photo_id=str(uuid.uuid4())
 assert service_request('/rpc/pin_test_seed_photo_v1',{'p_pin_id':photo_pin['id'],'p_photo_id':photo_id})[0]==200
 assert photos(creator,'prepare',p_photo_id=photo_id,p_expected_revision=1)[0]==200
-status,data=photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=1);assert status==200 and data['revision']==2
+status,data=photos(creator,'attach',p_photo_id=photo_id,p_expected_revision=1,p_focal_x=12,p_focal_y=89);assert status==200 and data['revision']==2
+assert (data['photo']['focal_x'],data['photo']['focal_y'])==(12,89)
 assert photos(creator,'read',p_photo_id=photo_id)[0]==200
 assert photos(other,'read',p_photo_id=photo_id)[0]==403
 assert rpc(creator,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revision=2)[0]==200

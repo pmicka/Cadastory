@@ -156,6 +156,27 @@ Rollout after approval:
 
 Verification includes real PostGIS/PostgREST authorization, creator/viewer/other-owner/admin/outsider/anonymous reads/mutations, missing/forged Storage references, count cap, stale revisions, independent concurrent attaches, private table/Storage RLS even under a broad policy, deletion cascades/outbox and preserved legacy data/grants/guard. The scratch fixture models only the Storage catalog; SQL/RLS/RPC execution is real, while object bytes are verified by actual WASM decode/resize/EXIF-orientation/metadata-strip/WebP tests. Edge tests cover JWT-first checks, streamed size/type limits, no privileged Storage before authorization, cleanup retry and conflict recovery. Browser tests cover real file decoding/preparation, four-file creation/editing, save/cancel/retry, lazy authenticated reads, timed/manual/swipe navigation and in-flight upload/download sign-out. Production preflight is read-only; no migration/deployment occurs during PR preparation.
 
+### Photo framing
+
+`20261121033050_farm_watch_pin_photo_framing_v1.sql` adds per-attachment
+`focal_x` and `focal_y` integer percentages (0–100, default 50). Existing photos
+read as 50/50. Photo identity and image bytes stay immutable.
+
+The list response includes both percentages. An upload may include both as
+`focal_x` and `focal_y` query parameters, with the same raw image body and
+processing limits. For an existing photo, send a bodyless
+`PATCH ?property=slug&pin=uuid&photo=uuid&revision=n&focal_x=x&focal_y=y`.
+Both mutations return the photo metadata and incremented pin revision. PATCH
+uses the creator-only `frame` RPC action. List and mutation responses contain
+no Storage paths. Older upload requests may omit both percentages.
+
+Apply the migration, deploy only the updated `farm-watch-pin-photos` Edge
+function, then publish the frontend. The browser stages adjustments until
+the pin is saved. Pin and photo writes are sequential, so a partial save may
+have committed earlier operations. A revision conflict requires reloading the
+pin before saving against the new revision.
+
+
 
 ## Creator-only private pins
 

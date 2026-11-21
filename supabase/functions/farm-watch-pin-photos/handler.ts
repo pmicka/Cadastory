@@ -5,20 +5,26 @@ export type ProcessedPhoto={bytes:Uint8Array;width:number;height:number}
 export function createPinPhotosHandler(clientForToken:(token:string)=>any,adminForStorage:()=>any,processImage:(bytes:Uint8Array)=>Promise<ProcessedPhoto>) {
  return async(req:Request):Promise<Response>=>{
   const origin=req.headers.get('origin')||'',headers:Record<string,string>={'content-type':'application/json; charset=utf-8','cache-control':'no-store, max-age=0','x-content-type-options':'nosniff','referrer-policy':'no-referrer',vary:'Origin'}
-  if(ORIGINS.has(origin))Object.assign(headers,{'access-control-allow-origin':origin,'access-control-allow-methods':'GET, POST, DELETE, OPTIONS','access-control-allow-headers':'authorization, apikey, content-type'})
+  if(ORIGINS.has(origin))Object.assign(headers,{'access-control-allow-origin':origin,'access-control-allow-methods':'GET, POST, PATCH, DELETE, OPTIONS','access-control-allow-headers':'authorization, apikey, content-type'})
   const respond=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers})
   const failure=(error:any)=>respond({error:error?.code==='PT409'?'Pin changed or four photos reached. Reload pins.':error?.code==='42501'?'not found':error?.code==='22023'||error?.code==='23514'?'Invalid photo.':'Photos unavailable. Try again.'},error?.code==='PT409'?409:error?.code==='42501'?404:['22023','23514'].includes(error?.code)?400:503)
   if(origin&&!ORIGINS.has(origin))return respond({error:'not found'},404)
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers})
-  if(!['GET','POST','DELETE'].includes(req.method))return respond({error:'not found'},404)
+  if(!['GET','POST','PATCH','DELETE'].includes(req.method))return respond({error:'not found'},404)
   const token=req.headers.get('authorization')?.match(/^Bearer (\S+)$/i)?.[1]
   if(!token)return respond({error:'not found'},404)
   try {
    const client=clientForToken(token),{data:auth,error:authError}=await client.auth.getUser(token)
    if(authError||!auth?.user||auth.user.is_anonymous)return respond({error:'not found'},404)
    const url=new URL(req.url),property=url.searchParams.get('property')||'',pin=url.searchParams.get('pin')||'',photo=url.searchParams.get('photo')
-   if(!/^[a-z0-9][a-z0-9-]{0,79}$/.test(property)||!UUID.test(pin)||(photo!==null&&!UUID.test(photo))||[...url.searchParams.keys()].some(k=>!['property','pin','photo','revision'].includes(k)))return respond({error:'invalid input'},400)
+   if(!/^[a-z0-9][a-z0-9-]{0,79}$/.test(property)||!UUID.test(pin)||(photo!==null&&!UUID.test(photo))||[...url.searchParams.keys()].some(k=>!['property','pin','photo','revision','focal_x','focal_y'].includes(k)))return respond({error:'invalid input'},400)
    const args:any={p_property_slug:property,p_pin_id:pin}
+   const x=url.searchParams.getAll('focal_x'),y=url.searchParams.getAll('focal_y')
+   const hasFraming=x.length>0||y.length>0
+   const isPercent=(value:string)=>/^(?:[0-9]|[1-9][0-9]|100)$/.test(value)
+   if(hasFraming&&(x.length!==1||y.length!==1||!isPercent(x[0])||!isPercent(y[0])||!['POST','PATCH'].includes(req.method))
+    ||req.method==='PATCH'&&!hasFraming)return respond({error:'invalid framing'},400)
+   const focalArgs=hasFraming?{p_focal_x:Number(x[0]),p_focal_y:Number(y[0])}:{}
    if(req.method==='GET') {
     const {data,error}=await client.rpc('farm_watch_pin_photos_v1',{...args,p_action:photo?'read':'list',...(photo?{p_photo_id:photo}:{})})
     if(error)return failure(error)
@@ -28,13 +34,14 @@ export function createPinPhotosHandler(clientForToken:(token:string)=>any,adminF
     return new Response(download.data,{headers:{...headers,'content-type':'image/webp','content-disposition':'inline'}})
    }
    const revision=Number(url.searchParams.get('revision'))
-   if(!Number.isSafeInteger(revision)||revision<1||(req.method==='DELETE'?!photo:photo!==null))return respond({error:'invalid input'},400)
-   if(req.method==='DELETE') {
+   if(!Number.isSafeInteger(revision)||revision<1||(req.method==='POST'?photo!==null:!photo))return respond({error:'invalid input'},400)
+   if(req.method==='DELETE'||req.method==='PATCH') {
     // No arbitrary JSON/body fields, image paths or ownership metadata accepted.
     if(req.body){const reader=req.body.getReader();while(true){const {done,value}=await reader.read();if(done)break;if(value.byteLength){await reader.cancel();return respond({error:'invalid input'},400)}}}
-    const result=await client.rpc('farm_watch_pin_photos_v1',{...args,p_action:'delete',p_photo_id:photo,p_expected_revision:revision})
+    const result=await client.rpc('farm_watch_pin_photos_v1',{...args,p_action:req.method==='PATCH'?'frame':'delete',p_photo_id:photo,p_expected_revision:revision,...focalArgs})
     if(result.error)return failure(result.error)
-    await cleanPinPhotos(adminForStorage());return respond(result.data)
+    if(req.method==='DELETE')await cleanPinPhotos(adminForStorage())
+    return respond(result.data)
    }
    if(!['image/jpeg','image/png','image/webp'].includes(req.headers.get('content-type')||''))return respond({error:'Choose a JPEG, PNG or WebP photo.'},415)
    const id=crypto.randomUUID()
@@ -52,7 +59,7 @@ export function createPinPhotosHandler(clientForToken:(token:string)=>any,adminF
    const admin=adminForStorage(),path=permitted.data.object_path
    const uploaded=await admin.storage.from(PHOTO_BUCKET).upload(path,processed.bytes,{contentType:'image/webp',upsert:false,metadata:{pin_id:pin,photo_id:id,width:processed.width,height:processed.height}})
    if(uploaded.error)return respond({error:'Photo upload failed. Try again.'},503)
-   const attached=await client.rpc('farm_watch_pin_photos_v1',{...args,p_action:'attach',p_photo_id:id,p_expected_revision:revision})
+   const attached=await client.rpc('farm_watch_pin_photos_v1',{...args,p_action:'attach',p_photo_id:id,p_expected_revision:revision,...focalArgs})
    if(attached.error){await cleanPinPhotos(admin,path);return failure(attached.error)}
    await cleanPinPhotos(admin)
    return respond(attached.data,201)

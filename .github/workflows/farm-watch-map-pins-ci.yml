@@ -6,6 +6,7 @@ on:
       - 'supabase/functions/farm-watch-pin-photos/**'
       - 'supabase/functions/_shared/farm-watch-pin-photo-storage.ts'
       - 'supabase/migrations/*farm_watch_pin_photos_v1.sql'
+      - 'supabase/migrations/*farm_watch_pin_photo_framing_v1.sql'
       - 'supabase/migrations/*farm_watch_home_gallery_catalog_v1.sql'
       - 'supabase/migrations/*farm_watch_home_gallery_uploads_v1.sql'
       - 'supabase/migrations/*farm_watch_home_gallery_direct_publish_v2.sql'
