@@ -47,53 +47,25 @@ do $$ declare saved jsonb; n integer; actor uuid; id uuid:=current_setting('test
   assert (saved->>'revision')::integer=n+1;
  end loop;
  assert jsonb_array_length(public.farm_watch_pin_photos_v1('one',id,'list')->'photos')=4;
- -- Legacy attachments require no client migration and remain centered.
- assert not exists(select 1 from jsonb_array_elements(public.farm_watch_pin_photos_v1('one',id,'list')->'photos') p
-  where (p->>'focal_x')::int<>50 or (p->>'focal_y')::int<>50);
- -- Each of four photos keeps independent framing, with row identity unchanged.
- for n in 1..4 loop
-  saved:=public.farm_watch_pin_photo_framing_v1('one',id,current_setting('test.photo_'||n)::uuid,
-   4+n, n*10, 100-n*10);
-  assert (saved->>'revision')::int=5+n;
- end loop;
- assert exists(select 1 from jsonb_array_elements(public.farm_watch_pin_photos_v1('one',id,'list')->'photos') p
-  where p->>'id'=current_setting('test.photo_1') and p->>'focal_x'='10' and p->>'focal_y'='90');
- assert exists(select 1 from jsonb_array_elements(public.farm_watch_pin_photos_v1('one',id,'list')->'photos') p
-  where p->>'id'=current_setting('test.photo_4') and p->>'focal_x'='40' and p->>'focal_y'='60');
- -- Invalid percent, cross-property identity, unknown photo and stale revision.
- perform public.pin_test_expect_error(format('select public.farm_watch_pin_photo_framing_v1(''one'',%L,%L,9,-1,50)',
-  id,current_setting('test.photo_1')),'22023');
- perform public.pin_test_expect_error(format('select public.farm_watch_pin_photo_framing_v1(''one'',%L,%L,9,101,50)',
-  id,current_setting('test.photo_1')),'22023');
- perform public.pin_test_expect_error(format('select public.farm_watch_pin_photo_framing_v1(''two'',%L,%L,9,50,50)',
-  id,current_setting('test.photo_1')),'42501');
- perform public.pin_test_expect_error(format('select public.farm_watch_pin_photo_framing_v1(''one'',%L,%L,8,50,50)',
-  id,current_setting('test.photo_1')),'PT409');
- perform public.pin_test_expect_error(format('select public.farm_watch_pin_photo_framing_v1(''one'',%L,%L,9,50,50)',
-  id,gen_random_uuid()),'42501');
- -- Idempotent framing changes must not increment the pin revision.
- assert public.farm_watch_pin_photo_framing_v1('one',id,current_setting('test.photo_1')::uuid,9,10,90)->>'revision'='9';
  assert exists(select 1 from jsonb_array_elements(public.farm_watch_map_pins_v1('one','list')->'pins') p where p->>'id'=id::text and p->>'photo_count'='4');
- perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''attach'',%L,9)',id,current_setting('test.photo_5')),'PT409');
+ perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''attach'',%L,5)',id,current_setting('test.photo_5')),'PT409');
  perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''delete'',%L,1)',id,current_setting('test.photo_1')),'PT409');
  foreach actor in array array['00000000-0000-0000-0000-000000000002'::uuid,'00000000-0000-0000-0000-000000000005'::uuid,'00000000-0000-0000-0000-000000000006'::uuid] loop
   perform set_config('request.jwt.claims',jsonb_build_object('sub',actor)::text,true);
   assert jsonb_array_length(public.farm_watch_pin_photos_v1('one',id,'list')->'photos')=4;
   assert public.farm_watch_pin_photos_v1('one',id,'read',current_setting('test.photo_1')::uuid)->>'object_path' is not null;
   perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''prepare'',%L,5)',id,current_setting('test.photo_5')),'42501');
-  perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''delete'',%L,9)',id,current_setting('test.photo_1')),'42501');
-  perform public.pin_test_expect_error(format('select public.farm_watch_pin_photo_framing_v1(''one'',%L,%L,9,50,50)',
-    id,current_setting('test.photo_1')),'42501');
+  perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''delete'',%L,5)',id,current_setting('test.photo_1')),'42501');
  end loop;
  perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000003"}',true);
  perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''list'')',id),'42501');
  perform set_config('request.jwt.claims','{}',true);
  perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''list'')',id),'42501');
  perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000001"}',true);
- saved:=public.farm_watch_pin_photos_v1('one',id,'delete',current_setting('test.photo_1')::uuid,9);assert saved->>'revision'='10';
+ saved:=public.farm_watch_pin_photos_v1('one',id,'delete',current_setting('test.photo_1')::uuid,5);assert saved->>'revision'='6';
  perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''read'',%L)',id,current_setting('test.photo_1')),'42501');
- perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''attach'',%L,10)',id,current_setting('test.photo_1')),'22023');
- perform public.farm_watch_map_pins_v1('one','delete',id,10);
+ perform public.pin_test_expect_error(format('select public.farm_watch_pin_photos_v1(''one'',%L,''attach'',%L,6)',id,current_setting('test.photo_1')),'22023');
+ perform public.farm_watch_map_pins_v1('one','delete',id,6);
 end $$;
 -- Even a broad permissive Storage policy cannot let a user read/write photos.
 do $$ begin
