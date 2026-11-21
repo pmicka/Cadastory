@@ -48,7 +48,7 @@ begin
  if p_action in ('prepare','attach','delete') then
   select * into pin from farm_watch.property_map_pins_v1 where id=p_pin_id and property_id=property.id and created_by=actor for update;
  else
-  select * into pin from farm_watch.property_map_pins_v1 where id=p_pin_id and property_id=property.id;
+  select * into pin from farm_watch.property_map_pins_v1 where id=p_pin_id and property_id=property.id and (not is_private or created_by=actor);
  end if;
  if pin.id is null then raise exception 'not found' using errcode='42501'; end if;
  if p_action='list' then
