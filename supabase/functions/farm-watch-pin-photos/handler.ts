@@ -5,12 +5,12 @@ export type ProcessedPhoto={bytes:Uint8Array;width:number;height:number}
 export function createPinPhotosHandler(clientForToken:(token:string)=>any,adminForStorage:()=>any,processImage:(bytes:Uint8Array)=>Promise<ProcessedPhoto>) {
  return async(req:Request):Promise<Response>=>{
   const origin=req.headers.get('origin')||'',headers:Record<string,string>={'content-type':'application/json; charset=utf-8','cache-control':'no-store, max-age=0','x-content-type-options':'nosniff','referrer-policy':'no-referrer',vary:'Origin'}
-  if(ORIGINS.has(origin))Object.assign(headers,{'access-control-allow-origin':origin,'access-control-allow-methods':'GET, POST, DELETE, OPTIONS','access-control-allow-headers':'authorization, apikey, content-type'})
+  if(ORIGINS.has(origin))Object.assign(headers,{'access-control-allow-origin':origin,'access-control-allow-methods':'GET, POST, PATCH, DELETE, OPTIONS','access-control-allow-headers':'authorization, apikey, content-type'})
   const respond=(body:unknown,status=200)=>new Response(JSON.stringify(body),{status,headers})
   const failure=(error:any)=>respond({error:error?.code==='PT409'?'Pin changed or four photos reached. Reload pins.':error?.code==='42501'?'not found':error?.code==='22023'||error?.code==='23514'?'Invalid photo.':'Photos unavailable. Try again.'},error?.code==='PT409'?409:error?.code==='42501'?404:['22023','23514'].includes(error?.code)?400:503)
   if(origin&&!ORIGINS.has(origin))return respond({error:'not found'},404)
   if(req.method==='OPTIONS')return new Response(null,{status:204,headers})
-  if(!['GET','POST','DELETE'].includes(req.method))return respond({error:'not found'},404)
+  if(!['GET','POST','PATCH','DELETE'].includes(req.method))return respond({error:'not found'},404)
   const token=req.headers.get('authorization')?.match(/^Bearer (\S+)$/i)?.[1]
   if(!token)return respond({error:'not found'},404)
   try {
@@ -28,7 +28,32 @@ export function createPinPhotosHandler(clientForToken:(token:string)=>any,adminF
     return new Response(download.data,{headers:{...headers,'content-type':'image/webp','content-disposition':'inline'}})
    }
    const revision=Number(url.searchParams.get('revision'))
-   if(!Number.isSafeInteger(revision)||revision<1||(req.method==='DELETE'?!photo:photo!==null))return respond({error:'invalid input'},400)
+   if(!Number.isSafeInteger(revision)||revision<1||(['DELETE','PATCH'].includes(req.method)?!photo:photo!==null))return respond({error:'invalid input'},400)
+   if(req.method==='PATCH') {
+    if(req.headers.get('content-type')?.split(';')[0]?.trim()!=='application/json')return respond({error:'invalid input'},415)
+    // A bounded, exact JSON contract: clients cannot supply identity, paths,
+    // ownership, or arbitrary metadata in the framing payload.
+    const reader=req.body?.getReader();if(!reader)return respond({error:'invalid input'},400)
+    const chunks:Uint8Array[]=[];let size=0
+    while(true){const {done,value}=await reader.read();if(done)break;size+=value.byteLength
+     if(size>128){await reader.cancel();return respond({error:'invalid input'},400)}chunks.push(value)}
+    let framing:any
+    try {
+     const raw=new Uint8Array(size);let offset=0
+     for(const chunk of chunks){raw.set(chunk,offset);offset+=chunk.length}
+     framing=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw))
+    }catch{return respond({error:'invalid input'},400)}
+    if(!framing||typeof framing!=='object'||Array.isArray(framing)
+     ||Object.keys(framing).sort().join(',')!=='focal_x,focal_y'
+     ||!Number.isInteger(framing.focal_x)||!Number.isInteger(framing.focal_y)
+     ||framing.focal_x<0||framing.focal_x>100||framing.focal_y<0||framing.focal_y>100)
+      return respond({error:'invalid input'},400)
+    const changed=await client.rpc('farm_watch_pin_photo_framing_v1',{
+     ...args,p_photo_id:photo,p_expected_revision:revision,
+     p_focal_x:framing.focal_x,p_focal_y:framing.focal_y})
+    if(changed.error)return failure(changed.error)
+    return respond(changed.data)
+   }
    if(req.method==='DELETE') {
     // No arbitrary JSON/body fields, image paths or ownership metadata accepted.
     if(req.body){const reader=req.body.getReader();while(true){const {done,value}=await reader.read();if(done)break;if(value.byteLength){await reader.cancel();return respond({error:'invalid input'},400)}}}

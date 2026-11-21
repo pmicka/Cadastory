@@ -44,3 +44,31 @@ Deno.test('failed finalize queues cleanup; deletion is creator/revision guarded;
  assert((await f.request('OPTIONS')).status===204)
  assert((await f.handler(new Request('https://test.invalid'))).status===404)
 })
+
+Deno.test('framing PATCH accepts only bounded focal JSON and never accesses privileged Storage',async()=>{
+ const f=fixture()
+ const response=await f.request('PATCH',JSON.stringify({focal_x:0,focal_y:100}),'&revision=1&photo='+photo,'valid','application/json')
+ assert(response.status===200)
+ assert(f.calls.length===1&&f.calls[0].name==='farm_watch_pin_photo_framing_v1')
+ assert(f.calls[0].args.p_photo_id===photo&&f.calls[0].args.p_expected_revision===1)
+ assert(f.calls[0].args.p_focal_x===0&&f.calls[0].args.p_focal_y===100)
+ assert(f.storage.length===0,'framing never reads or writes Storage')
+ for(const payload of [
+  {focal_x:-1,focal_y:50},{focal_x:101,focal_y:50},
+  {focal_x:50.5,focal_y:50},{focal_x:50},{focal_x:'50',focal_y:50},
+  {focal_x:50,focal_y:50,object_path:'injected'},
+  {focal_x:50,focal_y:50,created_by:'spoofed'},
+ ]) {
+  const invalid=await f.request('PATCH',JSON.stringify(payload),'&revision=1&photo='+photo,'valid','application/json')
+  assert(invalid.status===400)
+ }
+ assert((await f.request('PATCH',JSON.stringify({focal_x:50,focal_y:50}),'&revision=1','valid','application/json')).status===400)
+ assert((await f.request('PATCH',JSON.stringify({focal_x:50,focal_y:50}),'&revision=1&photo='+photo+'&path=bad','valid','application/json')).status===400)
+ assert((await f.request('PATCH','x'.repeat(129),'&revision=1&photo='+photo,'valid','application/json')).status===400)
+ assert((await f.request('PATCH','{}','&revision=1&photo='+photo,'valid','text/plain')).status===415)
+ const denied=fixture({denied:'42501'})
+ assert((await denied.request('PATCH',JSON.stringify({focal_x:50,focal_y:50}),'&revision=1&photo='+photo,'valid','application/json')).status===404)
+ const conflict=fixture({denied:'PT409'})
+ assert((await conflict.request('PATCH',JSON.stringify({focal_x:50,focal_y:50}),'&revision=1&photo='+photo,'valid','application/json')).status===409)
+ assert(!denied.storage.length&&!conflict.storage.length)
+})

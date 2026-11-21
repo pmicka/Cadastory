@@ -113,6 +113,10 @@ setup += '\n' + next(migrations.glob('*_farm_watch_people_access_v1.sql')).read_
 setup += '\n' + (root / 'tests/farm-watch-people-access.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_access_last_sign_in_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-access-last-sign-in.sql').read_text()
+# Apply the framing migration after the privacy-aware pin-photo RPC migration.
+# Preserve the legacy photo tests at their original migration boundary.
+setup += '\n' + next(migrations.glob('*_farm_watch_pin_photo_framing_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-pin-photo-framing.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
