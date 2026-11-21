@@ -44,3 +44,26 @@ Deno.test('failed finalize queues cleanup; deletion is creator/revision guarded;
  assert((await f.request('OPTIONS')).status===204)
  assert((await f.handler(new Request('https://test.invalid'))).status===404)
 })
+Deno.test('framing uses validated integer pairs and caller RPC without touching Storage',async()=>{
+ const {request,calls,storage}=fixture()
+ const target='&revision=3&photo='+photo
+ for(const focal of ['', '&focal_x=50', '&focal_x=-1&focal_y=0', '&focal_x=1.5&focal_y=0',
+  '&focal_x=0&focal_y=101','&focal_x=0&focal_y=5&focal_y=6']) {
+  assert((await request('PATCH',undefined,target+focal)).status===400)
+ }
+ const pair='&focal_x=0&focal_y=100'
+ assert((await request('PATCH','{}',target+pair)).status===400)
+ assert((await request('PATCH',undefined,target+pair,'invalid')).status===404)
+ assert(!calls.length&&!storage.length)
+ const response=await request('PATCH',undefined,target+pair)
+ assert(response.status===200&&response.headers.get('access-control-allow-methods')?.includes('PATCH'))
+ assert(calls[0].args.p_action==='frame'&&calls[0].args.p_photo_id===photo&&calls[0].args.p_expected_revision===3)
+ assert(calls[0].args.p_focal_x===0&&calls[0].args.p_focal_y===100&&!storage.length)
+ for(const [code,status] of [['42501',404],['PT409',409]]) {
+  const denied=fixture({denied:code})
+  assert((await denied.request('PATCH',undefined,target+pair)).status===status&&!denied.storage.length)
+ }
+ assert((await request('POST',new Uint8Array([1]),'&revision=3'+pair)).status===201)
+ assert(calls[1].args.p_action==='prepare'&&calls[1].args.p_focal_x===undefined)
+ assert(calls[2].args.p_action==='attach'&&calls[2].args.p_focal_x===0&&calls[2].args.p_focal_y===100)
+})

@@ -113,6 +113,29 @@ setup += '\n' + next(migrations.glob('*_farm_watch_people_access_v1.sql')).read_
 setup += '\n' + (root / 'tests/farm-watch-people-access.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_access_last_sign_in_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-access-last-sign-in.sql').read_text()
+# Leave one real attachment in place across the framing migration.
+setup += r'''
+set role authenticated;
+set request.jwt.claims='{"sub":"00000000-0000-0000-0000-000000000001"}';
+select set_config('test.legacy_framing_pin',public.farm_watch_map_pins_v1('one','create',p_title=>'Legacy framing fixture',p_longitude=>0,p_latitude=>1)->'pin'->>'id',false);
+reset role;
+select public.pin_test_seed_photo_v1(current_setting('test.legacy_framing_pin')::uuid,'99111111-1111-1111-1111-111111111111');
+set role authenticated;
+select public.farm_watch_pin_photos_v1('one',current_setting('test.legacy_framing_pin')::uuid,'attach','99111111-1111-1111-1111-111111111111',1);
+reset role;
+'''
+setup += '\n' + next(migrations.glob('*_farm_watch_pin_photo_framing_v1.sql')).read_text()
+setup += r'''
+set role authenticated;
+do $$ declare listing jsonb; begin
+ listing:=public.farm_watch_pin_photos_v1('one',current_setting('test.legacy_framing_pin')::uuid,'list');
+ assert listing->'photos'->0 @> '{"focal_x":50,"focal_y":50}';
+ assert listing->>'revision'='2';
+end $$;
+select public.farm_watch_map_pins_v1('one','delete',current_setting('test.legacy_framing_pin')::uuid,2);
+reset role;
+\echo PASS: migration preserves legacy framing and pin revision
+'''
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
