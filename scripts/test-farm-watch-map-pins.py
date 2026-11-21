@@ -111,6 +111,8 @@ insert into farm_watch.properties(slug,display_name) values ('validation-propert
 '''
 setup += '\n' + next(migrations.glob('*_farm_watch_people_access_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-people-access.sql').read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_access_last_sign_in_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-access-last-sign-in.sql').read_text()
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
