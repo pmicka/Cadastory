@@ -291,6 +291,43 @@ assert(
   'ArcGIS provider observation did not preserve complete catalog/sample scope',
 )
 
+const observedCatalog = await resolveFarmWatchExternalSourceIdentities({
+  boundary: testBoundary,
+  dependencyKeys: ['external:kyfromabove-phase3-dem'],
+  fetchImpl: arcgisMock(),
+})
+for (const recovered of [true, false]) {
+  const mock = arcgisMock()
+  const firstBodies = new Map<string, string>()
+  const rechecks = new Map<string, number>()
+  const observed = await resolveFarmWatchExternalSourceIdentities({
+    boundary: testBoundary,
+    dependencyKeys: ['external:kyfromabove-phase3-dem'],
+    requireAll: false,
+    fetchImpl: async (input, init) => {
+      const url = new URL(String(input))
+      const operation = url.pathname.split('/').at(-1) || ''
+      if (!['query', 'getSamples'].includes(operation)) return mock(input, init)
+      assert(init?.method === 'POST', 'DEM geometry must stay in the POST body')
+      const body = String(init?.body)
+      if (!url.searchParams.has('_')) {
+        firstBodies.set(operation, body)
+        return operation === 'query'
+          ? Response.json({ features: [] })
+          : Response.json({ error: { code: 400, message: 'Invalid or missing input parameters.' } })
+      }
+      rechecks.set(operation, (rechecks.get(operation) || 0) + 1)
+      assert(body === firstBodies.get(operation) && !url.searchParams.has('geometry'), 'DEM recheck changed query scope')
+      if (!recovered && operation === 'getSamples') return Response.json({ samples: [] })
+      return mock(url.origin + url.pathname, init)
+    },
+  })
+  assert(rechecks.get('query') === 1 && rechecks.get('getSamples') === 1, 'DEM probes must be rechecked only once')
+  assert(recovered
+    ? observed[0]?.status === 'available' && observed[0]?.identity_sha256 === observedCatalog[0]?.identity_sha256
+    : observed[0]?.status === 'unavailable', 'DEM recheck changed identity or failed open')
+}
+
 const incompleteArcgis = await resolveFarmWatchExternalSourceIdentities({
   boundary: testBoundary,
   dependencyKeys: ['external:kyfromabove-phase3-dem'],

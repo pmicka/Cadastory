@@ -161,6 +161,7 @@ async function postFormJson(
   url: string,
   params: Record<string, string>,
   fetchImpl: typeof fetch,
+  recheckField?: 'features' | 'samples',
 ) {
   const body = new URLSearchParams(params)
   const response = await fetchWithTimeout(url, {
@@ -178,6 +179,16 @@ async function postFormJson(
     payload = JSON.parse(text)
   } catch {
     throw new Error('source request did not return JSON')
+  }
+  if (recheckField && (
+    (payload?.error?.code === 400 && /^invalid or missing input parameters/i.test(String(payload.error.message))) ||
+    (payload?.exceededTransferLimit !== true &&
+      Array.isArray(payload?.[recheckField]) && payload[recheckField].length === 0)
+  )) {
+    // The KY DEM has returned empty or missing-input responses to valid POSTs.
+    // Recheck the same form once with a fresh URL, keeping its geometry in the body.
+    const recheck = new URLSearchParams({ f: params.f, _: crypto.randomUUID() })
+    return postFormJson(url + '?' + recheck, params, fetchImpl)
   }
   if (payload?.error) throw new Error(String(payload.error?.message || 'source request failed'))
   return payload
@@ -251,6 +262,7 @@ async function arcgisCatalog(
   where: string,
   outFields: string,
   fetchImpl: typeof fetch,
+  recheckEmpty = false,
 ) {
   const baseParams: Record<string, string> = {
     f: 'json',
@@ -275,14 +287,10 @@ async function arcgisCatalog(
     if (pageCount > 100) {
       throw new Error('bounded source catalog pagination exceeded page limit')
     }
-    const payload = await postFormJson(
-      serviceUrl.replace(/\/$/, '') + '/query',
-      {
-        ...baseParams,
-        resultOffset: String(resultOffset),
-      },
-      fetchImpl,
-    )
+    const queryUrl = serviceUrl.replace(/\/$/, '') + '/query'
+    const params = { ...baseParams, resultOffset: String(resultOffset) }
+    const payload = await postFormJson(queryUrl, params, fetchImpl,
+      recheckEmpty && pageCount === 1 ? 'features' : undefined)
     const pageRows = Array.isArray(payload?.features)
       ? payload.features.map((feature: any) =>
         stableValue(feature?.attributes || {})
@@ -332,6 +340,7 @@ async function arcgisSamples(
   size: number,
   extra: Record<string, string>,
   fetchImpl: typeof fetch,
+  recheckEmpty = false,
 ) {
   const points = gridPoints(bbox, size)
   const payload = await postFormJson(
@@ -347,6 +356,7 @@ async function arcgisSamples(
       ...extra,
     },
     fetchImpl,
+    recheckEmpty ? 'samples' : undefined,
   )
   const samples = Array.isArray(payload?.samples) ? payload.samples : []
   const byIndex = new Map<number, any>()
@@ -507,6 +517,7 @@ async function providerObservedArcgis(args: {
         args.where || '1=1',
         args.outFields || '*',
         args.fetchImpl,
+        args.key === 'external:kyfromabove-phase3-dem',
       )
       catalog = observedCatalog.rows
       catalogObservation = {
@@ -538,6 +549,7 @@ async function providerObservedArcgis(args: {
         args.sampleGrid,
         args.sampleExtra || {},
         args.fetchImpl,
+        args.key === 'external:kyfromabove-phase3-dem',
       )
       samples = observedSamples.rows
       const sampleCoverage = observedSamples.requested_count
