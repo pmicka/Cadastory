@@ -7,6 +7,8 @@ on:
       - 'tests/farm-watch-saved-areas.sql'
       - 'supabase/migrations/*farm_watch_area_field_details_v1.sql'
       - 'tests/farm-watch-area-field-details.sql'
+      - 'supabase/migrations/*farm_watch_agriculture_v1.sql'
+      - 'tests/farm-watch-agriculture.sql'
       - 'supabase/functions/farm-watch-pin-photos/**'
       - 'supabase/functions/_shared/farm-watch-pin-photo-storage.ts'
       - 'supabase/migrations/*farm_watch_pin_photos_v1.sql'

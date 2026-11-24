@@ -319,3 +319,36 @@ assert photos(creator,'read',p_photo_id=photo_id)[0]==200
 assert photos(other,'read',p_photo_id=photo_id)[0]==403
 assert rpc(creator,p_action='delete',p_pin_id=photo_pin['id'],p_expected_revision=2)[0]==200
 print('PASS: signed HTTP off-property 100 ft limit, exact coordinate persistence, move/edit/privacy/photos, restricted icons, creator/property/anonymous/outsider denial and unchanged conflict behavior.')
+
+# New contracts enforce administrator privileges and property scope with a caller JWT.
+def agriculture_rpc(contract, actor, **args):
+    return request('/rpc/'+contract, {'p_property_slug':'one',**args}, actor)
+
+pin_contract = 'farm_watch_map_pins_v2'
+area_contract = 'farm_watch_saved_areas_v3'
+area_id = '0280cace-49f8-48e9-9cd3-97007d202aaa'
+orchard = {
+    'p_action':'create', 'p_id':area_id, 'p_title':'HTTP private orchard',
+    'p_outline':[[0,1],[.001,1],[.001,1.001]], 'p_color':'#26745f',
+    'p_category':'general', 'p_is_private':True, 'p_agriculture':{'type':'orchard'},
+    'p_specialized_views':['hunting','farming-orchard'],
+}
+assert agriculture_rpc(area_contract, None, p_action='list')[0] in (401,403)
+assert agriculture_rpc(area_contract, creator, **orchard)[0] == 403
+status, data = agriculture_rpc(area_contract, other, **orchard)
+assert status == 200 and data['area']['id'] == area_id, (status,data)
+assert data['area']['specialized_views'] == ['hunting','farming-orchard']
+assert area_id not in [area['id'] for area in agriculture_rpc(area_contract,creator,p_action='list')[1]['areas']]
+planting = {**pin, 'p_title':'HTTP planned pear', 'p_agriculture':{'type':'fruit_tree','status':'planned','species':'Pear'}}
+assert agriculture_rpc(pin_contract, creator, **planting)[0] == 403
+assert agriculture_rpc(pin_contract, outsider, p_action='list')[0] == 403
+status, data = agriculture_rpc(pin_contract, other, **planting, p_group_id=area_id, p_set_group=True)
+assert status == 200 and data['pin']['planting_group_id'] == area_id, (status,data)
+planting_id = data['pin']['id']
+visible = next(p for p in agriculture_rpc(pin_contract,creator,p_action='list')[1]['pins'] if p['id']==planting_id)
+assert visible['planting_group_id'] is None and visible['can_edit'] is False
+assert agriculture_rpc(area_contract, other, p_action='delete', p_id=area_id, p_revision=1)[0] == 200
+saved = next(p for p in agriculture_rpc(pin_contract,other,p_action='list')[1]['pins'] if p['id']==planting_id)
+assert saved['planting_group_id'] is None and saved['agriculture']['status'] == 'planned'
+assert agriculture_rpc(pin_contract, other, p_action='delete', p_pin_id=planting_id, p_expected_revision=2)[0] == 200
+print('PASS: authenticated agriculture contracts, viewer write denial, private group redaction and group deletion.')
