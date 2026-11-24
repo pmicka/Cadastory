@@ -138,6 +138,8 @@ reset role;
 '''
 if not sys.argv[1:]:
     raise SystemExit(__doc__)
+setup += '\n' + next(migrations.glob('*_farm_watch_saved_areas_v1.sql')).read_text()
+setup += '\n' + (root / 'tests/farm-watch-saved-areas.sql').read_text()
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
 # Two independent sessions race the same revision against the actual row lock.
 command = sys.argv[1:]
