@@ -23,7 +23,7 @@ const pin = { title: 'My pin', notes: 'Plain text', longitude: -84.9, latitude: 
 Deno.test('verified user token and explicit property only; no supplied creator identity', async () => {
   const { calls, request } = fixture()
   assert((await request('POST', pin)).status === 201)
-  assert(calls[0].name === 'farm_watch_map_pins_v1')
+  assert(calls[0].name === 'farm_watch_map_pins_v2')
   assert(calls[0].args.p_property_slug === 'selected')
   assert(!Object.hasOwn(calls[0].args, 'p_user_id'))
   for (const key of ['created_by', 'property_id', 'geometry', 'created_at', 'updated_at'])
@@ -39,7 +39,7 @@ Deno.test('strict input bounds and finite numeric coordinates', async () => {
     { ...pin, notes: 'x'.repeat(2001) }, { ...pin, longitude: '1' }, { ...pin, longitude: 181 },
     { ...pin, latitude: 91 }, { ...pin, latitude: null }, { ...pin, geometry: {type:'LineString'} }])
     assert((await request('POST', body)).status === 400)
-  assert((await request('POST', { ...pin, notes: 'x'.repeat(20000) })).status === 413)
+  assert((await request('POST', { ...pin, notes: 'x'.repeat(40000) })).status === 413)
   assert((await request('PATCH', pin)).status === 400)
   assert((await request('DELETE', { id, revision: 0 })).status === 400)
   assert(calls.length === 0)
@@ -152,4 +152,28 @@ Deno.test('geometry validation reports the bounded placement allowance without e
   const body=await response.json()
   assert(body.error.includes('within 100 ft of its boundary'))
   assert(!body.error.includes('private database detail'))
+})
+
+Deno.test('agriculture and visibility use the same authenticated pin RPC and revision', async () => {
+  const { calls, request } = fixture()
+  const update = { ...pin, id, revision: 2 }
+  const agriculture = { type: 'fruit_tree', status: 'established', planted_date: '2027-04-02' }
+  const specialized_views = ['hunting', 'farming-orchard']
+  assert((await request('PATCH', { ...update, agriculture, specialized_views, planting_group_id: id })).status === 200)
+  const args = calls[0].args
+  assert(args.p_expected_revision === 2 && args.p_pin_id === id)
+  assert(args.p_agriculture.status === 'established')
+  assert(args.p_specialized_views.join(',') === specialized_views.join(','))
+  assert(args.p_set_group === true && args.p_group_id === id)
+  assert((await request('PATCH', { ...update, planting_group_id: null, specialized_views: [] })).status === 200)
+  assert(calls[1].args.p_set_group === true && calls[1].args.p_group_id === null)
+  assert(calls[1].args.p_specialized_views.length === 0)
+  for (const invalid of [
+    { planting_group_id: 'untrusted' },
+    { specialized_views: ['hunting','hunting'] },
+    { specialized_views: ['general'] },
+    { agriculture: [] },
+  ]) assert((await request('PATCH', { ...update, ...invalid })).status === 400)
+  assert(calls.length === 2)
+  assert((await fixture('42501').request('PATCH', { ...update, agriculture })).status === 404)
 })

@@ -4,7 +4,17 @@ const ORIGINS = new Set(['https://pmicka.com', 'https://www.pmicka.com',
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const PIN_ICONS = new Set(['pin', 'dot', 'deerstand', 'water_pump', 'container', 'trail_camera', 'gate', 'bonfire', 'crop', 'corn_feeder', 'salt_mineral_block', 'tree', 'pop_up_blind', 'ladder_stand', 'sprout', 'sapling', 'ear_of_corn', 'wheat', 'blackberry', 'acorn'])
 const PIN_CATEGORIES = new Set(['auto', 'general', 'hunting', 'farming-orchard'])
-type Client = { auth: { getUser(token: string): Promise<any> }; rpc(name: string, args: any): PromiseLike<any> }
+type Client = {
+  auth: { getUser(token: string): Promise<{ data?: { user: { id: string; is_anonymous?: boolean } | null }; error?: unknown }> }
+  rpc(name: string, args: Record<string, unknown>): PromiseLike<{ data?: unknown; error?: { code: string } | null }>
+}
+const PIN_WRITE_FIELDS = [
+  'title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'is_private',
+  'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg', 'specialized_views', 'agriculture', 'planting_group_id',
+]
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
 
 export function createMapPinsHandler(clientForToken: (token: string) => Client, cleanup: () => Promise<void> = async () => {}) {
   return async (req: Request): Promise<Response> => {
@@ -42,29 +52,29 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client, 
           const { done, value } = await reader.read()
           if (done) break
           size += value.byteLength
-          if (size > 16384) { await reader.cancel(); return respond({ error: 'input too large' }, 413) }
+          if (size > 32768) { await reader.cancel(); return respond({ error: 'input too large' }, 413) }
           chunks.push(value)
         }
         const bytes = new Uint8Array(size)
         let offset = 0
         for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length }
-        let body: any
+        let body: unknown
         try { body = JSON.parse(new TextDecoder().decode(bytes)) } catch { return respond({ error: 'invalid input' }, 400) }
         const fields = req.method === 'DELETE' ? ['id', 'revision']
-          : req.method === 'POST' ? ['title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'is_private', 'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg']
-          : ['id', 'revision', 'title', 'notes', 'longitude', 'latitude', 'color', 'icon', 'category', 'is_private', 'camera_bearing_deg', 'camera_range_m', 'camera_fov_deg']
-        if (!body || Array.isArray(body) || typeof body !== 'object' ||
-          Object.keys(body).some(key => !fields.includes(key))) return respond({ error: 'invalid input' }, 400)
+          : req.method === 'POST' ? PIN_WRITE_FIELDS : ['id', 'revision', ...PIN_WRITE_FIELDS]
+        if (!isRecord(body) || Object.keys(body).some(key => !fields.includes(key))) {
+          return respond({ error: 'invalid input' }, 400)
+        }
         if (req.method !== 'POST') {
-          if (!UUID.test(body.id) || !Number.isSafeInteger(body.revision) || body.revision < 1)
+          if (typeof body.id !== 'string' || !UUID.test(body.id) || typeof body.revision !== 'number' || !Number.isSafeInteger(body.revision) || body.revision < 1)
             return respond({ error: 'invalid input' }, 400)
           args.p_pin_id = body.id; args.p_expected_revision = body.revision
         }
         if (req.method !== 'DELETE') {
           if (typeof body.title !== 'string' || !body.title.trim() || [...body.title.trim()].length > 100 ||
             (body.notes != null && (typeof body.notes !== 'string' || [...body.notes].length > 2000)) ||
-            !Number.isFinite(body.longitude) || Math.abs(body.longitude) > 180 ||
-            !Number.isFinite(body.latitude) || Math.abs(body.latitude) > 90) return respond({ error: 'invalid input' }, 400)
+            typeof body.longitude !== 'number' || !Number.isFinite(body.longitude) || Math.abs(body.longitude) > 180 ||
+            typeof body.latitude !== 'number' || !Number.isFinite(body.latitude) || Math.abs(body.latitude) > 90) return respond({ error: 'invalid input' }, 400)
           Object.assign(args, { p_title: body.title.trim(), p_notes: body.notes || null,
             p_longitude: body.longitude, p_latitude: body.latitude })
           if (Object.hasOwn(body, 'is_private')) {
@@ -80,7 +90,7 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client, 
           ] as const) {
             if (!Object.hasOwn(body,field)) continue
             const value = body[field]
-            if (!Number.isFinite(value) || value < minimum || value > maximum || (integer && !Number.isInteger(value)))
+            if (typeof value !== 'number' || !Number.isFinite(value) || value < minimum || value > maximum || (integer && !Number.isInteger(value)))
               return respond({ error: 'invalid camera view' },400)
             args['p_'+field] = value
           }
@@ -88,17 +98,41 @@ export function createMapPinsHandler(clientForToken: (token: string) => Client, 
             if (typeof body.category !== 'string' || !PIN_CATEGORIES.has(body.category)) return respond({ error: 'invalid pin category' }, 400)
             args.p_category = body.category
           }
+          if (Object.hasOwn(body, 'specialized_views')) {
+            if (!Array.isArray(body.specialized_views) || body.specialized_views.length > 2 ||
+              body.specialized_views.some((view: unknown) => view !== 'hunting' && view !== 'farming-orchard') ||
+              new Set(body.specialized_views).size !== body.specialized_views.length) {
+              return respond({ error: 'Invalid map visibility.' }, 400)
+            }
+            args.p_specialized_views = body.specialized_views
+          }
+          if (Object.hasOwn(body, 'agriculture')) {
+            if (!isRecord(body.agriculture)) {
+              return respond({ error: 'Invalid planting details.' }, 400)
+            }
+            args.p_agriculture = body.agriculture
+          }
+          if (Object.hasOwn(body, 'planting_group_id')) {
+            if (body.planting_group_id !== null &&
+              (typeof body.planting_group_id !== 'string' || !UUID.test(body.planting_group_id))) {
+              return respond({ error: 'Invalid growing area.' }, 400)
+            }
+            args.p_group_id = body.planting_group_id
+            args.p_set_group = true
+          }
           if (Object.hasOwn(body, 'icon')) {
             if (typeof body.icon !== 'string' || !PIN_ICONS.has(body.icon)) return respond({ error: 'invalid pin icon' }, 400)
             args.p_icon = body.icon // The RPC enforces the account-specific grant.
           }
         }
       }
-      const { data, error } = await client.rpc('farm_watch_map_pins_v1', args)
+      const { data, error } = await client.rpc('farm_watch_map_pins_v2', args)
       if (error) {
         const status = error.code === '42501' ? 404 : error.code === 'PT409' ? 409
           : ['22023', '23514', '22P02'].includes(error.code) ? 400 : error.code === '54000' ? 409 : 503
         const message = status === 404 ? 'not found' : status === 409 ? 'Pin changed or property pin limit reached. Reload pins.'
+          : status === 400 && ['p_agriculture','p_specialized_views','p_set_group'].some(key => Object.hasOwn(args,key))
+          ? 'Check planting details, map visibility, and location, then try again.'
           : status === 400 ? 'Use a title up to 100 characters, notes up to 2,000 characters, and a location on the property or within 100 ft of its boundary.'
           : 'Pins unavailable. Try again.'
         return respond({ error: message }, status)
