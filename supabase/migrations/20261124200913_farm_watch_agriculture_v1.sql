@@ -102,7 +102,7 @@ language plpgsql set search_path = '' as $$
 begin
   -- A group can be deleted by its creator even when another member owns an
   -- associated pin or its existing location no longer fits the current parcel.
-  if tg_op='UPDATE' and old.planting_group_id is not null and new.planting_group_id is null
+  if tg_op='UPDATE' and pg_trigger_depth() > 1 and old.planting_group_id is not null and new.planting_group_id is null
     and (to_jsonb(old)-'planting_group_id') = (to_jsonb(new)-'planting_group_id') then
     new.updated_at := clock_timestamp();
     new.revision := old.revision + 1;

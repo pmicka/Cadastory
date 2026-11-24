@@ -13,6 +13,7 @@ declare
   exclusion uuid := gen_random_uuid();
   private_group uuid := gen_random_uuid();
   orchard_two uuid := gen_random_uuid();
+  other_owner_group uuid := gen_random_uuid();
   ring jsonb := '[[0,1],[0.001,1],[0.001,1.001],[0,1.001]]';
   other_ring jsonb := '[[0.0005,1],[0.0015,1],[0.0015,1.001],[0.0005,1.001]]';
   area jsonb;
@@ -100,6 +101,18 @@ begin
   perform public.farm_watch_saved_areas_v3('one','update',orchard,1,'Orchard',other_ring,'#729033','general',false,p_agriculture=>'{}');
   assert exists (select 1 from jsonb_array_elements(public.farm_watch_map_pins_v2('one','list')->'pins') p
     where p->>'id'=ident::text and p->>'planting_group_id' is null and p->>'revision'='6');
+  -- The group's authorized creator need not own the pin or hold its icon grant.
+  perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000005"}',true);
+  perform public.farm_watch_saved_areas_v3('one','create',other_owner_group,null,'Shared orchard',ring,'#729033','general',false,
+    p_agriculture=>'{"type":"orchard"}');
+  perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000002"}',true);
+  pin := public.farm_watch_map_pins_v2('one','create',p_icon=>'tree',p_title=>'Shared group tree',p_longitude=>0,p_latitude=>1,
+    p_agriculture=>'{"type":"fruit_tree"}',p_group_id=>other_owner_group,p_set_group=>true)->'pin';
+  perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000005"}',true);
+  perform public.farm_watch_saved_areas_v3('one','delete',other_owner_group,1);
+  assert exists (select 1 from jsonb_array_elements(public.farm_watch_map_pins_v2('one','list')->'pins') p
+    where p->>'id'=pin->>'id' and p->>'planting_group_id' is null and p->>'revision'='2' and p->>'icon'='tree');
+  perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000002"}',true);
   perform set_config('test.demoted_agriculture_pin',ident::text,true);
   perform set_config('test.demoted_agriculture_area',food::text,true);
 end $$;
