@@ -143,6 +143,7 @@ setup += '\n' + (root / 'tests/farm-watch-saved-areas.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_area_field_details_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-area-field-details.sql').read_text()
 setup += '\n' + next(migrations.glob('*_farm_watch_agriculture_v1.sql')).read_text()
+setup += '\n' + next(migrations.glob('*_farm_watch_generic_growing_area_v1.sql')).read_text()
 setup += '\n' + (root / 'tests/farm-watch-agriculture.sql').read_text()
 subprocess.run(sys.argv[1:], input=setup, text=True, check=True)
 # Two independent sessions race the same revision against the actual row lock.
