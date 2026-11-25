@@ -1005,7 +1005,11 @@ return async (req: Request): Promise<Response> => {
     capabilities: farmWatchPresentationCapabilities(normalizedAccountRole) }
   if (mode === 'bootstrap') {
     // Stored geometry/center only: no geocoding, evidence, refresh or arbitrary metadata.
-    return respond({ property: displayProperty(property), access, context: mode }, 200, origin)
+    // Account metadata is a presentation preference only. Authorization and
+    // capability policy above remain role-derived and cannot be changed by it.
+    const default_presentation_profile = normalizedAccountRole === 'viewer' ||
+      user.user_metadata?.farm_watch_default_presentation === 'guided' ? 'guided' : 'technical'
+    return respond({ property: displayProperty(property), access: { ...access, default_presentation_profile }, context: mode }, 200, origin)
   }
   if (mode === 'weather') {
     const weather = await measure('weather_forecast', () => readWeather(storedCenter(property)))
