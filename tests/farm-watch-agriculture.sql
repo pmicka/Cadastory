@@ -103,12 +103,13 @@ begin
     where p->>'id'=ident::text and p->>'planting_group_id' is null and p->>'revision'='6');
   -- The group's authorized creator need not own the pin or hold its icon grant.
   perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000005"}',true);
-  perform public.farm_watch_saved_areas_v3('one','create',other_owner_group,null,'Shared orchard',ring,'#729033','general',false,
-    p_agriculture=>'{"type":"orchard"}');
+  perform public.farm_watch_saved_areas_v3('one','create',other_owner_group,null,'Shared growing area',ring,'#729033','farming-orchard',false,
+    p_agriculture=>'{"type":"growing_area"}');
   perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000002"}',true);
   pin := public.farm_watch_map_pins_v2('one','create',p_icon=>'tree',p_title=>'Shared group tree',p_longitude=>0,p_latitude=>1,
     p_agriculture=>'{"type":"fruit_tree"}',p_group_id=>other_owner_group,p_set_group=>true)->'pin';
   perform set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000005"}',true);
+  assert (public.farm_watch_saved_areas_v3('one','list')->'managed_acreage'->'by_type'->>'growing_area')::numeric > 0;
   perform public.farm_watch_saved_areas_v3('one','delete',other_owner_group,1);
   assert exists (select 1 from jsonb_array_elements(public.farm_watch_map_pins_v2('one','list')->'pins') p
     where p->>'id'=pin->>'id' and p->>'planting_group_id' is null and p->>'revision'='2' and p->>'icon'='tree');
