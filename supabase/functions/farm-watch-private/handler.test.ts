@@ -4,7 +4,7 @@ function assert(value: unknown, message = 'assertion failed'): asserts value {
   if (!value) throw new Error(message)
 }
 const boundary = { type: 'Polygon', coordinates: [[[0,0], [.001,0], [.001,.001], [0,.001], [0,0]]] }
-function fixture(options: { allowed?: boolean; role?: string; property?: any; fail?: string; old?: boolean; oldDeep?: boolean; partialDeep?: boolean; hunting?: boolean; staleHunting?: boolean } = {}) {
+function fixture(options: { allowed?: boolean; role?: string; property?: any; fail?: string; old?: boolean; oldDeep?: boolean; partialDeep?: boolean; hunting?: boolean; staleHunting?: boolean; metadata?: Record<string, unknown> } = {}) {
   const calls: { name: string; args: any }[] = []
   const now = new Date().toISOString()
   const at = options.old ? '2000-01-01T00:00:00Z' : now
@@ -57,7 +57,7 @@ function fixture(options: { allowed?: boolean; role?: string; property?: any; fa
   }
   const handler = createPrivateHandler({
     auth: { getUser: async (token: string) => token === 'valid-token'
-      ? { data: { user: { id: 'private-user-id' } }, error: null } : { data: {}, error: true } },
+      ? { data: { user: { id: 'private-user-id', user_metadata: options.metadata } }, error: null } : { data: {}, error: true } },
     rpc: async (name: string, args: any) => {
       calls.push({ name, args })
       return { data: Object.hasOwn(values, name) ? values[name] : { status: 'unavailable' }, error: name === options.fail ? { message: 'Unavailable' } : null }
@@ -103,6 +103,21 @@ Deno.test('bootstrap exposes server role/capabilities and minimal property only 
     assert(response.headers.get('server-timing')?.includes('session_validation'))
     assert(!response.headers.get('server-timing')?.includes('private-'))
   }
+})
+Deno.test('startup preference never changes account authorization or capabilities', async () => {
+  for (const role of ['owner', 'admin', 'viewer']) {
+    for (const preference of [undefined, 'guided', 'technical', 'invalid']) {
+      const f = fixture({ role, metadata: { farm_watch_default_presentation: preference, unrelated_private: 'not returned' } })
+      const body = await (await f.request('bootstrap')).json()
+      assert(body.access.default_presentation_profile === (role === 'viewer' || preference === 'guided' ? 'guided' : 'technical'))
+      assert(body.access.account_role === role)
+      assert(body.access.capabilities.presentation_profile === (role === 'viewer' ? 'guided' : 'technical'))
+      assert(body.access.capabilities.qa_controls === (role !== 'viewer'))
+      assert(!JSON.stringify(body).includes('unrelated_private'))
+    }
+  }
+  const denied = fixture({ allowed: false, metadata: { farm_watch_default_presentation: 'guided' } })
+  assert((await denied.request('bootstrap')).status === 404)
 })
 Deno.test('map references never read analytical resources or refresh', async () => {
   const f = fixture()
