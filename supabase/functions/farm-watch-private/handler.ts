@@ -742,19 +742,6 @@ export async function refreshHydrology(slug: string, boundary: any, admin: any) 
   if (error) throw new Error(`farm_watch_replace_hydrology_v1_internal failed: ${error.message}`)
 }
 
-function displayEstimatedCanopy(value: any) {
-  if (value?.version !== 1 || value.silhouette?.type !== 'MultiPolygon') return null
-  const coordinates = value.silhouette.coordinates
-  const validRing = (ring: any) => Array.isArray(ring) && ring.length >= 4 &&
-    ring.every(point => Array.isArray(point) && point.length === 2 &&
-      Number.isFinite(point[0]) && Math.abs(point[0]) <= 180 &&
-      Number.isFinite(point[1]) && Math.abs(point[1]) <= 90) &&
-    ring[0][0] === ring.at(-1)[0] && ring[0][1] === ring.at(-1)[1]
-  if (!Array.isArray(coordinates) || !coordinates.length ||
-    !coordinates.every(poly => Array.isArray(poly) && poly.length && poly.every(validRing))) return null
-  return { version: 1, silhouette: { type: 'MultiPolygon', coordinates } }
-}
-
 function displayProperty(property: any) {
   return {
     id: property.id, slug: property.slug, display_name: property.display_name,
@@ -1044,8 +1031,6 @@ return async (req: Request): Promise<Response> => {
       admin.rpc('farm_watch_get_operator_observations_v1_internal', { p_slug: slug, p_observation_kind: null }),
     ]) as any[]
     return respond({ context: mode, analysis: {
-      // Shared cartography for authorized property viewers. Source and QA data stay private.
-      estimated_canopy: property.boundary_geojson ? displayEstimatedCanopy(property.metadata?.estimated_canopy) : null,
       access_features_geojson: features.error || !features.data ? EMPTY_FEATURE_COLLECTION : features.data,
       access_features_status: features.error ? 'unavailable' : 'available', access_buffer_m: 1000,
       operator_observations: observations.error || !Array.isArray(observations.data) ? [] : observations.data,
@@ -1184,7 +1169,6 @@ return async (req: Request): Promise<Response> => {
   const science = await readScience(admin, slug, property, deerNow, deerScenarioRequest,
     hydrology, hydrologyError, landscapeContext, landscapeContextError)
 
-  const { estimated_canopy: _estimate, ...metadata } = property.metadata ?? {}
   let center = storedCenter(property)
   if (!center) {
     const address = [property.street_address, property.city, property.state_code, property.postal_code]
@@ -1204,7 +1188,7 @@ return async (req: Request): Promise<Response> => {
       stated_acres: property.stated_acres,
       center,
       boundary_geojson: property.boundary_geojson,
-      metadata: property.metadata ? metadata : property.metadata,
+      metadata: property.metadata,
       updated_at: property.updated_at,
     },
     analysis: {
