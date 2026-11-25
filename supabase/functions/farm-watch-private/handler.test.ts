@@ -3,15 +3,18 @@ import { resolveFarmWatchExternalSourceIdentities } from '../_shared/farm-watch-
 function assert(value: unknown, message = 'assertion failed'): asserts value {
   if (!value) throw new Error(message)
 }
+const silhouette = { type: 'MultiPolygon', coordinates: [[[[0,0], [.001,0], [.001,.001], [0,0]]]] }
 const boundary = { type: 'Polygon', coordinates: [[[0,0], [.001,0], [.001,.001], [0,.001], [0,0]]] }
-function fixture(options: { allowed?: boolean; role?: string; property?: any; fail?: string; old?: boolean; oldDeep?: boolean; partialDeep?: boolean; hunting?: boolean; staleHunting?: boolean } = {}) {
+function fixture(options: { allowed?: boolean; role?: string; property?: any; fail?: string; old?: boolean; oldDeep?: boolean; partialDeep?: boolean; hunting?: boolean; staleHunting?: boolean; invalidCanopy?: boolean } = {}) {
   const calls: { name: string; args: any }[] = []
   const now = new Date().toISOString()
   const at = options.old ? '2000-01-01T00:00:00Z' : now
   let observations = 0
   const property = { id: 'private-property-id', slug: 'validation-property-01', display_name: 'Private fixture',
     center_geojson: { coordinates: [0,0] }, boundary_geojson: boundary, state_code: 'KY',
-    metadata: { selected_parcel_id: 'private-parcel', other: 'x'.repeat(50000) } }
+    metadata: { selected_parcel_id: 'private-parcel', other: 'x'.repeat(50000),
+      estimated_canopy: { version: 1, silhouette: options.invalidCanopy ? { ...silhouette, coordinates: [[[]]] } : silhouette,
+        footprint: 'review-only' } } }
   const values: Record<string, any> = {
     farm_watch_authorize_user_v1_internal: options.allowed !== false,
     farm_watch_get_account_role_v1_internal: options.role || 'viewer',
@@ -110,8 +113,20 @@ Deno.test('map references never read analytical resources or refresh', async () 
   assert(response.status === 200)
   const body = await response.json()
   assert(body.analysis.access_features_status === 'available')
+  assert(JSON.stringify(body.analysis.estimated_canopy) === JSON.stringify({ version: 1, silhouette }))
   assert(f.calls.length === 5 && f.observed() === 0)
   assert(!f.calls.some(c => /refresh|soils|hydrology|landscape|evidence/.test(c.name)))
+})
+Deno.test('estimated canopy follows private map authorization', async () => {
+  for (const options of [{ allowed: false }, { role: 'unknown' }, { property: null }]) {
+    const response = await fixture(options).request('map')
+    assert(response.status === 404)
+    assert(!JSON.stringify(await response.json()).includes('estimated_canopy'))
+  }
+  const invalid = await (await fixture({ invalidCanopy: true }).request('map')).json()
+  assert(invalid.analysis.estimated_canopy === null)
+  const full = await (await fixture().request('full')).json()
+  assert(!Object.hasOwn(full.property.metadata, 'estimated_canopy'))
 })
 Deno.test('expired physical context remains stale, with no map features or synchronous maintenance', async () => {
   const f = fixture({ old: true })
